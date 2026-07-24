@@ -16,6 +16,7 @@ import {
   useState,
 } from "react";
 import { useActivityTracking } from "./hooks/use-activity-tracking";
+import { EdwardAssistant } from "./components/edward-assistant";
 import {
   acceptAdmissionOffer,
   ApiClientError,
@@ -610,6 +611,7 @@ function Dashboard({
           <Link href="/help">Terms</Link>
         </nav>
       </footer>
+      <EdwardAssistant studentName={student.preferredName} />
     </div>
   );
 }

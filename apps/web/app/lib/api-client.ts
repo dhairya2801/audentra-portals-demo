@@ -1,8 +1,11 @@
 import type {
   AcceptOfferResponse,
   ActivityEventInput,
+  AskEdwardInput,
+  AskEdwardResponse,
   ApiErrorResponse,
   CompleteStudentOnboardingInput,
+  ConfirmStudentDocumentExtractionInput,
   CreateDepositPaymentInput,
   CreateStudentAppointmentInput,
   CreateStudentDocumentInput,
@@ -202,6 +205,52 @@ export function createStudentDocument(
       "Content-Type": "application/json",
       "Idempotency-Key": idempotencyKey,
     },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function uploadStudentDocument(
+  file: File,
+  category: StudentDocument["category"],
+  idempotencyKey: string,
+) {
+  const form = new FormData();
+  form.set("file", file);
+  form.set("category", category);
+  return request<StudentDocument>("/v1/student/documents/upload", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: form,
+  });
+}
+
+export function confirmStudentDocumentExtraction(
+  documentId: string,
+  input: ConfirmStudentDocumentExtractionInput,
+  idempotencyKey: string,
+) {
+  return request<StudentDocument>(
+    `/v1/student/documents/${encodeURIComponent(documentId)}/confirm-extraction`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function getStudentDocumentContentUrl(document: StudentDocument) {
+  if (!document.contentUrl) return null;
+  return `${API_BASE_URL}${document.contentUrl}`;
+}
+
+export function askEdward(input: AskEdwardInput) {
+  return request<AskEdwardResponse>("/v1/student/assistant/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
 }

@@ -159,6 +159,23 @@ test("typed client wires every resource route and mutation contract", async () =
       },
       "document-12345678",
     );
+    await client.uploadStudentDocument(
+      new File(["document"], "transcript.pdf", {
+        type: "application/pdf",
+      }),
+      "transcript",
+      "document-upload-12345678",
+    );
+    await client.confirmStudentDocumentExtraction(
+      "document/1",
+      { acceptedFieldKeys: ["student_name"] },
+      "document-confirm-12345678",
+    );
+    await client.askEdward({
+      message: "What should I do next?",
+      pageContext: "/dashboard",
+      history: [],
+    });
     await client.getStudentAppointments();
     await client.createStudentAppointment(
       {
@@ -212,6 +229,9 @@ test("typed client wires every resource route and mutation contract", async () =
     "/v1/student/messages",
     "/v1/student/messages/message%2F1/read",
     "/v1/student/documents",
+    "/v1/student/documents/upload",
+    "/v1/student/documents/document%2F1/confirm-extraction",
+    "/v1/student/assistant/messages",
     "/v1/student/appointments",
     "/v1/student/payments",
     "/v1/student/payments/deposit",
@@ -247,6 +267,22 @@ test("typed client wires every resource route and mutation contract", async () =
   assert.equal(
     requestByPath.get("/v1/student/documents").init.headers["Idempotency-Key"],
     "document-12345678",
+  );
+  assert.equal(
+    requestByPath.get("/v1/student/documents/upload").init.headers[
+      "Idempotency-Key"
+    ],
+    "document-upload-12345678",
+  );
+  assert.ok(
+    requestByPath.get("/v1/student/documents/upload").init.body instanceof
+      FormData,
+  );
+  assert.equal(
+    requestByPath.get(
+      "/v1/student/documents/document%2F1/confirm-extraction",
+    ).init.headers["Idempotency-Key"],
+    "document-confirm-12345678",
   );
   assert.equal(
     requestByPath.get("/v1/student/appointments").init.headers[

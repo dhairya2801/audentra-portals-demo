@@ -6,6 +6,7 @@ import { getStudentBootstrap } from "../lib/api-client";
 import { useApiResource } from "../hooks/use-api-resource";
 import { PortalMark } from "./portal-ui";
 import { ErrorState, LoadingState } from "./portal-ui";
+import { EdwardAssistant } from "./edward-assistant";
 
 type PortalSection =
   | "dashboard"
@@ -228,6 +229,7 @@ export function PortalShell({
           <Link href="/help">Student support</Link>
         </nav>
       </footer>
+      <EdwardAssistant studentName={identity.data.student.preferredName} />
     </div>
   );
 }

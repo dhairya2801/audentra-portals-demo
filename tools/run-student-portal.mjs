@@ -1,4 +1,9 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+
+if (existsSync(".env")) {
+  process.loadEnvFile(".env");
+}
 
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const children = [];
