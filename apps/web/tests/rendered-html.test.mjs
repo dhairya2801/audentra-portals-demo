@@ -82,11 +82,15 @@ test("removes the disposable starter preview", async () => {
 });
 
 test("connects business actions and non-blocking tracking to the API", async () => {
-  const [client, dashboard, tracking] = await Promise.all([
+  const [client, dashboard, tracking, edward] = await Promise.all([
     readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/student-dashboard.tsx", import.meta.url), "utf8"),
     readFile(
       new URL("../app/hooks/use-activity-tracking.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/components/edward-assistant.tsx", import.meta.url),
       "utf8",
     ),
   ]);
@@ -95,9 +99,12 @@ test("connects business actions and non-blocking tracking to the API", async () 
   assert.match(client, /http:\/\/localhost:4000/);
   assert.match(client, /Idempotency-Key/);
   assert.match(client, /\/v1\/activity-events\/batch/);
-  assert.match(dashboard, /acceptAdmissionOffer/);
-  assert.match(dashboard, /role="dialog"/);
-  assert.match(dashboard, /role="status"/);
+  assert.match(dashboard, /getStudentFinancials/);
+  assert.match(dashboard, /getStudentAcademics/);
+  assert.match(dashboard, /getCampusLife/);
+  assert.match(edward, /createDepositPayment/);
+  assert.match(edward, /"dialog" : "region"/);
+  assert.match(edward, /role="status"/);
   assert.match(tracking, /propertyAllowlist/);
   assert.match(tracking, /MAX_BATCH_SIZE/);
   assert.match(tracking, /catch \{/);
@@ -135,6 +142,14 @@ test("typed client wires every resource route and mutation contract", async () =
   try {
     await client.getStudentBootstrap();
     await client.getStudentDashboard();
+    await client.getStudentAcademics();
+    await client.searchCatalogCourses("calculus");
+    await client.getStudentFinancials();
+    await client.selectFinancialPaymentPlan(
+      "42000000-0000-7000-8000-000000000101",
+      "payment-plan-12345678",
+    );
+    await client.getCampusLife();
     await client.getStudentOnboarding();
     await client.updateStudentOnboarding({
       expectedVersion: 1,
@@ -222,6 +237,11 @@ test("typed client wires every resource route and mutation contract", async () =
   const expectedPaths = [
     "/v1/student/bootstrap",
     "/v1/student/dashboard",
+    "/v1/student/academics",
+    "/v1/catalog/courses",
+    "/v1/student/financials",
+    "/v1/student/financials/payment-plan",
+    "/v1/student/campus-life",
     "/v1/student/onboarding",
     "/v1/student/onboarding/complete",
     "/v1/student/requirements",

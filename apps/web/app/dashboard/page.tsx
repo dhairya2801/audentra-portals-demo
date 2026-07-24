@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { StudentRouteGuard } from "../components/student-route-guard";
 import { StudentDashboardPage } from "../student-dashboard";
 
 export const metadata: Metadata = {
@@ -8,9 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function DashboardPage() {
-  return (
-    <StudentRouteGuard>
-      <StudentDashboardPage />
-    </StudentRouteGuard>
-  );
+  return <StudentDashboardPage />;
 }

@@ -17,6 +17,30 @@ const propertyAllowlist: Record<ActivityEventName, readonly string[]> = {
   "ui.admission_decision_started.v1": ["decision", "entry_point"],
   "ui.enrollment_started.v1": ["entry_point"],
   "ui.enrollment_step_viewed.v1": ["step_code", "entry_point"],
+  "ui.portal_section_viewed.v1": ["section", "entry_point"],
+  "ui.enrollment_task_viewed.v1": [
+    "task_code",
+    "task_status",
+    "entry_point",
+  ],
+  "ui.enrollment_task_abandoned.v1": [
+    "task_code",
+    "task_status",
+    "duration_bucket",
+    "last_interaction",
+  ],
+  "ui.financial_aid_viewed.v1": ["surface", "aid_status"],
+  "ui.course_catalog_searched.v1": [
+    "query_length_bucket",
+    "result_count",
+  ],
+  "ui.course_viewed.v1": ["course_code", "surface"],
+  "ui.exemption_reviewed.v1": ["rule_code", "recommendation_status"],
+  "ui.campus_event_viewed.v1": ["event_id", "surface"],
+  "ui.club_viewed.v1": ["club_id", "surface"],
+  "ui.edward_tool_invoked.v1": ["tool_name", "page_context"],
+  "ui.edward_action_widget_viewed.v1": ["widget_type", "page_context"],
+  "ui.edward_action_completed.v1": ["widget_type", "outcome"],
   "ui.help_opened.v1": ["context"],
 };
 
@@ -132,4 +156,12 @@ export function useActivityTracking() {
   );
 
   return { track };
+}
+
+export function durationBucket(milliseconds: number) {
+  if (milliseconds < 10_000) return "under_10s";
+  if (milliseconds < 30_000) return "10s_to_30s";
+  if (milliseconds < 120_000) return "30s_to_2m";
+  if (milliseconds < 600_000) return "2m_to_10m";
+  return "over_10m";
 }

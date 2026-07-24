@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     template: "%s | Aster University",
   },
   description:
-    "Review your Aster University offer and complete your enrollment requirements.",
+    "Manage enrollment, financial aid, academics, campus life, and student support from one connected Aster University portal.",
   applicationName: "Aster University Student Portal",
   icons: {
     icon: [{ url: "/icon.png", type: "image/png", sizes: "512x512" }],
@@ -20,9 +20,9 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "Aster University Student Portal",
-    title: "Your enrollment starts here | Aster University",
+    title: "Your connected student life | Aster University",
     description:
-      "Review your admission offer and complete your enrollment requirements.",
+      "Enrollment, financials, classrooms, campus life, and Edward AI in one student portal.",
     images: [
       {
         url: "/og.png",
@@ -34,9 +34,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Your enrollment starts here | Aster University",
+    title: "Your connected student life | Aster University",
     description:
-      "Review your admission offer and complete your enrollment requirements.",
+      "Enrollment, financials, classrooms, campus life, and Edward AI in one student portal.",
     images: ["/og.png"],
   },
 };

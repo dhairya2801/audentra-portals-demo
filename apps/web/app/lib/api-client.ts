@@ -3,6 +3,8 @@ import type {
   ActivityEventInput,
   AskEdwardInput,
   AskEdwardResponse,
+  CampusLifeFeed,
+  CatalogCourse,
   ApiErrorResponse,
   CompleteStudentOnboardingInput,
   ConfirmStudentDocumentExtractionInput,
@@ -11,11 +13,13 @@ import type {
   CreateStudentDocumentInput,
   StudentAppointment,
   StudentAppointmentList,
+  StudentAcademics,
   StudentBootstrap,
   StudentDashboard,
   StudentDocument,
   StudentDocumentList,
   StudentHelp,
+  StudentFinancials,
   StudentMessage,
   StudentMessageList,
   StudentOnboarding,
@@ -126,6 +130,55 @@ export function signOutDemoStudent() {
 
 export function getStudentDashboard(signal?: AbortSignal) {
   return request<StudentDashboard>("/v1/student/dashboard", {
+    method: "GET",
+    signal,
+  });
+}
+
+export function getStudentAcademics(signal?: AbortSignal) {
+  return request<StudentAcademics>("/v1/student/academics", {
+    method: "GET",
+    signal,
+  });
+}
+
+export function searchCatalogCourses(query = "", signal?: AbortSignal) {
+  return request<{
+    items: CatalogCourse[];
+    total: number;
+    catalogVersion: string;
+  }>(`/v1/catalog/courses?query=${encodeURIComponent(query)}`, {
+    method: "GET",
+    signal,
+  });
+}
+
+export function getStudentFinancials(signal?: AbortSignal) {
+  return request<StudentFinancials>("/v1/student/financials", {
+    method: "GET",
+    signal,
+  });
+}
+
+export function selectFinancialPaymentPlan(
+  planId: string,
+  idempotencyKey: string,
+) {
+  return request<{ planId: string; status: "enrolled" }>(
+    "/v1/student/financials/payment-plan",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify({ planId }),
+    },
+  );
+}
+
+export function getCampusLife(signal?: AbortSignal) {
+  return request<CampusLifeFeed>("/v1/student/campus-life", {
     method: "GET",
     signal,
   });

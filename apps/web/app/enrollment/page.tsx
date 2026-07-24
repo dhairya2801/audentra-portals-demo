@@ -2,7 +2,7 @@
 
 import type { StudentRequirementDetail } from "@vv/contracts";
 import Link from "next/link";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { PortalShell } from "../components/portal-shell";
 import {
   EmptyState,
@@ -12,9 +12,19 @@ import {
   StatusPill,
 } from "../components/portal-ui";
 import { useApiResource } from "../hooks/use-api-resource";
+import {
+  durationBucket,
+  useActivityTracking,
+} from "../hooks/use-activity-tracking";
 import { getStudentRequirements } from "../lib/api-client";
 
-function RequirementItem({ item }: { item: StudentRequirementDetail }) {
+function RequirementItem({
+  item,
+  onView,
+}: {
+  item: StudentRequirementDetail;
+  onView: (item: StudentRequirementDetail) => void;
+}) {
   return (
     <li className="resource-list__item">
       <div className="resource-list__symbol" aria-hidden="true">
@@ -45,6 +55,7 @@ function RequirementItem({ item }: { item: StudentRequirementDetail }) {
       <Link
         className="button button--secondary resource-list__action"
         href={`/enrollment/requirements/${encodeURIComponent(item.id)}`}
+        onClick={() => onView(item)}
       >
         View
       </Link>
@@ -58,6 +69,34 @@ export default function EnrollmentPage() {
     [],
   );
   const requirements = useApiResource(loadRequirements);
+  const { track } = useActivityTracking();
+  const viewedAt = useRef(0);
+  const lastTask = useRef<StudentRequirementDetail | null>(null);
+
+  useEffect(() => {
+    track("ui.enrollment_started.v1", { entry_point: "portal_navigation" });
+    const onHidden = () => {
+      if (document.visibilityState !== "hidden" || !lastTask.current) return;
+      track("ui.enrollment_task_abandoned.v1", {
+        task_code: lastTask.current.code,
+        task_status: lastTask.current.status,
+        duration_bucket: durationBucket(Date.now() - viewedAt.current),
+        last_interaction: "checklist_view",
+      });
+    };
+    document.addEventListener("visibilitychange", onHidden);
+    return () => document.removeEventListener("visibilitychange", onHidden);
+  }, [track]);
+
+  const viewTask = (item: StudentRequirementDetail) => {
+    lastTask.current = item;
+    viewedAt.current = Date.now();
+    track("ui.enrollment_task_viewed.v1", {
+      task_code: item.code,
+      task_status: item.status,
+      entry_point: "enrollment_checklist",
+    });
+  };
 
   return (
     <PortalShell
@@ -88,7 +127,7 @@ export default function EnrollmentPage() {
           >
             <ul className="resource-list">
               {requirements.data.items.map((item) => (
-                <RequirementItem item={item} key={item.id} />
+                <RequirementItem item={item} onView={viewTask} key={item.id} />
               ))}
             </ul>
           </PageCard>

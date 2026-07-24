@@ -1,24 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect } from "react";
-import { getStudentBootstrap } from "../lib/api-client";
+import { useCallback, useEffect, useState } from "react";
+import { useActivityTracking } from "../hooks/use-activity-tracking";
 import { useApiResource } from "../hooks/use-api-resource";
-import { PortalMark } from "./portal-ui";
-import { ErrorState, LoadingState } from "./portal-ui";
+import { getStudentBootstrap } from "../lib/api-client";
 import { EdwardAssistant } from "./edward-assistant";
+import { ErrorState, LoadingState, PortalMark } from "./portal-ui";
 
-type PortalSection =
+export type PortalSection =
   | "dashboard"
   | "enrollment"
+  | "financials"
+  | "classrooms"
+  | "campus_life"
+  | "edward"
+  | "profile"
   | "documents"
   | "messages"
   | "appointments"
   | "payments"
-  | "profile"
   | "help";
 
-const primaryNavigation: {
+const navigation: {
   key: PortalSection;
   label: string;
   shortLabel: string;
@@ -27,45 +31,53 @@ const primaryNavigation: {
 }[] = [
   {
     key: "dashboard",
-    label: "Overview",
+    label: "Dashboard",
     shortLabel: "Home",
     href: "/dashboard",
     symbol: "⌂",
   },
   {
     key: "enrollment",
-    label: "Enrollment",
+    label: "My Enrollment",
     shortLabel: "Enroll",
     href: "/enrollment",
     symbol: "✓",
   },
   {
-    key: "documents",
-    label: "Documents",
-    shortLabel: "Docs",
-    href: "/documents",
-    symbol: "□",
+    key: "financials",
+    label: "My Financials",
+    shortLabel: "Finance",
+    href: "/financials",
+    symbol: "$",
   },
   {
-    key: "messages",
-    label: "Messages",
-    shortLabel: "Inbox",
-    href: "/messages",
-    symbol: "✉",
+    key: "classrooms",
+    label: "My Classrooms",
+    shortLabel: "Classes",
+    href: "/classrooms",
+    symbol: "▤",
   },
   {
-    key: "help",
-    label: "Help",
-    shortLabel: "Help",
-    href: "/help",
-    symbol: "?",
+    key: "campus_life",
+    label: "My Campus Life",
+    shortLabel: "Campus",
+    href: "/campus-life",
+    symbol: "◉",
   },
-];
-
-const utilityNavigation: { key: PortalSection; label: string; href: string }[] = [
-  { key: "appointments", label: "Appointments", href: "/appointments" },
-  { key: "payments", label: "Payments", href: "/payments" },
-  { key: "profile", label: "Profile", href: "/profile" },
+  {
+    key: "edward",
+    label: "Edward AI",
+    shortLabel: "Edward",
+    href: "/edward",
+    symbol: "✦",
+  },
+  {
+    key: "profile",
+    label: "Profile",
+    shortLabel: "Profile",
+    href: "/profile",
+    symbol: "○",
+  },
 ];
 
 function initials(fullName: string) {
@@ -92,6 +104,8 @@ export function PortalShell({
   actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { track } = useActivityTracking();
   const loadBootstrap = useCallback(
     (signal: AbortSignal) => getStudentBootstrap(signal),
     [],
@@ -112,6 +126,13 @@ export function PortalShell({
     }
   }, [needsOnboarding, needsSignIn]);
 
+  useEffect(() => {
+    track("ui.portal_section_viewed.v1", {
+      section: active,
+      entry_point: "portal_navigation",
+    });
+  }, [active, track]);
+
   if (identity.status === "loading" || needsSignIn || needsOnboarding) {
     return (
       <main className="load-state">
@@ -129,89 +150,116 @@ export function PortalShell({
   }
 
   return (
-    <div className="portal-shell portal-shell--resource">
+    <div className="aster-shell">
       <a className="skip-link" href="#main-content">
         Skip to main content
       </a>
-      <header className="site-header resource-header">
-        <div className="header-inner resource-header__inner">
-          <Link
-            className="brand"
-            href="/dashboard"
-            aria-label="Aster University portal home"
-          >
-            <PortalMark />
-            <span>
-              <strong>Aster</strong>
-              <small>University</small>
-            </span>
+
+      <header className="aster-topbar">
+        <button
+          className="aster-menu-button"
+          type="button"
+          aria-label={menuOpen ? "Close portal menu" : "Open portal menu"}
+          aria-expanded={menuOpen}
+          aria-controls="portal-navigation"
+          onClick={() => setMenuOpen((current) => !current)}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+        <Link
+          className="aster-brand"
+          href="/dashboard"
+          aria-label="Aster University student portal"
+        >
+          <PortalMark />
+          <span>
+            <strong>Aster</strong>
+            <small>University</small>
+          </span>
+        </Link>
+        <div className="aster-topbar__right">
+          <Link className="aster-help-link" href="/help">
+            Student support
           </Link>
-          <nav className="primary-nav resource-primary-nav" aria-label="Student portal">
-            {primaryNavigation.slice(0, 4).map((item) => (
-              <Link
-                className={active === item.key ? "primary-nav__active" : undefined}
-                href={item.href}
-                aria-current={active === item.key ? "page" : undefined}
-                key={item.key}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="header-utilities">
-            <nav aria-label="Student services">
-              {utilityNavigation.map((item) => (
-                <Link
-                  className={active === item.key ? "utility-link--active" : undefined}
-                  href={item.href}
-                  aria-current={active === item.key ? "page" : undefined}
-                  key={item.key}
-                >
-                  {item.label}
-                </Link>
-              ))}
-              <Link
-                className={active === "help" ? "utility-link--active" : undefined}
-                href="/help"
-                aria-current={active === "help" ? "page" : undefined}
-              >
-                Help
-              </Link>
-            </nav>
-            <Link
-              className="student-menu"
-              href="/profile"
-              aria-label={
-                `Open profile for ${identity.data.student.fullName}`
-              }
-            >
-              <span className="student-avatar" aria-hidden="true">
-                {initials(identity.data.student.fullName)}
-              </span>
-              <span className="student-menu__name">
-                {identity.data.student.preferredName}
-              </span>
-            </Link>
-          </div>
+          <Link
+            className="aster-student"
+            href="/profile"
+            aria-label={`Open profile for ${identity.data.student.fullName}`}
+          >
+            <span aria-hidden="true">
+              {initials(identity.data.student.fullName)}
+            </span>
+            <div>
+              <strong>{identity.data.student.preferredName}</strong>
+              <small>Student</small>
+            </div>
+          </Link>
         </div>
       </header>
 
-      <main id="main-content" className="resource-main">
-        <header className="resource-title">
+      {menuOpen ? (
+        <button
+          className="aster-nav-backdrop"
+          type="button"
+          aria-label="Close portal menu"
+          onClick={() => setMenuOpen(false)}
+        />
+      ) : null}
+
+      <aside
+        id="portal-navigation"
+        className={`aster-sidebar${menuOpen ? " aster-sidebar--open" : ""}`}
+      >
+        <p className="aster-sidebar__label">Student portal</p>
+        <nav aria-label="Student portal sections">
+          {navigation.map((item) => (
+            <Link
+              className={active === item.key ? "aster-nav-link--active" : undefined}
+              href={item.href}
+              aria-current={active === item.key ? "page" : undefined}
+              onClick={() => setMenuOpen(false)}
+              key={item.key}
+            >
+              <span aria-hidden="true">{item.symbol}</span>
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+        <div className="aster-sidebar__support">
+          <span aria-hidden="true">?</span>
+          <div>
+            <strong>Need a real person?</strong>
+            <p>Enrollment and financial-aid advisors are available weekdays.</p>
+            <Link href="/appointments">Book support</Link>
+          </div>
+        </div>
+      </aside>
+
+      <main id="main-content" className="aster-main">
+        <header className="aster-page-heading">
           <div>
             <p className="eyebrow">{eyebrow}</p>
             <h1>{title}</h1>
             <p>{description}</p>
           </div>
-          {actions ? <div className="resource-title__actions">{actions}</div> : null}
+          {actions ? <div className="aster-page-actions">{actions}</div> : null}
         </header>
         {children}
+        <footer className="aster-footer">
+          <p>© {new Date().getFullYear()} Aster University</p>
+          <nav aria-label="Portal policies">
+            <Link href="/help">Privacy & accessibility</Link>
+            <Link href="/help">Student support</Link>
+          </nav>
+        </footer>
       </main>
 
-      <nav className="mobile-nav" aria-label="Mobile student portal">
-        {primaryNavigation.map((item) => (
+      <nav className="aster-mobile-nav" aria-label="Mobile portal navigation">
+        {navigation.slice(0, 5).map((item) => (
           <Link
-            className={active === item.key ? "mobile-nav__active" : undefined}
+            className={active === item.key ? "aster-mobile-nav__active" : undefined}
             href={item.href}
             aria-current={active === item.key ? "page" : undefined}
             key={item.key}
@@ -222,14 +270,12 @@ export function PortalShell({
         ))}
       </nav>
 
-      <footer className="site-footer resource-footer">
-        <p>© {new Date().getFullYear()} Aster University</p>
-        <nav aria-label="Portal policies">
-          <Link href="/help">Privacy & accessibility</Link>
-          <Link href="/help">Student support</Link>
-        </nav>
-      </footer>
-      <EdwardAssistant studentName={identity.data.student.preferredName} />
+      {active !== "edward" ? (
+        <EdwardAssistant
+          studentName={identity.data.student.preferredName}
+          variant="floating"
+        />
+      ) : null}
     </div>
   );
 }
