@@ -37,6 +37,16 @@ const allowedMimeTypes = new Set([
 
 const exampleDocuments = [
   {
+    title: "2026–27 FAFSA form",
+    office: "Federal Student Aid",
+    detail:
+      "Official paper Free Application for Federal Student Aid and filing instructions.",
+    file: "https://studentaid.gov/sites/default/files/2026-27-fafsa-form.pdf",
+    source:
+      "https://studentaid.gov/sites/default/files/2026-27-fafsa-form.pdf",
+    tag: "Financial aid",
+  },
+  {
     title: "Federal FERPA model consent",
     office: "U.S. Department of Education",
     detail: "Official model for disclosing education records in a higher-education program.",
