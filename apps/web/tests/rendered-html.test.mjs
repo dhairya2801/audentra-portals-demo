@@ -49,7 +49,7 @@ test("all student portal routes render and the dynamic requirement route resolve
     "/payments",
     "/profile",
     "/help",
-    "/enrollment/requirements/00000000-0000-7000-8000-000000000301",
+    "/enrollment/requirements/transcript-upload",
   ];
 
   for (const route of routes) {
@@ -118,6 +118,78 @@ test("connects business actions and non-blocking tracking to the API", async () 
   await access(new URL("../public/og.png", import.meta.url));
 });
 
+test("dashboard enrollment CTA advances, waits, and completes from requirement state", async () => {
+  const source = await readFile(
+    new URL("../app/lib/enrollment-dashboard-action.ts", import.meta.url),
+    "utf8",
+  );
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
+  const { selectDashboardEnrollmentAction } = await import(moduleUrl);
+  const requirement = (code, status, blocking = true) => ({
+    id: code,
+    code,
+    title: code.replaceAll("_", " "),
+    description: `${code} description`,
+    status,
+    blocking,
+    dueAt: null,
+    progressPercent: status === "completed" ? 100 : 0,
+  });
+  const journey = (requirements) => ({
+    id: "journey-1",
+    status: "in_progress",
+    completionPercent: 50,
+    nextAction: {
+      code: "legacy_next_action",
+      label: "Legacy next action",
+      href: "/legacy",
+    },
+    requirements,
+  });
+
+  const nextTask = selectDashboardEnrollmentAction(
+    journey([
+      requirement("identity_document", "under_review"),
+      requirement("official_transcript", "ready"),
+    ]),
+    (code) => `/requirements/${code}`,
+  );
+  assert.deepEqual(nextTask, {
+    kind: "task",
+    code: "official_transcript",
+    label: "official transcript",
+    href: "/requirements/official_transcript",
+  });
+
+  const waiting = selectDashboardEnrollmentAction(
+    journey([
+      requirement("identity_document", "under_review"),
+      requirement("official_transcript", "blocked"),
+    ]),
+  );
+  assert.equal(waiting.kind, "waiting");
+  assert.equal(waiting.label, "Enrollment review in progress");
+
+  const completed = selectDashboardEnrollmentAction(
+    journey([
+      requirement("identity_document", "completed"),
+      requirement("official_transcript", "waived"),
+    ]),
+  );
+  assert.deepEqual(completed, {
+    kind: "complete",
+    code: "enrollment_complete",
+    label: "Enrollment complete",
+    href: "/enrollment",
+  });
+});
+
 test("typed client wires every resource route and mutation contract", async () => {
   const source = await readFile(
     new URL("../app/lib/api-client.ts", import.meta.url),
@@ -178,7 +250,10 @@ test("typed client wires every resource route and mutation contract", async () =
       new File(["document"], "transcript.pdf", {
         type: "application/pdf",
       }),
-      "transcript",
+      {
+        categoryHint: "transcript",
+        requirementId: "00000000-0000-7000-8000-000000000604",
+      },
       "document-upload-12345678",
     );
     await client.confirmStudentDocumentExtraction(
@@ -297,6 +372,18 @@ test("typed client wires every resource route and mutation contract", async () =
   assert.ok(
     requestByPath.get("/v1/student/documents/upload").init.body instanceof
       FormData,
+  );
+  assert.equal(
+    requestByPath
+      .get("/v1/student/documents/upload")
+      .init.body.get("category"),
+    "transcript",
+  );
+  assert.equal(
+    requestByPath
+      .get("/v1/student/documents/upload")
+      .init.body.get("requirementId"),
+    "00000000-0000-7000-8000-000000000604",
   );
   assert.equal(
     requestByPath.get(

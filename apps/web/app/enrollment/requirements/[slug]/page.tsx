@@ -1,8 +1,10 @@
 "use client";
 
+import type { StudentDocument } from "@vv/contracts";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
+import { DocumentUpload } from "../../../components/document-upload";
 import { PortalShell } from "../../../components/portal-shell";
 import {
   ErrorState,
@@ -15,17 +17,18 @@ import { getStudentRequirement } from "../../../lib/api-client";
 
 const actionByType = {
   form: { label: "Update your profile", href: "/profile" },
-  document: { label: "Go to documents", href: "/documents" },
   payment: { label: "Go to payments", href: "/payments" },
   none: { label: "Ask for help", href: "/help" },
 } as const;
 
 export default function RequirementDetailPage() {
-  const params = useParams<{ id: string | string[] }>();
-  const id = Array.isArray(params.id) ? params.id[0] : params.id;
+  const params = useParams<{ slug: string | string[] }>();
+  const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
+  const [uploadedDocument, setUploadedDocument] =
+    useState<StudentDocument | null>(null);
   const loadRequirement = useCallback(
-    (signal: AbortSignal) => getStudentRequirement(id, signal),
-    [id],
+    (signal: AbortSignal) => getStudentRequirement(slug, signal),
+    [slug],
   );
   const requirement = useApiResource(loadRequirement);
 
@@ -100,13 +103,73 @@ export default function RequirementDetailPage() {
               >
                 <span style={{ width: `${requirement.data.progressPercent}%` }} />
               </div>
-              <Link
-                className="button button--primary"
-                href={actionByType[requirement.data.submissionType].href}
-              >
-                {actionByType[requirement.data.submissionType].label}
-                <span aria-hidden="true">→</span>
-              </Link>
+              {requirement.data.submissionType === "document" ? (
+                <div className="requirement-upload">
+                  <div className="requirement-upload__heading">
+                    <p className="eyebrow">Complete this requirement here</p>
+                    <h2>No separate upload page needed</h2>
+                    <p>
+                      Select the file. Edward will identify what it contains,
+                      extract structured information, and attach it to this
+                      enrollment requirement.
+                    </p>
+                  </div>
+                  <DocumentUpload
+                    requirementId={requirement.data.id}
+                    categoryHint={requirement.data.documentCategory ?? undefined}
+                    expectedLabel={requirement.data.title
+                      .replace(/^Submit your /i, "")
+                      .replace(/^Provide /i, "")}
+                    onUploaded={(document) => {
+                      setUploadedDocument(document);
+                      requirement.refresh();
+                    }}
+                  />
+                  {uploadedDocument?.extraction ? (
+                    <div className="requirement-upload__result" role="status">
+                      <span aria-hidden="true">✓</span>
+                      <div>
+                        <strong>
+                          {uploadedDocument.extraction.status === "completed"
+                            ? `Identified as ${uploadedDocument.extraction.documentType.replaceAll(
+                                "_",
+                                " ",
+                              )}`
+                            : uploadedDocument.extraction.status ===
+                                "pending_configuration"
+                              ? "Document stored; parsing is not configured"
+                              : uploadedDocument.extraction.status === "failed"
+                                ? "Document stored; parsing needs attention"
+                                : "Document parsing is in progress"}
+                        </strong>
+                        <p>{uploadedDocument.extraction.summary}</p>
+                        {uploadedDocument.extraction.warnings.length ? (
+                          <ul>
+                            {uploadedDocument.extraction.warnings.map(
+                              (warning) => (
+                                <li key={warning}>{warning}</li>
+                              ),
+                            )}
+                          </ul>
+                        ) : null}
+                        <Link href="/documents">
+                          Review extracted fields <span aria-hidden="true">→</span>
+                        </Link>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <Link
+                  className="button button--primary"
+                  href={
+                    actionByType[requirement.data.submissionType].href
+                  }
+                >
+                  {actionByType[requirement.data.submissionType].label}
+                  <span aria-hidden="true">→</span>
+                </Link>
+              )}
             </div>
           </PageCard>
           <aside className="resource-aside">

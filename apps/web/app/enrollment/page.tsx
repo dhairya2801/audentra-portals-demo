@@ -54,7 +54,7 @@ function RequirementItem({
       </div>
       <Link
         className="button button--secondary resource-list__action"
-        href={`/enrollment/requirements/${encodeURIComponent(item.id)}`}
+        href={`/enrollment/requirements/${encodeURIComponent(item.slug)}`}
         onClick={() => onView(item)}
       >
         View

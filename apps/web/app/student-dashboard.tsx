@@ -1,6 +1,9 @@
 "use client";
 
-import type { StudentRequirementSummary } from "@vv/contracts";
+import {
+  studentRequirementSlug,
+  type StudentRequirementSummary,
+} from "@vv/contracts";
 import Link from "next/link";
 import { useCallback, useEffect } from "react";
 import { PortalShell } from "./components/portal-shell";
@@ -13,6 +16,10 @@ import {
   getStudentDashboard,
   getStudentFinancials,
 } from "./lib/api-client";
+import {
+  prioritizeDashboardRequirements,
+  selectDashboardEnrollmentAction,
+} from "./lib/enrollment-dashboard-action";
 
 function money(cents: number) {
   return new Intl.NumberFormat("en-US", {
@@ -76,12 +83,16 @@ export function StudentDashboardPage() {
   }
 
   const { dashboard, financials, academics, campus } = resource.data;
-  const pendingRequirements = dashboard.journey.requirements
-    .filter(
-      (item) =>
-        !["completed", "waived", "not_applicable"].includes(item.status),
-    )
-    .slice(0, 3);
+  const pendingRequirements = prioritizeDashboardRequirements(
+    dashboard.journey.requirements,
+  ).slice(0, 3);
+  const enrollmentAction = selectDashboardEnrollmentAction(
+    dashboard.journey,
+    (code) =>
+      `/enrollment/requirements/${encodeURIComponent(
+        studentRequirementSlug(code),
+      )}`,
+  );
   const actionDocuments = financials.requiredDocuments.filter(
     (document) => document.status === "action_required",
   );
@@ -97,8 +108,21 @@ export function StudentDashboardPage() {
       title={`Welcome back, ${dashboard.student.preferredName} 👋`}
       description="Here’s what is moving forward—and what deserves your attention next."
       actions={
-        <Link className="button button--accent" href={dashboard.journey.nextAction.href}>
-          {dashboard.journey.nextAction.label}
+        <Link
+          className={`button ${
+            enrollmentAction.kind === "complete"
+              ? "button--complete"
+              : enrollmentAction.kind === "waiting"
+                ? "button--secondary"
+                : "button--accent"
+          }`}
+          data-enrollment-action-state={enrollmentAction.kind}
+          href={enrollmentAction.href}
+        >
+          {enrollmentAction.label}
+          {enrollmentAction.kind === "complete" ? (
+            <span aria-hidden="true">✓</span>
+          ) : null}
         </Link>
       }
     >
@@ -179,7 +203,9 @@ export function StudentDashboardPage() {
           {pendingRequirements.map((item, index) => (
             <Link
               className="aster-task-card"
-              href={`/enrollment/requirements/${encodeURIComponent(item.id)}`}
+              href={`/enrollment/requirements/${encodeURIComponent(
+                studentRequirementSlug(item.code),
+              )}`}
               key={item.id}
             >
               <span className="aster-task-number">{String(index + 1).padStart(2, "0")}</span>

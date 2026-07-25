@@ -264,12 +264,20 @@ export function createStudentDocument(
 
 export async function uploadStudentDocument(
   file: File,
-  category: StudentDocument["category"],
+  context: {
+    categoryHint?: StudentDocument["category"];
+    requirementId?: string;
+  },
   idempotencyKey: string,
 ) {
   const form = new FormData();
   form.set("file", file);
-  form.set("category", category);
+  if (context.categoryHint) {
+    form.set("category", context.categoryHint);
+  }
+  if (context.requirementId) {
+    form.set("requirementId", context.requirementId);
+  }
   return request<StudentDocument>("/v1/student/documents/upload", {
     method: "POST",
     headers: { "Idempotency-Key": idempotencyKey },

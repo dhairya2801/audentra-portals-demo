@@ -2,15 +2,10 @@
 
 import type {
   StudentDocument,
-  StudentDocumentCategory,
   StudentDocumentList,
 } from "@vv/contracts";
-import {
-  type FormEvent,
-  useCallback,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useRef, useState } from "react";
+import { DocumentUpload } from "../components/document-upload";
 import { PortalShell } from "../components/portal-shell";
 import {
   ActionFeedback,
@@ -25,15 +20,7 @@ import {
   confirmStudentDocumentExtraction,
   getStudentDocumentContentUrl,
   getStudentDocuments,
-  uploadStudentDocument,
 } from "../lib/api-client";
-
-const MAXIMUM_FILE_BYTES = 10 * 1024 * 1024;
-const allowedMimeTypes = new Set([
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-]);
 
 const exampleDocuments = [
   {
@@ -229,48 +216,6 @@ function DocumentWorkspace({
   list: StudentDocumentList;
   reload: () => void;
 }) {
-  const form = useRef<HTMLFormElement>(null);
-  const intentKey = useRef<string | null>(null);
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const uploadAction = useCallback(
-    (file: File, category: StudentDocumentCategory, key: string) =>
-      uploadStudentDocument(file, category, key),
-    [],
-  );
-  const upload = useApiAction(uploadAction);
-
-  const submitDocument = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setValidationError(null);
-    upload.reset();
-    const values = new FormData(event.currentTarget);
-    const file = values.get("file");
-    const category = values.get("category") as StudentDocumentCategory;
-
-    if (!(file instanceof File) || file.size === 0) {
-      setValidationError("Choose a PDF, JPEG, or PNG document.");
-      return;
-    }
-    if (!allowedMimeTypes.has(file.type)) {
-      setValidationError("This file type isn’t supported. Use PDF, JPEG, or PNG.");
-      return;
-    }
-    if (file.size > MAXIMUM_FILE_BYTES) {
-      setValidationError("The document must be no larger than 10 MB.");
-      return;
-    }
-
-    const key = intentKey.current ?? (intentKey.current = crypto.randomUUID());
-    try {
-      await upload.run(file, category, key);
-      intentKey.current = null;
-      form.current?.reset();
-      reload();
-    } catch {
-      // Retain the same key so a retry cannot create a duplicate.
-    }
-  };
-
   return (
     <>
       <section className="document-hero">
@@ -283,55 +228,7 @@ function DocumentWorkspace({
             overwrites verified profile information.
           </p>
         </div>
-        <form ref={form} className="document-dropzone" onSubmit={submitDocument}>
-          <label>
-            <span className="document-dropzone__icon" aria-hidden="true">
-              ↑
-            </span>
-            <strong>Choose a document</strong>
-            <small>PDF, JPEG, or PNG · maximum 10 MB</small>
-            <input
-              name="file"
-              type="file"
-              accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-              required
-            />
-          </label>
-          <select name="category" defaultValue="transcript" aria-label="Document category">
-            <option value="transcript">Academic transcript</option>
-            <option value="identity">Identity document</option>
-            <option value="residency">Residency evidence</option>
-            <option value="financial_aid">Financial aid</option>
-            <option value="health">Health or immunization</option>
-            <option value="consent">Consent or FERPA</option>
-            <option value="other">Other document</option>
-          </select>
-          {validationError ? (
-            <p className="field-error" role="alert">
-              {validationError}
-            </p>
-          ) : null}
-          <ActionFeedback
-            status={upload.status}
-            error={upload.message}
-            success="Document uploaded and processed."
-          />
-          <button
-            className="button button--accent"
-            type="submit"
-            disabled={upload.status === "loading"}
-          >
-            {upload.status === "loading"
-              ? "Uploading and extracting…"
-              : upload.status === "error"
-                ? "Retry upload"
-                : "Upload document"}
-          </button>
-          <p className="document-privacy">
-            <span aria-hidden="true">◆</span> Encrypted storage boundary ·
-            student review required
-          </p>
-        </form>
+        <DocumentUpload onUploaded={() => reload()} />
       </section>
 
       <div className="documents-layout">
@@ -358,7 +255,20 @@ function DocumentWorkspace({
                       <div>
                         <h3>{document.fileName}</h3>
                         <p>
-                          {document.category.replaceAll("_", " ")} ·{" "}
+                          {document.extraction?.status === "completed"
+                            ? `Detected ${document.extraction.documentType.replaceAll(
+                                "_",
+                                " ",
+                              )}`
+                            : document.category.replaceAll("_", " ")}
+                          {document.requirementId &&
+                          document.extraction?.status === "completed"
+                            ? ` · expected ${document.category.replaceAll(
+                                "_",
+                                " ",
+                              )}`
+                            : ""}{" "}
+                          ·{" "}
                           {formatFileSize(document.sizeBytes)}
                         </p>
                       </div>
