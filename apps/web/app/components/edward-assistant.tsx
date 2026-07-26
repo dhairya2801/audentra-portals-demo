@@ -4,6 +4,7 @@ import type {
   AskEdwardResponse,
   EdwardActionWidget,
   EdwardChatMessage,
+  EdwardContextReceipt,
 } from "@vv/contracts";
 import Link from "next/link";
 import {
@@ -29,8 +30,19 @@ type DisplayMessage = EdwardChatMessage & {
   id: string;
   actions?: AskEdwardResponse["suggestedActions"];
   provider?: AskEdwardResponse["provider"];
-  toolsUsed?: string[];
+  contextReceipts?: AskEdwardResponse["contextReceipts"];
   widgets?: EdwardActionWidget[];
+};
+
+const contextSourceLabels: Record<EdwardContextReceipt["source"], string> = {
+  dashboard: "Enrollment summary",
+  profile: "Profile",
+  documents: "Documents",
+  onboarding: "Onboarding",
+  payments: "Payments",
+  academics: "Academic plan",
+  financials: "Financial plan",
+  messages: "Messages",
 };
 
 function ActionWidget({
@@ -215,12 +227,13 @@ export function EdwardAssistant({
         pageContext: window.location.pathname,
         history,
       });
-      (response.toolsUsed ?? []).forEach((toolName) => {
-        track("ui.edward_tool_invoked.v1", {
-          tool_name: toolName,
+      const contextReceipts = response.contextReceipts ?? [];
+      if (contextReceipts.length > 0) {
+        track("ui.edward_context_receipts_received.v1", {
+          source_count: contextReceipts.length,
           page_context: window.location.pathname,
         });
-      });
+      }
       setMessages((current) => [
         ...current,
         {
@@ -229,7 +242,7 @@ export function EdwardAssistant({
           content: response.message,
           actions: response.suggestedActions,
           provider: response.provider,
-          toolsUsed: response.toolsUsed ?? [],
+          contextReceipts,
           widgets: response.widgets ?? [],
         },
       ]);
@@ -290,11 +303,17 @@ export function EdwardAssistant({
             key={message.id}
           >
             <p>{message.content}</p>
-            {message.toolsUsed?.length ? (
-              <div className="edward-tools" aria-label="Portal data checked">
-                {message.toolsUsed.map((tool) => (
-                  <span key={`${message.id}-${tool}`}>
-                    ✓ {tool.replaceAll("_", " ")}
+            {message.contextReceipts?.length ? (
+              <div
+                className="edward-context-receipts"
+                aria-label="Student record context used for this response"
+              >
+                <span className="edward-context-receipts__label">
+                  Record context
+                </span>
+                {message.contextReceipts.map(({ source }) => (
+                  <span key={`${message.id}-${source}`}>
+                    {contextSourceLabels[source]}
                   </span>
                 ))}
               </div>

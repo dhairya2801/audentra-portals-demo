@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 
 if (existsSync(".env")) {
   process.loadEnvFile(".env");
@@ -8,6 +9,11 @@ if (existsSync(".env")) {
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const children = [];
 let stopping = false;
+const workspaceRoot = process.cwd();
+const configuredUploadDirectory = process.env.DOCUMENT_UPLOAD_DIR?.trim();
+const absoluteUploadDirectory = configuredUploadDirectory
+  ? resolve(workspaceRoot, configuredUploadDirectory)
+  : undefined;
 
 function start(name, args, environment = {}) {
   const child = spawn(npmCommand, args, {
@@ -46,7 +52,12 @@ process.once("SIGTERM", () => stop(0));
 start(
   "demo API",
   ["--prefix", "tools/demo-api", "run", "start"],
-  { PORT: process.env.DEMO_API_PORT ?? "4000" },
+  {
+    PORT: process.env.DEMO_API_PORT ?? "4000",
+    ...(absoluteUploadDirectory
+      ? { DOCUMENT_UPLOAD_DIR: absoluteUploadDirectory }
+      : {}),
+  },
 );
 start(
   "student portal",

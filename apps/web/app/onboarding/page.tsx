@@ -39,6 +39,7 @@ const onboardingSteps: {
   label: string;
   title: string;
   subtitle: string;
+  skippable?: boolean;
 }[] = [
   {
     key: "offer",
@@ -57,12 +58,14 @@ const onboardingSteps: {
     label: "Housing",
     title: "One personalized story",
     subtitle: "Tell us where you imagine starting your Aster experience.",
+    skippable: true,
   },
   {
     key: "campus_life",
     label: "Campus life",
     title: "Clubs, people & support",
     subtitle: "Choose the communities and support you want to hear about.",
+    skippable: true,
   },
   {
     key: "emergency_contacts",
@@ -111,6 +114,18 @@ const supportNeedOptions = [
   ["wellbeing_support", "Wellbeing support"],
 ] as const;
 
+/**
+ * `skippedSteps` is server-managed progress metadata. It is returned with the
+ * onboarding resource so the UI can label optional steps, but must never be
+ * echoed back as editable step data. Keeping that boundary here prevents a
+ * later optional step from being rejected after an earlier one was skipped.
+ */
+function editableOnboardingData(data: StudentOnboardingData) {
+  const editableData = { ...data };
+  delete editableData.skippedSteps;
+  return editableData;
+}
+
 type OnboardingPageData = {
   onboarding: StudentOnboarding;
   dashboard: StudentDashboard;
@@ -128,9 +143,11 @@ function formatMoney(cents: number) {
 function OnboardingProgress({
   current,
   completed,
+  skipped,
 }: {
   current: OnboardingStep;
   completed: OnboardingStep[];
+  skipped: OnboardingStep[];
 }) {
   const currentIndex = onboardingSteps.findIndex((step) => step.key === current);
 
@@ -152,6 +169,7 @@ function OnboardingProgress({
         {onboardingSteps.map((step, index) => {
           const isComplete = completed.includes(step.key);
           const isCurrent = step.key === current;
+          const wasSkipped = skipped.includes(step.key);
           return (
             <li
               className={`${isComplete ? "onboarding-step--complete " : ""}${isCurrent ? "onboarding-step--current" : ""}`}
@@ -163,7 +181,9 @@ function OnboardingProgress({
                 <strong>{step.label}</strong>
                 <small>
                   {isComplete
-                    ? "Saved"
+                    ? wasSkipped
+                      ? "Skipped for now"
+                      : "Saved"
                     : isCurrent
                       ? "In progress"
                       : index > currentIndex
@@ -273,6 +293,52 @@ function StepFields({
     case "about_you":
       return (
         <>
+          <fieldset className="form-section">
+            <legend>Create your student profile</legend>
+            <div className="form-grid">
+              <label className="field">
+                <span>First name</span>
+                <input
+                  name="firstName"
+                  required
+                  maxLength={120}
+                  autoComplete="given-name"
+                  defaultValue={data.firstName ?? ""}
+                />
+              </label>
+              <label className="field">
+                <span>Last name</span>
+                <input
+                  name="lastName"
+                  required
+                  maxLength={120}
+                  autoComplete="family-name"
+                  defaultValue={data.lastName ?? ""}
+                />
+              </label>
+              <label className="field">
+                <span>Preferred name</span>
+                <input
+                  name="preferredName"
+                  required
+                  maxLength={120}
+                  autoComplete="nickname"
+                  defaultValue={data.preferredName ?? ""}
+                />
+              </label>
+              <label className="field">
+                <span>Mobile phone</span>
+                <input
+                  name="mobilePhone"
+                  type="tel"
+                  required
+                  maxLength={32}
+                  autoComplete="tel"
+                  defaultValue={data.mobilePhone ?? ""}
+                />
+              </label>
+            </div>
+          </fieldset>
           <fieldset className="form-section">
             <legend>Confirm your student record</legend>
             <label className="confirmation-check">
@@ -555,6 +621,10 @@ function dataFromForm(
     case "about_you":
       return {
         ...next,
+        firstName: String(values.get("firstName") ?? "").trim(),
+        lastName: String(values.get("lastName") ?? "").trim(),
+        preferredName: String(values.get("preferredName") ?? "").trim(),
+        mobilePhone: String(values.get("mobilePhone") ?? "").trim(),
         legalNameConfirmed: values.get("legalNameConfirmed") === "on",
         contactInformationConfirmed:
           values.get("contactInformationConfirmed") === "on",
@@ -662,10 +732,12 @@ function OnboardingFlow({
     event.preventDefault();
     setError(null);
     save.reset();
-    const nextData = dataFromForm(
-      onboarding.currentStep,
-      event.currentTarget,
-      onboarding.data,
+    const nextData = editableOnboardingData(
+      dataFromForm(
+        onboarding.currentStep,
+        event.currentTarget,
+        onboarding.data,
+      ),
     );
 
     if (
@@ -721,11 +793,29 @@ function OnboardingFlow({
     }
   };
 
+  const skipStep = async () => {
+    setError(null);
+    save.reset();
+    try {
+      const result = await save.run({
+        expectedVersion: onboarding.version,
+        currentStep: onboarding.currentStep,
+        data: editableOnboardingData(onboarding.data),
+        skip: true,
+      });
+      setOnboarding(result);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (caught) {
+      setError(getApiErrorMessage(caught));
+    }
+  };
+
   return (
     <div className="onboarding-shell">
       <OnboardingProgress
         current={onboarding.currentStep}
         completed={onboarding.completedSteps}
+        skipped={onboarding.data.skippedSteps ?? []}
       />
       <main className="onboarding-main">
         <header className="onboarding-mobile-header">
@@ -792,28 +882,40 @@ function OnboardingFlow({
                   <span aria-hidden="true">→</span>
                 </button>
               ) : (
-                <button
-                  className="button button--primary"
-                  type="submit"
-                  disabled={save.status === "loading"}
-                >
-                  {save.status === "loading"
-                    ? onboarding.currentStep === "offer" &&
-                      offer.status === "offered"
-                      ? "Accepting offer…"
-                      : onboarding.currentStep === "deposit" && !depositPaid
-                        ? "Processing deposit…"
-                      : "Saving step…"
-                    : save.status === "error"
-                      ? "Retry step"
-                      : onboarding.currentStep === "offer" &&
-                          offer.status === "offered"
-                        ? "Accept and continue"
+                <div className="onboarding-actions__controls">
+                  {step.skippable ? (
+                    <button
+                      className="text-button"
+                      type="button"
+                      disabled={save.status === "loading"}
+                      onClick={() => void skipStep()}
+                    >
+                      Skip for now
+                    </button>
+                  ) : null}
+                  <button
+                    className="button button--primary"
+                    type="submit"
+                    disabled={save.status === "loading"}
+                  >
+                    {save.status === "loading"
+                      ? onboarding.currentStep === "offer" &&
+                        offer.status === "offered"
+                        ? "Accepting offer…"
                         : onboarding.currentStep === "deposit" && !depositPaid
-                          ? `Pay ${formatMoney(offer.depositAmountCents)} and continue`
-                        : "Save and continue"}
-                  <span aria-hidden="true">→</span>
-                </button>
+                          ? "Processing deposit…"
+                        : "Saving step…"
+                      : save.status === "error"
+                        ? "Retry step"
+                        : onboarding.currentStep === "offer" &&
+                            offer.status === "offered"
+                          ? "Accept and continue"
+                          : onboarding.currentStep === "deposit" && !depositPaid
+                            ? `Pay ${formatMoney(offer.depositAmountCents)} and continue`
+                            : "Save and continue"}
+                    <span aria-hidden="true">→</span>
+                  </button>
+                </div>
               )}
             </div>
             {save.status === "error" || complete.status === "error" ? (

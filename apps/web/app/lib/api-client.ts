@@ -19,6 +19,7 @@ import type {
   StudentDocument,
   StudentDocumentList,
   StudentHelp,
+  StudentHousingPlan,
   StudentFinancials,
   StudentMessage,
   StudentMessageList,
@@ -29,6 +30,7 @@ import type {
   StudentRequirementDetail,
   StudentRequirementList,
   UpdateStudentOnboardingInput,
+  UpdateStudentHousingPlanInput,
   UpdateStudentProfileInput,
 } from "@vv/contracts";
 
@@ -62,6 +64,21 @@ export interface DemoAuthSession {
   student: {
     id: string;
     preferredName: string;
+  };
+  notice: string;
+}
+
+export interface CredentialAuthSession {
+  authenticated: true;
+  mode: "credentials";
+  actorType: "student";
+  student: {
+    id: string;
+    preferredName: string | null;
+    email: string;
+    phone: string;
+    emailVerified: boolean;
+    phoneVerified: boolean;
   };
   notice: string;
 }
@@ -115,6 +132,51 @@ export function getStudentBootstrap(signal?: AbortSignal) {
 
 export function signInDemoStudent() {
   return request<DemoAuthSession>("/v1/auth/demo/sign-in", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+}
+
+export function signUpStudent(input: {
+  email: string;
+  phone: string;
+  password: string;
+}) {
+  return request<CredentialAuthSession>("/v1/auth/sign-up", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function signInStudent(input: {
+  email: string;
+  password: string;
+}) {
+  return request<CredentialAuthSession>("/v1/auth/sign-in", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function signOutStudent() {
+  return request<{ authenticated: false; mode: "credentials" }>(
+    "/v1/auth/sign-out",
+    { method: "POST" },
+  );
+}
+
+/**
+ * Development-preview only: start a clean, first-use student journey.
+ *
+ * This is intentionally separate from `signInDemoStudent`, which preserves a
+ * demo student's existing saved progress and lets the bootstrap response pick
+ * the correct return route.
+ */
+export function startGuidedOnboardingDemo() {
+  return request<DemoAuthSession>("/v1/auth/demo/start-guided-onboarding", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({}),
@@ -213,6 +275,23 @@ export function completeStudentOnboarding(
   });
 }
 
+export function getStudentHousingPlan(signal?: AbortSignal) {
+  return request<StudentHousingPlan>("/v1/student/housing-plan", {
+    method: "GET",
+    signal,
+  });
+}
+
+export function updateStudentHousingPlan(
+  input: UpdateStudentHousingPlanInput,
+) {
+  return request<StudentHousingPlan>("/v1/student/housing-plan", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
 export function getStudentRequirements(signal?: AbortSignal) {
   return request<StudentRequirementList>("/v1/student/requirements", {
     method: "GET",
@@ -285,6 +364,76 @@ export async function uploadStudentDocument(
   });
 }
 
+/**
+ * The document API deliberately accepts one file per request so each original
+ * file has its own audit trail, extraction result, and idempotency boundary.
+ * This helper keeps that server contract while allowing the UI to submit a
+ * related set of files (for example, the front and back of an identity card)
+ * as one sequential upload bundle.
+ */
+export type StudentDocumentUploadBundleEntry = {
+  file: File;
+  idempotencyKey: string;
+};
+
+export type StudentDocumentUploadBundleResult =
+  | {
+      status: "uploaded";
+      file: File;
+      idempotencyKey: string;
+      document: StudentDocument;
+    }
+  | {
+      status: "error";
+      file: File;
+      idempotencyKey: string;
+      error: unknown;
+    };
+
+export async function uploadStudentDocumentBundle(
+  entries: readonly StudentDocumentUploadBundleEntry[],
+  context: {
+    categoryHint?: StudentDocument["category"];
+    requirementId?: string;
+  },
+  callbacks: {
+    onFileStart?: (entry: StudentDocumentUploadBundleEntry) => void;
+    onFileSettled?: (result: StudentDocumentUploadBundleResult) => void;
+  } = {},
+): Promise<StudentDocumentUploadBundleResult[]> {
+  const results: StudentDocumentUploadBundleResult[] = [];
+
+  for (const entry of entries) {
+    callbacks.onFileStart?.(entry);
+    try {
+      const document = await uploadStudentDocument(
+        entry.file,
+        context,
+        entry.idempotencyKey,
+      );
+      const result: StudentDocumentUploadBundleResult = {
+        status: "uploaded",
+        file: entry.file,
+        idempotencyKey: entry.idempotencyKey,
+        document,
+      };
+      results.push(result);
+      callbacks.onFileSettled?.(result);
+    } catch (error) {
+      const result: StudentDocumentUploadBundleResult = {
+        status: "error",
+        file: entry.file,
+        idempotencyKey: entry.idempotencyKey,
+        error,
+      };
+      results.push(result);
+      callbacks.onFileSettled?.(result);
+    }
+  }
+
+  return results;
+}
+
 export function confirmStudentDocumentExtraction(
   documentId: string,
   input: ConfirmStudentDocumentExtractionInput,
@@ -303,9 +452,36 @@ export function confirmStudentDocumentExtraction(
   );
 }
 
+/**
+ * Reuses the privately stored original. A student never has to upload the
+ * same document again just because an external parsing attempt was transient.
+ */
+export function retryStudentDocumentExtraction(
+  documentId: string,
+  idempotencyKey: string,
+) {
+  return request<StudentDocument>(
+    `/v1/student/documents/${encodeURIComponent(documentId)}/retry-extraction`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      // The local demo API intentionally validates an empty JSON object here.
+      // Send the same explicit body to production for a uniform retry contract.
+      body: JSON.stringify({}),
+    },
+  );
+}
+
 export function getStudentDocumentContentUrl(document: StudentDocument) {
   if (!document.contentUrl) return null;
   return `${API_BASE_URL}${document.contentUrl}`;
+}
+
+export function getStudentDocumentProfilePhotoUrl(documentId: string) {
+  return `${API_BASE_URL}/v1/student/documents/${encodeURIComponent(documentId)}/profile-photo`;
 }
 
 export function askEdward(input: AskEdwardInput) {

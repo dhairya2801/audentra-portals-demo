@@ -4,7 +4,11 @@ import type {
   StudentDocument,
   StudentDocumentList,
 } from "@vv/contracts";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  canRetryDocumentExtraction,
+  DocumentExtractionRetry,
+} from "../components/document-extraction-retry";
 import { DocumentUpload } from "../components/document-upload";
 import { PortalShell } from "../components/portal-shell";
 import {
@@ -67,10 +71,10 @@ function formatFileSize(bytes: number) {
 
 function ExtractionReview({
   document,
-  onConfirmed,
+  onDocumentChanged,
 }: {
   document: StudentDocument;
-  onConfirmed: () => void;
+  onDocumentChanged: () => void;
 }) {
   const extraction = document.extraction;
   const intentKey = useRef<string | null>(null);
@@ -90,30 +94,83 @@ function ExtractionReview({
 
   if (!extraction) return null;
 
+  if (extraction.status === "processing") {
+    return (
+      <div className="extraction-state extraction-state--waiting" aria-live="polite">
+        <strong>Original saved — extracting a reviewable record</strong>
+        <p>
+          Your file is already attached to your student record. Edward is
+          reading it in the background; this page will refresh automatically.
+        </p>
+      </div>
+    );
+  }
+
   if (extraction.status === "pending_configuration") {
     return (
       <div className="extraction-state extraction-state--waiting">
         <strong>AI extraction is ready to connect</strong>
         <p>{extraction.summary}</p>
         <code>OPENROUTER_API_KEY</code>
+        {extraction.warnings.length ? (
+          <ul className="extraction-warnings">
+            {extraction.warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        ) : null}
+        <DocumentExtractionRetry
+          document={document}
+          onRetried={onDocumentChanged}
+        />
       </div>
     );
   }
 
   if (extraction.status === "failed") {
+    const retryable = canRetryDocumentExtraction(document);
     return (
       <div className="extraction-state extraction-state--error">
-        <strong>The original is safe, but extraction needs a retry</strong>
+        <strong>
+          {retryable
+            ? "The original is safe, but extraction needs a retry"
+            : "The original is safe, but this parser cannot complete it"}
+        </strong>
         <p>{extraction.summary}</p>
+        {extraction.warnings.length ? (
+          <ul className="extraction-warnings">
+            {extraction.warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        ) : null}
+        <DocumentExtractionRetry
+          document={document}
+          onRetried={onDocumentChanged}
+        />
       </div>
     );
   }
 
   if (extraction.status !== "completed" || extraction.fields.length === 0) {
+    const hasWarnings = extraction.warnings.length > 0;
     return (
-      <div className="extraction-state">
-        <strong>Document stored</strong>
+      <div
+        className={`extraction-state${hasWarnings ? " extraction-state--attention" : ""}`}
+      >
+        <strong>
+          {hasWarnings
+            ? "Document classified — review where it belongs"
+            : "Document stored"}
+        </strong>
         <p>{extraction.summary}</p>
+        {hasWarnings ? (
+          <ul className="extraction-warnings">
+            {extraction.warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        ) : null}
       </div>
     );
   }
@@ -124,7 +181,7 @@ function ExtractionReview({
     try {
       await confirm.run([...acceptedKeys], key);
       intentKey.current = null;
-      onConfirmed();
+      onDocumentChanged();
     } catch {
       // Keep the idempotency key for a safe retry of the same confirmation.
     }
@@ -286,7 +343,10 @@ function DocumentWorkspace({
                         </span>
                       ) : null}
                     </div>
-                    <ExtractionReview document={document} onConfirmed={reload} />
+                    <ExtractionReview
+                      document={document}
+                      onDocumentChanged={reload}
+                    />
                   </li>
                 );
               })}
@@ -368,6 +428,20 @@ export default function DocumentsPage() {
     [],
   );
   const documents = useApiResource(loadDocuments);
+  const refreshDocuments = documents.refresh;
+
+  const hasPendingExtraction =
+    documents.data?.items.some(
+      (document) => document.extraction?.status === "processing",
+    ) ?? false;
+
+  useEffect(() => {
+    if (!hasPendingExtraction) return;
+    const interval = window.setInterval(() => {
+      void refreshDocuments();
+    }, 2_500);
+    return () => window.clearInterval(interval);
+  }, [hasPendingExtraction, refreshDocuments]);
 
   return (
     <PortalShell

@@ -18,6 +18,27 @@ import {
 } from "../hooks/use-activity-tracking";
 import { getStudentRequirements } from "../lib/api-client";
 
+const terminalRequirementStatuses = new Set([
+  "completed",
+  "waived",
+  "not_applicable",
+]);
+
+function normalizedProgress(progressPercent: number) {
+  if (!Number.isFinite(progressPercent)) return 0;
+  return Math.round(Math.min(100, Math.max(0, progressPercent)));
+}
+
+function progressForRequirements(items: StudentRequirementDetail[]) {
+  if (items.length === 0) return 0;
+
+  const total = items.reduce(
+    (sum, item) => sum + normalizedProgress(item.progressPercent),
+    0,
+  );
+  return Math.round(total / items.length);
+}
+
 function RequirementItem({
   item,
   onView,
@@ -25,15 +46,20 @@ function RequirementItem({
   item: StudentRequirementDetail;
   onView: (item: StudentRequirementDetail) => void;
 }) {
+  const progress = normalizedProgress(item.progressPercent);
+  const isTerminal = terminalRequirementStatuses.has(item.status);
+  const actionLabel = isTerminal ? "Review" : "Open task";
+
   return (
-    <li className="resource-list__item">
+    <li
+      className={`resource-list__item enrollment-requirement enrollment-requirement--${item.status}`}
+    >
       <div className="resource-list__symbol" aria-hidden="true">
-        {item.status === "completed" || item.status === "waived" ? "✓" : "○"}
+        {isTerminal ? "✓" : "○"}
       </div>
       <div className="resource-list__content">
         <div className="resource-list__title">
           <h3>{item.title}</h3>
-          <StatusPill value={item.status} />
         </div>
         <p>{item.description}</p>
         <div className="resource-list__meta">
@@ -51,13 +77,31 @@ function RequirementItem({
           ) : null}
           {item.blocking ? <span>Required</span> : <span>Optional</span>}
         </div>
+        <div className="enrollment-requirement__progress">
+          <span>Task progress</span>
+          <div
+            aria-label={`${item.title} progress`}
+            aria-valuemax={100}
+            aria-valuemin={0}
+            aria-valuenow={progress}
+            className="enrollment-requirement__progress-track"
+            role="progressbar"
+          >
+            <span style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+      </div>
+      <div className="enrollment-requirement__status">
+        <StatusPill value={item.status} />
+        <span>{progress}%</span>
       </div>
       <Link
+        aria-label={`${actionLabel} ${item.title}`}
         className="button button--secondary resource-list__action"
         href={`/enrollment/requirements/${encodeURIComponent(item.slug)}`}
         onClick={() => onView(item)}
       >
-        View
+        {actionLabel}
       </Link>
     </li>
   );
@@ -97,6 +141,10 @@ export default function EnrollmentPage() {
       entry_point: "enrollment_checklist",
     });
   };
+  const overallProgress =
+    requirements.status === "ready"
+      ? progressForRequirements(requirements.data.items)
+      : 0;
 
   return (
     <PortalShell
@@ -120,10 +168,27 @@ export default function EnrollmentPage() {
           }
         />
       ) : (
-        <div className="resource-layout">
+        <div className="resource-layout resource-layout--enrollment">
           <PageCard
+            className="enrollment-overview"
             eyebrow="Enrollment checklist"
             title={`${requirements.data.total} ${requirements.data.total === 1 ? "requirement" : "requirements"}`}
+            action={
+              <div className="enrollment-overview__progress-summary">
+                <span>Overall progress</span>
+                <strong>{overallProgress}%</strong>
+                <div
+                  aria-label="Overall enrollment progress"
+                  aria-valuemax={100}
+                  aria-valuemin={0}
+                  aria-valuenow={overallProgress}
+                  className="enrollment-overview__progress-track"
+                  role="progressbar"
+                >
+                  <span style={{ width: `${overallProgress}%` }} />
+                </div>
+              </div>
+            }
           >
             <ul className="resource-list">
               {requirements.data.items.map((item) => (

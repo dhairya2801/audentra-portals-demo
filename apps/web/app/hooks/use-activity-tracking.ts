@@ -38,6 +38,12 @@ const propertyAllowlist: Record<ActivityEventName, readonly string[]> = {
   "ui.exemption_reviewed.v1": ["rule_code", "recommendation_status"],
   "ui.campus_event_viewed.v1": ["event_id", "surface"],
   "ui.club_viewed.v1": ["club_id", "surface"],
+  "ui.edward_context_receipts_received.v1": [
+    "source_count",
+    "page_context",
+  ],
+  // Accepted only for queued batches from clients released before context
+  // receipts replaced inferred tool-call analytics.
   "ui.edward_tool_invoked.v1": ["tool_name", "page_context"],
   "ui.edward_action_widget_viewed.v1": ["widget_type", "page_context"],
   "ui.edward_action_completed.v1": ["widget_type", "outcome"],

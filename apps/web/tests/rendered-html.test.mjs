@@ -62,8 +62,10 @@ test("all student portal routes render and the dynamic requirement route resolve
 
   const signInResponse = await render("/sign-in");
   const signInHtml = await signInResponse.text();
-  assert.match(signInHtml, /Continue with demo student/);
-  assert.match(signInHtml, /Institutional single sign-on replaces it/);
+  assert.match(signInHtml, /Sign in/);
+  assert.match(signInHtml, /Create account/);
+  assert.match(signInHtml, /Email address/);
+  assert.doesNotMatch(signInHtml, /demo student/i);
 });
 
 test("removes the disposable starter preview", async () => {
@@ -79,6 +81,60 @@ test("removes the disposable starter preview", async () => {
 
   assert.doesNotMatch(page, /_sites-preview|SkeletonPreview/);
   assert.doesNotMatch(layout, /codex-preview|Starter Project/);
+});
+
+test("keeps transcript review and exemption insights in the enrollment workspace", async () => {
+  const [requirementPage, extractionReview, exemptionSkill] = await Promise.all([
+    readFile(
+      new URL("../app/enrollment/requirements/[slug]/page.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/components/document-extraction-review.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../../../docs/agent-skills/course-exemption-skill.md",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(
+    requirementPage,
+    /Upload your transcript to discover potential course exemptions/,
+  );
+  assert.match(
+    requirementPage,
+    /reviewPlacement=\{kind === "transcript" \? "context" : "inline"\}/,
+  );
+  assert.match(requirementPage, /Your transcript view/);
+  assert.match(requirementPage, /Parsed transcript/);
+  assert.doesNotMatch(
+    requirementPage,
+    /Confirm transcript and sync courses/,
+  );
+  assert.match(extractionReview, /Transcript parsed automatically/);
+  assert.match(exemptionSkill, /Student confirmation is not a prerequisite/);
+  assert.match(requirementPage, /getStudentAcademics/);
+  assert.match(requirementPage, /Prediction only · Registrar approval required/);
+  assert.match(exemptionSkill, /course_equivalency_rule/);
+  assert.match(exemptionSkill, /database table—not this example and not the model/i);
+});
+
+test("keeps housing and deposit actions inside their enrollment tasks", async () => {
+  const requirementPage = await readFile(
+    new URL("../app/enrollment/requirements/[slug]/page.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(requirementPage, /aster-residence-hall\.jpg/);
+  assert.match(requirementPage, /onHousingPreviewChange/);
+  assert.match(requirementPage, /DepositPaymentAction/);
+  assert.match(requirementPage, /createDepositPayment/);
+  assert.doesNotMatch(requirementPage, /Go to payments/);
 });
 
 test("connects business actions and non-blocking tracking to the API", async () => {
@@ -105,6 +161,10 @@ test("connects business actions and non-blocking tracking to the API", async () 
   assert.match(edward, /createDepositPayment/);
   assert.match(edward, /"dialog" : "region"/);
   assert.match(edward, /role="status"/);
+  assert.match(edward, /contextReceipts/);
+  assert.match(edward, /ui\.edward_context_receipts_received\.v1/);
+  assert.match(edward, /Student record context used for this response/);
+  assert.doesNotMatch(edward, /toolsUsed/);
   assert.match(tracking, /propertyAllowlist/);
   assert.match(tracking, /MAX_BATCH_SIZE/);
   assert.match(tracking, /catch \{/);
@@ -261,6 +321,10 @@ test("typed client wires every resource route and mutation contract", async () =
       { acceptedFieldKeys: ["student_name"] },
       "document-confirm-12345678",
     );
+    await client.retryStudentDocumentExtraction(
+      "document/1",
+      "document-retry-12345678",
+    );
     await client.askEdward({
       message: "What should I do next?",
       pageContext: "/dashboard",
@@ -297,6 +361,7 @@ test("typed client wires every resource route and mutation contract", async () =
       },
     ]);
     await client.signInDemoStudent();
+    await client.startGuidedOnboardingDemo();
     await client.signOutDemoStudent();
   } finally {
     globalThis.fetch = originalFetch;
@@ -326,6 +391,7 @@ test("typed client wires every resource route and mutation contract", async () =
     "/v1/student/documents",
     "/v1/student/documents/upload",
     "/v1/student/documents/document%2F1/confirm-extraction",
+    "/v1/student/documents/document%2F1/retry-extraction",
     "/v1/student/assistant/messages",
     "/v1/student/appointments",
     "/v1/student/payments",
@@ -335,6 +401,7 @@ test("typed client wires every resource route and mutation contract", async () =
     "/v1/admission-offers/offer%2F1/accept",
     "/v1/activity-events/batch",
     "/v1/auth/demo/sign-in",
+    "/v1/auth/demo/start-guided-onboarding",
     "/v1/auth/demo/sign-out",
   ];
   for (const path of expectedPaths) {
@@ -390,6 +457,24 @@ test("typed client wires every resource route and mutation contract", async () =
       "/v1/student/documents/document%2F1/confirm-extraction",
     ).init.headers["Idempotency-Key"],
     "document-confirm-12345678",
+  );
+  assert.equal(
+    requestByPath.get(
+      "/v1/student/documents/document%2F1/retry-extraction",
+    ).init.headers["Idempotency-Key"],
+    "document-retry-12345678",
+  );
+  assert.equal(
+    requestByPath.get(
+      "/v1/student/documents/document%2F1/retry-extraction",
+    ).init.headers["Content-Type"],
+    "application/json",
+  );
+  assert.equal(
+    requestByPath.get(
+      "/v1/student/documents/document%2F1/retry-extraction",
+    ).init.body,
+    "{}",
   );
   assert.equal(
     requestByPath.get("/v1/student/appointments").init.headers[
@@ -456,6 +541,10 @@ test("onboarding preserves the nine-step order and authoritative boundary action
   assert.match(onboarding, /completeStudentOnboarding/);
   assert.match(onboarding, /Reload latest saved progress/);
   assert.match(onboarding, /Why we ask/);
+  assert.match(onboarding, /function editableOnboardingData/);
+  assert.match(onboarding, /delete editableData\.skippedSteps/);
+  assert.match(onboarding, /const nextData = editableOnboardingData\(/);
+  assert.match(onboarding, /data: editableOnboardingData\(onboarding\.data\)/);
   assert.match(onboarding, /window\.location\.replace\("\/dashboard"\)/);
 });
 
@@ -493,8 +582,13 @@ test("student routes enforce bootstrap gating and expose no dead static links", 
   assert.match(shell, /onboarding\.required/);
   assert.match(bootstrapRouter, /initialRoute/);
   assert.match(signIn, /getStudentBootstrap/);
-  assert.match(signIn, /signInDemoStudent/);
-  assert.match(routeFiles.join("\n"), /signOutDemoStudent/);
+  assert.match(signIn, /signInStudent/);
+  assert.match(signIn, /signUpStudent/);
+  assert.match(signIn, /name="email"/);
+  assert.match(signIn, /name="phone"/);
+  assert.match(signIn, /name="password"/);
+  assert.match(signIn, /window\.location\.assign\("\/onboarding"\)/);
+  assert.match(routeFiles.join("\n"), /signOutStudent/);
 
   const allRoutes = new Set([
     "/",

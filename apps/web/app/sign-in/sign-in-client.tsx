@@ -1,28 +1,67 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useState,
+} from "react";
 import { useApiAction } from "../hooks/use-api-resource";
 import {
   getStudentBootstrap,
-  signInDemoStudent,
+  signInStudent,
+  signUpStudent,
 } from "../lib/api-client";
 import { ActionFeedback, PortalMark } from "../components/portal-ui";
 
-export function SignInClient() {
-  const signInAction = useCallback(async () => {
-    await signInDemoStudent();
-    return getStudentBootstrap();
-  }, []);
-  const signIn = useApiAction(signInAction);
+type AuthMode = "sign_in" | "sign_up";
 
-  const continueWithDemo = async () => {
+export function SignInClient() {
+  const [mode, setMode] = useState<AuthMode>("sign_in");
+  const signInAction = useCallback(
+    async (input: { email: string; password: string }) => {
+      await signInStudent(input);
+      return getStudentBootstrap();
+    },
+    [],
+  );
+  const signUpAction = useCallback(
+    (input: { email: string; phone: string; password: string }) =>
+      signUpStudent(input),
+    [],
+  );
+  const signIn = useApiAction(signInAction);
+  const signUp = useApiAction(signUpAction);
+  const activeAction = mode === "sign_in" ? signIn : signUp;
+  const isBusy =
+    signIn.status === "loading" || signUp.status === "loading";
+
+  const chooseMode = (nextMode: AuthMode) => {
+    setMode(nextMode);
     signIn.reset();
+    signUp.reset();
+  };
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget);
+    const email = String(values.get("email") ?? "").trim();
+    const password = String(values.get("password") ?? "");
+
     try {
-      const bootstrap = await signIn.run();
+      if (mode === "sign_up") {
+        await signUp.run({
+          email,
+          phone: String(values.get("phone") ?? "").trim(),
+          password,
+        });
+        window.location.assign("/onboarding");
+        return;
+      }
+      const bootstrap = await signIn.run({ email, password });
       window.location.assign(bootstrap.initialRoute);
     } catch {
-      // Keep the sign-in panel visible with a retry action.
+      // Keep the submitted form available for a corrected retry.
     }
   };
 
@@ -38,35 +77,111 @@ export function SignInClient() {
         </Link>
         <div className="auth-panel__copy">
           <p className="eyebrow">Student portal</p>
-          <h1 id="sign-in-title">Your next chapter starts here.</h1>
+          <h1 id="sign-in-title">
+            {mode === "sign_up"
+              ? "Create your student account."
+              : "Welcome back."}
+          </h1>
           <p>
-            Sign in with your Aster University identity to review your admission
-            offer and continue enrollment.
+            {mode === "sign_up"
+              ? "Start with secure contact credentials. Your name, program details, and supporting records are collected during onboarding."
+              : "Sign in to continue onboarding or return to your student dashboard."}
           </p>
         </div>
-        <button
-          className="button button--primary auth-button"
-          type="button"
-          disabled={signIn.status === "loading"}
-          onClick={() => void continueWithDemo()}
-        >
-          {signIn.status === "loading"
-            ? "Signing in…"
-            : signIn.status === "error"
-              ? "Retry demo sign in"
-              : "Continue with demo student"}
-          <span aria-hidden="true">→</span>
-        </button>
+
+        <div className="auth-mode-switch" role="tablist" aria-label="Account access">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "sign_in"}
+            className={mode === "sign_in" ? "is-active" : undefined}
+            onClick={() => chooseMode("sign_in")}
+          >
+            Sign in
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "sign_up"}
+            className={mode === "sign_up" ? "is-active" : undefined}
+            onClick={() => chooseMode("sign_up")}
+          >
+            Create account
+          </button>
+        </div>
+
+        <form className="auth-form" onSubmit={submit}>
+          <label className="field">
+            <span>Email address</span>
+            <input
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              maxLength={254}
+              placeholder="you@example.com"
+            />
+          </label>
+          {mode === "sign_up" ? (
+            <label className="field">
+              <span>Mobile phone</span>
+              <input
+                name="phone"
+                type="tel"
+                autoComplete="tel"
+                required
+                maxLength={32}
+                placeholder="+1 555 123 4567"
+              />
+              <small>Include your country code. Verification will be enabled later.</small>
+            </label>
+          ) : null}
+          <label className="field">
+            <span>Password</span>
+            <input
+              name="password"
+              type="password"
+              autoComplete={
+                mode === "sign_up" ? "new-password" : "current-password"
+              }
+              required
+              minLength={mode === "sign_up" ? 12 : 1}
+              maxLength={128}
+            />
+            {mode === "sign_up" ? (
+              <small>At least 12 characters, including a letter and number.</small>
+            ) : null}
+          </label>
+          <button
+            className="button button--primary auth-button"
+            type="submit"
+            disabled={isBusy}
+          >
+            {activeAction.status === "loading"
+              ? mode === "sign_up"
+                ? "Creating account…"
+                : "Signing in…"
+              : mode === "sign_up"
+                ? "Create account and start onboarding"
+                : "Sign in"}
+            <span aria-hidden="true">→</span>
+          </button>
+        </form>
+
         <ActionFeedback
-          status={signIn.status}
-          error={signIn.message}
-          success="Signed in. Opening your portal…"
+          status={activeAction.status}
+          error={activeAction.message}
+          success={
+            mode === "sign_up"
+              ? "Account created. Opening onboarding…"
+              : "Signed in. Opening your portal…"
+          }
         />
-        <div className="demo-notice">
-          <strong>Development preview</strong>
+        <div className="auth-security-note">
+          <strong>Account verification</strong>
           <p>
-            This local environment uses a secured demo identity endpoint.
-            Institutional single sign-on replaces it in production.
+            Email and SMS verification statuses are already tracked. Delivery
+            will be connected when those providers are configured.
           </p>
         </div>
         <p className="auth-support">
