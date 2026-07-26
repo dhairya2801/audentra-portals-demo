@@ -289,7 +289,7 @@ test("typed client wires every resource route and mutation contract", async () =
     await client.updateStudentOnboarding({
       expectedVersion: 1,
       currentStep: "about_you",
-      data: { legalNameConfirmed: true },
+      data: { firstName: "Alex" },
     });
     await client.completeStudentOnboarding(
       { expectedVersion: 2 },
@@ -420,7 +420,7 @@ test("typed client wires every resource route and mutation contract", async () =
   assert.deepEqual(JSON.parse(onboardingUpdate.init.body), {
     expectedVersion: 1,
     currentStep: "about_you",
-    data: { legalNameConfirmed: true },
+    data: { firstName: "Alex" },
   });
 
   assert.equal(
@@ -514,7 +514,7 @@ test("typed client wires every resource route and mutation contract", async () =
   );
 });
 
-test("onboarding preserves the nine-step order and authoritative boundary actions", async () => {
+test("onboarding preserves the eight-step order and authoritative boundary actions", async () => {
   const onboarding = await readFile(
     new URL("../app/onboarding/page.tsx", import.meta.url),
     "utf8",
@@ -525,7 +525,6 @@ test("onboarding preserves the nine-step order and authoritative boundary action
     '"housing"',
     '"campus_life"',
     '"emergency_contacts"',
-    '"other_records"',
     '"family_permissions"',
     '"review_and_sign"',
     '"deposit"',
@@ -546,6 +545,10 @@ test("onboarding preserves the nine-step order and authoritative boundary action
   assert.match(onboarding, /Why we ask/);
   assert.match(onboarding, /function editableOnboardingData/);
   assert.match(onboarding, /delete editableData\.skippedSteps/);
+  assert.doesNotMatch(onboarding, /Confirm your student record/);
+  assert.match(onboarding, /emergencyContacts/);
+  assert.match(onboarding, /depositChoice/);
+  assert.match(onboarding, /key: "deposit"[\s\S]*skippable: true/);
   assert.match(onboarding, /const nextData = editableOnboardingData\(/);
   assert.match(onboarding, /data: editableOnboardingData\(onboarding\.data\)/);
   assert.match(onboarding, /window\.location\.replace\("\/dashboard"\)/);

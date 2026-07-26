@@ -77,10 +77,22 @@ const housingChoices: Array<{
     description: "Arrange housing independently in the city.",
   },
   {
+    value: "commuting",
+    icon: "⇄",
+    title: "Commuting",
+    description: "Plan parking, transit, and time between classes.",
+  },
+  {
     value: "undecided",
     icon: "◌",
     title: "Still deciding",
     description: "Keep your plans open for now.",
+  },
+  {
+    value: "family",
+    icon: "⌂",
+    title: "Family or dependent housing",
+    description: "Connect with family-friendly housing guidance.",
   },
 ];
 

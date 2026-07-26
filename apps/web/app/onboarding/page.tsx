@@ -2,6 +2,8 @@
 
 import type {
   AdmissionOfferSummary,
+  OnboardingEmergencyContact,
+  OnboardingFamilyPermission,
   OnboardingStep,
   StudentDashboard,
   StudentOnboarding,
@@ -12,6 +14,7 @@ import type {
 import Link from "next/link";
 import {
   type FormEvent,
+  type ChangeEvent,
   useCallback,
   useEffect,
   useRef,
@@ -51,7 +54,7 @@ const onboardingSteps: {
     key: "about_you",
     label: "About you",
     title: "Identity & home address",
-    subtitle: "Confirm the details Aster uses to protect your student record.",
+    subtitle: "Add the personal details and permanent address Aster needs to prepare your student record.",
   },
   {
     key: "housing",
@@ -71,13 +74,7 @@ const onboardingSteps: {
     key: "emergency_contacts",
     label: "Emergency contacts",
     title: "People in your corner",
-    subtitle: "Confirm that Aster has the emergency contact information you trust.",
-  },
-  {
-    key: "other_records",
-    label: "Other records",
-    title: "ID, health & access",
-    subtitle: "Review the records that keep services safe and accessible.",
+    subtitle: "Enter one or more people Aster may contact in an emergency.",
   },
   {
     key: "family_permissions",
@@ -95,23 +92,52 @@ const onboardingSteps: {
     key: "deposit",
     label: "Deposit",
     title: "Secure your place",
-    subtitle: "Acknowledge the enrollment deposit and finish your onboarding.",
+    subtitle: "Pay now, choose a later path, or skip this step and return from enrollment.",
+    skippable: true,
   },
 ];
 
 const campusInterestOptions = [
-  ["student_organizations", "Student organizations"],
-  ["arts_and_culture", "Arts & culture"],
-  ["athletics_and_wellness", "Athletics & wellness"],
-  ["community_service", "Community service"],
-  ["career_network", "Career network"],
+  ["aster_app_lab", "Aster App Lab"],
+  ["women_in_business", "Women in Business"],
+  ["late_night_radio", "Late Night Radio"],
+  ["pixel_league", "Pixel League"],
+  ["harbor_outdoor_club", "Harbor Outdoor Club"],
+  ["boston_neighbors", "Boston Neighbors"],
+  ["global_table", "Global Table"],
+  ["first_year_council", "First-Year Council"],
+  ["campus_rec_mix", "Campus Rec Mix"],
 ] as const;
 
 const supportNeedOptions = [
-  ["academic_advising", "Academic advising"],
+  ["academic_coaching", "Academic coaching"],
   ["accessibility_services", "Accessibility services"],
-  ["financial_guidance", "Financial guidance"],
-  ["wellbeing_support", "Wellbeing support"],
+  ["career_planning", "Career planning"],
+  ["counseling_wellbeing", "Counseling & wellbeing"],
+  ["financial_wellness", "Financial wellness"],
+  ["first_gen_resources", "First-gen resources"],
+  ["international_student_services", "International student services"],
+  ["family_resources", "Family resources"],
+] as const;
+
+const firstMonthGoalOptions = [
+  ["friends_in_major", "Friends in my major"],
+  ["creative_outlet", "A creative outlet"],
+  ["career_connections", "Career connections"],
+  ["fitness_routine", "A fitness routine"],
+  ["shared_culture", "Shared culture"],
+  ["volunteer", "Ways to volunteer"],
+  ["something_new", "Something new"],
+] as const;
+
+const ferpaScopeOptions = [
+  ["academic_records", "Academic records & advising"],
+  ["registration", "Registration & enrollment"],
+  ["billing", "Student account & billing"],
+  ["financial_aid", "Financial aid"],
+  ["housing", "Housing & dining"],
+  ["conduct", "Student conduct records"],
+  ["accessibility", "Accessibility services"],
 ] as const;
 
 /**
@@ -123,6 +149,18 @@ const supportNeedOptions = [
 function editableOnboardingData(data: StudentOnboardingData) {
   const editableData = { ...data };
   delete editableData.skippedSteps;
+  for (const legacyField of [
+    "legalNameConfirmed",
+    "contactInformationConfirmed",
+    "homeAddressConfirmed",
+    "emergencyContactConfirmed",
+    "recordsConfirmed",
+    "familyPermissionsReviewed",
+    "signatureConfirmed",
+    "depositAcknowledged",
+  ]) {
+    delete (editableData as Record<string, unknown>)[legacyField];
+  }
   return editableData;
 }
 
@@ -213,6 +251,7 @@ function Choice({
   defaultChecked,
   type = "checkbox",
   required,
+  onChange,
 }: {
   name: string;
   value: string;
@@ -220,6 +259,7 @@ function Choice({
   defaultChecked?: boolean;
   type?: "checkbox" | "radio";
   required?: boolean;
+  onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
 }) {
   return (
     <label className="choice-card">
@@ -229,10 +269,674 @@ function Choice({
         value={value}
         defaultChecked={defaultChecked}
         required={required}
+        onChange={onChange}
       />
       <span aria-hidden="true" />
       <strong>{label}</strong>
     </label>
+  );
+}
+
+const emptyEmergencyContact: OnboardingEmergencyContact = {
+  fullName: "",
+  relationship: "parent",
+  mobilePhone: "",
+};
+
+const emptyFamilyPermission: OnboardingFamilyPermission = {
+  fullName: "",
+  relationship: "parent",
+  email: "",
+  scopes: [],
+  purpose: "education_and_expenses",
+  expires: "end_first_year",
+};
+
+function HousingFields({ data }: { data: StudentOnboardingData }) {
+  const [preference, setPreference] = useState(
+    data.housingPreference ?? "undecided",
+  );
+
+  return (
+    <>
+      <fieldset className="form-section">
+        <legend>Where do you picture starting your day?</legend>
+        <p>
+          Choose a plan. Aster opens only the follow-up questions useful for
+          that plan.
+        </p>
+        <div className="choice-grid">
+          {[
+            ["on_campus", "On campus"],
+            ["off_campus", "Off campus"],
+            ["commuting", "Commuting"],
+            ["undecided", "I’m not sure yet"],
+            ["family", "Family or dependent housing"],
+          ].map(([value, label]) => (
+            <Choice
+              type="radio"
+              name="housingPreference"
+              value={value}
+              label={label}
+              defaultChecked={preference === value}
+              required
+              onChange={(event) => {
+                if (event.currentTarget.checked) {
+                  setPreference(
+                    event.currentTarget
+                      .value as NonNullable<
+                        StudentOnboardingData["housingPreference"]
+                      >,
+                  );
+                }
+              }}
+              key={value}
+            />
+          ))}
+        </div>
+      </fieldset>
+
+      {preference === "on_campus" ? (
+        <>
+          <fieldset className="form-section">
+            <legend>What kind of space feels right?</legend>
+            <div className="choice-grid">
+              {[
+                ["single", "Single"],
+                ["double", "Double"],
+                ["triple", "Triple"],
+                ["quad", "Quad"],
+                ["suite", "Suite"],
+                ["no_preference", "No preference"],
+              ].map(([value, label]) => (
+                <Choice
+                  type="radio"
+                  name="housingRoomType"
+                  value={value}
+                  label={label}
+                  defaultChecked={data.housingRoomType === value}
+                  required
+                  key={value}
+                />
+              ))}
+            </div>
+            <div className="form-grid">
+              <label className="field">
+                <span>Bathroom preference</span>
+                <select
+                  name="bathroomPreference"
+                  defaultValue={data.bathroomPreference ?? ""}
+                  required
+                >
+                  <option value="" disabled>Choose one</option>
+                  <option value="shared_floor">Shared floor bathroom</option>
+                  <option value="suite">Suite bathroom</option>
+                  <option value="private">Private bathroom</option>
+                  <option value="no_preference">No preference</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Roommate matching</span>
+                <select
+                  name="roommateMatching"
+                  defaultValue={data.roommateMatching ?? ""}
+                  required
+                >
+                  <option value="" disabled>Choose one</option>
+                  <option value="match_preferences">Match me from my preferences</option>
+                  <option value="known_roommate">I know my roommate</option>
+                  <option value="browse_later">Let me browse profiles later</option>
+                </select>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset className="form-section">
+            <legend>Tell us how you actually live in a shared space</legend>
+            <p>
+              Honest routine preferences help Residential Life reduce
+              avoidable roommate friction.
+            </p>
+            <div className="form-grid">
+              {[
+                [
+                  "sleepSchedule",
+                  "Sleep schedule",
+                  [
+                    ["early", "Early bird · before 11"],
+                    ["middle", "Usually 11–1"],
+                    ["night", "Night owl · after 1"],
+                    ["changes", "It changes"],
+                  ],
+                  data.sleepSchedule,
+                ],
+                [
+                  "studyHabits",
+                  "Study habits",
+                  [
+                    ["room", "Mostly in my room"],
+                    ["elsewhere", "Mostly library / elsewhere"],
+                    ["mix", "A mix"],
+                    ["late_room", "Late-night room study"],
+                  ],
+                  data.studyHabits,
+                ],
+                [
+                  "roomNoise",
+                  "Room noise",
+                  [
+                    ["quiet", "Usually quiet"],
+                    ["headphones", "Music with headphones"],
+                    ["background", "Background sound"],
+                    ["social", "Lively and social"],
+                  ],
+                  data.roomNoise,
+                ],
+                [
+                  "cleanliness",
+                  "Cleanliness",
+                  [
+                    ["everything_in_place", "Everything in place"],
+                    ["tidy", "Tidy but lived-in"],
+                    ["relaxed", "Pretty relaxed"],
+                  ],
+                  data.cleanliness,
+                ],
+                [
+                  "guestPreference",
+                  "Guests",
+                  [
+                    ["rarely", "Rarely"],
+                    ["notice", "Sometimes, with notice"],
+                    ["active", "I like an active room"],
+                  ],
+                  data.guestPreference,
+                ],
+                [
+                  "temperaturePreference",
+                  "Temperature",
+                  [
+                    ["cool", "Cool"],
+                    ["middle", "In the middle"],
+                    ["warm", "Warm"],
+                  ],
+                  data.temperaturePreference,
+                ],
+                [
+                  "smokeVapeCompatibility",
+                  "Smoke / vape compatibility",
+                  [
+                    ["smoke_free", "Smoke-free roommate only"],
+                    ["off_campus_only", "Okay if only off campus"],
+                    ["no_preference", "No preference"],
+                  ],
+                  data.smokeVapeCompatibility,
+                ],
+              ].map(([name, label, options, defaultValue]) => (
+                <label className="field" key={String(name)}>
+                  <span>{String(label)}</span>
+                  <select
+                    name={String(name)}
+                    defaultValue={String(defaultValue ?? "")}
+                    required
+                  >
+                    <option value="" disabled>Choose one</option>
+                    {(options as string[][]).map(([value, optionLabel]) => (
+                      <option value={value} key={value}>{optionLabel}</option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+            <div className="choice-grid choice-grid--multi">
+              <Choice
+                name="substanceFreeHousing"
+                value="yes"
+                label="Substance-free housing"
+                defaultChecked={data.substanceFreeHousing}
+              />
+              <Choice
+                name="genderInclusiveHousing"
+                value="yes"
+                label="Gender-inclusive housing"
+                defaultChecked={data.genderInclusiveHousing}
+              />
+              <Choice
+                name="accessibleHousingInformation"
+                value="yes"
+                label="Accessible housing information"
+                defaultChecked={data.accessibleHousingInformation}
+              />
+            </div>
+          </fieldset>
+
+          <fieldset className="form-section">
+            <legend>Would you like a themed residential community?</legend>
+            <div className="choice-grid choice-grid--multi">
+              {[
+                ["first_year_launch", "First-Year Launch"],
+                ["honors_house", "Honors House"],
+                ["stem_innovation", "STEM + Innovation"],
+                ["arts_collective", "Arts Collective"],
+                ["wellbeing_commons", "Wellbeing Commons"],
+                ["substance_free_living", "Substance-Free Living"],
+              ].map(([value, label]) => (
+                <Choice
+                  name="livingLearningCommunities"
+                  value={value}
+                  label={label}
+                  defaultChecked={data.livingLearningCommunities?.includes(value)}
+                  key={value}
+                />
+              ))}
+            </div>
+          </fieldset>
+        </>
+      ) : null}
+
+      {preference === "off_campus" ? (
+        <>
+          <fieldset className="form-section">
+            <legend>Where are you in the search?</legend>
+            <div className="choice-grid">
+              {[
+                ["lease_signed", "I signed a lease"],
+                ["actively_looking", "I’m actively looking"],
+                ["need_roommates", "I need roommates"],
+                ["living_with_family", "I’m living with family"],
+              ].map(([value, label]) => (
+                <Choice
+                  type="radio"
+                  name="offCampusStatus"
+                  value={value}
+                  label={label}
+                  defaultChecked={data.offCampusStatus === value}
+                  required
+                  key={value}
+                />
+              ))}
+            </div>
+          </fieldset>
+          <fieldset className="form-section">
+            <legend>What would make this easier?</legend>
+            <div className="choice-grid choice-grid--multi">
+              {[
+                ["verified_listings", "Verified listings"],
+                ["budget_planning", "Budget planning"],
+                ["lease_resources", "Lease resources"],
+                ["roommate_finder", "Roommate finder"],
+                ["neighborhood_guide", "Neighborhood guide"],
+                ["public_transit", "Public transit"],
+                ["furniture_exchange", "Furniture exchange"],
+              ].map(([value, label]) => (
+                <Choice
+                  name="offCampusResources"
+                  value={value}
+                  label={label}
+                  defaultChecked={data.offCampusResources?.includes(value)}
+                  key={value}
+                />
+              ))}
+            </div>
+          </fieldset>
+        </>
+      ) : null}
+
+      {preference === "commuting" ? (
+        <fieldset className="form-section">
+          <legend>Build your commuter starter pack</legend>
+          <div className="form-grid">
+            <label className="field">
+              <span>Main commute</span>
+              <select
+                name="commuteMode"
+                defaultValue={data.commuteMode ?? ""}
+                required
+              >
+                <option value="" disabled>Choose one</option>
+                <option value="drive">Drive</option>
+                <option value="public_transit">Public transit</option>
+                <option value="bike_scooter">Bike / scooter</option>
+                <option value="walk">Walk</option>
+                <option value="carpool">Carpool</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>One-way time</span>
+              <select
+                name="commuteDuration"
+                defaultValue={data.commuteDuration ?? ""}
+                required
+              >
+                <option value="" disabled>Choose one</option>
+                <option value="under_20">Under 20 minutes</option>
+                <option value="20_40">20–40 minutes</option>
+                <option value="40_60">40–60 minutes</option>
+                <option value="over_60">More than an hour</option>
+              </select>
+            </label>
+          </div>
+          <div className="choice-grid choice-grid--multi">
+            {[
+              ["parking_permit", "Parking permit"],
+              ["transit_pass", "Transit pass"],
+              ["bike_storage", "Bike storage"],
+              ["commuter_lounge", "Commuter lounge"],
+              ["day_use_lockers", "Day-use lockers"],
+              ["meal_plan", "Meal plan"],
+              ["safety_escort", "Safety escort"],
+              ["commuter_events", "Commuter events"],
+            ].map(([value, label]) => (
+              <Choice
+                name="commuterResources"
+                value={value}
+                label={label}
+                defaultChecked={data.commuterResources?.includes(value)}
+                key={value}
+              />
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
+
+      {preference === "undecided" || preference === "family" ? (
+        <div className="review-summary">
+          <h3>Keep your options open</h3>
+          <p>
+            A housing advisor can help compare cost, timing, family needs, and
+            availability. No housing deposit is required here.
+          </p>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function CampusLifeFields({ data }: { data: StudentOnboardingData }) {
+  return (
+    <>
+      <fieldset className="form-section">
+        <legend>Explore student clubs</legend>
+        <p>Select anything you want Aster to place in your welcome feed.</p>
+        <div className="choice-grid choice-grid--multi">
+          {campusInterestOptions.map(([value, label]) => (
+            <Choice
+              name="campusInterests"
+              value={value}
+              label={label}
+              defaultChecked={data.campusInterests?.includes(value)}
+              key={value}
+            />
+          ))}
+        </div>
+      </fieldset>
+      <fieldset className="form-section">
+        <legend>Your social settings</legend>
+        <label className="field">
+          <span>I feel most comfortable…</span>
+          <select name="socialComfort" defaultValue={data.socialComfort ?? ""}>
+            <option value="">Choose later</option>
+            <option value="small_groups">In small groups</option>
+            <option value="big_events">At big events</option>
+            <option value="mix">A mix</option>
+            <option value="one_on_one">One-on-one first</option>
+          </select>
+        </label>
+        <h3>In your first month, what would you love to find?</h3>
+        <div className="choice-grid choice-grid--multi">
+          {firstMonthGoalOptions.map(([value, label]) => (
+            <Choice
+              name="firstMonthGoals"
+              value={value}
+              label={label}
+              defaultChecked={data.firstMonthGoals?.includes(value)}
+              key={value}
+            />
+          ))}
+        </div>
+      </fieldset>
+      <fieldset className="form-section">
+        <legend>What support would you like to hear about?</legend>
+        <div className="choice-grid choice-grid--multi">
+          {supportNeedOptions.map(([value, label]) => (
+            <Choice
+              name="supportNeeds"
+              value={value}
+              label={label}
+              defaultChecked={data.supportNeeds?.includes(value)}
+              key={value}
+            />
+          ))}
+        </div>
+      </fieldset>
+    </>
+  );
+}
+
+function EmergencyContactFields({ data }: { data: StudentOnboardingData }) {
+  const nextKey = useRef(1);
+  const [contacts, setContacts] = useState(() =>
+    (data.emergencyContacts?.length
+      ? data.emergencyContacts
+      : [emptyEmergencyContact]
+    ).map((value, index) => ({ key: `contact-${index}`, value })),
+  );
+
+  return (
+    <>
+      <input type="hidden" name="emergencyContactCount" value={contacts.length} />
+      {contacts.map(({ key, value }, index) => (
+        <fieldset className="form-section" key={key}>
+          <legend>
+            {index === 0
+              ? "Primary emergency contact"
+              : `Additional emergency contact ${index}`}
+          </legend>
+          {contacts.length > 1 ? (
+            <button
+              className="text-button"
+              type="button"
+              onClick={() =>
+                setContacts((current) =>
+                  current.filter((contact) => contact.key !== key),
+                )
+              }
+            >
+              Remove
+            </button>
+          ) : null}
+          <div className="form-grid">
+            <label className="field">
+              <span>Full name</span>
+              <input
+                name={`emergencyContacts.${index}.fullName`}
+                defaultValue={value.fullName}
+                maxLength={160}
+                required
+              />
+            </label>
+            <label className="field">
+              <span>Relationship</span>
+              <select
+                name={`emergencyContacts.${index}.relationship`}
+                defaultValue={value.relationship}
+                required
+              >
+                <option value="parent">Parent</option>
+                <option value="guardian">Guardian</option>
+                <option value="partner">Partner</option>
+                <option value="sibling">Sibling</option>
+                <option value="relative">Relative</option>
+                <option value="friend">Friend</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Mobile number</span>
+              <input
+                name={`emergencyContacts.${index}.mobilePhone`}
+                defaultValue={value.mobilePhone}
+                placeholder="+1 555 010 0300"
+                type="tel"
+                required
+              />
+            </label>
+          </div>
+        </fieldset>
+      ))}
+      {contacts.length < 4 ? (
+        <button
+          className="button button--secondary"
+          type="button"
+          onClick={() => {
+            const key = `new-contact-${nextKey.current++}`;
+            setContacts((current) => [
+              ...current,
+              { key, value: emptyEmergencyContact },
+            ]);
+          }}
+        >
+          + Add another emergency contact
+        </button>
+      ) : null}
+      <div className="review-summary">
+        <h3>Emergency use only</h3>
+        <p>
+          These contacts are not invited to your portal and cannot discuss
+          your record unless you separately authorize them.
+        </p>
+      </div>
+    </>
+  );
+}
+
+function FamilyPermissionFields({ data }: { data: StudentOnboardingData }) {
+  const nextKey = useRef(1);
+  const [permissions, setPermissions] = useState(() =>
+    (data.familyPermissions ?? []).map((value, index) => ({
+      key: `permission-${index}`,
+      value,
+    })),
+  );
+
+  return (
+    <>
+      <input type="hidden" name="familyPermissionCount" value={permissions.length} />
+      {permissions.length === 0 ? (
+        <div className="review-summary">
+          <h3>No one else has record access</h3>
+          <p>
+            Your record is private by default. You can continue this way or
+            authorize a specific person and exact record categories.
+          </p>
+        </div>
+      ) : null}
+      {permissions.map(({ key, value }, index) => (
+        <fieldset className="form-section" key={key}>
+          <legend>Authorized person {index + 1}</legend>
+          <button
+            className="text-button"
+            type="button"
+            onClick={() =>
+              setPermissions((current) =>
+                current.filter((permission) => permission.key !== key),
+              )
+            }
+          >
+            Remove
+          </button>
+          <div className="form-grid">
+            <label className="field">
+              <span>Full name</span>
+              <input
+                name={`familyPermissions.${index}.fullName`}
+                defaultValue={value.fullName}
+                maxLength={160}
+                required
+              />
+            </label>
+            <label className="field">
+              <span>Relationship</span>
+              <select
+                name={`familyPermissions.${index}.relationship`}
+                defaultValue={value.relationship}
+                required
+              >
+                <option value="parent">Parent</option>
+                <option value="guardian">Guardian</option>
+                <option value="partner">Spouse or partner</option>
+                <option value="sponsor">Sponsor</option>
+                <option value="other">Other trusted person</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Email</span>
+              <input
+                name={`familyPermissions.${index}.email`}
+                defaultValue={value.email}
+                type="email"
+                maxLength={254}
+                required
+              />
+            </label>
+          </div>
+          <h3>What may Aster discuss with this person?</h3>
+          <div className="choice-grid choice-grid--multi">
+            {ferpaScopeOptions.map(([scope, label]) => (
+              <Choice
+                name={`familyPermissions.${index}.scopes`}
+                value={scope}
+                label={label}
+                defaultChecked={value.scopes.includes(scope)}
+                key={scope}
+              />
+            ))}
+          </div>
+          <div className="form-grid">
+            <label className="field">
+              <span>Purpose of this disclosure</span>
+              <select
+                name={`familyPermissions.${index}.purpose`}
+                defaultValue={value.purpose}
+                required
+              >
+                <option value="education_and_expenses">Coordinate my education and expenses</option>
+                <option value="academic_planning">Help me manage academic planning</option>
+                <option value="billing_and_aid">Help me manage billing and aid</option>
+                <option value="other">Another purpose stated in my signed form</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Permission ends</span>
+              <select
+                name={`familyPermissions.${index}.expires`}
+                defaultValue={value.expires}
+                required
+              >
+                <option value="end_first_year">End of first academic year</option>
+                <option value="end_enrollment">End of my enrollment at Aster</option>
+                <option value="registrar_date">On a date I provide to the Registrar</option>
+              </select>
+            </label>
+          </div>
+        </fieldset>
+      ))}
+      {permissions.length < 4 ? (
+        <button
+          className="button button--secondary"
+          type="button"
+          onClick={() => {
+            const key = `new-permission-${nextKey.current++}`;
+            setPermissions((current) => [
+              ...current,
+              { key, value: emptyFamilyPermission },
+            ]);
+          }}
+        >
+          + Add a parent, guardian or supporter
+        </button>
+      ) : null}
+    </>
   );
 }
 
@@ -274,14 +978,19 @@ function StepFields({
             </dl>
           </div>
           {offer.status === "offered" ? (
-            <label className="confirmation-check">
-              <input name="offerAccepted" type="checkbox" required />
-              <span>
-                <strong>I accept my offer of admission to Aster University.</strong>
-                I understand this decision will be recorded in my official
-                admissions record.
-              </span>
-            </label>
+            <>
+              <label className="confirmation-check">
+                <input name="offerAccepted" type="checkbox" required />
+                <span>
+                  <strong>Yes—start my Aster enrollment</strong>
+                  I accept my offer of admission and understand this decision
+                  will be recorded in my official admissions record.
+                </span>
+              </label>
+              <Link className="button button--secondary" href="/help">
+                I’m still deciding—show me my options
+              </Link>
+            </>
           ) : (
             <p className="confirmed-line">
               <span aria-hidden="true">✓</span>
@@ -294,10 +1003,10 @@ function StepFields({
       return (
         <>
           <fieldset className="form-section">
-            <legend>Create your student profile</legend>
+            <legend>We know a lot already. Make sure it still feels like you.</legend>
             <div className="form-grid">
               <label className="field">
-                <span>First name</span>
+                <span>Legal first name</span>
                 <input
                   name="firstName"
                   required
@@ -307,7 +1016,7 @@ function StepFields({
                 />
               </label>
               <label className="field">
-                <span>Last name</span>
+                <span>Legal last name</span>
                 <input
                   name="lastName"
                   required
@@ -317,7 +1026,7 @@ function StepFields({
                 />
               </label>
               <label className="field">
-                <span>Preferred name</span>
+                <span>What should we call you?</span>
                 <input
                   name="preferredName"
                   required
@@ -327,7 +1036,18 @@ function StepFields({
                 />
               </label>
               <label className="field">
-                <span>Mobile phone</span>
+                <span>Personal email</span>
+                <input
+                  name="personalEmail"
+                  type="email"
+                  required
+                  maxLength={254}
+                  autoComplete="email"
+                  defaultValue={data.personalEmail ?? ""}
+                />
+              </label>
+              <label className="field">
+                <span>Mobile number</span>
                 <input
                   name="mobilePhone"
                   type="tel"
@@ -337,206 +1057,109 @@ function StepFields({
                   defaultValue={data.mobilePhone ?? ""}
                 />
               </label>
+              <label className="field">
+                <span>Citizenship / student status</span>
+                <select
+                  name="citizenshipStatus"
+                  defaultValue={data.citizenshipStatus ?? ""}
+                  required
+                >
+                  <option value="" disabled>Choose one</option>
+                  <option value="us_citizen">U.S. citizen</option>
+                  <option value="permanent_resident">U.S. permanent resident</option>
+                  <option value="eligible_noncitizen">Other eligible noncitizen / status</option>
+                  <option value="international">International student · F-1 or J-1</option>
+                </select>
+              </label>
             </div>
           </fieldset>
           <fieldset className="form-section">
-            <legend>Confirm your student record</legend>
-            <label className="confirmation-check">
-              <input
-                name="legalNameConfirmed"
-                type="checkbox"
-                defaultChecked={data.legalNameConfirmed}
-                required
-              />
-              <span>
-                <strong>My legal identity is correct</strong>
-                I reviewed the legal name associated with my student record.
-              </span>
-            </label>
-            <label className="confirmation-check">
-              <input
-                name="contactInformationConfirmed"
-                type="checkbox"
-                defaultChecked={data.contactInformationConfirmed}
-                required
-              />
-              <span>
-                <strong>My contact details are current</strong>
-                Aster can use my confirmed contact information for enrollment.
-              </span>
-            </label>
-            <label className="confirmation-check">
-              <input
-                name="homeAddressConfirmed"
-                type="checkbox"
-                defaultChecked={data.homeAddressConfirmed}
-                required
-              />
-              <span>
-                <strong>My home address is current</strong>
-                I reviewed the address held in my official record.
-              </span>
-            </label>
-          </fieldset>
-          <fieldset className="form-section">
-            <legend>Residency status</legend>
-            <div className="choice-grid">
-              <Choice
-                type="radio"
-                name="residencyStatus"
-                value="domestic"
-                label="Domestic student"
-                defaultChecked={data.residencyStatus === "domestic"}
-                required
-              />
-              <Choice
-                type="radio"
-                name="residencyStatus"
-                value="international"
-                label="International student"
-                defaultChecked={data.residencyStatus === "international"}
-                required
-              />
-            </div>
-          </fieldset>
-          <fieldset className="form-section">
-            <legend>Preferred communication</legend>
-            <div className="choice-grid">
-              <Choice
-                type="radio"
-                name="communicationPreference"
-                value="email"
-                label="Email"
-                defaultChecked={data.communicationPreference === "email"}
-                required
-              />
-              <Choice
-                type="radio"
-                name="communicationPreference"
-                value="sms"
-                label="SMS"
-                defaultChecked={data.communicationPreference === "sms"}
-                required
-              />
+            <legend>Your permanent home address</legend>
+            <p>
+              This helps Aster prepare your initial tuition classification.
+              Residency is determined under institutional and state policy,
+              not by this address alone.
+            </p>
+            <div className="form-grid">
+              <label className="field">
+                <span>Street address</span>
+                <input
+                  name="streetAddress"
+                  defaultValue={data.streetAddress ?? ""}
+                  autoComplete="street-address"
+                  maxLength={180}
+                  required
+                />
+              </label>
+              <label className="field">
+                <span>Apartment, unit or building · optional</span>
+                <input
+                  name="addressLine2"
+                  defaultValue={data.addressLine2 ?? ""}
+                  maxLength={180}
+                />
+              </label>
+              <label className="field">
+                <span>City</span>
+                <input
+                  name="city"
+                  defaultValue={data.city ?? ""}
+                  autoComplete="address-level2"
+                  maxLength={120}
+                  required
+                />
+              </label>
+              <label className="field">
+                <span>State / province</span>
+                <input
+                  name="stateOrProvince"
+                  defaultValue={data.stateOrProvince ?? ""}
+                  autoComplete="address-level1"
+                  maxLength={120}
+                  required
+                />
+              </label>
+              <label className="field">
+                <span>ZIP / postal code</span>
+                <input
+                  name="postalCode"
+                  defaultValue={data.postalCode ?? ""}
+                  autoComplete="postal-code"
+                  maxLength={32}
+                  required
+                />
+              </label>
+              <label className="field">
+                <span>Country</span>
+                <select
+                  name="country"
+                  defaultValue={data.country ?? ""}
+                  autoComplete="country-name"
+                  required
+                >
+                  <option value="" disabled>Choose one</option>
+                  <option value="United States">United States</option>
+                  <option value="Canada">Canada</option>
+                  <option value="China">China</option>
+                  <option value="India">India</option>
+                  <option value="Mexico">Mexico</option>
+                  <option value="Türkiye">Türkiye</option>
+                  <option value="United Kingdom">United Kingdom</option>
+                  <option value="Another country">Another country</option>
+                </select>
+              </label>
             </div>
           </fieldset>
         </>
       );
     case "housing":
-      return (
-        <fieldset className="form-section">
-          <legend>Where are you planning to live?</legend>
-          <p>Your answer helps tailor housing guidance. It is not a housing contract.</p>
-          <div className="choice-grid">
-            <Choice
-              type="radio"
-              name="housingPreference"
-              value="on_campus"
-              label="On campus"
-              defaultChecked={data.housingPreference === "on_campus"}
-              required
-            />
-            <Choice
-              type="radio"
-              name="housingPreference"
-              value="off_campus"
-              label="Off campus"
-              defaultChecked={data.housingPreference === "off_campus"}
-              required
-            />
-            <Choice
-              type="radio"
-              name="housingPreference"
-              value="undecided"
-              label="Still deciding"
-              defaultChecked={data.housingPreference === "undecided"}
-              required
-            />
-          </div>
-        </fieldset>
-      );
+      return <HousingFields data={data} />;
     case "campus_life":
-      return (
-        <>
-          <fieldset className="form-section">
-            <legend>What would you like to explore?</legend>
-            <p>Choose any communities you want Aster to introduce.</p>
-            <div className="choice-grid choice-grid--multi">
-              {campusInterestOptions.map(([value, label]) => (
-                <Choice
-                  name="campusInterests"
-                  value={value}
-                  label={label}
-                  defaultChecked={data.campusInterests?.includes(value)}
-                  key={value}
-                />
-              ))}
-            </div>
-          </fieldset>
-          <fieldset className="form-section">
-            <legend>Support you may want</legend>
-            <div className="choice-grid choice-grid--multi">
-              {supportNeedOptions.map(([value, label]) => (
-                <Choice
-                  name="supportNeeds"
-                  value={value}
-                  label={label}
-                  defaultChecked={data.supportNeeds?.includes(value)}
-                  key={value}
-                />
-              ))}
-            </div>
-          </fieldset>
-        </>
-      );
+      return <CampusLifeFields data={data} />;
     case "emergency_contacts":
-      return (
-        <label className="confirmation-check confirmation-check--large">
-          <input
-            name="emergencyContactConfirmed"
-            type="checkbox"
-            defaultChecked={data.emergencyContactConfirmed}
-            required
-          />
-          <span>
-            <strong>I reviewed my emergency contact information</strong>
-            The people listed in my official record are the right people for
-            Aster to contact in an urgent situation.
-          </span>
-        </label>
-      );
-    case "other_records":
-      return (
-        <label className="confirmation-check confirmation-check--large">
-          <input
-            name="recordsConfirmed"
-            type="checkbox"
-            defaultChecked={data.recordsConfirmed}
-            required
-          />
-          <span>
-            <strong>I reviewed my ID, health, and access records</strong>
-            I understand Aster may request verified documents separately, and
-            this confirmation does not replace those requirements.
-          </span>
-        </label>
-      );
+      return <EmergencyContactFields data={data} />;
     case "family_permissions":
-      return (
-        <label className="confirmation-check confirmation-check--large">
-          <input
-            name="familyPermissionsReviewed"
-            type="checkbox"
-            defaultChecked={data.familyPermissionsReviewed}
-            required
-          />
-          <span>
-            <strong>I reviewed family and delegate access</strong>
-            FERPA permissions are granted to specific people and scopes. No one
-            receives access just because they are a family member.
-          </span>
-        </label>
-      );
+      return <FamilyPermissionFields data={data} />;
     case "review_and_sign":
       return (
         <>
@@ -552,8 +1175,8 @@ function StepFields({
                 <dd>{data.housingPreference?.replace("_", " ") || "Not provided"}</dd>
               </div>
               <div>
-                <dt>Communication</dt>
-                <dd>{data.communicationPreference || "Not provided"}</dd>
+                <dt>Emergency contacts</dt>
+                <dd>{data.emergencyContacts?.length || 0} entered</dd>
               </div>
               <div>
                 <dt>Campus interests</dt>
@@ -561,19 +1184,25 @@ function StepFields({
               </div>
             </dl>
           </div>
-          <label className="confirmation-check">
-            <input
-              name="signatureConfirmed"
-              type="checkbox"
-              defaultChecked={data.signatureConfirmed}
-              required
-            />
-            <span>
-              <strong>This is my electronic confirmation</strong>
-              I reviewed this onboarding packet and confirm my responses are
-              accurate to the best of my knowledge.
-            </span>
-          </label>
+          <fieldset className="form-section">
+            <legend>Type your full legal name once</legend>
+            <p>
+              Aster uses it as your electronic confirmation for this
+              onboarding packet. Optional permissions remain separate.
+            </p>
+            <label className="field">
+              <span>Full legal name</span>
+              <input
+                name="signatureFullName"
+                defaultValue={
+                  data.signatureFullName ??
+                  `${data.firstName ?? ""} ${data.lastName ?? ""}`.trim()
+                }
+                maxLength={240}
+                required
+              />
+            </label>
+          </fieldset>
         </>
       );
     case "deposit":
@@ -585,26 +1214,69 @@ function StepFields({
             <p>
               {depositPaid
                 ? "Payment received through Aster’s secure processor."
-                : "The amount is set by your admission offer and will be processed when you continue."}
+                : "Choose whether to pay now, pay later, or request a waiver or deferral."}
             </p>
           </div>
-          <label className="confirmation-check">
-            <input
-              name="depositAcknowledged"
-              type="checkbox"
-              defaultChecked={data.depositAcknowledged}
-              required
-            />
-            <span>
-              <strong>I understand the enrollment deposit</strong>
-              {depositPaid
-                ? "My payment is recorded and I acknowledge the deposit terms."
-                : "Continuing will record the deposit through the development payment processor."}
-            </span>
-          </label>
+          <fieldset className="form-section">
+            <legend>How would you like to handle it?</legend>
+            <div className="choice-grid">
+              <Choice
+                type="radio"
+                name="depositChoice"
+                value="pay_now"
+                label={
+                  depositPaid
+                    ? "Payment already received"
+                    : `Pay ${formatMoney(offer.depositAmountCents)} securely now`
+                }
+                defaultChecked={
+                  depositPaid || data.depositChoice === "pay_now"
+                }
+                required
+              />
+              {!depositPaid ? (
+                <>
+                  <Choice
+                    type="radio"
+                    name="depositChoice"
+                    value="pay_later"
+                    label={`Accept now, pay by ${new Intl.DateTimeFormat("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      timeZone: "UTC",
+                    }).format(new Date(offer.responseDeadline))}`}
+                    defaultChecked={data.depositChoice === "pay_later"}
+                    required
+                  />
+                  <Choice
+                    type="radio"
+                    name="depositChoice"
+                    value="waiver_or_deferral"
+                    label="Request a waiver or deferral"
+                    defaultChecked={
+                      data.depositChoice === "waiver_or_deferral"
+                    }
+                    required
+                  />
+                </>
+              ) : null}
+            </div>
+          </fieldset>
         </>
       );
   }
+}
+
+function optionalFormString(values: FormData, name: string) {
+  const value = String(values.get(name) ?? "").trim();
+  return value || undefined;
+}
+
+function normalizedPhone(values: FormData, name: string) {
+  const value = String(values.get(name) ?? "")
+    .trim()
+    .replace(/[ ()-]/g, "");
+  return value && !value.startsWith("+") ? `+${value}` : value;
 }
 
 function dataFromForm(
@@ -619,62 +1291,152 @@ function dataFromForm(
     case "offer":
       return next;
     case "about_you":
+      {
+        const citizenshipStatus = values.get(
+          "citizenshipStatus",
+        ) as StudentOnboardingData["citizenshipStatus"];
       return {
         ...next,
         firstName: String(values.get("firstName") ?? "").trim(),
         lastName: String(values.get("lastName") ?? "").trim(),
         preferredName: String(values.get("preferredName") ?? "").trim(),
-        mobilePhone: String(values.get("mobilePhone") ?? "").trim(),
-        legalNameConfirmed: values.get("legalNameConfirmed") === "on",
-        contactInformationConfirmed:
-          values.get("contactInformationConfirmed") === "on",
-        homeAddressConfirmed: values.get("homeAddressConfirmed") === "on",
-        communicationPreference: values.get(
-          "communicationPreference",
-        ) as StudentOnboardingData["communicationPreference"],
-        residencyStatus: values.get(
-          "residencyStatus",
-        ) as StudentOnboardingData["residencyStatus"],
+        personalEmail: String(values.get("personalEmail") ?? "")
+          .trim()
+          .toLowerCase(),
+        mobilePhone: normalizedPhone(values, "mobilePhone"),
+        citizenshipStatus,
+        communicationPreference: next.communicationPreference ?? "email",
+        residencyStatus:
+          citizenshipStatus === "international"
+            ? "international"
+            : "domestic",
+        streetAddress: String(values.get("streetAddress") ?? "").trim(),
+        addressLine2: optionalFormString(values, "addressLine2"),
+        city: String(values.get("city") ?? "").trim(),
+        stateOrProvince: String(values.get("stateOrProvince") ?? "").trim(),
+        postalCode: String(values.get("postalCode") ?? "").trim(),
+        country: String(values.get("country") ?? "").trim(),
       };
+      }
     case "housing":
       return {
         ...next,
         housingPreference: values.get(
           "housingPreference",
         ) as StudentOnboardingData["housingPreference"],
+        housingRoomType: optionalFormString(values, "housingRoomType"),
+        bathroomPreference: optionalFormString(values, "bathroomPreference"),
+        roommateMatching: optionalFormString(values, "roommateMatching"),
+        sleepSchedule: optionalFormString(values, "sleepSchedule"),
+        studyHabits: optionalFormString(values, "studyHabits"),
+        roomNoise: optionalFormString(values, "roomNoise"),
+        cleanliness: optionalFormString(values, "cleanliness"),
+        guestPreference: optionalFormString(values, "guestPreference"),
+        temperaturePreference: optionalFormString(
+          values,
+          "temperaturePreference",
+        ),
+        smokeVapeCompatibility: optionalFormString(
+          values,
+          "smokeVapeCompatibility",
+        ),
+        substanceFreeHousing: values.get("substanceFreeHousing") === "yes",
+        genderInclusiveHousing:
+          values.get("genderInclusiveHousing") === "yes",
+        accessibleHousingInformation:
+          values.get("accessibleHousingInformation") === "yes",
+        livingLearningCommunities: values
+          .getAll("livingLearningCommunities")
+          .map(String),
+        offCampusStatus: optionalFormString(values, "offCampusStatus"),
+        offCampusResources: values.getAll("offCampusResources").map(String),
+        commuteMode: optionalFormString(values, "commuteMode"),
+        commuteDuration: optionalFormString(values, "commuteDuration"),
+        commuterResources: values.getAll("commuterResources").map(String),
       };
     case "campus_life":
       return {
         ...next,
         campusInterests: values.getAll("campusInterests").map(String),
         supportNeeds: values.getAll("supportNeeds").map(String),
+        socialComfort: optionalFormString(values, "socialComfort"),
+        firstMonthGoals: values.getAll("firstMonthGoals").map(String),
       };
     case "emergency_contacts":
+      {
+        const contactCount = Number(
+          values.get("emergencyContactCount") ?? 0,
+        );
       return {
         ...next,
-        emergencyContactConfirmed:
-          values.get("emergencyContactConfirmed") === "on",
+        emergencyContacts: Array.from(
+          { length: contactCount },
+          (_, index) => ({
+            fullName: String(
+              values.get(`emergencyContacts.${index}.fullName`) ?? "",
+            ).trim(),
+            relationship: String(
+              values.get(`emergencyContacts.${index}.relationship`) ??
+                "other",
+            ) as OnboardingEmergencyContact["relationship"],
+            mobilePhone: normalizedPhone(
+              values,
+              `emergencyContacts.${index}.mobilePhone`,
+            ),
+          }),
+        ),
       };
-    case "other_records":
-      return {
-        ...next,
-        recordsConfirmed: values.get("recordsConfirmed") === "on",
-      };
+      }
     case "family_permissions":
+      {
+        const permissionCount = Number(
+          values.get("familyPermissionCount") ?? 0,
+        );
       return {
         ...next,
-        familyPermissionsReviewed:
-          values.get("familyPermissionsReviewed") === "on",
+        familyPermissions: Array.from(
+          { length: permissionCount },
+          (_, index) => ({
+            fullName: String(
+              values.get(`familyPermissions.${index}.fullName`) ?? "",
+            ).trim(),
+            relationship: String(
+              values.get(`familyPermissions.${index}.relationship`) ??
+                "other",
+            ) as OnboardingFamilyPermission["relationship"],
+            email: String(
+              values.get(`familyPermissions.${index}.email`) ?? "",
+            )
+              .trim()
+              .toLowerCase(),
+            scopes: values
+              .getAll(`familyPermissions.${index}.scopes`)
+              .map(String),
+            purpose: String(
+              values.get(`familyPermissions.${index}.purpose`) ??
+                "education_and_expenses",
+            ) as OnboardingFamilyPermission["purpose"],
+            expires: String(
+              values.get(`familyPermissions.${index}.expires`) ??
+                "end_first_year",
+            ) as OnboardingFamilyPermission["expires"],
+          }),
+        ),
       };
+      }
     case "review_and_sign":
       return {
         ...next,
-        signatureConfirmed: values.get("signatureConfirmed") === "on",
+        signatureFullName: String(
+          values.get("signatureFullName") ?? "",
+        ).trim(),
       };
     case "deposit":
       return {
         ...next,
-        depositAcknowledged: values.get("depositAcknowledged") === "on",
+        depositChoice: values.get(
+          "depositChoice",
+        ) as StudentOnboardingData["depositChoice"],
       };
   }
 }
@@ -740,14 +1502,6 @@ function OnboardingFlow({
       ),
     );
 
-    if (
-      onboarding.currentStep === "campus_life" &&
-      (!nextData.campusInterests || nextData.campusInterests.length === 0)
-    ) {
-      setError("Choose at least one campus interest to continue.");
-      return;
-    }
-
     try {
       if (onboarding.currentStep === "offer" && offer.status === "offered") {
         const key = offerKey.current ?? (offerKey.current = crypto.randomUUID());
@@ -755,7 +1509,11 @@ function OnboardingFlow({
         offerKey.current = null;
         setOffer((current) => ({ ...current, status: "accepted" }));
       }
-      if (onboarding.currentStep === "deposit" && !depositPaid) {
+      if (
+        onboarding.currentStep === "deposit" &&
+        nextData.depositChoice === "pay_now" &&
+        !depositPaid
+      ) {
         const key =
           depositKey.current ?? (depositKey.current = crypto.randomUUID());
         await createDepositPayment({ offerId: offer.id }, key);
@@ -902,17 +1660,13 @@ function OnboardingFlow({
                       ? onboarding.currentStep === "offer" &&
                         offer.status === "offered"
                         ? "Accepting offer…"
-                        : onboarding.currentStep === "deposit" && !depositPaid
-                          ? "Processing deposit…"
                         : "Saving step…"
                       : save.status === "error"
                         ? "Retry step"
                         : onboarding.currentStep === "offer" &&
                             offer.status === "offered"
                           ? "Accept and continue"
-                          : onboarding.currentStep === "deposit" && !depositPaid
-                            ? `Pay ${formatMoney(offer.depositAmountCents)} and continue`
-                            : "Save and continue"}
+                          : "Save and continue"}
                     <span aria-hidden="true">→</span>
                   </button>
                 </div>
