@@ -71,7 +71,10 @@ test("all student portal routes render and the dynamic requirement route resolve
 test("removes the disposable starter preview", async () => {
   const disposablePreviewFiles = await readdir(
     new URL("../app/_sites-preview", import.meta.url),
-  );
+  ).catch((error) => {
+    if (error?.code === "ENOENT") return [];
+    throw error;
+  });
   assert.deepEqual(disposablePreviewFiles, []);
 
   const [page, layout] = await Promise.all([
