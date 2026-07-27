@@ -577,6 +577,19 @@ function DocumentAction({
       ? recentDocument
       : latestStoredDocument;
   const extraction = selectedDocument?.extraction;
+  const extractionMismatch =
+    extraction?.status === "completed" &&
+    requirement.documentCategory &&
+    extraction.documentType !==
+      {
+        consent: "ferpa",
+        financial_aid: "financial_aid",
+        health: "immunization",
+        identity: "identity",
+        other: "other",
+        residency: "residency",
+        transcript: "transcript",
+      }[requirement.documentCategory];
   const refreshDocuments = documents.refresh;
 
   useEffect(() => {
@@ -622,7 +635,7 @@ function DocumentAction({
   }, [selectedDocument]);
 
   const resultTone =
-    extraction?.status === "completed"
+    extraction?.status === "completed" && !extractionMismatch
       ? "success"
       : extraction?.status === "processing"
         ? "pending"
@@ -692,7 +705,9 @@ function DocumentAction({
               ) : null}
             </div>
           </div>
-          {selectedDocument && reviewPlacement === "inline" ? (
+          {selectedDocument &&
+          selectedDocument.processingMode === "agentic" &&
+          reviewPlacement === "inline" ? (
             <DocumentExtractionReview
               key={`${selectedDocument.id}:${selectedDocument.extraction?.status ?? "none"}:${selectedDocument.extraction?.processedAt ?? ""}`}
               document={selectedDocument}

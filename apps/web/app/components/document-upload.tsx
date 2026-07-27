@@ -65,9 +65,11 @@ function statusLabel(item: SelectedDocument) {
     }
     const extraction = item.document?.extraction;
     return extraction?.status === "processing"
-      ? "Original saved; Edward is extracting it"
+      ? item.document?.processingMode === "classification_only"
+        ? "Original saved; Edward is checking the document type"
+        : "Original saved; Edward is extracting it"
       : extraction?.status === "completed"
-      ? `Extracted as ${extraction.documentType.replaceAll("_", " ")}`
+      ? `${item.document?.processingMode === "classification_only" ? "Classified" : "Extracted"} as ${extraction.documentType.replaceAll("_", " ")}`
       : extraction?.status === "failed"
         ? "Stored; parsing needs attention"
         : extraction?.status === "pending_configuration"
@@ -75,6 +77,23 @@ function statusLabel(item: SelectedDocument) {
           : "Stored; parsing result needs review";
   }
   return item.message ?? "Upload needs attention";
+}
+
+function matchesExpectedCategory(
+  document: StudentDocument,
+  categoryHint?: StudentDocumentCategory,
+) {
+  if (!categoryHint || document.extraction?.status !== "completed") return true;
+  const expectedType = {
+    consent: "ferpa",
+    financial_aid: "financial_aid",
+    health: "immunization",
+    identity: "identity",
+    other: "other",
+    residency: "residency",
+    transcript: "transcript",
+  }[categoryHint];
+  return document.extraction.documentType === expectedType;
 }
 
 export function DocumentUpload({
@@ -93,9 +112,11 @@ export function DocumentUpload({
   const [isUploading, setIsUploading] = useState(false);
   const [bundleMessage, setBundleMessage] = useState<string | null>(null);
   const onUploadedRef = useRef(onUploaded);
-  const parsingEnabled = categoryHint
-    ? documentProcessingModeForCategory(categoryHint) === "agentic"
-    : false;
+  const processingMode = categoryHint
+    ? documentProcessingModeForCategory(categoryHint)
+    : "manual_review";
+  const parsingEnabled = processingMode !== "manual_review";
+  const classificationOnly = processingMode === "classification_only";
   useEffect(() => {
     onUploadedRef.current = onUploaded;
   }, [onUploaded]);
@@ -150,14 +171,17 @@ export function DocumentUpload({
             (document) => document.extraction?.status === "processing",
           );
           if (!stillProcessing && changed.length > 0) {
-            const completedCount = changed.filter(
-              (document) => document.extraction?.status === "completed",
+            const acceptedCount = changed.filter(
+              (document) =>
+                document.extraction?.status === "completed" &&
+                matchesExpectedCategory(document, categoryHint),
             ).length;
-            const attentionCount = changed.length - completedCount;
+            const attentionCount = changed.length - acceptedCount;
+            const completedVerb = classificationOnly ? "checked" : "parsed";
             setBundleMessage(
               attentionCount > 0
-                ? `${completedCount} document${completedCount === 1 ? "" : "s"} parsed; ${attentionCount} stored document${attentionCount === 1 ? " needs" : "s need"} attention.`
-                : `${completedCount} document${completedCount === 1 ? "" : "s"} parsed and ready for your review.`,
+                ? `${acceptedCount} document${acceptedCount === 1 ? "" : "s"} ${completedVerb}; ${attentionCount} stored document${attentionCount === 1 ? " needs" : "s need"} attention.`
+                : `${acceptedCount} document${acceptedCount === 1 ? "" : "s"} ${completedVerb} and ready for your review.`,
             );
           } else if (stillProcessing && attempts < 90) {
             void poll();
@@ -177,7 +201,7 @@ export function DocumentUpload({
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [processingDocumentKey]);
+  }, [categoryHint, classificationOnly, processingDocumentKey]);
 
   const addFiles = (files: readonly File[]) => {
     if (files.length === 0) return;
@@ -260,10 +284,12 @@ export function DocumentUpload({
     }
 
     setBundleMessage(
-      `${parsingEnabled ? "Processing" : "Uploading"} ${queuedDocuments.length} document${
+      `${classificationOnly ? "Checking" : parsingEnabled ? "Processing" : "Uploading"} ${queuedDocuments.length} document${
         queuedDocuments.length === 1 ? "" : "s"
       } as one requirement bundle.${
-        parsingEnabled
+        classificationOnly
+          ? " Edward checks each document type without extracting financial fields."
+          : parsingEnabled
           ? " Each file gets its own extraction result."
           : " Each original will be stored and routed to staff review."
       }`,
@@ -311,8 +337,10 @@ export function DocumentUpload({
     }
 
     const failedCount = results.length - uploaded.length;
-    const parsedCount = uploaded.filter(
-      (result) => result.document.extraction?.status === "completed",
+    const acceptedCount = uploaded.filter(
+      (result) =>
+        result.document.extraction?.status === "completed" &&
+        matchesExpectedCategory(result.document, categoryHint),
     ).length;
     const processingCount = uploaded.filter(
       (result) => result.document.extraction?.status === "processing",
@@ -322,21 +350,22 @@ export function DocumentUpload({
         result.document.processingMode === "manual_review" &&
         result.document.status === "under_review",
     ).length;
-    const storedForAttentionCount = uploaded.length - parsedCount;
+    const storedForAttentionCount = uploaded.length - acceptedCount;
+    const completedVerb = classificationOnly ? "checked" : "parsed";
     setBundleMessage(
       failedCount > 0
         ? `${uploaded.length} stored; ${failedCount} need${
             failedCount === 1 ? "s" : ""
           } attention before upload could finish.`
         : processingCount > 0
-          ? `${uploaded.length} original document${uploaded.length === 1 ? " is" : "s are"} safely stored. Edward is extracting ${processingCount === uploaded.length ? "them" : "the remaining files"} in the background.`
+          ? `${uploaded.length} original document${uploaded.length === 1 ? " is" : "s are"} safely stored. Edward is ${classificationOnly ? "checking document types" : `extracting ${processingCount === uploaded.length ? "them" : "the remaining files"}`} in the background.`
         : manualReviewCount === uploaded.length && manualReviewCount > 0
           ? `${manualReviewCount} original document${manualReviewCount === 1 ? " was" : "s were"} safely stored and sent for staff review.`
         : storedForAttentionCount > 0
-          ? `${parsedCount} document${parsedCount === 1 ? "" : "s"} parsed; ${storedForAttentionCount} safely stored but need${
+          ? `${acceptedCount} document${acceptedCount === 1 ? "" : "s"} ${completedVerb}; ${storedForAttentionCount} safely stored but need${
               storedForAttentionCount === 1 ? "s" : ""
             } parsing attention.`
-          : `${parsedCount} document${parsedCount === 1 ? "" : "s"} parsed and ready for your review.`
+          : `${acceptedCount} document${acceptedCount === 1 ? "" : "s"} ${completedVerb} and ready for your review.`
     );
     setIsUploading(false);
   };
@@ -380,6 +409,8 @@ export function DocumentUpload({
           ? "Add every page or file that belongs to your academic record. Edward identifies the transcript, builds the course record, and runs advisory matching automatically; you do not need to classify it."
           : categoryHint === "identity"
             ? "Add every side of your identity document. Edward identifies the document, locates the portrait region, and prepares a private ID preview for review."
+            : categoryHint === "financial_aid"
+              ? "Edward checks that each file is a financial-aid document before it reaches the review queue. Financial fields are not extracted or added to your profile."
             : "Add every file that supports this requirement. The originals are stored securely in your student record and routed directly to staff review."}
       </p>
 
@@ -445,8 +476,10 @@ export function DocumentUpload({
         }
       >
         {isUploading
-          ? parsingEnabled
-            ? "Uploading and extracting…"
+          ? classificationOnly
+            ? "Uploading and checking…"
+            : parsingEnabled
+              ? "Uploading and extracting…"
             : "Uploading securely…"
           : documents.some((item) => item.status === "error" && !item.validationError)
             ? "Retry files needing attention"
@@ -460,6 +493,8 @@ export function DocumentUpload({
           ? "automatic parsing after upload"
           : categoryHint === "identity"
             ? "private photo extraction after upload"
+            : categoryHint === "financial_aid"
+              ? "document-type check only; no financial-field extraction"
             : "direct staff review"}
       </p>
     </form>

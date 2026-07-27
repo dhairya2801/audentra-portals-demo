@@ -74,6 +74,7 @@ export type ActionState = {
 
 export function useApiAction<Args extends unknown[], Result>(
   action: (...args: Args) => Promise<Result>,
+  errorMessage: (error: unknown) => string = messageFor,
 ) {
   const [state, setState] = useState<ActionState>({
     status: "idle",
@@ -88,11 +89,11 @@ export function useApiAction<Args extends unknown[], Result>(
         setState({ status: "success", message: null });
         return result;
       } catch (error) {
-        setState({ status: "error", message: messageFor(error) });
+        setState({ status: "error", message: errorMessage(error) });
         throw error;
       }
     },
-    [action],
+    [action, errorMessage],
   );
 
   const reset = useCallback(() => {

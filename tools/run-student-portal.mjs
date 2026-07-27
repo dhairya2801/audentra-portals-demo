@@ -61,7 +61,18 @@ start(
 );
 start(
   "student portal",
-  ["--prefix", "apps/web", "run", "dev", "--workspaces=false"],
+  [
+    "--prefix",
+    "apps/web",
+    "run",
+    "dev",
+    "--workspaces=false",
+    "--",
+    "--host",
+    process.env.WEB_HOST ?? "127.0.0.1",
+    "--port",
+    process.env.WEB_PORT ?? "3000",
+  ],
   {
     NEXT_PUBLIC_API_BASE_URL:
       process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000",
