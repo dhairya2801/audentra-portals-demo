@@ -1,0 +1,30 @@
+{
+  "documents": [
+    {
+      "id": "ferpa_release",
+      "name": "FERPA Information Release",
+      "file": "aster-ferpa-release.pdf",
+      "preview": "aster-ferpa-release-page-1.png",
+      "signatureBox": {
+        "x": 0.098,
+        "y": 0.488,
+        "width": 0.53,
+        "height": 0.054,
+        "page": 1
+      }
+    },
+    {
+      "id": "enrollment_acknowledgment",
+      "name": "Enrollment Information Acknowledgment",
+      "file": "aster-enrollment-acknowledgment.pdf",
+      "preview": "aster-enrollment-acknowledgment-page-1.png",
+      "signatureBox": {
+        "x": 0.098,
+        "y": 0.447,
+        "width": 0.53,
+        "height": 0.054,
+        "page": 1
+      }
+    }
+  ]
+}

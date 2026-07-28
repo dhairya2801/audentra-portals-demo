@@ -20,6 +20,8 @@ function start(name, args, environment = {}) {
     cwd: process.cwd(),
     env: { ...process.env, ...environment },
     stdio: "inherit",
+    shell: process.platform === "win32",
+    windowsHide: true,
   });
   children.push(child);
 

@@ -133,8 +133,20 @@ test("keeps housing and deposit actions inside their enrollment tasks", async ()
     "utf8",
   );
 
-  assert.match(requirementPage, /aster-residence-hall\.jpg/);
+  assert.match(requirementPage, /aster-residence-hall-room\.jpg/);
   assert.match(requirementPage, /onHousingPreviewChange/);
+  assert.match(
+    requirementPage,
+    /Residence and room details can be[\s\S]*decided later/,
+  );
+  assert.match(
+    requirementPage,
+    /On-campus housing selected [^"]* residence not selected yet/,
+  );
+  assert.doesNotMatch(
+    requirementPage,
+    /\(preference === "on_campus" && !residenceOption\)/,
+  );
   assert.match(requirementPage, /DepositPaymentAction/);
   assert.match(requirementPage, /createDepositPayment/);
   assert.doesNotMatch(requirementPage, /Go to payments/);
@@ -549,6 +561,12 @@ test("onboarding preserves the eight-step order and authoritative boundary actio
   assert.match(onboarding, /emergencyContacts/);
   assert.match(onboarding, /depositChoice/);
   assert.match(onboarding, /key: "deposit"[\s\S]*skippable: true/);
+  assert.doesNotMatch(
+    onboarding,
+    /key: "housing"[\s\S]{0,240}skippable: true/,
+  );
+  assert.match(onboarding, /No residence selected yet/);
+  assert.match(onboarding, /Clear residence selection and decide later/);
   assert.match(onboarding, /const nextData = editableOnboardingData\(/);
   assert.match(onboarding, /data: editableOnboardingData\(onboarding\.data\)/);
   assert.match(onboarding, /window\.location\.replace\("\/dashboard"\)/);

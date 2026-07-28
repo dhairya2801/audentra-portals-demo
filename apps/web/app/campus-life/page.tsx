@@ -167,11 +167,7 @@ export default function CampusLifePage() {
             return (
               <article key={club.id}>
                 <div className={`club-monogram club-monogram--${index % 4}`}>
-                  {club.name
-                    .split(/\s+/)
-                    .slice(0, 2)
-                    .map((word) => word[0])
-                    .join("")}
+                  <img src={club.imageUrl} alt={club.imageAlt} />
                 </div>
                 <small>{club.category}</small>
                 <h3>{club.name}</h3>

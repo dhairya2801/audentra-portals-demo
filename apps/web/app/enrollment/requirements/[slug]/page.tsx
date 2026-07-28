@@ -111,8 +111,8 @@ const residenceOptions: Array<{
     subtitle: "Classic campus living",
     description: "A lively, central home minutes from classes and campus dining.",
     amenities: ["Dining hall", "High-speed Wi-Fi", "Study lounges"],
-    image: "/images/housing/aster-residence-hall.jpg",
-    imageAlt: "Brick campus residence hall facing a green lawn",
+    image: "/media/housing/aster-residence-hall-room.jpg",
+    imageAlt: "Bright shared room with two beds, wardrobes, and a window desk",
   },
   {
     value: "aster_apartments",
@@ -120,7 +120,7 @@ const residenceOptions: Array<{
     subtitle: "Independent living",
     description: "Apartment-style rooms with more privacy and in-unit routines.",
     amenities: ["In-unit laundry", "Kitchenette", "Fitness room"],
-    image: "/images/housing/aster-apartments.jpg",
+    image: "/media/housing/aster-apartments-room.jpg",
     imageAlt: "Bright furnished apartment with a kitchenette and living area",
   },
   {
@@ -129,7 +129,7 @@ const residenceOptions: Array<{
     subtitle: "A connected community",
     description: "Shared suites surrounded by green space and resident events.",
     amenities: ["Community kitchen", "Courtyard", "Bike storage"],
-    image: "/images/housing/student-village.jpg",
+    image: "/media/housing/student-village-room.jpg",
     imageAlt: "Shared student room with bunk beds and large windows",
   },
 ];
@@ -360,8 +360,8 @@ function HousingActionForm({
   const [preference, setPreference] = useState<HousingPreference | null>(
     plan.preference,
   );
-  const [residenceOption, setResidenceOption] = useState<ResidenceOption>(
-    plan.residenceOption || "aster_residence_hall",
+  const [residenceOption, setResidenceOption] = useState<ResidenceOption | null>(
+    plan.residenceOption,
   );
   const [version, setVersion] = useState(plan.version);
   const saveHousing = useApiAction(
@@ -387,7 +387,9 @@ function HousingActionForm({
       const saved = await saveHousing.run({
         expectedVersion: version,
         preference,
-        ...(preference === "on_campus" ? { residenceOption } : {}),
+        ...(preference === "on_campus" && residenceOption
+          ? { residenceOption }
+          : {}),
       });
       setVersion(saved.version);
       onSaved(saved);
@@ -402,7 +404,10 @@ function HousingActionForm({
         <span aria-hidden="true">⌂</span>
         <div>
           <strong>Choose the plan that best matches your arrival.</strong>
-          <p>You can revise this selection here until housing placement is finalized.</p>
+          <p>
+            Your housing path is required. Residence and room details can be
+            decided later.
+          </p>
         </div>
       </div>
       <fieldset className="housing-choice-fieldset">
@@ -418,7 +423,13 @@ function HousingActionForm({
                 <input
                   checked={selected}
                   name="housing-preference"
-                  onChange={() => setPreference(choice.value)}
+                  onChange={() => {
+                    setPreference(choice.value);
+                    if (choice.value !== "on_campus") {
+                      setResidenceOption(null);
+                    }
+                  }}
+                  required
                   type="radio"
                   value={choice.value}
                 />
@@ -435,6 +446,23 @@ function HousingActionForm({
       {preference === "on_campus" ? (
         <fieldset className="housing-choice-fieldset housing-choice-fieldset--residence">
           <legend>Pick a residence style</legend>
+          <p>
+            Optional — leave every residence unselected to save your
+            on-campus plan and decide later.
+          </p>
+          {residenceOption ? (
+            <button
+              className="text-button"
+              type="button"
+              onClick={() => setResidenceOption(null)}
+            >
+              Clear residence selection and decide later
+            </button>
+          ) : (
+            <p className="optional-field-note">
+              On-campus housing selected · residence not selected yet.
+            </p>
+          )}
           <div className="residence-option-grid">
             {residenceOptions.map((option) => {
               const selected = residenceOption === option.value;
@@ -482,7 +510,10 @@ function HousingActionForm({
       <div className="form-actions">
         <button
           className="button button--accent"
-          disabled={!preference || saveHousing.status === "loading"}
+          disabled={
+            !preference ||
+            saveHousing.status === "loading"
+          }
           type="submit"
         >
           {saveHousing.status === "loading" ? "Saving housing plan…" : "Save housing plan"}
@@ -672,6 +703,46 @@ function DocumentAction({
               : "Drop every file that supports this requirement together. The originals are stored securely and routed to the responsible office for review."}
         </p>
       </div>
+      {requirement.immunizationPolicy ? (
+        <section className="immunization-policy" aria-labelledby="immunization-policy-title">
+          <div>
+            <p className="eyebrow">Active health policy</p>
+            <h3 id="immunization-policy-title">
+              {requirement.immunizationPolicy.name}
+            </h3>
+            <p>
+              Edward compares the uploaded evidence with policy{" "}
+              {requirement.immunizationPolicy.code}, version{" "}
+              {requirement.immunizationPolicy.version}. Health Services makes
+              the final determination.
+            </p>
+          </div>
+          <ul>
+            {requirement.immunizationPolicy.requirements.map((item) => (
+              <li key={item.id}>
+                <span aria-hidden="true">◇</span>
+                <div>
+                  <strong>
+                    {item.name}
+                    {item.required ? (
+                      <b className="required-asterisk" aria-label="required">
+                        *
+                      </b>
+                    ) : null}
+                  </strong>
+                  <p>{item.description}</p>
+                  {item.doseCount ? (
+                    <small>
+                      {item.doseCount} documented{" "}
+                      {item.doseCount === 1 ? "dose" : "doses"}
+                    </small>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       <DocumentUpload
         requirementId={requirement.id}
         categoryHint={requirement.documentCategory ?? undefined}
@@ -713,6 +784,44 @@ function DocumentAction({
               document={selectedDocument}
               onDocumentChanged={rememberDocument}
             />
+          ) : null}
+          {extraction.immunizationCompliance ? (
+            <section
+              className="immunization-results"
+              aria-labelledby="immunization-results-title"
+            >
+              <div>
+                <p className="eyebrow">Policy check</p>
+                <h3 id="immunization-results-title">
+                  Requirements found in this record
+                </h3>
+                <p>
+                  Checked with{" "}
+                  {extraction.immunizationCompliance.policyVersion}.
+                </p>
+              </div>
+              <ul>
+                {extraction.immunizationCompliance.requirements.map((item) => (
+                  <li
+                    key={item.ruleId}
+                    className={`immunization-results__item immunization-results__item--${item.status}`}
+                  >
+                    <span aria-hidden="true">
+                      {item.status === "met"
+                        ? "✓"
+                        : item.status === "missing"
+                          ? "!"
+                          : "?"}
+                    </span>
+                    <div>
+                      <strong>{item.name}</strong>
+                      <small>{humanize(item.status)}</small>
+                      <p>{item.rationale}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ) : null}
         </>
       ) : null}
@@ -872,16 +981,20 @@ function TranscriptPreview({
           <strong>
             {academics.status === "loading"
               ? `Checking ${courses.length} ${courses.length === 1 ? "course" : "courses"} against Aster rules`
-              : "No automatic equivalency matched yet"}
+              : extraction?.courseExemptionEvaluation
+                ? "No policy-backed equivalency matched yet"
+                : "Course mapping needs advisor review"}
           </strong>
           <p>
             {academics.status === "loading"
               ? "The transcript was parsed successfully. Potential matches will appear here automatically."
-              : `${courses.length} extracted ${courses.length === 1 ? "course was" : "courses were"} checked against the active ${academics.status === "ready" ? academics.data.catalogVersion : "Aster"} rule set. An advisor can review courses without a stored match.`}
+              : extraction?.courseExemptionEvaluation
+                ? `${courses.length} extracted ${courses.length === 1 ? "course was" : "courses were"} evaluated using the tenant's active ${academics.status === "ready" ? academics.data.catalogVersion : "catalog"}, program, prerequisites, equivalency rules, and versioned mapping prompt. An advisor can review every unmatched course.`
+                : "Your extracted courses are preserved. The active tenant policy context was not available for an automatic recommendation, so an advisor will review them."}
           </p>
           <div className="transcript-insight__notice">
             <span aria-hidden="true">◇</span>
-            Predictions never grant academic credit
+            Prompted recommendations never grant academic credit
           </div>
         </div>
       ) : (
@@ -910,8 +1023,9 @@ function TranscriptPreview({
       )}
       {!leadingRecommendation && extraction?.status !== "completed" ? (
         <p>
-          Edward extracts courses and grades, then deterministic, versioned
-          university rules prepare possible equivalencies for staff review.
+          Edward extracts every course and grade, then a tenant-versioned
+          prompt evaluates the current catalog, program requirements,
+          prerequisites, and equivalency rules for staff review.
         </p>
       ) : null}
     </section>
@@ -1050,8 +1164,8 @@ function HousingPreview({
         src={
           selected?.image ??
           (plan?.preference === "off_campus"
-            ? "/images/housing/aster-apartments.jpg"
-            : "/images/housing/aster-residence-hall.jpg")
+            ? "/media/housing/aster-apartments-room.jpg"
+            : "/media/housing/aster-residence-hall-room.jpg")
         }
         alt={
           selected?.imageAlt ??
@@ -1063,7 +1177,15 @@ function HousingPreview({
         width={960}
       />
       <strong>{selected?.title || preferenceLabel}</strong>
-      <p>{selected ? selected.description : "Choose a plan on the left to personalize this preview."}</p>
+      <p>
+        {selected
+          ? selected.description
+          : plan?.preference === "on_campus"
+            ? "Your on-campus plan is selected. A specific residence can be chosen later."
+            : plan?.preference
+              ? "Your housing path is selected. Additional details can be decided later."
+              : "Choose a housing path on the left to personalize this preview."}
+      </p>
       {selected ? (
         <div className="housing-preview__amenities">
           {selected.amenities.map((amenity) => (
