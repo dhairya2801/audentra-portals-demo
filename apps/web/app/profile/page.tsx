@@ -25,6 +25,7 @@ import {
   signOutStudent,
   updateStudentProfile,
 } from "../lib/api-client";
+import { useTenant } from "../components/tenant-provider";
 
 function ProfileForm({
   profile,
@@ -35,6 +36,8 @@ function ProfileForm({
   documents: StudentDocumentList;
   reload: () => void;
 }) {
+  const tenantRuntime = useTenant();
+  const { tenant } = tenantRuntime;
   const [preferredName, setPreferredName] = useState(profile.preferredName);
   const [pronouns, setPronouns] = useState(profile.pronouns || "");
   const [mobilePhone, setMobilePhone] = useState(profile.mobilePhone || "");
@@ -224,7 +227,7 @@ function ProfileForm({
             These fields are student-controlled. Changes to legal identity or
             academic records require support from the registrar.
           </p>
-          <a href="mailto:registrar@aster.edu">Contact the registrar</a>
+          <a href={`mailto:${tenant.registrarEmail}`}>Contact the registrar</a>
         </div>
         <PageCard title="Record details">
           <dl className="stacked-details">
@@ -258,7 +261,7 @@ function ProfileForm({
             disabled={signOut.status === "loading"}
             onClick={() => {
               void signOut.run().then(() => {
-                window.location.replace("/sign-in");
+                window.location.replace(tenantRuntime.href("/sign-in"));
               }).catch(() => {
                 // Keep the session control visible so the student can retry.
               });

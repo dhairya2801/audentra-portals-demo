@@ -14,7 +14,7 @@ import type {
   StudentHousingPlan,
   UpdateStudentOnboardingInput,
 } from "@vv/contracts";
-import Link from "next/link";
+import { TenantLink as Link } from "../components/tenant-link";
 import {
   type FormEvent,
   type ChangeEvent,
@@ -25,6 +25,7 @@ import {
   useState,
 } from "react";
 import { PortalMark } from "../components/portal-ui";
+import { useTenant } from "../components/tenant-provider";
 import {
   getApiErrorMessage,
   useApiAction,
@@ -56,7 +57,6 @@ const onboardingSteps: {
     label: "Offer",
     title: "Your place at Aster",
     subtitle: "Begin by confirming the admission decision that brought you here.",
-    skippable: true,
   },
   {
     key: "about_you",
@@ -202,6 +202,7 @@ function OnboardingProgress({
   skipped: OnboardingStep[];
   onNavigate: (step: OnboardingStep) => void;
 }) {
+  const { tenant } = useTenant();
   const activeIndex = onboardingSteps.findIndex((step) => step.key === active);
 
   return (
@@ -209,13 +210,13 @@ function OnboardingProgress({
       <Link className="brand onboarding-brand" href="/onboarding">
         <PortalMark />
         <span>
-          <strong>Aster</strong>
+          <strong>{tenant.shortName}</strong>
           <small>University</small>
         </span>
       </Link>
       <div className="onboarding-progress__heading">
         <p className="eyebrow">Getting started</p>
-        <h2>Your path to Aster</h2>
+        <h2>Your path to {tenant.shortName}</h2>
         <p>{completed.length} of {onboardingSteps.length} steps saved</p>
       </div>
       <ol>
@@ -321,6 +322,7 @@ function HousingFields({
   data: StudentOnboardingData;
   residences: StudentHousingPlan["residences"];
 }) {
+  const { tenant } = useTenant();
   const [preference, setPreference] = useState(
     data.housingPreference ?? "",
   );
@@ -336,7 +338,7 @@ function HousingFields({
       <fieldset className="form-section">
         <legend>Where do you picture starting your day?</legend>
         <p>
-          Choose a plan. Aster opens only the follow-up questions useful for
+          Choose a plan. {tenant.shortName} opens only the follow-up questions useful for
           that plan.
         </p>
         <div className="choice-grid">
@@ -761,18 +763,26 @@ function CampusLifeFields({
   data: StudentOnboardingData;
   clubs: CampusLifeFeed["clubs"];
 }) {
+  const { tenant, copy } = useTenant();
   const interestByClubName: Record<string, string> = {
     "Aster Robotics": "aster_robotics",
+    "Harvard Undergraduate Robotics Club": "aster_robotics",
     "Code Collective": "code_collective",
+    "Harvard Computer Society": "code_collective",
     "Women in Business": "women_in_business",
+    "Harvard Undergraduate Women in Business": "women_in_business",
     "Outdoor Aster": "outdoor_aster",
+    "Harvard Outing Club": "outdoor_aster",
   };
   const visualInterestValues = new Set(Object.values(interestByClubName));
   return (
     <>
       <fieldset className="form-section">
         <legend>Explore student clubs</legend>
-        <p>Select anything you want Aster to place in your welcome feed.</p>
+        <p>
+          Select anything you want {tenant.shortName} to place in your welcome
+          feed.
+        </p>
         <div className="onboarding-club-showcase">
           {clubs.slice(0, 4).map((club) => {
             const value =
@@ -804,7 +814,7 @@ function CampusLifeFields({
             <Choice
               name="campusInterests"
               value={value}
-              label={label}
+              label={copy(label)}
               defaultChecked={data.campusInterests?.includes(value)}
               key={value}
             />
@@ -952,6 +962,7 @@ function EmergencyContactFields({ data }: { data: StudentOnboardingData }) {
 }
 
 function FamilyPermissionFields({ data }: { data: StudentOnboardingData }) {
+  const { tenant } = useTenant();
   const nextKey = useRef(1);
   const [permissions, setPermissions] = useState(() =>
     (data.familyPermissions ?? []).map((value, index) => ({
@@ -1021,7 +1032,7 @@ function FamilyPermissionFields({ data }: { data: StudentOnboardingData }) {
               />
             </label>
           </div>
-          <h3>What may Aster discuss with this person?</h3>
+          <h3>What may {tenant.shortName} discuss with this person?</h3>
           <div className="choice-grid choice-grid--multi">
             {ferpaScopeOptions.map(([scope, label]) => (
               <Choice
@@ -1055,7 +1066,9 @@ function FamilyPermissionFields({ data }: { data: StudentOnboardingData }) {
                 required
               >
                 <option value="end_first_year">End of first academic year</option>
-                <option value="end_enrollment">End of my enrollment at Aster</option>
+                <option value="end_enrollment">
+                  End of my enrollment at {tenant.shortName}
+                </option>
                 <option value="registrar_date">On a date I provide to the Registrar</option>
               </select>
             </label>
@@ -1369,8 +1382,6 @@ function StepFields({
   depositPaid,
   housingPlan,
   campusLife,
-  onDeferOffer,
-  offerDeferralPending,
 }: {
   step: OnboardingStep;
   data: StudentOnboardingData;
@@ -1378,9 +1389,8 @@ function StepFields({
   depositPaid: boolean;
   housingPlan: StudentHousingPlan;
   campusLife: CampusLifeFeed;
-  onDeferOffer: () => void;
-  offerDeferralPending: boolean;
 }) {
+  const { tenant } = useTenant();
   switch (step) {
     case "offer":
       return (
@@ -1408,26 +1418,16 @@ function StepFields({
             </dl>
           </div>
           {offer.status === "offered" ? (
-            <>
-              <label className="confirmation-check">
-                <input name="offerAccepted" type="checkbox" required />
-                <span>
-                  <strong>Yes—start my Aster enrollment</strong>
-                  I accept my offer of admission and understand this decision
-                  will be recorded in my official admissions record.
-                </span>
-              </label>
-              <button
-                className="button button--secondary"
-                type="button"
-                disabled={offerDeferralPending}
-                onClick={onDeferOffer}
-              >
-                {offerDeferralPending
-                  ? "Saving for later…"
-                  : "I’m still deciding—show me my options"}
-              </button>
-            </>
+            <label className="confirmation-check">
+              <input name="offerAccepted" type="checkbox" required />
+              <span>
+                <strong>
+                  Yes—start my {tenant.shortName} enrollment
+                </strong>
+                I accept my offer of admission and understand this decision
+                will be recorded in my official admissions record.
+              </span>
+            </label>
           ) : (
             <p className="confirmed-line">
               <span aria-hidden="true">✓</span>
@@ -1513,7 +1513,8 @@ function StepFields({
           <fieldset className="form-section">
             <legend>Your permanent home address</legend>
             <p>
-              This helps Aster prepare your initial tuition classification.
+              This helps {tenant.shortName} prepare your initial tuition
+              classification.
               Residency is determined under institutional and state policy,
               not by this address alone.
             </p>
@@ -1609,7 +1610,7 @@ function StepFields({
             <strong>{formatMoney(offer.depositAmountCents)}</strong>
             <p>
               {depositPaid
-                ? "Payment received through Aster’s secure processor."
+                ? `Payment received through ${tenant.shortName}’s secure processor.`
                 : "Choose whether to pay now, pay later, or request a waiver or deferral."}
             </p>
           </div>
@@ -1871,6 +1872,8 @@ function OnboardingFlow({
   campusLife: CampusLifeFeed;
   reload: () => void;
 }) {
+  const tenantRuntime = useTenant();
+  const { tenant } = tenantRuntime;
   const [onboarding, setOnboarding] = useState(initial);
   const [viewingStep, setViewingStep] = useState<OnboardingStep>(
     initial.currentStep,
@@ -1909,9 +1912,9 @@ function OnboardingFlow({
 
   useEffect(() => {
     if (onboarding.status === "completed") {
-      window.location.replace("/dashboard");
+      window.location.replace(tenantRuntime.href("/dashboard"));
     }
-  }, [onboarding.status]);
+  }, [onboarding.status, tenantRuntime]);
 
   const submitStep = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1977,7 +1980,7 @@ function OnboardingFlow({
     }
   };
 
-  const skipStep = async (destination?: "/dashboard") => {
+  const skipStep = async () => {
     setError(null);
     save.reset();
     try {
@@ -1989,10 +1992,6 @@ function OnboardingFlow({
       });
       setOnboarding(result);
       setViewingStep(result.currentStep);
-      if (destination) {
-        window.location.assign(destination);
-        return;
-      }
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (caught) {
       setError(getApiErrorMessage(caught));
@@ -2013,7 +2012,7 @@ function OnboardingFlow({
           <Link className="brand" href="/onboarding">
             <PortalMark />
             <span>
-              <strong>Aster</strong>
+              <strong>{tenant.shortName}</strong>
               <small>University</small>
             </span>
           </Link>
@@ -2028,8 +2027,8 @@ function OnboardingFlow({
             </div>
             <div>
               <p className="eyebrow">{step.label}</p>
-              <h1>{step.title}</h1>
-              <p>{step.subtitle}</p>
+              <h1>{tenantRuntime.copy(step.title)}</h1>
+              <p>{tenantRuntime.copy(step.subtitle)}</p>
             </div>
           </header>
 
@@ -2045,8 +2044,6 @@ function OnboardingFlow({
               depositPaid={depositPaid}
               housingPlan={housingPlan}
               campusLife={campusLife}
-              onDeferOffer={() => void skipStep("/dashboard")}
-              offerDeferralPending={save.status === "loading"}
             />
             {error || save.message || complete.message ? (
               <p className="field-error" role="alert">
@@ -2059,7 +2056,10 @@ function OnboardingFlow({
                 Saved progress is available on any signed-in device.
               </p>
               {offerCannotAdvance ? (
-                <a className="button button--primary" href="mailto:admissions@aster.edu">
+                <a
+                  className="button button--primary"
+                  href={`mailto:${tenant.admissionsEmail}`}
+                >
                   Get help with this offer <span aria-hidden="true">→</span>
                 </a>
               ) : allStepsSaved && viewingActiveStep ? (
@@ -2078,7 +2078,7 @@ function OnboardingFlow({
                 </button>
               ) : (
                 <div className="onboarding-actions__controls">
-                  {step.skippable && viewingStep !== "offer" ? (
+                  {step.skippable ? (
                     <button
                       className="text-button"
                       type="button"
@@ -2127,7 +2127,7 @@ function OnboardingFlow({
             <div>
               <strong>Why we ask</strong>
               <p>
-                Aster uses this information only to prepare your student record,
+                {tenant.shortName} uses this information only to prepare your student record,
                 personalize support, and meet university obligations. Official
                 changes are always confirmed by the server.
               </p>
@@ -2140,6 +2140,7 @@ function OnboardingFlow({
 }
 
 function OnboardingResource() {
+  const { tenant } = useTenant();
   const loadOnboarding = useCallback(
     async (signal: AbortSignal): Promise<OnboardingPageData> => {
       const [
@@ -2182,7 +2183,7 @@ function OnboardingResource() {
       <main className="load-state" aria-busy="true" aria-live="polite">
         <div className="load-state__card">
           <PortalMark />
-          <p className="eyebrow">Aster University</p>
+          <p className="eyebrow">{tenant.name}</p>
           <h1>Resuming your onboarding</h1>
           <p>We’re opening your last server-confirmed step.</p>
           <span className="loader" aria-hidden="true" />
@@ -2196,7 +2197,7 @@ function OnboardingResource() {
       <main className="load-state">
         <div className="load-state__card" role="alert">
           <PortalMark />
-          <p className="eyebrow">Aster University</p>
+          <p className="eyebrow">{tenant.name}</p>
           <h1>Your onboarding couldn’t open</h1>
           <p>{onboarding.error}</p>
           <button
@@ -2206,7 +2207,7 @@ function OnboardingResource() {
           >
             Try again
           </button>
-          <a className="text-link" href="mailto:enrollment@aster.edu">
+          <a className="text-link" href={`mailto:${tenant.supportEmail}`}>
             Get help
           </a>
         </div>
@@ -2228,6 +2229,8 @@ function OnboardingResource() {
 }
 
 export default function OnboardingPage() {
+  const tenantRuntime = useTenant();
+  const { tenant } = tenantRuntime;
   const loadBootstrap = useCallback(
     (signal: AbortSignal) => getStudentBootstrap(signal),
     [],
@@ -2241,18 +2244,18 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (needsSignIn) {
-      window.location.replace("/sign-in");
+      window.location.replace(tenantRuntime.href("/sign-in"));
     } else if (alreadyComplete) {
-      window.location.replace("/dashboard");
+      window.location.replace(tenantRuntime.href("/dashboard"));
     }
-  }, [alreadyComplete, needsSignIn]);
+  }, [alreadyComplete, needsSignIn, tenantRuntime]);
 
   if (bootstrap.status === "loading" || needsSignIn || alreadyComplete) {
     return (
       <main className="load-state" aria-busy="true" aria-live="polite">
         <div className="load-state__card">
           <PortalMark />
-          <p className="eyebrow">Aster University</p>
+          <p className="eyebrow">{tenant.name}</p>
           <h1>Checking your onboarding</h1>
           <p>We’re opening the right place for your saved progress.</p>
           <span className="loader" aria-hidden="true" />
@@ -2266,7 +2269,7 @@ export default function OnboardingPage() {
       <main className="load-state">
         <div className="load-state__card" role="alert">
           <PortalMark />
-          <p className="eyebrow">Aster University</p>
+          <p className="eyebrow">{tenant.name}</p>
           <h1>We couldn’t confirm your onboarding</h1>
           <p>{bootstrap.error}</p>
           <button

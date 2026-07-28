@@ -1,9 +1,13 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { useTenant } from "./tenant-provider";
 
 export function PortalMark() {
+  const { tenant } = useTenant();
   return (
     <span className="portal-mark" aria-hidden="true">
-      A
+      {tenant.mark}
     </span>
   );
 }

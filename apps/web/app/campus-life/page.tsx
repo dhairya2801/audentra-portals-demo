@@ -6,6 +6,7 @@ import { ErrorState, LoadingState } from "../components/portal-ui";
 import { useActivityTracking } from "../hooks/use-activity-tracking";
 import { useApiResource } from "../hooks/use-api-resource";
 import { getCampusLife } from "../lib/api-client";
+import { useTenant } from "../components/tenant-provider";
 
 function eventDate(value: string) {
   return {
@@ -26,6 +27,7 @@ function eventDate(value: string) {
 }
 
 export default function CampusLifePage() {
+  const { tenant } = useTenant();
   const load = useCallback((signal: AbortSignal) => getCampusLife(signal), []);
   const campus = useApiResource(load);
   const { track } = useActivityTracking();
@@ -149,7 +151,7 @@ export default function CampusLifePage() {
         <div className="aster-section__heading">
           <div>
             <p className="eyebrow">Student organizations</p>
-            <h2>Clubs at Aster</h2>
+            <h2>Clubs at {tenant.shortName}</h2>
           </div>
           <p>Open a club to see its contact and next activity.</p>
         </div>

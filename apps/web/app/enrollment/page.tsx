@@ -1,7 +1,7 @@
 "use client";
 
 import type { StudentRequirementDetail } from "@vv/contracts";
-import Link from "next/link";
+import { TenantLink as Link } from "../components/tenant-link";
 import { useCallback, useEffect, useRef } from "react";
 import { PortalShell } from "../components/portal-shell";
 import {
@@ -39,6 +39,37 @@ function progressForRequirements(items: StudentRequirementDetail[]) {
   return Math.round(total / items.length);
 }
 
+const requirementActionLabels: Record<string, string> = {
+  profile_verification: "Verify profile",
+  identity_document: "Upload ID",
+  official_transcript: "Upload transcript",
+  financial_aid_verification: "Upload aid documents",
+  immunization_record: "Upload health records",
+  housing_preference: "Select housing",
+  enrollment_deposit: "Pay deposit",
+  orientation_registration: "Select orientation",
+};
+
+function requirementActionLabel(item: StudentRequirementDetail) {
+  if (terminalRequirementStatuses.has(item.status)) return "Review";
+  if (item.status === "blocked") return "View prerequisites";
+  if (item.status === "submitted") return "View submission";
+  if (item.status === "under_review") return "View review";
+  if (item.status === "rejected") return "Fix and resubmit";
+  if (item.status === "expired") return "Review options";
+
+  return (
+    requirementActionLabels[item.code] ??
+    (item.submissionType === "document"
+      ? "Upload document"
+      : item.submissionType === "payment"
+        ? "Make payment"
+        : item.submissionType === "form"
+          ? "Complete form"
+          : "View details")
+  );
+}
+
 function RequirementItem({
   item,
   onView,
@@ -48,7 +79,7 @@ function RequirementItem({
 }) {
   const progress = normalizedProgress(item.progressPercent);
   const isTerminal = terminalRequirementStatuses.has(item.status);
-  const actionLabel = isTerminal ? "Review" : "Open task";
+  const actionLabel = requirementActionLabel(item);
 
   return (
     <li

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   type FormEvent,
   useCallback,
@@ -14,6 +13,8 @@ import {
   signUpStudent,
 } from "../lib/api-client";
 import { ActionFeedback, PortalMark } from "../components/portal-ui";
+import { TenantLink as Link } from "../components/tenant-link";
+import { useTenant } from "../components/tenant-provider";
 
 type AuthMode = "sign_in" | "sign_up";
 type AuthField = "email" | "phone" | "password" | "passwordConfirmation";
@@ -27,6 +28,8 @@ const signInErrorMessage = (error: unknown) =>
     : "We couldn’t sign you in. Check your connection and try again.";
 
 export function SignInClient() {
+  const tenantRuntime = useTenant();
+  const { tenant } = tenantRuntime;
   const [mode, setMode] = useState<AuthMode>("sign_in");
   const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
   const signInAction = useCallback(
@@ -90,11 +93,11 @@ export function SignInClient() {
           phone,
           password,
         });
-        window.location.assign("/onboarding");
+        window.location.assign(tenantRuntime.href("/onboarding"));
         return;
       }
       const bootstrap = await signIn.run({ email, password });
-      window.location.assign(bootstrap.initialRoute);
+      window.location.assign(tenantRuntime.href(bootstrap.initialRoute));
     } catch {
       // Keep the submitted form available for a corrected retry.
     }
@@ -103,10 +106,10 @@ export function SignInClient() {
   return (
     <main className="auth-page">
       <section className="auth-panel" aria-labelledby="sign-in-title">
-        <Link className="brand" href="/sign-in" aria-label="Aster University sign in">
+        <Link className="brand" href="/sign-in" aria-label={`${tenant.name} sign in`}>
           <PortalMark />
           <span>
-            <strong>Aster</strong>
+            <strong>{tenant.shortName}</strong>
             <small>University</small>
           </span>
         </Link>
@@ -323,14 +326,14 @@ export function SignInClient() {
         </div>
         <p className="auth-support">
           Trouble signing in?{" "}
-          <a href="mailto:enrollment@aster.edu">Contact student support</a>
+          <a href={`mailto:${tenant.supportEmail}`}>Contact student support</a>
         </p>
       </section>
-      <aside className="auth-story" aria-label="Aster University student experience">
+      <aside className="auth-story" aria-label={`${tenant.name} student experience`}>
         <div>
-          <span className="auth-story__index">AU · 1891</span>
+          <span className="auth-story__index">{tenant.foundedLabel}</span>
           <blockquote>
-            “Every Aster journey begins with a single, thoughtful step.”
+            “{tenant.welcomeQuote}”
           </blockquote>
           <p>Office of Student Enrollment</p>
         </div>

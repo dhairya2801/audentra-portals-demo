@@ -13,7 +13,7 @@ import type {
   UpdateStudentProfileInput,
 } from "@vv/contracts";
 import Image from "next/image";
-import Link from "next/link";
+import { TenantLink as Link } from "../../../components/tenant-link";
 import { useParams } from "next/navigation";
 import {
   type FormEvent,
@@ -641,12 +641,28 @@ function DocumentAction({
     ) {
       return;
     }
-    const interval = window.setInterval(() => {
+    let attempts = 0;
+    let timer: number | undefined;
+    const deadline = Date.parse(extraction.processingDeadlineAt ?? "");
+    const stopPollingAt = Number.isFinite(deadline)
+      ? deadline + 10_000
+      : Date.now() + 100_000;
+    const poll = () => {
       refreshDocuments();
-    }, 1_000);
-    return () => window.clearInterval(interval);
+      attempts += 1;
+      if (Date.now() >= stopPollingAt) return;
+      timer = window.setTimeout(
+        poll,
+        Math.min(5_000, 1_000 + attempts * 500),
+      );
+    };
+    timer = window.setTimeout(poll, 1_000);
+    return () => {
+      if (timer) window.clearTimeout(timer);
+    };
   }, [
     extraction?.status,
+    extraction?.processingDeadlineAt,
     recentDocument?.id,
     refreshDocuments,
     selectedDocument?.id,
@@ -747,6 +763,7 @@ function DocumentAction({
         requirementId={requirement.id}
         categoryHint={requirement.documentCategory ?? undefined}
         expectedLabel={expectedLabel}
+        activeDocument={selectedDocument}
         onUploaded={rememberDocument}
       />
       {extraction ? (

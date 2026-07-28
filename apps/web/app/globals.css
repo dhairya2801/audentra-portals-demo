@@ -16,6 +16,34 @@
   --shadow: 0 18px 55px rgb(15 23 42 / 7%);
 }
 
+:root[data-tenant="harvard"] {
+  --forest: #7f1725;
+  --forest-deep: #5f101b;
+  --gold: #d6b56d;
+  --red: #a51c30;
+}
+
+:root[data-tenant="harvard"] .aster-sidebar nav .aster-nav-link--active {
+  background: #a51c30;
+  box-shadow: 0 8px 20px rgb(165 28 48 / 22%);
+  color: #fff;
+}
+
+:root[data-tenant="harvard"] .aster-sidebar nav .aster-nav-link--active > span {
+  color: #fff;
+}
+
+:root[data-tenant="harvard"] .aster-student > span {
+  background: #f3e1e4;
+  color: #731522;
+}
+
+:root[data-tenant="harvard"] .auth-story {
+  background:
+    radial-gradient(circle at 80% 15%, rgb(214 181 109 / 22%), transparent 22rem),
+    linear-gradient(145deg, #a51c30, #5f101b);
+}
+
 /* Aster student operating system — Stitch-derived visual language */
 .aster-shell {
   min-height: 100vh;
@@ -6612,6 +6640,13 @@ a {
   border-color: var(--gold);
   background: rgb(251 191 36 / 12%);
   box-shadow: inset 0 0 0 1px rgb(251 191 36 / 30%);
+}
+
+.requirement-upload--workspace .document-dropzone > label[data-disabled] {
+  cursor: not-allowed;
+  border-color: rgb(148 163 184 / 35%);
+  background: rgb(15 23 42 / 38%);
+  opacity: 0.78;
 }
 
 .requirement-upload--workspace .document-dropzone > label:focus-within {

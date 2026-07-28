@@ -68,6 +68,49 @@ test("all student portal routes render and the dynamic requirement route resolve
   assert.doesNotMatch(signInHtml, /demo student/i);
 });
 
+test("tenant routes render and preserve tenant-aware internal destinations", async () => {
+  for (const tenant of ["aster", "harvard"]) {
+    for (const route of [
+      `/${tenant}/sign-in`,
+      `/${tenant}/onboarding`,
+      `/${tenant}/dashboard`,
+      `/${tenant}/campus-life`,
+      `/${tenant}/enrollment/requirements/transcript-upload`,
+    ]) {
+      const response = await render(route);
+      assert.equal(response.status, 200, `${route} should render`);
+      assert.doesNotMatch(await response.text(), /404|Page not found/i);
+    }
+  }
+
+  const source = await readFile(
+    new URL("../app/lib/tenant.ts", import.meta.url),
+    "utf8",
+  );
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
+  const tenant = await import(moduleUrl);
+
+  assert.equal(tenant.tenantHref("/dashboard", "aster"), "/aster/dashboard");
+  assert.equal(
+    tenant.tenantHref("/campus-life?view=clubs#featured", "harvard"),
+    "/harvard/campus-life?view=clubs#featured",
+  );
+  assert.equal(
+    tenant.tenantHref("/offer", "harvard"),
+    "/harvard/onboarding",
+  );
+  assert.equal(
+    tenant.tenantCopy("Your place at Aster University", tenant.tenantConfigs.harvard),
+    "Your place at Harvard University",
+  );
+});
+
 test("removes the disposable starter preview", async () => {
   const disposablePreviewFiles = await readdir(
     new URL("../app/_sites-preview", import.meta.url),
@@ -270,7 +313,11 @@ test("typed client wires every resource route and mutation contract", async () =
     new URL("../app/lib/api-client.ts", import.meta.url),
     "utf8",
   );
-  const compiled = ts.transpileModule(source, {
+  const executableSource = source.replace(
+    /import\s+\{\s*currentTenantSlug\s*\}\s+from\s+"\.\/tenant";/,
+    'const currentTenantSlug = () => "aster";',
+  );
+  const compiled = ts.transpileModule(executableSource, {
     compilerOptions: {
       module: ts.ModuleKind.ESNext,
       target: ts.ScriptTarget.ES2022,
@@ -385,6 +432,7 @@ test("typed client wires every resource route and mutation contract", async () =
   assert.equal(requests[0].url, "http://localhost:4000/v1/student/bootstrap");
   assert.equal(requests[0].init.method, "GET");
   assert.equal(requests[0].init.credentials, "include");
+  assert.equal(requests[0].init.headers["X-Tenant-Slug"], "aster");
 
   const requestByPath = new Map(
     requests.map((entry) => [new URL(entry.url).pathname, entry]),
@@ -569,7 +617,10 @@ test("onboarding preserves the eight-step order and authoritative boundary actio
   assert.match(onboarding, /Clear residence selection and decide later/);
   assert.match(onboarding, /const nextData = editableOnboardingData\(/);
   assert.match(onboarding, /data: editableOnboardingData\(onboarding\.data\)/);
-  assert.match(onboarding, /window\.location\.replace\("\/dashboard"\)/);
+  assert.match(
+    onboarding,
+    /window\.location\.replace\(tenantRuntime\.href\("\/dashboard"\)\)/,
+  );
 });
 
 test("student routes enforce bootstrap gating and expose no dead static links", async () => {
@@ -601,9 +652,17 @@ test("student routes enforce bootstrap gating and expose no dead static links", 
   ]);
 
   assert.match(guard, /getStudentBootstrap/);
-  assert.match(guard, /window\.location\.replace\("\/onboarding"\)/);
-  assert.match(guard, /window\.location\.replace\("\/sign-in"\)/);
+  assert.match(
+    guard,
+    /window\.location\.replace\(tenantRuntime\.href\("\/onboarding"\)\)/,
+  );
+  assert.match(
+    guard,
+    /window\.location\.replace\(tenantRuntime\.href\("\/sign-in"\)\)/,
+  );
   assert.match(shell, /onboarding\.required/);
+  assert.match(shell, /label: "My Documents"/);
+  assert.match(shell, /href: "\/documents"/);
   assert.match(bootstrapRouter, /initialRoute/);
   assert.match(signIn, /getStudentBootstrap/);
   assert.match(signIn, /signInStudent/);
@@ -611,7 +670,10 @@ test("student routes enforce bootstrap gating and expose no dead static links", 
   assert.match(signIn, /name="email"/);
   assert.match(signIn, /name="phone"/);
   assert.match(signIn, /name="password"/);
-  assert.match(signIn, /window\.location\.assign\("\/onboarding"\)/);
+  assert.match(
+    signIn,
+    /window\.location\.assign\(tenantRuntime\.href\("\/onboarding"\)\)/,
+  );
   assert.match(routeFiles.join("\n"), /signOutStudent/);
 
   const allRoutes = new Set([
@@ -628,6 +690,9 @@ test("student routes enforce bootstrap gating and expose no dead static links", 
     "/sign-in",
   ]);
   const source = [shell, signIn, ...routeFiles].join("\n");
+  assert.doesNotMatch(source, />Open task</);
+  assert.match(source, /Upload transcript/);
+  assert.match(source, /Select housing/);
   for (const match of source.matchAll(/href=["'](\/[^"'#?{}]*)["']/g)) {
     assert.ok(allRoutes.has(match[1]), `dead static link: ${match[1]}`);
   }

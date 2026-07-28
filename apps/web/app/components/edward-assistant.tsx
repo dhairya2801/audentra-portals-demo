@@ -6,7 +6,7 @@ import type {
   EdwardChatMessage,
   EdwardContextReceipt,
 } from "@vv/contracts";
-import Link from "next/link";
+import { TenantLink as Link } from "./tenant-link";
 import {
   type FormEvent,
   useEffect,
@@ -18,6 +18,7 @@ import {
   askEdward,
   createDepositPayment,
 } from "../lib/api-client";
+import { useTenant } from "./tenant-provider";
 
 const quickPrompts = [
   "What should I do next?",
@@ -162,6 +163,7 @@ export function EdwardAssistant({
   studentName: string;
   variant?: "floating" | "embedded";
 }) {
+  const { tenant } = useTenant();
   const [open, setOpen] = useState(variant === "embedded");
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -280,7 +282,7 @@ export function EdwardAssistant({
         <div>
           <strong>Edward</strong>
           <span>
-            <i aria-hidden="true" /> Connected to your Aster record
+            <i aria-hidden="true" /> Connected to your {tenant.shortName} record
           </span>
         </div>
         {variant === "floating" ? (

@@ -1,7 +1,7 @@
 "use client";
 
 import type { FinancialAward } from "@vv/contracts";
-import Link from "next/link";
+import { TenantLink as Link } from "../components/tenant-link";
 import { useCallback, useEffect, useState } from "react";
 import { PortalShell } from "../components/portal-shell";
 import { ErrorState, LoadingState, StatusPill } from "../components/portal-ui";

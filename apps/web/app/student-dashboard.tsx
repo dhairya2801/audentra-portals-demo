@@ -4,7 +4,6 @@ import {
   studentRequirementSlug,
   type StudentRequirementSummary,
 } from "@vv/contracts";
-import Link from "next/link";
 import { useCallback, useEffect } from "react";
 import { PortalShell } from "./components/portal-shell";
 import { ErrorState, LoadingState } from "./components/portal-ui";
@@ -20,6 +19,8 @@ import {
   prioritizeDashboardRequirements,
   selectDashboardEnrollmentAction,
 } from "./lib/enrollment-dashboard-action";
+import { TenantLink as Link } from "./components/tenant-link";
+import { useTenant } from "./components/tenant-provider";
 
 function money(cents: number) {
   return new Intl.NumberFormat("en-US", {
@@ -47,6 +48,7 @@ function requirementState(item: StudentRequirementSummary) {
 }
 
 export function StudentDashboardPage() {
+  const { tenant } = useTenant();
   const load = useCallback(async (signal: AbortSignal) => {
     const [dashboard, financials, academics, campus] = await Promise.all([
       getStudentDashboard(signal),
@@ -150,7 +152,7 @@ export function StudentDashboardPage() {
           <div className="aster-card__heading">
             <div>
               <p className="eyebrow">Enrollment progress</p>
-              <h2>Your place at Aster</h2>
+              <h2>Your place at {tenant.shortName}</h2>
             </div>
             <strong>{dashboard.journey.completionPercent}%</strong>
           </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import type { CatalogCourse, StudentAcademicPlanItem } from "@vv/contracts";
-import Link from "next/link";
+import { TenantLink as Link } from "../components/tenant-link";
 import {
   type FormEvent,
   useCallback,
@@ -15,6 +15,7 @@ import {
   getStudentAcademics,
   searchCatalogCourses,
 } from "../lib/api-client";
+import { useTenant } from "../components/tenant-provider";
 
 const statusLabels: Record<StudentAcademicPlanItem["status"], string> = {
   required: "Required",
@@ -71,6 +72,7 @@ function CourseDetail({
 }
 
 export default function ClassroomsPage() {
+  const { tenant } = useTenant();
   const load = useCallback(
     (signal: AbortSignal) => getStudentAcademics(signal),
     [],
@@ -191,7 +193,7 @@ export default function ClassroomsPage() {
                       </div>
                       <span aria-hidden="true">→</span>
                       <div>
-                        <small>Aster equivalent</small>
+                        <small>{tenant.shortName} equivalent</small>
                         <strong>{recommendation.targetCourseCode}</strong>
                         <span>{recommendation.targetCourseTitle}</span>
                       </div>
@@ -272,7 +274,7 @@ export default function ClassroomsPage() {
           <section className="aster-section course-catalog">
             <div className="aster-section__heading">
               <div>
-                <p className="eyebrow">Aster catalog</p>
+                <p className="eyebrow">{tenant.shortName} catalog</p>
                 <h2>Search classes</h2>
               </div>
               <p>

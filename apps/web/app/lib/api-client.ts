@@ -33,6 +33,7 @@ import type {
   UpdateStudentHousingPlanInput,
   UpdateStudentProfileInput,
 } from "@vv/contracts";
+import { currentTenantSlug } from "./tenant";
 
 const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
 
@@ -112,6 +113,7 @@ async function request<T>(
     credentials: "include",
     headers: {
       Accept: "application/json",
+      "X-Tenant-Slug": currentTenantSlug(),
       ...init.headers,
     },
   });
@@ -346,6 +348,7 @@ export async function uploadStudentDocument(
   context: {
     categoryHint?: StudentDocument["category"];
     requirementId?: string;
+    uploadBundleId?: string;
   },
   idempotencyKey: string,
 ) {
@@ -356,6 +359,9 @@ export async function uploadStudentDocument(
   }
   if (context.requirementId) {
     form.set("requirementId", context.requirementId);
+  }
+  if (context.uploadBundleId) {
+    form.set("uploadBundleId", context.uploadBundleId);
   }
   return request<StudentDocument>("/v1/student/documents/upload", {
     method: "POST",
@@ -402,13 +408,14 @@ export async function uploadStudentDocumentBundle(
   } = {},
 ): Promise<StudentDocumentUploadBundleResult[]> {
   const results: StudentDocumentUploadBundleResult[] = [];
+  const uploadBundleId = crypto.randomUUID();
 
   for (const entry of entries) {
     callbacks.onFileStart?.(entry);
     try {
       const document = await uploadStudentDocument(
         entry.file,
-        context,
+        { ...context, uploadBundleId },
         entry.idempotencyKey,
       );
       const result: StudentDocumentUploadBundleResult = {

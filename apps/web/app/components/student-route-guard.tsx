@@ -4,12 +4,14 @@ import { useCallback, useEffect } from "react";
 import { useApiResource } from "../hooks/use-api-resource";
 import { getStudentBootstrap } from "../lib/api-client";
 import { ErrorState, LoadingState } from "./portal-ui";
+import { useTenant } from "./tenant-provider";
 
 export function StudentRouteGuard({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const tenantRuntime = useTenant();
   const loadBootstrap = useCallback(
     (signal: AbortSignal) => getStudentBootstrap(signal),
     [],
@@ -24,11 +26,11 @@ export function StudentRouteGuard({
 
   useEffect(() => {
     if (needsSignIn) {
-      window.location.replace("/sign-in");
+      window.location.replace(tenantRuntime.href("/sign-in"));
     } else if (needsOnboarding) {
-      window.location.replace("/onboarding");
+      window.location.replace(tenantRuntime.href("/onboarding"));
     }
-  }, [needsOnboarding, needsSignIn]);
+  }, [needsOnboarding, needsSignIn, tenantRuntime]);
 
   if (
     bootstrap.status === "loading" ||

@@ -100,11 +100,13 @@ export function DocumentUpload({
   requirementId,
   categoryHint,
   expectedLabel,
+  activeDocument,
   onUploaded,
 }: {
   requirementId?: string;
   categoryHint?: StudentDocumentCategory;
   expectedLabel?: string;
+  activeDocument?: StudentDocument | null;
   onUploaded: (document: StudentDocument) => void | Promise<void>;
 }) {
   const [documents, setDocuments] = useState<SelectedDocument[]>([]);
@@ -117,6 +119,9 @@ export function DocumentUpload({
     : "manual_review";
   const parsingEnabled = processingMode !== "manual_review";
   const classificationOnly = processingMode === "classification_only";
+  const serverProcessing =
+    activeDocument?.status === "processing" &&
+    activeDocument.extraction?.status === "processing";
   useEffect(() => {
     onUploadedRef.current = onUploaded;
   }, [onUploaded]);
@@ -134,6 +139,22 @@ export function DocumentUpload({
     [documents],
   );
   const processingDocumentKey = processingDocumentIds.join(",");
+  const processingDeadlineKey = useMemo(
+    () =>
+      documents
+        .filter(
+          (item) =>
+            item.status === "uploaded" &&
+            item.document?.extraction?.status === "processing",
+        )
+        .map(
+          (item) =>
+            `${item.document?.id ?? ""}:${item.document?.extraction?.processingDeadlineAt ?? ""}`,
+        )
+        .sort()
+        .join(","),
+    [documents],
+  );
 
   useEffect(() => {
     if (!processingDocumentKey) return;
@@ -142,6 +163,14 @@ export function DocumentUpload({
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let attempts = 0;
+    const deadlines = processingDeadlineKey
+      .split(",")
+      .map((entry) => Date.parse(entry.slice(entry.indexOf(":") + 1)))
+      .filter(Number.isFinite);
+    const stopPollingAt =
+      deadlines.length > 0
+        ? Math.max(...deadlines) + 10_000
+        : Date.now() + 100_000;
 
     const poll = async () => {
       timer = setTimeout(async () => {
@@ -183,7 +212,7 @@ export function DocumentUpload({
                 ? `${acceptedCount} document${acceptedCount === 1 ? "" : "s"} ${completedVerb}; ${attentionCount} stored document${attentionCount === 1 ? " needs" : "s need"} attention.`
                 : `${acceptedCount} document${acceptedCount === 1 ? "" : "s"} ${completedVerb} and ready for your review.`,
             );
-          } else if (stillProcessing && attempts < 90) {
+          } else if (stillProcessing && Date.now() < stopPollingAt) {
             void poll();
           } else if (stillProcessing) {
             setBundleMessage(
@@ -191,9 +220,9 @@ export function DocumentUpload({
             );
           }
         } catch {
-          if (!cancelled && attempts < 90) void poll();
+          if (!cancelled && Date.now() < stopPollingAt) void poll();
         }
-      }, 1_000);
+      }, Math.min(5_000, 1_000 + attempts * 500));
     };
 
     void poll();
@@ -201,10 +230,21 @@ export function DocumentUpload({
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [categoryHint, classificationOnly, processingDocumentKey]);
+  }, [
+    categoryHint,
+    classificationOnly,
+    processingDeadlineKey,
+    processingDocumentKey,
+  ]);
 
   const addFiles = (files: readonly File[]) => {
     if (files.length === 0) return;
+    if (serverProcessing) {
+      setBundleMessage(
+        `${activeDocument?.fileName ?? "The current document"} is still being parsed. Wait for this attempt to finish or fail before uploading another document.`,
+      );
+      return;
+    }
 
     setBundleMessage(null);
     setDocuments((current) => {
@@ -261,6 +301,7 @@ export function DocumentUpload({
   const handleDrop = (event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
     setIsDragging(false);
+    if (serverProcessing) return;
     addFiles(Array.from(event.dataTransfer.files));
   };
 
@@ -272,6 +313,12 @@ export function DocumentUpload({
 
   const submitDocument = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (serverProcessing) {
+      setBundleMessage(
+        `${activeDocument?.fileName ?? "The current document"} is still being parsed. Another upload will be available when this attempt finishes or fails.`,
+      );
+      return;
+    }
     const queuedDocuments = documents.filter(
       (item) =>
         item.validationError === null &&
@@ -378,6 +425,7 @@ export function DocumentUpload({
       <label
         onDragEnter={(event) => {
           event.preventDefault();
+          if (serverProcessing) return;
           setIsDragging(true);
         }}
         onDragOver={(event) => event.preventDefault()}
@@ -386,12 +434,18 @@ export function DocumentUpload({
         }}
         onDrop={handleDrop}
         data-dragging={isDragging || undefined}
+        data-disabled={serverProcessing || undefined}
+        aria-disabled={serverProcessing}
       >
         <span className="document-dropzone__icon" aria-hidden="true">
           ↑
         </span>
         <strong>
-          {expectedLabel ? `Add ${expectedLabel}` : "Add documents"}
+          {serverProcessing
+            ? "Document parsing is in progress"
+            : expectedLabel
+              ? `Add ${expectedLabel}`
+              : "Add documents"}
         </strong>
         <small>
           Drop files here or browse · PDF, JPEG, or PNG · up to 8 files / 30 MB
@@ -402,8 +456,17 @@ export function DocumentUpload({
           accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
           multiple
           onChange={handleFileSelection}
+          disabled={serverProcessing}
         />
       </label>
+      {serverProcessing ? (
+        <p className="action-feedback" role="status">
+          <strong>{activeDocument?.fileName ?? "Your document"}</strong> is
+          safely stored and still being parsed. You can leave this page and
+          return; another upload stays locked until this attempt finishes or
+          fails.
+        </p>
+      ) : null}
       <p className="document-auto-classify">
         {categoryHint === "transcript"
           ? "Add every page or file that belongs to your academic record. Edward identifies the transcript, builds the course record, and runs advisory matching automatically; you do not need to classify it."
@@ -468,6 +531,7 @@ export function DocumentUpload({
         type="submit"
         disabled={
           isUploading ||
+          serverProcessing ||
           !documents.some(
             (item) =>
               item.validationError === null &&
@@ -475,7 +539,9 @@ export function DocumentUpload({
           )
         }
       >
-        {isUploading
+        {serverProcessing
+          ? "Parsing current documentâ€¦"
+          : isUploading
           ? classificationOnly
             ? "Uploading and checking…"
             : parsingEnabled

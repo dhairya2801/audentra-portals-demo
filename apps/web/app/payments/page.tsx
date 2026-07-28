@@ -19,6 +19,7 @@ import {
   getStudentDashboard,
   getStudentPayments,
 } from "../lib/api-client";
+import { useTenant } from "../components/tenant-provider";
 
 type PaymentPageData = {
   payments: StudentPaymentList;
@@ -39,6 +40,7 @@ function PaymentWorkspace({
   data: PaymentPageData;
   reload: () => void;
 }) {
+  const { tenant } = useTenant();
   const intentKey = useRef<string | null>(null);
   const payDepositAction = useCallback(
     (offerId: string, key: string) =>
@@ -74,7 +76,7 @@ function PaymentWorkspace({
           <p>
             The enrollment deposit secures your place in{" "}
             <strong>{data.dashboard.offer.programName}</strong>. The amount is
-            confirmed by Aster and cannot be edited in the portal.
+            confirmed by {tenant.shortName} and cannot be edited in the portal.
           </p>
           <dl className="detail-grid">
             <div>
@@ -133,7 +135,7 @@ function PaymentWorkspace({
           <span aria-hidden="true">$</span>
           <h2>Secure payment</h2>
           <p>
-            This development environment uses Aster’s dummy processor. No card
+            This development environment uses {tenant.shortName}’s dummy processor. No card
             details are collected by the portal.
           </p>
         </div>

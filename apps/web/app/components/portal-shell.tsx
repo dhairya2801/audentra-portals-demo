@@ -1,12 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useActivityTracking } from "../hooks/use-activity-tracking";
 import { useApiResource } from "../hooks/use-api-resource";
 import { getStudentBootstrap } from "../lib/api-client";
 import { EdwardAssistant } from "./edward-assistant";
 import { ErrorState, LoadingState, PortalMark } from "./portal-ui";
+import { TenantLink as Link } from "./tenant-link";
+import { useTenant } from "./tenant-provider";
 
 export type PortalSection =
   | "dashboard"
@@ -72,6 +73,13 @@ const navigation: {
     symbol: "✦",
   },
   {
+    key: "documents",
+    label: "My Documents",
+    shortLabel: "Documents",
+    href: "/documents",
+    symbol: "↑",
+  },
+  {
     key: "profile",
     label: "Profile",
     shortLabel: "Profile",
@@ -104,6 +112,8 @@ export function PortalShell({
   actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const tenantRuntime = useTenant();
+  const { tenant } = tenantRuntime;
   const [menuOpen, setMenuOpen] = useState(false);
   const { track } = useActivityTracking();
   const loadBootstrap = useCallback(
@@ -120,11 +130,11 @@ export function PortalShell({
 
   useEffect(() => {
     if (needsSignIn) {
-      window.location.replace("/sign-in");
+      window.location.replace(tenantRuntime.href("/sign-in"));
     } else if (needsOnboarding) {
-      window.location.replace("/onboarding");
+      window.location.replace(tenantRuntime.href("/onboarding"));
     }
-  }, [needsOnboarding, needsSignIn]);
+  }, [needsOnboarding, needsSignIn, tenantRuntime]);
 
   useEffect(() => {
     track("ui.portal_section_viewed.v1", {
@@ -171,11 +181,11 @@ export function PortalShell({
         <Link
           className="aster-brand"
           href="/dashboard"
-          aria-label="Aster University student portal"
+          aria-label={tenant.portalLabel}
         >
           <PortalMark />
           <span>
-            <strong>Aster</strong>
+            <strong>{tenant.shortName}</strong>
             <small>University</small>
           </span>
         </Link>
@@ -231,7 +241,10 @@ export function PortalShell({
           <span aria-hidden="true">?</span>
           <div>
             <strong>Need a real person?</strong>
-            <p>Enrollment and financial-aid advisors are available weekdays.</p>
+            <p>
+              {tenant.shortName} enrollment and financial-aid advisors are
+              available weekdays.
+            </p>
             <Link href="/appointments">Book support</Link>
           </div>
         </div>
@@ -240,15 +253,15 @@ export function PortalShell({
       <main id="main-content" className="aster-main">
         <header className="aster-page-heading">
           <div>
-            <p className="eyebrow">{eyebrow}</p>
-            <h1>{title}</h1>
-            <p>{description}</p>
+            <p className="eyebrow">{tenantRuntime.copy(eyebrow)}</p>
+            <h1>{tenantRuntime.copy(title)}</h1>
+            <p>{tenantRuntime.copy(description)}</p>
           </div>
           {actions ? <div className="aster-page-actions">{actions}</div> : null}
         </header>
         {children}
         <footer className="aster-footer">
-          <p>© {new Date().getFullYear()} Aster University</p>
+          <p>© {new Date().getFullYear()} {tenant.name}</p>
           <nav aria-label="Portal policies">
             <Link href="/help">Privacy & accessibility</Link>
             <Link href="/help">Student support</Link>
