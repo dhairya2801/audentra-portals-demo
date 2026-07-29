@@ -433,6 +433,19 @@ test("typed client wires every resource route and mutation contract", async () =
   assert.equal(requests[0].init.method, "GET");
   assert.equal(requests[0].init.credentials, "include");
   assert.equal(requests[0].init.headers["X-Tenant-Slug"], "aster");
+  assert.equal(
+    client.getStudentDocumentContentUrl({
+      contentUrl:
+        "/v1/student/documents/00000000-0000-7000-8000-000000000701/content",
+    }),
+    "http://localhost:4000/v1/student/documents/00000000-0000-7000-8000-000000000701/content?tenant=aster",
+  );
+  assert.equal(
+    client.getStudentDocumentProfilePhotoUrl(
+      "00000000-0000-7000-8000-000000000701",
+    ),
+    "http://localhost:4000/v1/student/documents/00000000-0000-7000-8000-000000000701/profile-photo?tenant=aster",
+  );
 
   const requestByPath = new Map(
     requests.map((entry) => [new URL(entry.url).pathname, entry]),

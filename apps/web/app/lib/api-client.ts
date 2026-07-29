@@ -491,11 +491,19 @@ export function retryStudentDocumentExtraction(
 
 export function getStudentDocumentContentUrl(document: StudentDocument) {
   if (!document.contentUrl) return null;
-  return `${API_BASE_URL}${document.contentUrl}`;
+  return tenantAwareDocumentUrl(document.contentUrl);
 }
 
 export function getStudentDocumentProfilePhotoUrl(documentId: string) {
-  return `${API_BASE_URL}/v1/student/documents/${encodeURIComponent(documentId)}/profile-photo`;
+  return tenantAwareDocumentUrl(
+    `/v1/student/documents/${encodeURIComponent(documentId)}/profile-photo`,
+  );
+}
+
+function tenantAwareDocumentUrl(path: string) {
+  const url = new URL(path, `${API_BASE_URL}/`);
+  url.searchParams.set("tenant", currentTenantSlug());
+  return url.toString();
 }
 
 export function askEdward(input: AskEdwardInput) {
