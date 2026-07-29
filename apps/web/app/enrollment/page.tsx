@@ -108,6 +108,16 @@ function RequirementItem({
           ) : null}
           {item.blocking ? <span>Required</span> : <span>Optional</span>}
         </div>
+        {item.reward ? (
+          <div
+            className={`enrollment-reward${item.reward.earned ? " enrollment-reward--earned" : ""}`}
+          >
+            <span aria-hidden="true">✦</span>
+            {item.reward.earned
+              ? `${item.reward.points} points earned`
+              : `Earn ${item.reward.points} points`}
+          </div>
+        ) : null}
         <div className="enrollment-requirement__progress">
           <span>Task progress</span>
           <div

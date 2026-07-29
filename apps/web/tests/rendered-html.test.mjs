@@ -698,6 +698,28 @@ test("student routes enforce bootstrap gating and expose no dead static links", 
   }
 });
 
+test("tenant points stay visible and enrollment tasks advertise their reward", async () => {
+  const [shell, enrollment, apiClient, styles] = await Promise.all([
+    readFile(
+      new URL("../app/components/portal-shell.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/enrollment/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(shell, /rewards\.lifetimePoints/);
+  assert.match(shell, /rewards\.pointName/);
+  assert.match(shell, /bookstoreCreditCents/);
+  assert.match(enrollment, /item\.reward\.points/);
+  assert.match(enrollment, /points earned/);
+  assert.match(apiClient, /vv:student-record-changed/);
+  assert.match(styles, /\.aster-points-balance/);
+  assert.match(styles, /\.aster-sidebar__rewards/);
+  assert.match(styles, /\.enrollment-reward--earned/);
+});
+
 test("campus event visuals are data-driven, accessible, and backed by local assets", async () => {
   const [campusPage, contracts, demoSeed, tenantContent, styles] =
     await Promise.all([

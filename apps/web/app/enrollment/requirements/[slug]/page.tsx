@@ -1618,6 +1618,16 @@ export default function RequirementDetailPage() {
                     <dt>Requirement</dt>
                     <dd>{requirement.data.blocking ? "Required" : "Optional"}</dd>
                   </div>
+                  {requirement.data.reward ? (
+                    <div>
+                      <dt>Points</dt>
+                      <dd>
+                        {requirement.data.reward.earned
+                          ? `${requirement.data.reward.points} earned`
+                          : `+${requirement.data.reward.points} on completion`}
+                      </dd>
+                    </div>
+                  ) : null}
                 </dl>
               </section>
             )}

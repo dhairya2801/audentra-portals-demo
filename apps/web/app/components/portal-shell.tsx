@@ -97,6 +97,13 @@ function initials(fullName: string) {
     .join("");
 }
 
+function bookstoreCredit(cents: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(cents / 100);
+}
+
 export function PortalShell({
   active,
   eyebrow,
@@ -121,6 +128,7 @@ export function PortalShell({
     [],
   );
   const identity = useApiResource(loadBootstrap);
+  const reloadIdentity = identity.reload;
   const needsOnboarding =
     identity.data?.onboarding.required &&
     identity.data.onboarding.status !== "completed";
@@ -142,6 +150,19 @@ export function PortalShell({
       entry_point: "portal_navigation",
     });
   }, [active, track]);
+
+  useEffect(() => {
+    const refreshStudentRecord = () => reloadIdentity();
+    window.addEventListener(
+      "vv:student-record-changed",
+      refreshStudentRecord,
+    );
+    return () =>
+      window.removeEventListener(
+        "vv:student-record-changed",
+        refreshStudentRecord,
+      );
+  }, [reloadIdentity]);
 
   if (identity.status === "loading" || needsSignIn || needsOnboarding) {
     return (
@@ -190,6 +211,18 @@ export function PortalShell({
           </span>
         </Link>
         <div className="aster-topbar__right">
+          {identity.data.rewards ? (
+            <div
+              className="aster-points-balance"
+              title={`${bookstoreCredit(identity.data.rewards.bookstoreCreditCents)} in bookstore credit`}
+            >
+              <span aria-hidden="true">✦</span>
+              <div>
+                <strong>{identity.data.rewards.lifetimePoints}</strong>
+                <small>{identity.data.rewards.pointName}</small>
+              </div>
+            </div>
+          ) : null}
           <Link className="aster-help-link" href="/help">
             Student support
           </Link>
@@ -237,6 +270,24 @@ export function PortalShell({
             </Link>
           ))}
         </nav>
+        {identity.data.rewards ? (
+          <section
+            className="aster-sidebar__rewards"
+            aria-label={`${identity.data.rewards.pointName} balance`}
+          >
+            <span aria-hidden="true">✦</span>
+            <div>
+              <small>{identity.data.rewards.pointName}</small>
+              <strong>{identity.data.rewards.lifetimePoints} points</strong>
+              <p>
+                {bookstoreCredit(
+                  identity.data.rewards.bookstoreCreditCents,
+                )}{" "}
+                bookstore credit
+              </p>
+            </div>
+          </section>
+        ) : null}
         <div className="aster-sidebar__support">
           <span aria-hidden="true">?</span>
           <div>

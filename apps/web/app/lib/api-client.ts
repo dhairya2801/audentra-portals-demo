@@ -122,7 +122,14 @@ async function request<T>(
     throw await parseError(response);
   }
 
-  return (await response.json()) as T;
+  const result = (await response.json()) as T;
+  if (
+    typeof window !== "undefined" &&
+    (init.method ?? "GET").toUpperCase() !== "GET"
+  ) {
+    window.dispatchEvent(new Event("vv:student-record-changed"));
+  }
+  return result;
 }
 
 export function getStudentBootstrap(signal?: AbortSignal) {

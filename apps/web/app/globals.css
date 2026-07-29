@@ -131,6 +131,39 @@
   gap: 1.1rem;
 }
 
+.aster-points-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.38rem 0.62rem;
+  border: 1px solid rgb(255 195 41 / 55%);
+  border-radius: 999px;
+  background: linear-gradient(135deg, #fff9df, #fff2b7);
+  color: #2b2108;
+  box-shadow: 0 7px 18px rgb(154 112 0 / 10%);
+}
+
+.aster-points-balance > span {
+  color: #b47a00;
+  font-size: 0.9rem;
+}
+
+.aster-points-balance > div {
+  display: flex;
+  align-items: baseline;
+  gap: 0.28rem;
+}
+
+.aster-points-balance strong {
+  font-size: 0.74rem;
+}
+
+.aster-points-balance small {
+  color: #766126;
+  font-size: 0.55rem;
+  font-weight: 700;
+}
+
 .aster-help-link {
   padding-right: 1.1rem;
   border-right: 1px solid #e7e7e5;
@@ -252,6 +285,59 @@
   border: 1px solid #dededb;
   border-radius: 0.75rem;
   background: #fff;
+}
+
+.aster-sidebar__rewards {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.65rem;
+  margin-top: auto;
+  padding: 0.85rem;
+  border: 1px solid rgb(255 195 41 / 52%);
+  border-radius: 0.75rem;
+  background:
+    radial-gradient(circle at 90% 0%, rgb(255 255 255 / 78%), transparent 42%),
+    linear-gradient(145deg, #fff7d7, #f8e6a6);
+  color: #2b2108;
+}
+
+.aster-sidebar__rewards + .aster-sidebar__support {
+  margin-top: 0.65rem;
+}
+
+.aster-sidebar__rewards > span {
+  display: grid;
+  width: 1.7rem;
+  height: 1.7rem;
+  place-items: center;
+  border-radius: 50%;
+  background: #131b2e;
+  color: #ffc329;
+}
+
+.aster-sidebar__rewards div {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.aster-sidebar__rewards small {
+  color: #756125;
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.aster-sidebar__rewards strong {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+}
+
+.aster-sidebar__rewards p {
+  margin: 0;
+  color: #6d5a23;
+  font-size: 0.55rem;
+  line-height: 1.35;
 }
 
 .aster-sidebar__support > span {
@@ -5829,6 +5915,25 @@ a {
   font-weight: 760;
   letter-spacing: 0.045em;
   text-transform: uppercase;
+}
+
+.enrollment-reward {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.6rem;
+  padding: 0.28rem 0.5rem;
+  border-radius: 999px;
+  background: #fff4c8;
+  color: #74540b;
+  font-size: 0.6rem;
+  font-weight: 800;
+}
+
+.enrollment-reward--earned {
+  background: #e7f5ec;
+  color: #17643c;
 }
 
 .enrollment-requirement__progress-track {
