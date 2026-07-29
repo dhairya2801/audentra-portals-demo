@@ -697,3 +697,54 @@ test("student routes enforce bootstrap gating and expose no dead static links", 
     assert.ok(allRoutes.has(match[1]), `dead static link: ${match[1]}`);
   }
 });
+
+test("campus event visuals are data-driven, accessible, and backed by local assets", async () => {
+  const [campusPage, contracts, demoSeed, tenantContent, styles] =
+    await Promise.all([
+      readFile(new URL("../app/campus-life/page.tsx", import.meta.url), "utf8"),
+      readFile(
+        new URL("../../../packages/contracts/src/index.ts", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../../../tools/demo-api/src/seed.js", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../../../tools/demo-api/src/tenant-content.js",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    ]);
+
+  assert.match(contracts, /visualTheme\?: "festival" \| "discovery"/);
+  assert.match(campusPage, /data-visual-theme=/);
+  assert.match(campusPage, /activeEvent\.imageAlt/);
+  assert.match(campusPage, /activeEvent\.imageAttribution/);
+  assert.match(styles, /\.campus-carousel--theme-festival/);
+  assert.match(styles, /\.campus-carousel--theme-discovery/);
+  assert.match(styles, /\.campus-carousel--theme-career/);
+  assert.match(styles, /\.campus-carousel--theme-community/);
+
+  const source = `${demoSeed}\n${tenantContent}`;
+  for (const asset of [
+    "welcome-week-block-party.webp",
+    "first-year-research-showcase.webp",
+    "internship-ready-lab.webp",
+  ]) {
+    assert.match(source, new RegExp(asset.replace(".", "\\.")));
+    await access(new URL(`../public/media/events/${asset}`, import.meta.url));
+  }
+});
+
+test("the web command wrapper forwards isolated host and port arguments", async () => {
+  const buildScript = await readFile(
+    new URL("../scripts/build.mjs", import.meta.url),
+    "utf8",
+  );
+  assert.match(buildScript, /process\.argv\.slice\(3\)/);
+  assert.match(buildScript, /\[cli, command, \.\.\.commandArguments\]/);
+});

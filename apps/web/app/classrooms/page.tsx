@@ -49,6 +49,24 @@ function CourseDetail({
         <p className="eyebrow">{course.code} · {course.credits} credits</p>
         <h2 id="course-dialog-title">{course.title}</h2>
         <p>{course.description}</p>
+        <dl className="course-dialog__facts">
+          <div>
+            <dt>Availability</dt>
+            <dd>{course.availabilityLabel ?? "Confirm with the registrar"}</dd>
+          </div>
+          <div>
+            <dt>Instruction</dt>
+            <dd>
+              {course.instructorNames?.length
+                ? course.instructorNames.join(", ")
+                : "Not yet published"}
+            </dd>
+          </div>
+          <div>
+            <dt>Meeting pattern</dt>
+            <dd>{course.meetingPattern ?? "Not yet published"}</dd>
+          </div>
+        </dl>
         <div>
           <strong>Prerequisites</strong>
           {course.prerequisites.length ? (
@@ -66,6 +84,49 @@ function CourseDetail({
             <p>No course prerequisites.</p>
           )}
         </div>
+        {course.resources?.length ? (
+          <section
+            className="course-dialog__resources"
+            aria-labelledby="course-resource-title"
+          >
+            <div>
+              <span aria-hidden="true">↗</span>
+              <div>
+                <strong id="course-resource-title">Relevant resources</strong>
+                <p>Open textbooks selected for this course by academic staff.</p>
+              </div>
+            </div>
+            <ul>
+              {course.resources.map((resource) => (
+                <li key={resource.id}>
+                  <span className="course-resource-preview" aria-hidden="true">
+                    PDF
+                  </span>
+                  <div>
+                    <h3>{resource.title}</h3>
+                    <p>{resource.description}</p>
+                    <small>
+                      {resource.provider} · {resource.licenseLabel}
+                    </small>
+                  </div>
+                  <a href={resource.url} target="_blank" rel="noreferrer">
+                    Open PDF <span aria-hidden="true">↗</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+        {course.source ? (
+          <a
+            className="course-source-link"
+            href={course.source.url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {course.source.label} <span aria-hidden="true">↗</span>
+          </a>
+        ) : null}
       </section>
     </div>
   );
@@ -152,6 +213,18 @@ export default function ClassroomsPage() {
                 Catalog {academics.data.catalogVersion} ·{" "}
                 {academics.data.selectedProgram.totalCredits} degree credits
               </small>
+              {academics.data.selectedProgram.source ? (
+                <a
+                  className="academic-source-link"
+                  href={academics.data.selectedProgram.source.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Program source ·{" "}
+                  {academics.data.selectedProgram.source.label}
+                  <span aria-hidden="true"> ↗</span>
+                </a>
+              ) : null}
             </div>
             <div className="academic-progress">
               <div>
@@ -169,6 +242,41 @@ export default function ClassroomsPage() {
             </div>
           </section>
 
+          <section className="aster-section academic-next-term">
+            <div className="aster-section__heading">
+              <div>
+                <p className="eyebrow">Plan at a glance</p>
+                <h2>Your next recommended courses</h2>
+              </div>
+              <p>
+                Recommendations come from the active tenant catalog and can be
+                changed by academic staff.
+              </p>
+            </div>
+            <div className="academic-next-grid">
+              {academics.data.plan
+                .filter((item) =>
+                  ["eligible", "required", "in_progress"].includes(item.status),
+                )
+                .slice(0, 3)
+                .map((item) => (
+                  <button
+                    type="button"
+                    onClick={() => openCourse(item.course, "next_term")}
+                    key={item.course.id}
+                  >
+                    <span>{item.course.code}</span>
+                    <strong>{item.course.title}</strong>
+                    <small>
+                      Recommended term {item.recommendedTerm} ·{" "}
+                      {statusLabels[item.status]}
+                    </small>
+                    <i aria-hidden="true">View course →</i>
+                  </button>
+                ))}
+            </div>
+          </section>
+
           <section className="aster-section">
             <div className="aster-section__heading">
               <div>
@@ -178,7 +286,18 @@ export default function ClassroomsPage() {
               <p>Recommendations require registrar or academic-advisor approval.</p>
             </div>
             <div className="exemption-grid">
-              {academics.data.exemptionRecommendations.map((recommendation) => {
+              {academics.data.exemptionRecommendations.length === 0 ? (
+                <div className="academic-empty-state">
+                  <span aria-hidden="true">◎</span>
+                  <div>
+                    <strong>No transcript matches are waiting</strong>
+                    <p>
+                      Upload a transcript to generate reviewable course-credit
+                      recommendations against this university’s active rules.
+                    </p>
+                  </div>
+                </div>
+              ) : academics.data.exemptionRecommendations.map((recommendation) => {
                 const source = academics.data.transcriptCredits.find(
                   (credit) => credit.id === recommendation.transcriptCreditId,
                 );
@@ -233,9 +352,9 @@ export default function ClassroomsPage() {
             <div className="aster-section__heading">
               <div>
                 <p className="eyebrow">Program map</p>
-                <h2>Required course sequence</h2>
+                <h2>Suggested program path</h2>
               </div>
-              <span>{academics.data.plan.length} courses in this preview</span>
+              <span>{academics.data.plan.length} tenant-managed plan items</span>
             </div>
             <div className="academic-plan-table" role="table" aria-label="Program requirements">
               <div role="row" className="academic-plan-table__header">
@@ -255,7 +374,10 @@ export default function ClassroomsPage() {
                     <strong>{item.course.code}</strong>
                     <small>{item.course.title}</small>
                   </span>
-                  <span role="cell">Term {item.recommendedTerm}</span>
+                  <span role="cell">
+                    Term {item.recommendedTerm}
+                    <small>{item.category.replaceAll("_", " ")}</small>
+                  </span>
                   <span role="cell">
                     {item.missingPrerequisiteCodes.length
                       ? item.missingPrerequisiteCodes.join(", ")
@@ -298,23 +420,36 @@ export default function ClassroomsPage() {
             </form>
             {searchError ? <p className="inline-error">{searchError}</p> : null}
             <div className="course-results">
-              {results.map((course) => (
-                <button
-                  type="button"
-                  onClick={() => openCourse(course, "catalog_search")}
-                  key={course.id}
-                >
-                  <span>{course.code}</span>
-                  <h3>{course.title}</h3>
-                  <p>{course.description}</p>
-                  <small>
-                    {course.credits} credits ·{" "}
-                    {course.prerequisites.length
-                      ? `${course.prerequisites.length} prerequisite${course.prerequisites.length === 1 ? "" : "s"}`
-                      : "No prerequisites"}
-                  </small>
-                </button>
-              ))}
+              {results.length === 0 ? (
+                <div className="academic-empty-state">
+                  <span aria-hidden="true">⌕</span>
+                  <div>
+                    <strong>No catalog courses match that search</strong>
+                    <p>Try a course code, subject, topic, or a shorter keyword.</p>
+                  </div>
+                </div>
+              ) : (
+                results.map((course) => (
+                  <button
+                    type="button"
+                    onClick={() => openCourse(course, "catalog_search")}
+                    key={course.id}
+                  >
+                    <span>{course.code}</span>
+                    <h3>{course.title}</h3>
+                    <p>{course.description}</p>
+                    {course.availabilityLabel ? (
+                      <em>{course.availabilityLabel}</em>
+                    ) : null}
+                    <small>
+                      {course.credits} credits ·{" "}
+                      {course.prerequisites.length
+                        ? `${course.prerequisites.length} prerequisite${course.prerequisites.length === 1 ? "" : "s"}`
+                        : "No prerequisites"}
+                    </small>
+                  </button>
+                ))
+              )}
             </div>
           </section>
         </>

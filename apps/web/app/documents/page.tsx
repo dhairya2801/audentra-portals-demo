@@ -291,25 +291,51 @@ function DocumentWorkspace({
       <div className="documents-layout">
         <PageCard
           eyebrow="Your student record"
-          title={`Submitted documents (${list.total})`}
+          title={`Submitted & signed documents (${list.total})`}
           className="documents-list-card"
         >
+          <p className="documents-list-card__intro">
+            Uploaded records and completed signature documents stay together in
+            one reviewable library.
+          </p>
           {list.items.length === 0 ? (
             <EmptyState
               title="No documents uploaded yet"
               description="When a checklist item asks for supporting evidence, upload the real file here."
             />
           ) : (
-            <ul className="document-records">
+            <ul className="submitted-document-grid">
               {list.items.map((document) => {
                 const contentUrl = getStudentDocumentContentUrl(document);
+                const isSigned =
+                  document.extraction?.documentType === "ferpa" &&
+                  (document.status === "accepted" ||
+                    document.extraction.verifiedAt != null);
+                const documentKind = isSigned
+                  ? "Signed document"
+                  : "Submitted document";
                 return (
                   <li key={document.id}>
-                    <div className="document-record__top">
-                      <span className="document-file-icon" aria-hidden="true">
+                    <div className="submitted-document__preview" aria-hidden="true">
+                      <span>
                         {document.mimeType === "application/pdf" ? "PDF" : "IMG"}
                       </span>
+                      <strong>{isSigned ? "SIGNED" : "FILED"}</strong>
+                      <i />
+                      <i />
+                      <i />
+                      <em>
+                        {new Intl.DateTimeFormat("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        }).format(new Date(document.createdAt))}
+                      </em>
+                    </div>
+                    <div className="submitted-document__body">
+                      <div className="document-record__top">
                       <div>
+                        <span className="submitted-document__kind">{documentKind}</span>
                         <h3>{document.fileName}</h3>
                         <p>
                           {document.extraction?.status === "completed"
@@ -330,23 +356,25 @@ function DocumentWorkspace({
                         </p>
                       </div>
                       <StatusPill value={document.status} />
+                      </div>
+                      <div className="document-record__actions">
+                        {contentUrl ? (
+                          <a href={contentUrl} target="_blank" rel="noreferrer">
+                            View original <span aria-hidden="true">↗</span>
+                          </a>
+                        ) : null}
+                        {document.sha256 ? (
+                          <span title={document.sha256}>
+                            <i aria-hidden="true">✓</i> Integrity checked ·{" "}
+                            {document.sha256.slice(0, 8)}
+                          </span>
+                        ) : null}
+                      </div>
+                      <ExtractionReview
+                        document={document}
+                        onDocumentChanged={reload}
+                      />
                     </div>
-                    <div className="document-record__actions">
-                      {contentUrl ? (
-                        <a href={contentUrl} target="_blank" rel="noreferrer">
-                          View original <span aria-hidden="true">↗</span>
-                        </a>
-                      ) : null}
-                      {document.sha256 ? (
-                        <span title={document.sha256}>
-                          Integrity checked · {document.sha256.slice(0, 8)}
-                        </span>
-                      ) : null}
-                    </div>
-                    <ExtractionReview
-                      document={document}
-                      onDocumentChanged={reload}
-                    />
                   </li>
                 );
               })}
@@ -386,8 +414,8 @@ function DocumentWorkspace({
       <section className="official-forms" aria-labelledby="official-forms-title">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Reference library</p>
-            <h2 id="official-forms-title">Real forms students may encounter</h2>
+            <p className="eyebrow">Official form templates</p>
+            <h2 id="official-forms-title">Reference forms students may encounter</h2>
           </div>
           <p>Official sources · provided as examples</p>
         </div>

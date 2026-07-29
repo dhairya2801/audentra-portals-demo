@@ -200,4 +200,63 @@ test.describe("Edward adversarial requests through the browser", () => {
     const { response } = await sendEdwardMessage(page, await composer.inputValue());
     expect(response.request().postDataJSON().message).toHaveLength(2_000);
   });
+
+  test("loads only the context domains needed for each student question", async ({
+    page,
+  }) => {
+    await page.goto("/edward");
+    const cases = [
+      {
+        prompt: "Which classes and prerequisites are in my academic plan?",
+        expected: ["dashboard", "profile", "academics"],
+      },
+      {
+        prompt: "Which clubs and campus events can I join?",
+        expected: ["dashboard", "profile", "campus_life"],
+      },
+      {
+        prompt: "What did I choose for housing during onboarding?",
+        expected: ["dashboard", "profile", "onboarding"],
+      },
+      {
+        prompt: "Do I have unread messages?",
+        expected: ["dashboard", "profile", "messages"],
+      },
+      {
+        prompt: "What is my financial aid balance?",
+        expected: ["dashboard", "profile", "payments", "financials"],
+      },
+    ];
+
+    for (const scenario of cases) {
+      const { payload } = await sendEdwardMessage(page, scenario.prompt);
+      expect(payload.contextReceipts.map((receipt) => receipt.source)).toEqual(
+        scenario.expected,
+      );
+    }
+  });
+
+  test("keeps the outbound conversation window bounded as a chat grows", async ({
+    page,
+  }) => {
+    await page.goto("/edward");
+    let finalResponse: Awaited<ReturnType<typeof sendEdwardMessage>> | null =
+      null;
+
+    for (let index = 1; index <= 5; index += 1) {
+      finalResponse = await sendEdwardMessage(
+        page,
+        `Conversation turn ${index}: tell me about campus.`,
+      );
+    }
+
+    const body = finalResponse?.response.request().postDataJSON() as {
+      history: Array<{ role: string; content: string }>;
+    };
+    expect(body.history).toHaveLength(6);
+    expect(body.history.every((entry) => entry.content.length <= 1_200)).toBe(
+      true,
+    );
+    expect(body.history[0]?.content).not.toContain("Conversation turn 1");
+  });
 });

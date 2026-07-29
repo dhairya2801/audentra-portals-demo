@@ -153,9 +153,11 @@ async function portalReady() {
       fetch("http://127.0.0.1:4000/health/ready", {
         signal: AbortSignal.timeout(1_000),
       }),
-      fetch("http://127.0.0.1:3000/", {
+      fetch("http://localhost:3000/", {
         redirect: "manual",
-        signal: AbortSignal.timeout(1_000),
+        // The first vinext request may include a short route compilation.
+        // Keep status truthful without turning startup into a long foreground wait.
+        signal: AbortSignal.timeout(3_000),
       }),
     ]);
     return api.ok && web.status >= 200 && web.status < 500;

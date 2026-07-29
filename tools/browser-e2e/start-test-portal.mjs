@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -7,6 +7,7 @@ const workspaceRoot = resolve(import.meta.dirname, "../..");
 const testDirectory = await mkdtemp(join(tmpdir(), "vv-browser-e2e-"));
 const apiPort = process.env.E2E_API_PORT?.trim() || "41817";
 const webPort = process.env.E2E_WEB_PORT?.trim() || "31817";
+const parentPid = process.ppid;
 const portal = spawn(process.execPath, ["tools/run-student-portal.mjs"], {
   cwd: workspaceRoot,
   env: {
@@ -28,11 +29,28 @@ const portal = spawn(process.execPath, ["tools/run-student-portal.mjs"], {
 });
 
 let stopping = false;
+const parentWatch = setInterval(() => {
+  try {
+    process.kill(parentPid, 0);
+  } catch {
+    void stop(0);
+  }
+}, 1_000);
+
 async function stop(exitCode) {
   if (stopping) return;
   stopping = true;
+  clearInterval(parentWatch);
   if (portal.exitCode === null && portal.signalCode === null) {
-    portal.kill("SIGTERM");
+    if (process.platform === "win32" && Number.isInteger(portal.pid)) {
+      spawnSync(
+        "taskkill.exe",
+        ["/PID", String(portal.pid), "/T", "/F"],
+        { stdio: "ignore", windowsHide: true },
+      );
+    } else {
+      portal.kill("SIGTERM");
+    }
   }
   await rm(testDirectory, { recursive: true, force: true });
   process.exit(exitCode);

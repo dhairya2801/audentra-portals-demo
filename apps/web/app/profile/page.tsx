@@ -246,9 +246,16 @@ function ProfileForm({
             </div>
           </dl>
         </PageCard>
-        <PageCard title="Portal session">
-          <p className="form-intro">
-            Sign out when you are finished, especially on a shared device.
+        <section className="profile-session-card">
+          <div className="profile-session-card__icon" aria-hidden="true">↪</div>
+          <div className="profile-session-card__status">
+            <i aria-hidden="true" /> Signed in securely
+          </div>
+          <p className="eyebrow">Account security</p>
+          <h2>Portal session</h2>
+          <p>
+            You are signed in to your {tenant.shortName} student record.
+            Always sign out before leaving a shared device.
           </p>
           <ActionFeedback
             status={signOut.status}
@@ -256,7 +263,7 @@ function ProfileForm({
             success="Signed out."
           />
           <button
-            className="button button--secondary"
+            className="profile-session-card__button"
             type="button"
             disabled={signOut.status === "loading"}
             onClick={() => {
@@ -267,19 +274,26 @@ function ProfileForm({
               });
             }}
           >
-            {signOut.status === "loading"
-              ? "Signing out…"
-              : signOut.status === "error"
-                ? "Retry sign out"
-                : "Sign out"}
+            <span>
+              <strong>
+                {signOut.status === "loading"
+                  ? "Signing out…"
+                  : signOut.status === "error"
+                    ? "Retry sign out"
+                    : "Sign out of the portal"}
+              </strong>
+              <small>End this session on this device</small>
+            </span>
+            <b aria-hidden="true">→</b>
           </button>
-        </PageCard>
+        </section>
       </aside>
     </div>
   );
 }
 
 export default function ProfilePage() {
+  const { tenant } = useTenant();
   const loadProfile = useCallback(
     (signal: AbortSignal) =>
       Promise.all([
@@ -306,7 +320,7 @@ export default function ProfilePage() {
       active="profile"
       eyebrow="Your account"
       title="Profile"
-      description="Keep the student-controlled parts of your Aster profile current."
+      description={`Keep the student-controlled parts of your ${tenant.shortName} profile current.`}
     >
       {profileResource.status === "loading" ? (
         <LoadingState label="Loading your profile" />

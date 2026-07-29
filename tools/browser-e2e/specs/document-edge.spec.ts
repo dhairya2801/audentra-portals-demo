@@ -175,4 +175,63 @@ test.describe("document misuse through the enrollment UI", () => {
       page.getByRole("button", { name: "Retry files needing attention" }),
     ).toBeEnabled();
   });
+
+  test("accepts both JPEG extensions and enforces per-file and bundle limits", async ({
+    page,
+  }) => {
+    await page.goto(
+      "/enrollment/requirements/financial-aid-verification",
+    );
+    const fileInput = page.locator('input[type="file"]');
+    const jpeg = Buffer.from([
+      0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46,
+      ...Buffer.from(" FAFSA verification worksheet ", "ascii"),
+      0xff, 0xd9,
+    ]);
+
+    await fileInput.setInputFiles([
+      {
+        name: "aid-photo.jpg",
+        mimeType: "image/jpeg",
+        buffer: jpeg,
+      },
+      {
+        name: "aid-photo-second.jpeg",
+        mimeType: "image/jpeg",
+        buffer: jpeg,
+      },
+    ]);
+    await expect(
+      page.getByRole("listitem").filter({ hasText: "aid-photo.jpg" }),
+    ).not.toContainText("Use PDF, JPEG, or PNG.");
+    await expect(
+      page.getByRole("listitem").filter({ hasText: "aid-photo-second.jpeg" }),
+    ).not.toContainText("Use PDF, JPEG, or PNG.");
+    await expect(
+      page.getByRole("button", { name: "Upload requirement bundle" }),
+    ).toBeEnabled();
+
+    await fileInput.setInputFiles({
+      name: "oversized.jpg",
+      mimeType: "image/jpeg",
+      buffer: Buffer.alloc(10 * 1024 * 1024 + 1, 0xff),
+    });
+    await expect(
+      page.getByRole("listitem").filter({ hasText: "oversized.jpg" }),
+    ).toContainText("This file is larger than 10 MB.");
+    await expect(
+      page.getByRole("button", { name: "Upload requirement bundle" }),
+    ).toBeDisabled();
+
+    await fileInput.setInputFiles(
+      Array.from({ length: 9 }, (_, index) => ({
+        name: `bundle-${index + 1}.jpg`,
+        mimeType: "image/jpeg",
+        buffer: jpeg,
+      })),
+    );
+    await expect(
+      page.getByRole("listitem").filter({ hasText: "bundle-9.jpg" }),
+    ).toContainText("A bundle can contain up to 8 files.");
+  });
 });

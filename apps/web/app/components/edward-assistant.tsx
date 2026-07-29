@@ -44,6 +44,7 @@ const contextSourceLabels: Record<EdwardContextReceipt["source"], string> = {
   academics: "Academic plan",
   financials: "Financial plan",
   messages: "Messages",
+  campus_life: "Campus life",
 };
 
 function ActionWidget({

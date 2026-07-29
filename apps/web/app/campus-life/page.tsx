@@ -7,6 +7,7 @@ import { useActivityTracking } from "../hooks/use-activity-tracking";
 import { useApiResource } from "../hooks/use-api-resource";
 import { getCampusLife } from "../lib/api-client";
 import { useTenant } from "../components/tenant-provider";
+import { TenantLink as Link } from "../components/tenant-link";
 
 function eventDate(value: string) {
   return {
@@ -33,7 +34,6 @@ export default function CampusLifePage() {
   const { track } = useActivityTracking();
   const [eventIndex, setEventIndex] = useState(0);
   const [clubQuery, setClubQuery] = useState("");
-  const [expandedClub, setExpandedClub] = useState<string | null>(null);
 
   const filteredClubs = useMemo(() => {
     if (!campus.data) return [];
@@ -52,7 +52,7 @@ export default function CampusLifePage() {
         active="campus_life"
         eyebrow="My campus life"
         title="Find your people"
-        description="Events, clubs, and the communities that make Aster feel like home."
+        description={`Events, clubs, and communities published for ${tenant.shortName} students.`}
       >
         <LoadingState label="Loading campus life" />
       </PortalShell>
@@ -65,7 +65,7 @@ export default function CampusLifePage() {
         active="campus_life"
         eyebrow="My campus life"
         title="Find your people"
-        description="Events, clubs, and the communities that make Aster feel like home."
+        description={`Events, clubs, and communities published for ${tenant.shortName} students.`}
       >
         <ErrorState message={campus.error} onRetry={campus.reload} />
       </PortalShell>
@@ -93,11 +93,30 @@ export default function CampusLifePage() {
       active="campus_life"
       eyebrow="My campus life"
       title="Find your people"
-      description="Events, clubs, and the communities that make Aster feel like home."
+      description={`Events, clubs, and communities published for ${tenant.shortName} students.`}
     >
+      <section className="campus-overview" aria-label="Campus life overview">
+        <article>
+          <strong>{events.length}</strong>
+          <span>Upcoming experiences</span>
+          <small>Events published for this tenant</small>
+        </article>
+        <article>
+          <strong>{campus.data.clubs.length}</strong>
+          <span>Student organizations</span>
+          <small>Search by interest or community</small>
+        </article>
+        <article>
+          <strong>{new Set(campus.data.clubs.map((club) => club.category)).size}</strong>
+          <span>Interest areas</span>
+          <small>Technology, service, culture, and more</small>
+        </article>
+      </section>
+
       {activeEvent && date ? (
         <section
-          className={`campus-carousel campus-carousel--${activeEvent.accent}`}
+          className={`campus-carousel campus-carousel--${activeEvent.accent} campus-carousel--theme-${activeEvent.visualTheme ?? "community"}`}
+          data-visual-theme={activeEvent.visualTheme ?? "community"}
           aria-roledescription="carousel"
           aria-label="Featured campus events"
         >
@@ -107,13 +126,67 @@ export default function CampusLifePage() {
             <strong>{date.month}</strong>
           </div>
           <div className="campus-carousel__content">
+            {activeEvent.imageUrl ? (
+              <img
+                className="campus-carousel__background"
+                src={activeEvent.imageUrl}
+                alt={activeEvent.imageAlt ?? ""}
+              />
+            ) : null}
+            <span className="campus-carousel__backdrop" aria-hidden="true" />
+            <span className="campus-carousel__live">
+              <i aria-hidden="true" /> Live campus calendar
+            </span>
             <p className="eyebrow">Featured this month · {activeEvent.category}</p>
             <h2>{activeEvent.title}</h2>
             <p>{activeEvent.description}</p>
-            <div>
+            {activeEvent.source ? (
+              <a
+                className="campus-source-link"
+                href={activeEvent.source.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {activeEvent.source.dataStatus === "synthetic_preview"
+                  ? "Preview inspired by"
+                  : "Event source"}
+                {" · "}
+                {activeEvent.source.label}
+                <span aria-hidden="true"> ↗</span>
+              </a>
+            ) : null}
+            <div className="campus-carousel__meta">
               <span>◷ {date.time}</span>
               <span>⌖ {activeEvent.location}</span>
+              {activeEvent.registrationUrl ? (
+                <a
+                  href={activeEvent.registrationUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Registration details ↗
+                </a>
+              ) : null}
             </div>
+            {activeEvent.imageAttribution ? (
+              activeEvent.imageSourceUrl ? (
+                <a
+                  className="campus-carousel__credit"
+                  href={activeEvent.imageSourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {activeEvent.imageAttribution} <span aria-hidden="true">↗</span>
+                </a>
+              ) : (
+                <span className="campus-carousel__credit">
+                  {activeEvent.imageAttribution}
+                </span>
+              )
+            ) : null}
+            <span className="campus-carousel__feature-number" aria-hidden="true">
+              0{eventIndex + 1}
+            </span>
           </div>
           <div className="campus-carousel__controls">
             <button
@@ -164,10 +237,18 @@ export default function CampusLifePage() {
           />
         </label>
         <div className="club-grid">
-          {filteredClubs.map((club, index) => {
-            const expanded = expandedClub === club.id;
-            return (
-              <article key={club.id}>
+          {filteredClubs.map((club, index) => (
+              <Link
+                className="club-directory-card"
+                href={`/campus-life/clubs/${club.id}`}
+                key={club.id}
+                onClick={() => {
+                  track("ui.club_viewed.v1", {
+                    club_id: club.id,
+                    surface: "club_directory",
+                  });
+                }}
+              >
                 <div className={`club-monogram club-monogram--${index % 4}`}>
                   <img src={club.imageUrl} alt={club.imageAlt} />
                 </div>
@@ -178,31 +259,21 @@ export default function CampusLifePage() {
                   <span>Latest</span>
                   <p>{club.latestUpdate}</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setExpandedClub(expanded ? null : club.id);
-                    track("ui.club_viewed.v1", {
-                      club_id: club.id,
-                      surface: "club_directory",
-                    });
-                  }}
-                >
-                  {expanded ? "Hide details" : "Contact & activities"}{" "}
-                  <span aria-hidden="true">{expanded ? "↑" : "→"}</span>
-                </button>
-                {expanded ? (
-                  <div className="club-details">
-                    <strong>{club.contactName}</strong>
-                    <span>{club.contactRole}</span>
-                    <a href={`mailto:${club.contactChannel}`}>{club.contactChannel}</a>
-                    {club.nextActivity ? <p>{club.nextActivity}</p> : null}
-                  </div>
-                ) : null}
-              </article>
-            );
-          })}
+                <span className="club-directory-card__action">
+                  Explore club, events & calendar <b aria-hidden="true">→</b>
+                </span>
+              </Link>
+          ))}
         </div>
+        {filteredClubs.length === 0 ? (
+          <div className="campus-empty-state">
+            <span aria-hidden="true">⌕</span>
+            <div>
+              <strong>No clubs match “{clubQuery}”</strong>
+              <p>Try another interest, organization name, or category.</p>
+            </div>
+          </div>
+        ) : null}
       </section>
     </PortalShell>
   );

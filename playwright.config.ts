@@ -37,7 +37,14 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      // Use the developer machine's managed Chrome installation. This keeps
+      // the acceptance suite runnable after npm/Playwright caches are cleared
+      // and avoids a separate multi-hundred-megabyte browser download. CI uses
+      // the exact Playwright Chromium revision installed by the workflow.
+      use: {
+        ...devices["Desktop Chrome"],
+        ...(process.env.CI ? {} : { channel: "chrome" as const }),
+      },
     },
   ],
 });
