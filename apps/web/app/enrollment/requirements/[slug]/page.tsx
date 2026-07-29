@@ -564,11 +564,13 @@ function DocumentAction({
   onUploaded,
   reviewPlacement = "inline",
   onDocumentSelected,
+  documentOverride,
 }: {
   requirement: StudentRequirementDetail;
   onUploaded: (document: StudentDocument) => void;
   reviewPlacement?: "inline" | "context";
   onDocumentSelected?: (document: StudentDocument | null) => void;
+  documentOverride?: StudentDocument | null;
 }) {
   const [recentDocument, setRecentDocument] =
     useState<StudentDocument | null>(null);
@@ -603,10 +605,29 @@ function DocumentAction({
       null,
     );
   }, [documents.data, documents.status, requirement.id]);
-  const selectedDocument =
-    recentDocument?.requirementId === requirement.id
-      ? recentDocument
-      : latestStoredDocument;
+  const selectedDocument = [
+    recentDocument,
+    documentOverride,
+    latestStoredDocument,
+  ]
+    .filter(
+      (document): document is StudentDocument =>
+        document?.requirementId === requirement.id,
+    )
+    .reduce<StudentDocument | null>((latest, document) => {
+      if (!latest) return document;
+      const latestActivity = Date.parse(
+        latest.extraction?.processedAt ??
+          latest.extraction?.processingStartedAt ??
+          latest.createdAt,
+      );
+      const documentActivity = Date.parse(
+        document.extraction?.processedAt ??
+          document.extraction?.processingStartedAt ??
+          document.createdAt,
+      );
+      return documentActivity > latestActivity ? document : latest;
+    }, null);
   const extraction = selectedDocument?.extraction;
   const extractionMismatch =
     extraction?.status === "completed" &&
@@ -635,10 +656,7 @@ function DocumentAction({
     // A file selected in this mounted uploader is already polled by the
     // uploader so its per-file status can update. This route-level poll is the
     // recovery path for a refreshed/reopened page.
-    if (
-      extraction?.status !== "processing" ||
-      recentDocument?.id === selectedDocument?.id
-    ) {
+    if (extraction?.status !== "processing") {
       return;
     }
     let attempts = 0;
@@ -663,7 +681,6 @@ function DocumentAction({
   }, [
     extraction?.status,
     extraction?.processingDeadlineAt,
-    recentDocument?.id,
     refreshDocuments,
     selectedDocument?.id,
   ]);
@@ -1408,12 +1425,14 @@ function RequirementAction({
   kind,
   onRecordChanged,
   onDocumentSelected,
+  activeDocument,
   onHousingPreviewChange,
 }: {
   requirement: StudentRequirementDetail;
   kind: RequirementKind;
   onRecordChanged: () => void;
   onDocumentSelected?: (document: StudentDocument | null) => void;
+  activeDocument?: StudentDocument | null;
   onHousingPreviewChange?: (selection: HousingPreviewSelection) => void;
 }) {
   if (requirement.status === "blocked") {
@@ -1453,6 +1472,7 @@ function RequirementAction({
         onDocumentSelected={
           kind === "transcript" ? onDocumentSelected : undefined
         }
+        documentOverride={kind === "transcript" ? activeDocument : undefined}
       />
     );
   }
@@ -1556,6 +1576,7 @@ export default function RequirementDetailPage() {
               kind={kind ?? "other"}
               onRecordChanged={refreshAfterRecordChange}
               onDocumentSelected={setTranscriptDocument}
+              activeDocument={transcriptDocument}
               onHousingPreviewChange={setHousingSelection}
             />
           </section>

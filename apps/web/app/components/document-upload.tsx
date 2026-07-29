@@ -120,8 +120,7 @@ export function DocumentUpload({
   const parsingEnabled = processingMode !== "manual_review";
   const classificationOnly = processingMode === "classification_only";
   const serverProcessing =
-    activeDocument?.status === "processing" &&
-    activeDocument.extraction?.status === "processing";
+    activeDocument?.extraction?.status === "processing";
   useEffect(() => {
     onUploadedRef.current = onUploaded;
   }, [onUploaded]);
@@ -540,7 +539,7 @@ export function DocumentUpload({
         }
       >
         {serverProcessing
-          ? "Parsing current documentâ€¦"
+          ? "Parsing current document…"
           : isUploading
           ? classificationOnly
             ? "Uploading and checking…"
