@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { resetAndAuthenticateDemoStudent } from "../support/demo-session";
 
 function makeTextPdf(lines: readonly string[]) {
   const textCommands = lines
@@ -36,20 +37,8 @@ function makeTextPdf(lines: readonly string[]) {
 }
 
 test.describe("document misuse through the enrollment UI", () => {
-  test.beforeEach(async ({ context, baseURL }) => {
-    if (!baseURL) throw new Error("Playwright baseURL is required");
-    const url = new URL(baseURL);
-    await context.addCookies([
-      {
-        name: "vv_demo_session",
-        value: "demo-session-v2",
-        domain: url.hostname,
-        path: "/",
-        httpOnly: true,
-        sameSite: "Lax",
-        secure: url.protocol === "https:",
-      },
-    ]);
+  test.beforeEach(async ({ request, context, baseURL }) => {
+    await resetAndAuthenticateDemoStudent({ request, context, baseURL });
   });
 
   test("rejects a restaurant menu, then accepts a FAFSA document without retaining fields", async ({
@@ -211,6 +200,12 @@ test.describe("document misuse through the enrollment UI", () => {
       page.getByRole("button", { name: "Upload requirement bundle" }),
     ).toBeEnabled();
 
+    await page
+      .getByRole("button", { name: "Remove aid-photo.jpg" })
+      .click();
+    await page
+      .getByRole("button", { name: "Remove aid-photo-second.jpeg" })
+      .click();
     await fileInput.setInputFiles({
       name: "oversized.jpg",
       mimeType: "image/jpeg",

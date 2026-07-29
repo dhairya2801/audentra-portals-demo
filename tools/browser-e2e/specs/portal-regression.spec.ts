@@ -1,25 +1,5 @@
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
-
-const sessionCookie = "demo-session-v2";
-
-async function authenticateDemoStudent(
-  context: BrowserContext,
-  baseURL: string | undefined,
-) {
-  if (!baseURL) throw new Error("Playwright baseURL is required");
-  const url = new URL(baseURL);
-  await context.addCookies([
-    {
-      name: "vv_demo_session",
-      value: sessionCookie,
-      domain: url.hostname,
-      path: "/",
-      httpOnly: true,
-      sameSite: "Lax",
-      secure: url.protocol === "https:",
-    },
-  ]);
-}
+import { expect, test, type Page } from "@playwright/test";
+import { resetAndAuthenticateDemoStudent } from "../support/demo-session";
 
 async function expectLoadedImage(page: Page, source: RegExp) {
   const image = page.locator(".campus-carousel__background");
@@ -38,8 +18,8 @@ async function expectLoadedImage(page: Page, source: RegExp) {
 }
 
 test.describe("student portal regression journeys", () => {
-  test.beforeEach(async ({ context, baseURL }) => {
-    await authenticateDemoStudent(context, baseURL);
+  test.beforeEach(async ({ request, context, baseURL }) => {
+    await resetAndAuthenticateDemoStudent({ request, context, baseURL });
   });
 
   test("uses a distinct staff-configured image and visual theme for each featured event", async ({

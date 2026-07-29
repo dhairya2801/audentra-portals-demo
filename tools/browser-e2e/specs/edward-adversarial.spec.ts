@@ -1,9 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
-
-const sessionCookie = "demo-session-v2";
-const apiBaseUrl =
-  process.env.E2E_API_BASE_URL?.trim().replace(/\/+$/, "") ||
-  `http://localhost:${process.env.E2E_API_PORT?.trim() || "41817"}`;
+import {
+  demoApiBaseUrl,
+  resetAndAuthenticateDemoStudent,
+} from "../support/demo-session";
 
 type EdwardHttpResponse = {
   message: string;
@@ -36,27 +35,15 @@ async function sendEdwardMessage(page: Page, message: string) {
 
 async function paymentSnapshot(page: Page) {
   const response = await page.request.get(
-    `${apiBaseUrl}/v1/student/payments`,
+    `${demoApiBaseUrl}/v1/student/payments`,
   );
   expect(response.status()).toBe(200);
   return response.json() as Promise<unknown>;
 }
 
 test.describe("Edward adversarial requests through the browser", () => {
-  test.beforeEach(async ({ context, baseURL }) => {
-    if (!baseURL) throw new Error("Playwright baseURL is required");
-    const url = new URL(baseURL);
-    await context.addCookies([
-      {
-        name: "vv_demo_session",
-        value: sessionCookie,
-        domain: url.hostname,
-        path: "/",
-        httpOnly: true,
-        sameSite: "Lax",
-        secure: url.protocol === "https:",
-      },
-    ]);
+  test.beforeEach(async ({ request, context, baseURL }) => {
+    await resetAndAuthenticateDemoStudent({ request, context, baseURL });
   });
 
   test("blocks capability escalation and leaves payments unchanged", async ({
