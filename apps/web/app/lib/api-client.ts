@@ -107,6 +107,7 @@ async function parseError(response: Response): Promise<ApiClientError> {
 async function request<T>(
   path: string,
   init: RequestInit = {},
+  options: { notifyStudentRecordChanged?: boolean } = {},
 ): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -125,7 +126,8 @@ async function request<T>(
   const result = (await response.json()) as T;
   if (
     typeof window !== "undefined" &&
-    (init.method ?? "GET").toUpperCase() !== "GET"
+    (init.method ?? "GET").toUpperCase() !== "GET" &&
+    options.notifyStudentRecordChanged !== false
   ) {
     window.dispatchEvent(new Event("vv:student-record-changed"));
   }
@@ -507,11 +509,20 @@ function tenantAwareDocumentUrl(path: string) {
 }
 
 export function askEdward(input: AskEdwardInput) {
-  return request<AskEdwardResponse>("/v1/student/assistant/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
+  return request<AskEdwardResponse>(
+    "/v1/student/assistant/messages",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+    {
+      // Asking Edward reads the student record but does not mutate it.
+      // Refreshing the portal shell here would remount the conversation
+      // before the assistant response can render.
+      notifyStudentRecordChanged: false,
+    },
+  );
 }
 
 export function getStudentAppointments(signal?: AbortSignal) {
