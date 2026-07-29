@@ -1094,24 +1094,28 @@ function FamilyPermissionFields({ data }: { data: StudentOnboardingData }) {
   );
 }
 
-const onboardingDocuments = [
-  {
-    id: "ferpa_release",
-    name: "FERPA Information Release",
-    pdf: "/documents/onboarding/aster-ferpa-release.pdf",
-    preview:
-      "/documents/onboarding/aster-ferpa-release-page-1.png",
-    signatureBox: { x: 9.8, y: 48.8, width: 53, height: 5.4 },
-  },
-  {
-    id: "enrollment_acknowledgment",
-    name: "Enrollment Information Acknowledgment",
-    pdf: "/documents/onboarding/aster-enrollment-acknowledgment.pdf",
-    preview:
-      "/documents/onboarding/aster-enrollment-acknowledgment-page-1.png",
-    signatureBox: { x: 9.8, y: 44.7, width: 53, height: 5.4 },
-  },
-] as const;
+function onboardingDocumentsForTenant(tenantSlug: string) {
+  const assetPrefix = tenantSlug === "harvard" ? "harvard" : "aster";
+  return [
+    {
+      id: "ferpa_release",
+      name: "FERPA Information Release",
+      pdf: `/documents/onboarding/${assetPrefix}-ferpa-release.pdf`,
+      preview:
+        `/documents/onboarding/${assetPrefix}-ferpa-release-page-1.png`,
+      signatureBox: { x: 9.8, y: 48.8, width: 53, height: 5.4 },
+    },
+    {
+      id: "enrollment_acknowledgment",
+      name: "Enrollment Information Acknowledgment",
+      pdf:
+        `/documents/onboarding/${assetPrefix}-enrollment-acknowledgment.pdf`,
+      preview:
+        `/documents/onboarding/${assetPrefix}-enrollment-acknowledgment-page-1.png`,
+      signatureBox: { x: 9.8, y: 44.7, width: 53, height: 5.4 },
+    },
+  ] as const;
+}
 
 function SignatureCanvas({
   value,
@@ -1206,6 +1210,8 @@ function SignatureCanvas({
 }
 
 function ReviewAndSignFields({ data }: { data: StudentOnboardingData }) {
+  const { tenant } = useTenant();
+  const onboardingDocuments = onboardingDocumentsForTenant(tenant.slug);
   const [activeDocument, setActiveDocument] = useState(0);
   const [signatureMethod, setSignatureMethod] = useState<"typed" | "drawn">(
     data.signatureMethod ?? "typed",

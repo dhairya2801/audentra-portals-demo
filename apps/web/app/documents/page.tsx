@@ -300,17 +300,14 @@ function DocumentWorkspace({
           </p>
           {list.items.length === 0 ? (
             <EmptyState
-              title="No documents uploaded yet"
-              description="When a checklist item asks for supporting evidence, upload the real file here."
+              title="No documents yet"
+              description="Uploads and documents signed during onboarding will appear together here."
             />
           ) : (
             <ul className="submitted-document-grid">
               {list.items.map((document) => {
                 const contentUrl = getStudentDocumentContentUrl(document);
-                const isSigned =
-                  document.extraction?.documentType === "ferpa" &&
-                  (document.status === "accepted" ||
-                    document.extraction.verifiedAt != null);
+                const isSigned = document.signature != null;
                 const documentKind = isSigned
                   ? "Signed document"
                   : "Submitted document";
@@ -336,31 +333,56 @@ function DocumentWorkspace({
                       <div className="document-record__top">
                       <div>
                         <span className="submitted-document__kind">{documentKind}</span>
-                        <h3>{document.fileName}</h3>
-                        <p>
-                          {document.extraction?.status === "completed"
-                            ? `Detected ${document.extraction.documentType.replaceAll(
-                                "_",
-                                " ",
-                              )}`
-                            : document.category.replaceAll("_", " ")}
-                          {document.requirementId &&
-                          document.extraction?.status === "completed"
-                            ? ` · expected ${document.category.replaceAll(
-                                "_",
-                                " ",
-                              )}`
-                            : ""}{" "}
-                          ·{" "}
-                          {formatFileSize(document.sizeBytes)}
-                        </p>
+                        <h3>
+                          {document.signature?.title ?? document.fileName}
+                        </h3>
+                        {document.signature ? (
+                          <p>
+                            Signed{" "}
+                            {new Intl.DateTimeFormat("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            }).format(
+                              new Date(document.signature.signedAt),
+                            )}{" "}
+                            · {document.signature.method} signature ·{" "}
+                            {formatFileSize(document.sizeBytes)}
+                          </p>
+                        ) : (
+                          <p>
+                            {document.extraction?.status === "completed"
+                              ? `Detected ${document.extraction.documentType.replaceAll(
+                                  "_",
+                                  " ",
+                                )}`
+                              : document.category.replaceAll("_", " ")}
+                            {document.requirementId &&
+                            document.extraction?.status === "completed"
+                              ? ` · expected ${document.category.replaceAll(
+                                  "_",
+                                  " ",
+                                )}`
+                              : ""}{" "}
+                            · {formatFileSize(document.sizeBytes)}
+                          </p>
+                        )}
                       </div>
-                      <StatusPill value={document.status} />
+                      {document.signature ? (
+                        <span className="submitted-document__signed-status">
+                          ✓ Signed
+                        </span>
+                      ) : (
+                        <StatusPill value={document.status} />
+                      )}
                       </div>
                       <div className="document-record__actions">
                         {contentUrl ? (
                           <a href={contentUrl} target="_blank" rel="noreferrer">
-                            View original <span aria-hidden="true">↗</span>
+                            {document.signature
+                              ? "View signed PDF"
+                              : "View original"}{" "}
+                            <span aria-hidden="true">↗</span>
                           </a>
                         ) : null}
                         {document.sha256 ? (
@@ -370,10 +392,26 @@ function DocumentWorkspace({
                           </span>
                         ) : null}
                       </div>
-                      <ExtractionReview
-                        document={document}
-                        onDocumentChanged={reload}
-                      />
+                      {document.signature ? (
+                        <dl className="submitted-document__signature-details">
+                          <div>
+                            <dt>Signed by</dt>
+                            <dd>{document.signature.signerName}</dd>
+                          </div>
+                          <div>
+                            <dt>Document version</dt>
+                            <dd>
+                              Onboarding v
+                              {document.signature.onboardingVersion}
+                            </dd>
+                          </div>
+                        </dl>
+                      ) : (
+                        <ExtractionReview
+                          document={document}
+                          onDocumentChanged={reload}
+                        />
+                      )}
                     </div>
                   </li>
                 );
