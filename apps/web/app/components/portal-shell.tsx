@@ -291,12 +291,17 @@ export function PortalShell({
         <div className="aster-sidebar__support">
           <span aria-hidden="true">?</span>
           <div>
-            <strong>Need a real person?</strong>
+            <strong>Your student support team</strong>
             <p>
               {tenant.shortName} enrollment and financial-aid advisors are
               available weekdays.
             </p>
-            <Link href="/appointments">Book support</Link>
+            <div className="aster-sidebar__support-links">
+              <a href={`mailto:${tenant.admissionsEmail}`}>
+                {tenant.admissionsEmail}
+              </a>
+              <Link href="/appointments">Book an advisor</Link>
+            </div>
           </div>
         </div>
       </aside>

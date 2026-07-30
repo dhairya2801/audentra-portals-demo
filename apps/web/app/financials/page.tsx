@@ -1,6 +1,6 @@
 "use client";
 
-import type { FinancialAward } from "@vv/contracts";
+import type { FinancialAward, StudentFinancials } from "@vv/contracts";
 import { TenantLink as Link } from "../components/tenant-link";
 import { useCallback, useEffect, useState } from "react";
 import { PortalShell } from "../components/portal-shell";
@@ -27,6 +27,126 @@ function awardLabel(award: FinancialAward) {
     loan: "Loan",
     work_study: "Work-study",
   }[award.type];
+}
+
+const fundingColors = {
+  grant: "#2f7d5b",
+  scholarship: "#f2b824",
+  loan: "#5f68c5",
+  payments: "#44a6a8",
+  balance: "#d9dee6",
+} as const;
+
+function FinancialAidDonut({
+  financials,
+}: {
+  financials: StudentFinancials;
+}) {
+  const acceptedByType = financials.awards.reduce(
+    (totals, award) => {
+      if (award.type !== "work_study") {
+        totals[award.type] += award.acceptedAmountCents;
+      }
+      return totals;
+    },
+    { grant: 0, scholarship: 0, loan: 0 },
+  );
+  const slices = [
+    {
+      key: "grant",
+      label: "Accepted grants",
+      cents: acceptedByType.grant,
+      color: fundingColors.grant,
+    },
+    {
+      key: "scholarship",
+      label: "Accepted scholarships",
+      cents: acceptedByType.scholarship,
+      color: fundingColors.scholarship,
+    },
+    {
+      key: "loan",
+      label: "Accepted loans",
+      cents: acceptedByType.loan,
+      color: fundingColors.loan,
+    },
+    {
+      key: "payments",
+      label: "Payments and deposits",
+      cents: financials.paymentsCents,
+      color: fundingColors.payments,
+    },
+    {
+      key: "balance",
+      label: "Remaining balance",
+      cents: financials.remainingBalanceCents,
+      color: fundingColors.balance,
+    },
+  ].filter((slice) => slice.cents > 0);
+  const total = Math.max(
+    1,
+    slices.reduce((sum, slice) => sum + slice.cents, 0),
+  );
+  let offset = 0;
+
+  return (
+    <section className="financial-donut-card" aria-labelledby="financial-donut-title">
+      <div>
+        <p className="eyebrow">{financials.academicYear}</p>
+        <h2 id="financial-donut-title">How your college cost is covered</h2>
+        <p>
+          Accepted funding and recorded payments are shown against your current
+          estimated balance.
+        </p>
+      </div>
+      <div className="financial-donut">
+        <div className="financial-donut__chart">
+          <svg viewBox="0 0 42 42" role="img" aria-label="Financial aid breakdown">
+            <circle
+              className="financial-donut__track"
+              cx="21"
+              cy="21"
+              r="15.9155"
+              pathLength="100"
+            />
+            {slices.map((slice) => {
+              const percent = (slice.cents / total) * 100;
+              const dashOffset = -offset;
+              offset += percent;
+              return (
+                <circle
+                  className="financial-donut__segment"
+                  cx="21"
+                  cy="21"
+                  r="15.9155"
+                  pathLength="100"
+                  stroke={slice.color}
+                  strokeDasharray={`${percent} ${100 - percent}`}
+                  strokeDashoffset={dashOffset}
+                  key={slice.key}
+                />
+              );
+            })}
+          </svg>
+          <div>
+            <span>Remaining</span>
+            <strong>{money(financials.remainingBalanceCents)}</strong>
+          </div>
+        </div>
+        <ul className="financial-donut__legend">
+          {slices.map((slice) => (
+            <li key={slice.key}>
+              <span style={{ backgroundColor: slice.color }} />
+              <div>
+                <small>{slice.label}</small>
+                <strong>{money(slice.cents)}</strong>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
 }
 
 export default function FinancialsPage() {
@@ -85,7 +205,9 @@ export default function FinancialsPage() {
         <ErrorState message={financials.error} onRetry={financials.reload} />
       ) : (
         <>
-          <section className="financial-summary" aria-label="Financial summary">
+          <div className="financial-overview">
+            <FinancialAidDonut financials={financials.data} />
+            <section className="financial-summary" aria-label="Financial summary">
             <div className="financial-summary__balance">
               <p className="eyebrow">{financials.data.academicYear}</p>
               <span>Estimated remaining balance</span>
@@ -111,7 +233,8 @@ export default function FinancialsPage() {
               <span>Possible additional aid</span>
               <strong>{money(financials.data.pendingAidCents)}</strong>
             </div>
-          </section>
+            </section>
+          </div>
 
           <div className="financial-columns">
             <section className="aster-card">
@@ -123,7 +246,9 @@ export default function FinancialsPage() {
                 <Link href="/edward">Ask Edward to explain →</Link>
               </div>
               <ul className="financial-awards">
-                {financials.data.awards.map((award) => (
+                {financials.data.awards
+                  .filter((award) => award.type !== "work_study")
+                  .map((award) => (
                   <li key={award.id}>
                     <span aria-hidden="true">
                       {award.type === "grant"
@@ -144,8 +269,35 @@ export default function FinancialsPage() {
                       <StatusPill value={award.status} />
                     </div>
                   </li>
-                ))}
+                  ))}
               </ul>
+              {financials.data.awards.some(
+                (award) => award.type === "work_study",
+              ) ? (
+                <div className="work-study-callout">
+                  <span aria-hidden="true">W</span>
+                  <div>
+                    <p className="eyebrow">Earned through employment</p>
+                    <h3>Federal Work-Study</h3>
+                    <p>
+                      Up to{" "}
+                      {money(
+                        financials.data.awards
+                          .filter((award) => award.type === "work_study")
+                          .reduce(
+                            (total, award) =>
+                              total + award.offeredAmountCents,
+                            0,
+                          ),
+                      )}{" "}
+                      may be earned through an eligible campus job. These are
+                      wages paid as you work, so they are not counted as
+                      accepted aid or subtracted from your remaining balance.
+                    </p>
+                  </div>
+                  <Link href="/appointments">Ask about campus jobs</Link>
+                </div>
+              ) : null}
             </section>
 
             <section className="aster-card financial-documents">

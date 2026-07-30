@@ -12,6 +12,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { useActivityTracking } from "../hooks/use-activity-tracking";
 import {
@@ -34,6 +35,52 @@ type DisplayMessage = EdwardChatMessage & {
   contextReceipts?: AskEdwardResponse["contextReceipts"];
   widgets?: EdwardActionWidget[];
 };
+
+type SpeechRecognitionResultEvent = Event & {
+  results: {
+    [index: number]: {
+      [index: number]: {
+        transcript: string;
+      };
+    };
+  };
+};
+
+type SpeechRecognitionErrorEvent = Event & {
+  error?: string;
+};
+
+type SpeechRecognitionInstance = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onresult: ((event: SpeechRecognitionResultEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+};
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
+
+type VoiceWindow = Window &
+  typeof globalThis & {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  };
+
+const subscribeToVoiceCapability = () => () => undefined;
+
+function voiceCapabilitySnapshot() {
+  if (typeof window === "undefined") return false;
+  const voiceWindow = window as VoiceWindow;
+  return Boolean(
+    voiceWindow.SpeechRecognition ||
+      voiceWindow.webkitSpeechRecognition,
+  );
+}
 
 const contextSourceLabels: Record<EdwardContextReceipt["source"], string> = {
   dashboard: "Enrollment summary",
@@ -169,6 +216,13 @@ export function EdwardAssistant({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const voiceSupported = useSyncExternalStore(
+    subscribeToVoiceCapability,
+    voiceCapabilitySnapshot,
+    () => false,
+  );
+  const [listening, setListening] = useState(false);
+  const [voiceReplies, setVoiceReplies] = useState(false);
   const [messages, setMessages] = useState<DisplayMessage[]>([
     {
       id: "welcome",
@@ -183,7 +237,15 @@ export function EdwardAssistant({
   ]);
   const input = useRef<HTMLInputElement>(null);
   const transcript = useRef<HTMLDivElement>(null);
+  const recognition = useRef<SpeechRecognitionInstance | null>(null);
   const { track } = useActivityTracking();
+
+  useEffect(() => {
+    return () => {
+      recognition.current?.abort();
+      window.speechSynthesis?.cancel();
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -209,7 +271,7 @@ export function EdwardAssistant({
     ]);
   };
 
-  const send = async (message: string) => {
+  const send = async (message: string, speakResponse = voiceReplies) => {
     const normalized = message.trim();
     if (!normalized || sending) return;
     const userMessage: DisplayMessage = {
@@ -249,6 +311,13 @@ export function EdwardAssistant({
           widgets: response.widgets ?? [],
         },
       ]);
+      if (speakResponse && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(response.message);
+        utterance.lang = navigator.language || "en-US";
+        utterance.rate = 1;
+        window.speechSynthesis.speak(utterance);
+      }
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -257,6 +326,61 @@ export function EdwardAssistant({
       );
     } finally {
       setSending(false);
+    }
+  };
+
+  const toggleVoiceInput = () => {
+    if (listening) {
+      recognition.current?.stop();
+      return;
+    }
+    const voiceWindow = window as VoiceWindow;
+    const Recognition =
+      voiceWindow.SpeechRecognition ||
+      voiceWindow.webkitSpeechRecognition;
+    if (!Recognition) {
+      setError(
+        "Voice input is not available in this browser. You can still type your question.",
+      );
+      return;
+    }
+    const nextRecognition = new Recognition();
+    recognition.current = nextRecognition;
+    nextRecognition.lang = navigator.language || "en-US";
+    nextRecognition.continuous = false;
+    nextRecognition.interimResults = false;
+    nextRecognition.onstart = () => {
+      setError(null);
+      setListening(true);
+    };
+    nextRecognition.onend = () => {
+      setListening(false);
+      recognition.current = null;
+    };
+    nextRecognition.onerror = (event) => {
+      setListening(false);
+      recognition.current = null;
+      setError(
+        event.error === "not-allowed"
+          ? "Microphone access was blocked. Allow microphone access or type your question."
+          : "Edward could not hear that clearly. Please try again or type your question.",
+      );
+    };
+    nextRecognition.onresult = (event) => {
+      const spokenMessage = event.results[0]?.[0]?.transcript?.trim() ?? "";
+      if (!spokenMessage) return;
+      setDraft(spokenMessage);
+      setVoiceReplies(true);
+      void send(spokenMessage, true);
+    };
+    try {
+      nextRecognition.start();
+    } catch {
+      setListening(false);
+      recognition.current = null;
+      setError(
+        "Edward could not start the microphone. Please try again or type your question.",
+      );
     }
   };
 
@@ -386,6 +510,28 @@ export function EdwardAssistant({
             onChange={(event) => setDraft(event.target.value)}
           />
           <button
+            className={`edward-voice-button${listening ? " is-listening" : ""}`}
+            type="button"
+            disabled={sending || !voiceSupported}
+            aria-label={
+              !voiceSupported
+                ? "Voice input is unavailable"
+                : listening
+                  ? "Stop listening"
+                  : "Ask Edward by voice"
+            }
+            aria-pressed={listening}
+            title={
+              voiceSupported
+                ? "Ask Edward by voice"
+                : "Voice input is not supported by this browser"
+            }
+            onClick={toggleVoiceInput}
+          >
+            <span aria-hidden="true">{listening ? "■" : "●"}</span>
+          </button>
+          <button
+            className="edward-send-button"
             type="submit"
             disabled={sending || draft.trim().length === 0}
             aria-label="Send message"
@@ -393,6 +539,22 @@ export function EdwardAssistant({
             ↑
           </button>
         </div>
+        {listening ? (
+          <p className="edward-voice-status" role="status">
+            <span aria-hidden="true" /> Listening — ask your question naturally.
+          </p>
+        ) : voiceReplies ? (
+          <button
+            className="edward-voice-replies"
+            type="button"
+            onClick={() => {
+              window.speechSynthesis?.cancel();
+              setVoiceReplies(false);
+            }}
+          >
+            Voice replies are on · turn off
+          </button>
+        ) : null}
         <small>
           Don’t share passwords, government IDs, health details, or payment
           credentials. Edward cannot approve academic or aid decisions.

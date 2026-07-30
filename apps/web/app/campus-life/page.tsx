@@ -34,17 +34,29 @@ export default function CampusLifePage() {
   const { track } = useActivityTracking();
   const [eventIndex, setEventIndex] = useState(0);
   const [clubQuery, setClubQuery] = useState("");
+  const [clubCategory, setClubCategory] = useState("all");
+
+  const clubCategories = useMemo(() => {
+    if (!campus.data) return [];
+    return Array.from(
+      new Set(campus.data.clubs.map((club) => club.category)),
+    ).sort((left, right) => left.localeCompare(right));
+  }, [campus.data]);
 
   const filteredClubs = useMemo(() => {
     if (!campus.data) return [];
     const query = clubQuery.trim().toLowerCase();
-    if (!query) return campus.data.clubs;
-    return campus.data.clubs.filter((club) =>
-      `${club.name} ${club.category} ${club.description}`
-        .toLowerCase()
-        .includes(query),
-    );
-  }, [campus.data, clubQuery]);
+    return campus.data.clubs.filter((club) => {
+      const matchesCategory =
+        clubCategory === "all" || club.category === clubCategory;
+      const matchesQuery =
+        !query ||
+        `${club.name} ${club.category} ${club.description}`
+          .toLowerCase()
+          .includes(query);
+      return matchesCategory && matchesQuery;
+    });
+  }, [campus.data, clubCategory, clubQuery]);
 
   if (campus.status === "loading") {
     return (
@@ -228,14 +240,44 @@ export default function CampusLifePage() {
           </div>
           <p>Open a club to see its contact and next activity.</p>
         </div>
-        <label className="club-search">
-          <span>Search clubs</span>
-          <input
-            value={clubQuery}
-            placeholder="Technology, business, outdoors…"
-            onChange={(event) => setClubQuery(event.target.value)}
-          />
-        </label>
+        <div className="club-directory-tools">
+          <label className="club-search">
+            <span>Search clubs</span>
+            <input
+              value={clubQuery}
+              placeholder="Technology, business, outdoors…"
+              onChange={(event) => setClubQuery(event.target.value)}
+            />
+          </label>
+          <div className="club-category-filters" aria-label="Filter clubs by category">
+            <button
+              className={clubCategory === "all" ? "is-active" : undefined}
+              type="button"
+              aria-pressed={clubCategory === "all"}
+              onClick={() => setClubCategory("all")}
+            >
+              All clubs
+              <span>{campus.data.clubs.length}</span>
+            </button>
+            {clubCategories.map((category) => {
+              const count = campus.data.clubs.filter(
+                (club) => club.category === category,
+              ).length;
+              return (
+                <button
+                  className={clubCategory === category ? "is-active" : undefined}
+                  type="button"
+                  aria-pressed={clubCategory === category}
+                  onClick={() => setClubCategory(category)}
+                  key={category}
+                >
+                  {category}
+                  <span>{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <div className="club-grid">
           {filteredClubs.map((club, index) => (
               <Link
@@ -270,7 +312,14 @@ export default function CampusLifePage() {
             <span aria-hidden="true">⌕</span>
             <div>
               <strong>No clubs match “{clubQuery}”</strong>
-              <p>Try another interest, organization name, or category.</p>
+              <p>
+                Try another interest, organization name, or category.
+                {clubCategory !== "all" ? (
+                  <button type="button" onClick={() => setClubCategory("all")}>
+                    Show all clubs
+                  </button>
+                ) : null}
+              </p>
             </div>
           </div>
         ) : null}

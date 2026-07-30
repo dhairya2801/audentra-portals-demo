@@ -1,6 +1,10 @@
 "use client";
 
-import type { StudentRequirementDetail } from "@vv/contracts";
+import type {
+  StudentOnboarding,
+  StudentRequirementDetail,
+  StudentRequirementList,
+} from "@vv/contracts";
 import { TenantLink as Link } from "../components/tenant-link";
 import { useCallback, useEffect, useRef } from "react";
 import { PortalShell } from "../components/portal-shell";
@@ -16,7 +20,36 @@ import {
   durationBucket,
   useActivityTracking,
 } from "../hooks/use-activity-tracking";
-import { getStudentRequirements } from "../lib/api-client";
+import {
+  getStudentOnboarding,
+  getStudentRequirements,
+} from "../lib/api-client";
+
+type EnrollmentPageData = {
+  requirements: StudentRequirementList;
+  onboarding: StudentOnboarding;
+};
+
+const residencyReviewLabels = {
+  home_address_review: "Permanent address review",
+  document_upload: "Supporting documents requested",
+  advisor_review: "Advisor review requested",
+} as const;
+
+const insuranceLabels = {
+  not_now: "Not requested",
+  learn_more: "Comparison information requested",
+  tuition: "Tuition protection information requested",
+  housing: "Housing protection information requested",
+  both: "Tuition and housing information requested",
+} as const;
+
+const accommodationLabels = {
+  not_now: "No follow-up requested",
+  housing: "Housing follow-up requested",
+  academic: "Academic follow-up requested",
+  both: "Housing and academic follow-up requested",
+} as const;
 
 const terminalRequirementStatuses = new Set([
   "completed",
@@ -148,12 +181,86 @@ function RequirementItem({
   );
 }
 
+function OptionalSupportChecklist({
+  onboarding,
+}: {
+  onboarding: StudentOnboarding;
+}) {
+  const { data } = onboarding;
+  const choices = [
+    {
+      key: "residency",
+      title: "Residency verification",
+      description:
+        "Confirm how Enrollment Services should review your residency classification.",
+      value: data.residencyVerificationPath
+        ? residencyReviewLabels[data.residencyVerificationPath]
+        : "Review path not selected",
+      selected: Boolean(data.residencyVerificationPath),
+    },
+    {
+      key: "insurance",
+      title: "Optional tuition and housing protection",
+      description:
+        "Request information without purchasing or enrolling in a policy.",
+      value: data.insuranceInterest
+        ? insuranceLabels[data.insuranceInterest]
+        : "No preference recorded",
+      selected: Boolean(data.insuranceInterest),
+    },
+    {
+      key: "accommodations",
+      title: "Accommodations follow-up",
+      description:
+        "Privately flag a housing or academic follow-up without submitting medical records.",
+      value: data.accommodationInterest
+        ? accommodationLabels[data.accommodationInterest]
+        : "No preference recorded",
+      selected: Boolean(data.accommodationInterest),
+    },
+  ];
+
+  return (
+    <section className="enrollment-support-choices" aria-labelledby="support-choices-title">
+      <div className="enrollment-support-choices__heading">
+        <div>
+          <p className="eyebrow">Optional support choices</p>
+          <h2 id="support-choices-title">Your onboarding follow-ups</h2>
+        </div>
+        <Link href="/appointments">Ask an advisor</Link>
+      </div>
+      <div className="enrollment-support-choices__grid">
+        {choices.map((choice) => (
+          <article key={choice.key}>
+            <span aria-hidden="true">{choice.selected ? "✓" : "○"}</span>
+            <div>
+              <h3>{choice.title}</h3>
+              <p>{choice.description}</p>
+              <strong>{choice.value}</strong>
+            </div>
+          </article>
+        ))}
+      </div>
+      <p className="enrollment-support-choices__privacy">
+        These choices coordinate follow-up only. Sensitive health information
+        belongs in each office’s separate protected process.
+      </p>
+    </section>
+  );
+}
+
 export default function EnrollmentPage() {
-  const loadRequirements = useCallback(
-    (signal: AbortSignal) => getStudentRequirements(signal),
+  const loadEnrollment = useCallback(
+    async (signal: AbortSignal): Promise<EnrollmentPageData> => {
+      const [requirements, onboarding] = await Promise.all([
+        getStudentRequirements(signal),
+        getStudentOnboarding(signal),
+      ]);
+      return { requirements, onboarding };
+    },
     [],
   );
-  const requirements = useApiResource(loadRequirements);
+  const enrollment = useApiResource(loadEnrollment);
   const { track } = useActivityTracking();
   const viewedAt = useRef(0);
   const lastTask = useRef<StudentRequirementDetail | null>(null);
@@ -183,8 +290,8 @@ export default function EnrollmentPage() {
     });
   };
   const overallProgress =
-    requirements.status === "ready"
-      ? progressForRequirements(requirements.data.items)
+    enrollment.status === "ready"
+      ? progressForRequirements(enrollment.data.requirements.items)
       : 0;
 
   return (
@@ -194,11 +301,11 @@ export default function EnrollmentPage() {
       title="Your requirements"
       description="Everything needed to secure your place at Aster, organized in one clear path."
     >
-      {requirements.status === "loading" ? (
+      {enrollment.status === "loading" ? (
         <LoadingState label="Loading your enrollment requirements" />
-      ) : requirements.status === "error" ? (
-        <ErrorState message={requirements.error} onRetry={requirements.reload} />
-      ) : requirements.data.total === 0 ? (
+      ) : enrollment.status === "error" ? (
+        <ErrorState message={enrollment.error} onRetry={enrollment.reload} />
+      ) : enrollment.data.requirements.total === 0 ? (
         <EmptyState
           title="No requirements assigned"
           description="Your enrollment requirements will appear here once your journey begins."
@@ -210,33 +317,36 @@ export default function EnrollmentPage() {
         />
       ) : (
         <div className="resource-layout resource-layout--enrollment">
-          <PageCard
-            className="enrollment-overview"
-            eyebrow="Enrollment checklist"
-            title={`${requirements.data.total} ${requirements.data.total === 1 ? "requirement" : "requirements"}`}
-            action={
-              <div className="enrollment-overview__progress-summary">
-                <span>Overall progress</span>
-                <strong>{overallProgress}%</strong>
-                <div
-                  aria-label="Overall enrollment progress"
-                  aria-valuemax={100}
-                  aria-valuemin={0}
-                  aria-valuenow={overallProgress}
-                  className="enrollment-overview__progress-track"
-                  role="progressbar"
-                >
-                  <span style={{ width: `${overallProgress}%` }} />
+          <div className="enrollment-checklist-column">
+            <PageCard
+              className="enrollment-overview"
+              eyebrow="Enrollment checklist"
+              title={`${enrollment.data.requirements.total} ${enrollment.data.requirements.total === 1 ? "requirement" : "requirements"}`}
+              action={
+                <div className="enrollment-overview__progress-summary">
+                  <span>Overall progress</span>
+                  <strong>{overallProgress}%</strong>
+                  <div
+                    aria-label="Overall enrollment progress"
+                    aria-valuemax={100}
+                    aria-valuemin={0}
+                    aria-valuenow={overallProgress}
+                    className="enrollment-overview__progress-track"
+                    role="progressbar"
+                  >
+                    <span style={{ width: `${overallProgress}%` }} />
+                  </div>
                 </div>
-              </div>
-            }
-          >
-            <ul className="resource-list">
-              {requirements.data.items.map((item) => (
-                <RequirementItem item={item} onView={viewTask} key={item.id} />
-              ))}
-            </ul>
-          </PageCard>
+              }
+            >
+              <ul className="resource-list">
+                {enrollment.data.requirements.items.map((item) => (
+                  <RequirementItem item={item} onView={viewTask} key={item.id} />
+                ))}
+              </ul>
+            </PageCard>
+            <OptionalSupportChecklist onboarding={enrollment.data.onboarding} />
+          </div>
           <aside className="resource-aside">
             <div className="aside-note">
               <span aria-hidden="true">?</span>

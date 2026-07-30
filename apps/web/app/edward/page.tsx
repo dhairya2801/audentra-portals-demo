@@ -37,6 +37,7 @@ export default function EdwardPage() {
             <p className="eyebrow">Connected tools</p>
             <h2>Edward can check</h2>
             <ul>
+              <li><span>✓</span> Spoken questions with optional voice replies</li>
               <li><span>✓</span> Your enrollment checklist and deadlines</li>
               <li><span>✓</span> Aid, required documents, and balances</li>
               <li><span>✓</span> Program requirements and course catalog</li>

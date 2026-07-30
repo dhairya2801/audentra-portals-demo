@@ -626,14 +626,58 @@ test("onboarding preserves the eight-step order and authoritative boundary actio
     onboarding,
     /key: "housing"[\s\S]{0,240}skippable: true/,
   );
-  assert.match(onboarding, /No residence selected yet/);
-  assert.match(onboarding, /Clear residence selection and decide later/);
+  assert.match(onboarding, /No residence ranked yet/);
+  assert.match(onboarding, /Clear residence ranking and decide later/);
+  assert.match(onboarding, /housingResidencePreferences/);
+  assert.match(onboarding, /residencyVerificationPath/);
+  assert.match(onboarding, /insuranceInterest/);
+  assert.match(onboarding, /accommodationInterest/);
   assert.match(onboarding, /const nextData = editableOnboardingData\(/);
   assert.match(onboarding, /data: editableOnboardingData\(onboarding\.data\)/);
   assert.match(
     onboarding,
     /window\.location\.replace\(tenantRuntime\.href\("\/dashboard"\)\)/,
   );
+});
+
+test("DSM feedback surfaces remain connected to portal data and safe fallbacks", async () => {
+  const [financials, campusLife, edward, shell, enrollment] =
+    await Promise.all([
+      readFile(
+        new URL("../app/financials/page.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../app/campus-life/page.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../app/components/edward-assistant.tsx",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL("../app/components/portal-shell.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../app/enrollment/page.tsx", import.meta.url),
+        "utf8",
+      ),
+    ]);
+
+  assert.match(financials, /function FinancialAidDonut/);
+  assert.match(financials, /award\.type !== "work_study"/);
+  assert.match(financials, /not counted as[\s\S]*accepted aid/);
+  assert.match(campusLife, /clubCategory/);
+  assert.match(campusLife, /Filter clubs by category/);
+  assert.match(edward, /webkitSpeechRecognition/);
+  assert.match(edward, /speechSynthesis\.speak/);
+  assert.match(edward, /Microphone access was blocked/);
+  assert.match(shell, /tenant\.admissionsEmail/);
+  assert.match(enrollment, /OptionalSupportChecklist/);
 });
 
 test("student routes enforce bootstrap gating and expose no dead static links", async () => {

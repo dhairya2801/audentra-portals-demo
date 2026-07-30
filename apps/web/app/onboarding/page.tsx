@@ -271,6 +271,7 @@ function Choice({
   name,
   value,
   label,
+  description,
   defaultChecked,
   type = "checkbox",
   required,
@@ -279,6 +280,7 @@ function Choice({
   name: string;
   value: string;
   label: string;
+  description?: string;
   defaultChecked?: boolean;
   type?: "checkbox" | "radio";
   required?: boolean;
@@ -295,7 +297,10 @@ function Choice({
         onChange={onChange}
       />
       <span aria-hidden="true" />
-      <strong>{label}</strong>
+      <div>
+        <strong>{label}</strong>
+        {description ? <small>{description}</small> : null}
+      </div>
     </label>
   );
 }
@@ -326,8 +331,14 @@ function HousingFields({
   const [preference, setPreference] = useState(
     data.housingPreference ?? "",
   );
-  const [residenceOption, setResidenceOption] = useState(
-    data.housingResidenceOption ?? "",
+  const [residencePreferences, setResidencePreferences] = useState<
+    Array<StudentHousingPlan["residences"][number]["value"]>
+  >(
+    data.housingResidencePreferences?.length
+      ? data.housingResidencePreferences
+      : data.housingResidenceOption
+        ? [data.housingResidenceOption]
+        : [],
   );
   const [roommateMatching, setRoommateMatching] = useState(
     data.roommateMatching ?? "",
@@ -375,50 +386,132 @@ function HousingFields({
       {preference === "on_campus" ? (
         <>
           <fieldset className="form-section">
-            <legend>See the rooms and choose a residence</legend>
+            <legend>Rank the residences that feel right</legend>
             <p>
-              Optional — compare the rooms now or leave every residence
-              unselected and decide later. Exact layouts and furnishings can
-              vary by building and assignment.
+              Optional — add up to three choices in preference order. Housing
+              uses the ranking when your first choice is unavailable; exact
+              layouts and assignments can still vary.
             </p>
-            {residenceOption ? (
+            {residencePreferences.map((value) => (
+              <input
+                type="hidden"
+                name="housingResidencePreferences"
+                value={value}
+                key={`ranked-${value}`}
+              />
+            ))}
+            <input
+              type="hidden"
+              name="housingResidenceOption"
+              value={residencePreferences[0] ?? ""}
+            />
+            {residencePreferences.length > 0 ? (
               <button
                 className="text-button"
                 type="button"
-                onClick={() => setResidenceOption("")}
+                onClick={() => setResidencePreferences([])}
               >
-                Clear residence selection and decide later
+                Clear residence ranking and decide later
               </button>
             ) : (
-              <p className="optional-field-note">
-                No residence selected yet.
-              </p>
+              <p className="optional-field-note">No residence ranked yet.</p>
             )}
             <div className="residence-option-grid">
-              {residences.map((residence) => (
-                <label className="residence-option" key={residence.id}>
-                  <input
-                    type="radio"
-                    name="housingResidenceOption"
-                    value={residence.value}
-                    checked={residenceOption === residence.value}
-                    onChange={() => setResidenceOption(residence.value)}
-                  />
-                  <img
-                    className="residence-option__photo"
-                    src={residence.imageUrl}
-                    alt={residence.imageAlt}
-                  />
-                  <span className="residence-option__content">
-                    <strong>{residence.name}</strong>
-                    <span>{residence.description}</span>
-                    <span className="residence-option__amenities">
-                      {residence.amenities.join(" · ")}
+              {residences.map((residence) => {
+                const rank = residencePreferences.indexOf(residence.value);
+                const isRanked = rank >= 0;
+                return (
+                  <article
+                    className={`residence-option residence-option--ranked${isRanked ? " residence-option--selected" : ""}`}
+                    key={residence.id}
+                  >
+                    <img
+                      className="residence-option__photo"
+                      src={residence.imageUrl}
+                      alt={residence.imageAlt}
+                    />
+                    <span className="residence-option__content">
+                      <strong>{residence.name}</strong>
+                      <span>{residence.description}</span>
+                      <span className="residence-option__amenities">
+                        {residence.amenities.join(" · ")}
+                      </span>
+                      <small>{residence.attribution}</small>
                     </span>
-                    <small>{residence.attribution}</small>
-                  </span>
-                </label>
-              ))}
+                    <div className="residence-ranking-controls">
+                      {isRanked ? (
+                        <>
+                          <strong>Preference #{rank + 1}</strong>
+                          <div>
+                            <button
+                              type="button"
+                              disabled={rank === 0}
+                              aria-label={`Move ${residence.name} up`}
+                              onClick={() =>
+                                setResidencePreferences((current) => {
+                                  const next = [...current];
+                                  [next[rank - 1], next[rank]] = [
+                                    next[rank],
+                                    next[rank - 1],
+                                  ];
+                                  return next;
+                                })
+                              }
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              disabled={rank === residencePreferences.length - 1}
+                              aria-label={`Move ${residence.name} down`}
+                              onClick={() =>
+                                setResidencePreferences((current) => {
+                                  const next = [...current];
+                                  [next[rank], next[rank + 1]] = [
+                                    next[rank + 1],
+                                    next[rank],
+                                  ];
+                                  return next;
+                                })
+                              }
+                            >
+                              ↓
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Remove ${residence.name} from residence ranking`}
+                              onClick={() =>
+                                setResidencePreferences((current) =>
+                                  current.filter(
+                                    (candidate) =>
+                                      candidate !== residence.value,
+                                  ),
+                                )
+                              }
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={residencePreferences.length >= 3}
+                          aria-label={`Add ${residence.name} as preference #${residencePreferences.length + 1}`}
+                          onClick={() =>
+                            setResidencePreferences((current) => [
+                              ...current,
+                              residence.value,
+                            ])
+                          }
+                        >
+                          Add as preference #{residencePreferences.length + 1}
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           </fieldset>
           <fieldset className="form-section">
@@ -571,10 +664,10 @@ function HousingFields({
                 ],
                 [
                   "smokeVapeCompatibility",
-                  "Smoke / vape compatibility",
+                  "Roommate substance preference",
                   [
-                    ["smoke_free", "Smoke-free roommate only"],
-                    ["off_campus_only", "Okay if only off campus"],
+                    ["smoke_free", "Substance-free roommate"],
+                    ["off_campus_only", "Okay if use is only off campus"],
                     ["no_preference", "No preference"],
                   ],
                   data.smokeVapeCompatibility,
@@ -598,19 +691,22 @@ function HousingFields({
               <Choice
                 name="substanceFreeHousing"
                 value="yes"
-                label="Substance-free housing"
+                label="Substance-free floor or community"
+                description="Separate from roommate matching: everyone assigned to this floor follows the community standard."
                 defaultChecked={data.substanceFreeHousing}
               />
               <Choice
                 name="genderInclusiveHousing"
                 value="yes"
                 label="Gender-inclusive housing"
+                description="Show room and community options designed for students of all gender identities."
                 defaultChecked={data.genderInclusiveHousing}
               />
               <Choice
                 name="accessibleHousingInformation"
                 value="yes"
                 label="Accessible housing information"
+                description="Share general housing-access information without collecting medical documents."
                 defaultChecked={data.accessibleHousingInformation}
               />
             </div>
@@ -620,17 +716,18 @@ function HousingFields({
             <legend>Would you like a themed residential community?</legend>
             <div className="choice-grid choice-grid--multi">
               {[
-                ["first_year_launch", "First-Year Launch"],
-                ["honors_house", "Honors House"],
-                ["stem_innovation", "STEM + Innovation"],
-                ["arts_collective", "Arts Collective"],
-                ["wellbeing_commons", "Wellbeing Commons"],
-                ["substance_free_living", "Substance-Free Living"],
-              ].map(([value, label]) => (
+                ["first_year_launch", "First-Year Launch", "Peer mentoring and transition programming for new students."],
+                ["honors_house", "Honors House", "An academically focused community with honors programming."],
+                ["stem_innovation", "STEM + Innovation", "Project-based community for science, engineering, and technology."],
+                ["arts_collective", "Arts Collective", "Shared creative programming for visual and performing artists."],
+                ["wellbeing_commons", "Wellbeing Commons", "A community centered on balanced routines and wellbeing."],
+                ["substance_free_living", "Substance-Free Living", "A floor or community where residents commit to a substance-free environment."],
+              ].map(([value, label, description]) => (
                 <Choice
                   name="livingLearningCommunities"
                   value={value}
                   label={label}
+                  description={description}
                   defaultChecked={data.livingLearningCommunities?.includes(value)}
                   key={value}
                 />
@@ -752,6 +849,35 @@ function HousingFields({
           </p>
         </div>
       ) : null}
+
+      {preference ? (
+        <fieldset className="form-section">
+          <legend>Would you like optional tuition or housing protection?</legend>
+          <p>
+            This does not purchase a policy. It only records whether you want
+            information about optional protection before enrollment.
+          </p>
+          <div className="choice-grid">
+            {[
+              ["not_now", "Not now", "Continue without insurance information."],
+              ["learn_more", "Help me compare", "Show tuition and housing options before I decide."],
+              ["tuition", "Tuition protection", "Learn about eligible tuition-loss coverage."],
+              ["housing", "Housing protection", "Learn about belongings and housing-incident coverage."],
+              ["both", "Both options", "Send information about tuition and housing protection."],
+            ].map(([value, label, description]) => (
+              <Choice
+                type="radio"
+                name="insuranceInterest"
+                value={value}
+                label={label}
+                description={description}
+                defaultChecked={data.insuranceInterest === value}
+                key={value}
+              />
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
     </>
   );
 }
@@ -855,6 +981,31 @@ function CampusLifeFields({
               value={value}
               label={label}
               defaultChecked={data.supportNeeds?.includes(value)}
+              key={value}
+            />
+          ))}
+        </div>
+      </fieldset>
+      <fieldset className="form-section">
+        <legend>Would you like an accommodations follow-up?</legend>
+        <p>
+          Optional — this is only a private indicator for the appropriate
+          university office. Do not upload diagnoses or medical records here.
+        </p>
+        <div className="choice-grid">
+          {[
+            ["not_now", "Not now", "You can contact Accessibility Services whenever you are ready."],
+            ["housing", "Housing accommodations", "Ask Housing Accessibility to explain its separate documentation process."],
+            ["academic", "Academic accommodations", "Ask Accessibility Services to explain classroom and learning support."],
+            ["both", "Housing and academic", "Request follow-up from both support teams."],
+          ].map(([value, label, description]) => (
+            <Choice
+              type="radio"
+              name="accommodationInterest"
+              value={value}
+              label={label}
+              description={description}
+              defaultChecked={data.accommodationInterest === value}
               key={value}
             />
           ))}
@@ -1235,21 +1386,55 @@ function ReviewAndSignFields({ data }: { data: StudentOnboardingData }) {
             <dt>Residency</dt>
             <dd>{data.residencyStatus?.replace("_", " ") || "Not provided"}</dd>
           </div>
+          <div>
+            <dt>Residency review</dt>
+            <dd>
+              {data.residencyVerificationPath
+                ?.replaceAll("_", " ")
+                .replace(/\b\w/g, (letter) => letter.toUpperCase()) ||
+                "Not provided"}
+            </dd>
+          </div>
             <div>
               <dt>Housing</dt>
               <dd>{data.housingPreference?.replace("_", " ") || "Not provided"}</dd>
             </div>
             {data.housingPreference === "on_campus" ? (
               <div>
-                <dt>Residence</dt>
+                <dt>Residence ranking</dt>
                 <dd>
-                  {data.housingResidenceOption
-                    ?.replaceAll("_", " ")
-                    .replace(/\b\w/g, (letter) => letter.toUpperCase()) ||
-                    "Decide later"}
+                  {data.housingResidencePreferences?.length
+                    ? data.housingResidencePreferences
+                        .map((value, index) =>
+                          `${index + 1}. ${value
+                            .replaceAll("_", " ")
+                            .replace(/\b\w/g, (letter) =>
+                              letter.toUpperCase(),
+                            )}`,
+                        )
+                        .join(" · ")
+                    : "Decide later"}
                 </dd>
               </div>
             ) : null}
+          <div>
+            <dt>Insurance information</dt>
+            <dd>
+              {data.insuranceInterest
+                ?.replaceAll("_", " ")
+                .replace(/\b\w/g, (letter) => letter.toUpperCase()) ||
+                "Not selected"}
+            </dd>
+          </div>
+          <div>
+            <dt>Accommodations follow-up</dt>
+            <dd>
+              {data.accommodationInterest
+                ?.replaceAll("_", " ")
+                .replace(/\b\w/g, (letter) => letter.toUpperCase()) ||
+                "Not selected"}
+            </dd>
+          </div>
           <div>
             <dt>Emergency contacts</dt>
             <dd>{data.emergencyContacts?.length || 0} entered</dd>
@@ -1447,6 +1632,10 @@ function StepFields({
         <>
           <fieldset className="form-section">
             <legend>We know a lot already. Make sure it still feels like you.</legend>
+            <p>
+              We prefilled available details from your student record. Review
+              and edit anything that has changed before continuing.
+            </p>
             <div className="form-grid">
               <label className="field">
                 <span>Legal first name</span>
@@ -1490,13 +1679,15 @@ function StepFields({
                 />
               </label>
               <label className="field">
-                <span>Mobile number</span>
+                <span>Mobile number <small>Include country code</small></span>
                 <input
                   name="mobilePhone"
                   type="tel"
                   required
                   maxLength={32}
                   autoComplete="tel"
+                  inputMode="tel"
+                  placeholder="+1 555 010 0300"
                   defaultValue={data.mobilePhone ?? ""}
                 />
               </label>
@@ -1592,6 +1783,43 @@ function StepFields({
                   <option value="Another country">Another country</option>
                 </select>
               </label>
+            </div>
+          </fieldset>
+          <fieldset className="form-section">
+            <legend>How should residency be verified?</legend>
+            <p>
+              Choose the review path that fits your situation. A selection
+              starts review but does not determine residency by itself.
+            </p>
+            <div className="choice-grid">
+              {[
+                [
+                  "home_address_review",
+                  "Review my permanent address",
+                  "Use the address above for an initial institutional residency review.",
+                ],
+                [
+                  "document_upload",
+                  "I will provide supporting documents",
+                  "Add a residency-document task to my enrollment follow-up.",
+                ],
+                [
+                  "advisor_review",
+                  "I need an advisor review",
+                  "Ask Enrollment Services to contact me before classification.",
+                ],
+              ].map(([value, label, description]) => (
+                <Choice
+                  type="radio"
+                  name="residencyVerificationPath"
+                  value={value}
+                  label={label}
+                  description={description}
+                  defaultChecked={data.residencyVerificationPath === value}
+                  required
+                  key={value}
+                />
+              ))}
             </div>
           </fieldset>
         </>
@@ -1713,6 +1941,9 @@ function dataFromForm(
           citizenshipStatus === "international"
             ? "international"
             : "domestic",
+        residencyVerificationPath: values.get(
+          "residencyVerificationPath",
+        ) as StudentOnboardingData["residencyVerificationPath"],
         streetAddress: String(values.get("streetAddress") ?? "").trim(),
         addressLine2: optionalFormString(values, "addressLine2"),
         city: String(values.get("city") ?? "").trim(),
@@ -1722,16 +1953,23 @@ function dataFromForm(
       };
       }
     case "housing":
+      {
+        const housingResidencePreferences = values
+          .getAll("housingResidencePreferences")
+          .map(String) as NonNullable<
+            StudentOnboardingData["housingResidencePreferences"]
+          >;
       return {
         ...next,
         housingPreference: values.get(
           "housingPreference",
         ) as StudentOnboardingData["housingPreference"],
-        housingResidenceOption:
-          (optionalFormString(
-            values,
-            "housingResidenceOption",
-          ) as StudentOnboardingData["housingResidenceOption"]) ?? null,
+        housingResidenceOption: housingResidencePreferences[0] ?? null,
+        housingResidencePreferences,
+        insuranceInterest: optionalFormString(
+          values,
+          "insuranceInterest",
+        ) as StudentOnboardingData["insuranceInterest"],
         housingRoomType: optionalFormString(values, "housingRoomType"),
         bathroomPreference: optionalFormString(values, "bathroomPreference"),
         roommateMatching: optionalFormString(values, "roommateMatching"),
@@ -1767,6 +2005,7 @@ function dataFromForm(
         commuteDuration: optionalFormString(values, "commuteDuration"),
         commuterResources: values.getAll("commuterResources").map(String),
       };
+      }
     case "campus_life":
       return {
         ...next,
@@ -1774,6 +2013,10 @@ function dataFromForm(
         supportNeeds: values.getAll("supportNeeds").map(String),
         socialComfort: optionalFormString(values, "socialComfort"),
         firstMonthGoals: values.getAll("firstMonthGoals").map(String),
+        accommodationInterest: optionalFormString(
+          values,
+          "accommodationInterest",
+        ) as StudentOnboardingData["accommodationInterest"],
       };
     case "emergency_contacts":
       {
@@ -2169,8 +2412,20 @@ function OnboardingResource() {
           ...onboarding,
           data: {
             ...onboarding.data,
+            firstName:
+              onboarding.data.firstName || profile.firstName || undefined,
+            lastName:
+              onboarding.data.lastName || profile.lastName || undefined,
+            preferredName:
+              onboarding.data.preferredName ||
+              profile.preferredName ||
+              undefined,
             personalEmail:
               onboarding.data.personalEmail || profile.email || undefined,
+            mobilePhone:
+              onboarding.data.mobilePhone ||
+              profile.mobilePhone ||
+              undefined,
           },
         },
         dashboard,
