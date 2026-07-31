@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useMemo, useState } from "react";
 import { PortalShell } from "../components/portal-shell";
 import {
   EmptyState,
@@ -8,8 +8,8 @@ import {
   LoadingState,
   PageCard,
 } from "../components/portal-ui";
-import { useApiResource } from "../hooks/use-api-resource";
-import { getStudentHelp } from "../lib/api-client";
+import { useApiAction, useApiResource } from "../hooks/use-api-resource";
+import { createStudentHelpRequest, getStudentHelp } from "../lib/api-client";
 
 const categoryLabels = {
   all: "All topics",
@@ -20,6 +20,74 @@ const categoryLabels = {
 } as const;
 
 type HelpCategory = keyof typeof categoryLabels;
+
+function StudentInquiryForm() {
+  const action = useApiAction(createStudentHelpRequest);
+  const [sent, setSent] = useState(false);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSent(false);
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    try {
+      await action.run(
+        {
+          topicCode: data.get("topicCode") as Exclude<HelpCategory, "all">,
+          message: String(data.get("message")),
+        },
+        crypto.randomUUID(),
+      );
+      form.reset();
+      setSent(true);
+    } catch {
+      // The action state provides the student-safe error.
+    }
+  };
+
+  return (
+    <PageCard eyebrow="Ask the enrollment team" title="Send an inquiry">
+      <form className="student-inquiry-form" onSubmit={submit}>
+        <label>
+          Topic
+          <select name="topicCode" defaultValue="support">
+            <option value="getting_started">Getting started</option>
+            <option value="documents">Documents</option>
+            <option value="payments">Payments</option>
+            <option value="support">Other support</option>
+          </select>
+        </label>
+        <label>
+          Your question
+          <textarea
+            name="message"
+            minLength={1}
+            maxLength={500}
+            placeholder="Tell us what you need help with."
+            required
+          />
+        </label>
+        {action.message ? (
+          <p className="field-error" role="alert">
+            {action.message}
+          </p>
+        ) : null}
+        {sent ? (
+          <p className="student-inquiry-form__success" role="status">
+            Your inquiry is now in the staff message portal.
+          </p>
+        ) : null}
+        <button
+          className="button button--primary"
+          type="submit"
+          disabled={action.status === "loading"}
+        >
+          {action.status === "loading" ? "Sending…" : "Send inquiry"}
+        </button>
+      </form>
+    </PageCard>
+  );
+}
 
 export default function HelpPage() {
   const [category, setCategory] = useState<HelpCategory>("all");
@@ -80,6 +148,7 @@ export default function HelpPage() {
             )}
           </PageCard>
           <aside className="resource-aside">
+            <StudentInquiryForm />
             <div className="support-card">
               <span className="support-card__mark" aria-hidden="true">A</span>
               <p className="eyebrow">Talk with a person</p>

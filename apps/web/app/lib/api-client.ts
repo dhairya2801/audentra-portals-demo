@@ -9,6 +9,10 @@ import type {
   CompleteStudentOnboardingInput,
   ConfirmStudentDocumentExtractionInput,
   CreateDepositPaymentInput,
+  CreateStaffClubInput,
+  CreateStaffCorePlayInput,
+  CreateStaffKnowledgeCardInput,
+  CreateStudentHelpRequestInput,
   CreateStudentAppointmentInput,
   CreateStudentDocumentInput,
   StudentAppointment,
@@ -19,6 +23,7 @@ import type {
   StudentDocument,
   StudentDocumentList,
   StudentHelp,
+  StudentHelpRequest,
   StudentHousingPlan,
   StudentFinancials,
   StudentMessage,
@@ -29,6 +34,33 @@ import type {
   StudentProfile,
   StudentRequirementDetail,
   StudentRequirementList,
+  ReviewStaffDocumentInput,
+  StaffActionCenter,
+  StaffCorePlay,
+  StaffDocumentDecisionResult,
+  StaffEdwardPreview,
+  StaffEdwardPreviewInput,
+  StaffEdwardConfigurationDraft,
+  StaffEdwardConfigurationDraftInput,
+  StaffInquiry,
+  StaffKnowledgeCard,
+  StaffManagedConfiguration,
+  StaffManagedConfigurationKind,
+  StaffOperationsWorkspace,
+  StaffOutreachRun,
+  StaffSession,
+  StaffSignInInput,
+  StaffStudentRecord,
+  StaffWorkItem,
+  StudentClub,
+  SimulateStaffOutreachInput,
+  UpdateStaffClubInput,
+  UpdateStaffCorePlayInput,
+  UpdateStaffInquiryInput,
+  UpdateStaffKnowledgeCardInput,
+  UpdateStaffManagedConfigurationInput,
+  UpdateStaffStudentPreferencesInput,
+  UpdateStaffWorkItemInput,
   UpdateStudentOnboardingInput,
   UpdateStudentHousingPlanInput,
   UpdateStudentProfileInput,
@@ -502,6 +534,301 @@ export function getStudentDocumentProfilePhotoUrl(documentId: string) {
   );
 }
 
+export function signInStaff(input: StaffSignInInput) {
+  return request<StaffSession>("/v1/auth/staff/sign-in", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function signOutStaff() {
+  return request<{
+    authenticated: false;
+    mode: "credentials";
+    actorType: "staff";
+  }>(
+    "/v1/auth/staff/sign-out",
+    { method: "POST" },
+  );
+}
+
+const staffHeaders = {
+  "X-Demo-Actor-Type": "staff",
+} as const;
+
+export function getStaffActionCenter(signal?: AbortSignal) {
+  return request<StaffActionCenter>("/v1/staff/action-center", {
+    method: "GET",
+    headers: staffHeaders,
+    signal,
+  });
+}
+
+export function getStaffOperationsWorkspace(signal?: AbortSignal) {
+  return request<StaffOperationsWorkspace>("/v1/staff/workspace", {
+    method: "GET",
+    headers: staffHeaders,
+    signal,
+  });
+}
+
+export function getStaffManagedConfiguration(
+  kind: StaffManagedConfigurationKind,
+  signal?: AbortSignal,
+) {
+  return request<StaffManagedConfiguration>(
+    `/v1/staff/configurations/${kind}`,
+    {
+      method: "GET",
+      headers: staffHeaders,
+      signal,
+    },
+  );
+}
+
+export function updateStaffManagedConfiguration(
+  kind: StaffManagedConfigurationKind,
+  input: UpdateStaffManagedConfigurationInput,
+) {
+  return request<StaffManagedConfiguration>(
+    `/v1/staff/configurations/${kind}`,
+    {
+      method: "PUT",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: true },
+  );
+}
+
+export function draftStaffConfigurationWithEdward(
+  input: StaffEdwardConfigurationDraftInput,
+) {
+  return request<StaffEdwardConfigurationDraft>(
+    "/v1/staff/edward/configuration-draft",
+    {
+      method: "POST",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function updateStaffKnowledgeCard(
+  cardId: string,
+  input: UpdateStaffKnowledgeCardInput,
+) {
+  return request<StaffKnowledgeCard>(
+    `/v1/staff/knowledge-base/${encodeURIComponent(cardId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function createStaffKnowledgeCard(input: CreateStaffKnowledgeCardInput) {
+  return request<StaffKnowledgeCard>(
+    "/v1/staff/knowledge-base",
+    {
+      method: "POST",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function updateStaffCorePlay(
+  playId: string,
+  input: UpdateStaffCorePlayInput,
+) {
+  return request<StaffCorePlay>(
+    `/v1/staff/core-plays/${encodeURIComponent(playId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function createStaffCorePlay(input: CreateStaffCorePlayInput) {
+  return request<StaffCorePlay>(
+    "/v1/staff/core-plays",
+    {
+      method: "POST",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function updateStaffInquiry(
+  inquiryId: string,
+  input: UpdateStaffInquiryInput,
+) {
+  return request<StaffInquiry>(
+    `/v1/staff/inquiries/${encodeURIComponent(inquiryId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function updateStaffClub(
+  clubId: string,
+  input: UpdateStaffClubInput,
+) {
+  return request<StudentClub>(
+    `/v1/staff/campus-life/clubs/${encodeURIComponent(clubId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function createStaffClub(input: CreateStaffClubInput) {
+  return request<StudentClub>(
+    "/v1/staff/campus-life/clubs",
+    {
+      method: "POST",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function simulateStaffOutreach(input: SimulateStaffOutreachInput) {
+  return request<StaffOutreachRun>("/v1/staff/outreach/simulate", {
+    method: "POST",
+    headers: {
+      ...staffHeaders,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+}
+
+export function previewStaffEdward(input: StaffEdwardPreviewInput) {
+  return request<StaffEdwardPreview>("/v1/staff/edward/preview", {
+    method: "POST",
+    headers: {
+      ...staffHeaders,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateStaffWorkItem(
+  workItemId: string,
+  input: UpdateStaffWorkItemInput,
+) {
+  return request<StaffWorkItem>(
+    `/v1/staff/work-items/${encodeURIComponent(workItemId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function getStaffStudentRecord(
+  studentId: string,
+  signal?: AbortSignal,
+) {
+  return request<StaffStudentRecord>(
+    `/v1/staff/students/${encodeURIComponent(studentId)}`,
+    {
+      method: "GET",
+      headers: staffHeaders,
+      signal,
+    },
+  );
+}
+
+export function updateStaffStudentPreferences(
+  studentId: string,
+  input: UpdateStaffStudentPreferencesInput,
+) {
+  return request<StaffStudentRecord>(
+    `/v1/staff/students/${encodeURIComponent(studentId)}/preferences`,
+    {
+      method: "PATCH",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function reviewStaffDocument(
+  documentId: string,
+  input: ReviewStaffDocumentInput,
+) {
+  return request<StaffDocumentDecisionResult>(
+    `/v1/staff/documents/${encodeURIComponent(documentId)}/decision`,
+    {
+      method: "POST",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
 function tenantAwareDocumentUrl(path: string) {
   const url = new URL(path, `${API_BASE_URL}/`);
   url.searchParams.set("tenant", currentTenantSlug());
@@ -586,6 +913,20 @@ export function getStudentHelp(signal?: AbortSignal) {
   return request<StudentHelp>("/v1/student/help", {
     method: "GET",
     signal,
+  });
+}
+
+export function createStudentHelpRequest(
+  input: CreateStudentHelpRequestInput,
+  idempotencyKey: string,
+) {
+  return request<StudentHelpRequest>("/v1/demo/help-requests", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": idempotencyKey,
+    },
+    body: JSON.stringify(input),
   });
 }
 

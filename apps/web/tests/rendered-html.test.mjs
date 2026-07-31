@@ -49,6 +49,7 @@ test("all student portal routes render and the dynamic requirement route resolve
     "/payments",
     "/profile",
     "/help",
+    "/staff",
     "/enrollment/requirements/transcript-upload",
   ];
 
@@ -75,6 +76,7 @@ test("tenant routes render and preserve tenant-aware internal destinations", asy
       `/${tenant}/onboarding`,
       `/${tenant}/dashboard`,
       `/${tenant}/campus-life`,
+      `/${tenant}/staff`,
       `/${tenant}/enrollment/requirements/transcript-upload`,
     ]) {
       const response = await render(route);
@@ -411,6 +413,10 @@ test("typed client wires every resource route and mutation contract", async () =
       preferredName: "Maya",
     });
     await client.getStudentHelp();
+    await client.createStudentHelpRequest(
+      { topicCode: "documents", message: "Which transcript should I upload?" },
+      "help-request-12345678",
+    );
     await client.acceptAdmissionOffer("offer/1", "intent-12345678");
     await client.sendActivityEvents([
       {
@@ -425,6 +431,133 @@ test("typed client wires every resource route and mutation contract", async () =
     await client.signInDemoStudent();
     await client.startGuidedOnboardingDemo();
     await client.signOutDemoStudent();
+    await client.signInStaff({
+      email: "priya.shah@aster.example.edu",
+      password: "AsterStaff2027!",
+    });
+    await client.getStaffActionCenter();
+    await client.getStaffOperationsWorkspace();
+    await client.createStaffKnowledgeCard({
+      title: "Orientation guide",
+      summary: "Arrival guidance.",
+      body: "Check in at the student center.",
+      category: "Orientation",
+      audience: "student",
+      status: "draft",
+    });
+    await client.updateStaffKnowledgeCard(
+      "00000000-0000-7000-8000-000000000931",
+      {
+        expectedVersion: 1,
+        title: "Deposit policy",
+        summary: "Approved guidance.",
+        body: "Review the active offer deadline.",
+        category: "Enrollment",
+        audience: "internal",
+        status: "published",
+      },
+    );
+    await client.updateStaffCorePlay(
+      "00000000-0000-7000-8000-000000000941",
+      {
+        expectedVersion: 1,
+        title: "Deposit rescue",
+        description: "Deadline follow-up.",
+        trigger: "Deposit due soon",
+        audience: "Admitted students",
+        steps: ["Verify the offer"],
+        status: "active",
+      },
+    );
+    await client.createStaffCorePlay({
+      title: "Orientation rescue",
+      description: "Registration support.",
+      trigger: "Registration is overdue",
+      audience: "Students without a session",
+      steps: ["Verify eligibility"],
+      status: "draft",
+    });
+    await client.updateStaffInquiry(
+      "00000000-0000-7000-8000-000000000951",
+      {
+        expectedVersion: 1,
+        status: "open",
+        notifyStudent: false,
+      },
+    );
+    await client.updateStaffClub(
+      "51000000-0000-7000-8000-000000000101",
+      {
+        expectedVersion: 1,
+        name: "Aster Robotics",
+        category: "Engineering",
+        description: "Build robots.",
+        latestUpdate: "Teams are open.",
+        contactName: "Maya Chen",
+        contactRole: "President",
+        contactChannel: "robotics@aster.edu",
+        membershipOpen: true,
+      },
+    );
+    await client.createStaffClub({
+      name: "Aster Debate",
+      category: "Academic",
+      description: "Practice debate.",
+      latestUpdate: "New members welcome.",
+      contactName: "Taylor Kim",
+      contactRole: "President",
+      contactChannel: "debate@aster.edu",
+      membershipOpen: true,
+    });
+    await client.simulateStaffOutreach({
+      title: "Deposit reminder",
+      audience: "Students with incomplete deposits",
+      channel: "voice",
+      requestedCount: 100,
+    });
+    await client.previewStaffEdward({
+      message: "Show students with incomplete deposits.",
+    });
+    await client.updateStaffManagedConfiguration("journeys", {
+      expectedVersion: 1,
+      yaml: "schema_version: 1\nconfiguration: journeys\nflows: []\n",
+      changeSummary: "Test request",
+    });
+    await client.draftStaffConfigurationWithEdward({
+      kind: "journeys",
+      expectedVersion: 1,
+      instruction: "Add a task to enrollment",
+    });
+    await client.updateStaffWorkItem(
+      "00000000-0000-7000-8000-000000000911",
+      { expectedVersion: 1, status: "in_progress" },
+    );
+    await client.getStaffStudentRecord(
+      "00000000-0000-7000-8000-000000000101",
+    );
+    await client.updateStaffStudentPreferences(
+      "00000000-0000-7000-8000-000000000101",
+      {
+        expectedOnboardingVersion: 1,
+        expectedProfileVersion: 1,
+        communicationPreference: "email",
+        housingPreference: "undecided",
+        accommodationInterest: "not_now",
+        residencyVerificationPath: "home_address_review",
+        notifyStudent: false,
+      },
+    );
+    await client.reviewStaffDocument(
+      "00000000-0000-7000-8000-000000000601",
+      {
+        workItemId: "00000000-0000-7000-8000-000000000911",
+        expectedWorkItemVersion: 1,
+        decision: "accepted",
+        note: "Reviewed.",
+        notifyStudent: true,
+      },
+    );
+    await client.signOutStaff();
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -474,11 +607,31 @@ test("typed client wires every resource route and mutation contract", async () =
     "/v1/student/payments/deposit",
     "/v1/student/profile",
     "/v1/student/help",
+    "/v1/demo/help-requests",
     "/v1/admission-offers/offer%2F1/accept",
     "/v1/activity-events/batch",
     "/v1/auth/demo/sign-in",
     "/v1/auth/demo/start-guided-onboarding",
     "/v1/auth/demo/sign-out",
+    "/v1/auth/staff/sign-in",
+    "/v1/staff/action-center",
+    "/v1/staff/workspace",
+    "/v1/staff/knowledge-base",
+    "/v1/staff/knowledge-base/00000000-0000-7000-8000-000000000931",
+    "/v1/staff/core-plays",
+    "/v1/staff/core-plays/00000000-0000-7000-8000-000000000941",
+    "/v1/staff/inquiries/00000000-0000-7000-8000-000000000951",
+    "/v1/staff/campus-life/clubs/51000000-0000-7000-8000-000000000101",
+    "/v1/staff/campus-life/clubs",
+    "/v1/staff/outreach/simulate",
+    "/v1/staff/edward/preview",
+    "/v1/staff/configurations/journeys",
+    "/v1/staff/edward/configuration-draft",
+    "/v1/staff/work-items/00000000-0000-7000-8000-000000000911",
+    "/v1/staff/students/00000000-0000-7000-8000-000000000101",
+    "/v1/staff/students/00000000-0000-7000-8000-000000000101/preferences",
+    "/v1/staff/documents/00000000-0000-7000-8000-000000000601/decision",
+    "/v1/auth/staff/sign-out",
   ];
   for (const path of expectedPaths) {
     assert.ok(requestByPath.has(path), `missing API request for ${path}`);

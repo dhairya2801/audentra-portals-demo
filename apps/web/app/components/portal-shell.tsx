@@ -129,6 +129,7 @@ export function PortalShell({
   );
   const identity = useApiResource(loadBootstrap);
   const reloadIdentity = identity.reload;
+  const refreshIdentity = identity.refresh;
   const needsOnboarding =
     identity.data?.onboarding.required &&
     identity.data.onboarding.status !== "completed";
@@ -163,6 +164,16 @@ export function PortalShell({
         refreshStudentRecord,
       );
   }, [reloadIdentity]);
+
+  useEffect(() => {
+    const interval = window.setInterval(refreshIdentity, 15_000);
+    const refreshOnFocus = () => refreshIdentity();
+    window.addEventListener("focus", refreshOnFocus);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshOnFocus);
+    };
+  }, [refreshIdentity]);
 
   if (identity.status === "loading" || needsSignIn || needsOnboarding) {
     return (
@@ -225,6 +236,17 @@ export function PortalShell({
           ) : null}
           <Link className="aster-help-link" href="/help">
             Student support
+          </Link>
+          <Link
+            className="aster-notification-link"
+            href="/messages"
+            aria-label={`${identity.data.unreadMessageCount} unread notifications`}
+          >
+            <span aria-hidden="true">●</span>
+            Notifications
+            {identity.data.unreadMessageCount > 0 ? (
+              <strong>{identity.data.unreadMessageCount}</strong>
+            ) : null}
           </Link>
           <Link
             className="aster-student"
