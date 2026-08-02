@@ -15,6 +15,7 @@ import type {
   CreateStudentHelpRequestInput,
   CreateStudentAppointmentInput,
   CreateStudentDocumentInput,
+  DecideStudentExperienceUpdateInput,
   StudentAppointment,
   StudentAppointmentList,
   StudentAcademics,
@@ -22,6 +23,7 @@ import type {
   StudentDashboard,
   StudentDocument,
   StudentDocumentList,
+  StudentExperienceUpdateDecision,
   StudentHelp,
   StudentHelpRequest,
   StudentHousingPlan,
@@ -171,6 +173,20 @@ export function getStudentBootstrap(signal?: AbortSignal) {
     method: "GET",
     signal,
   });
+}
+
+export function decideStudentExperienceUpdate(
+  updateId: string,
+  input: DecideStudentExperienceUpdateInput,
+) {
+  return request<StudentExperienceUpdateDecision>(
+    `/v1/student/experience-updates/${encodeURIComponent(updateId)}/decision`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export function signInDemoStudent() {

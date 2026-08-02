@@ -6,7 +6,10 @@
 **/coverage
 **/.git
 *.log
-*.pdf
+docs/
+tools/browser-e2e/
+playwright-report/
+test-results/
 .env
 .env.*
 !.env.example

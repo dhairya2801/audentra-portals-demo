@@ -337,6 +337,10 @@ test("typed client wires every resource route and mutation contract", async () =
 
   try {
     await client.getStudentBootstrap();
+    await client.decideStudentExperienceUpdate("update/1", {
+      action: "handle_now",
+      expectedVersion: 3,
+    });
     await client.getStudentDashboard();
     await client.getStudentAcademics();
     await client.searchCatalogCourses("calculus");
@@ -585,6 +589,7 @@ test("typed client wires every resource route and mutation contract", async () =
   );
   const expectedPaths = [
     "/v1/student/bootstrap",
+    "/v1/student/experience-updates/update%2F1/decision",
     "/v1/student/dashboard",
     "/v1/student/academics",
     "/v1/catalog/courses",
@@ -637,7 +642,17 @@ test("typed client wires every resource route and mutation contract", async () =
     assert.ok(requestByPath.has(path), `missing API request for ${path}`);
   }
 
-  assert.equal(requests[2].init.method, "GET");
+  const experienceDecision = requestByPath.get(
+    "/v1/student/experience-updates/update%2F1/decision",
+  );
+  assert.equal(experienceDecision.init.method, "POST");
+  assert.equal(experienceDecision.init.headers["Content-Type"], "application/json");
+  assert.deepEqual(JSON.parse(experienceDecision.init.body), {
+    action: "handle_now",
+    expectedVersion: 3,
+  });
+
+  assert.equal(requests[3].init.method, "GET");
   const onboardingUpdate = requests.find(
     (entry) =>
       new URL(entry.url).pathname === "/v1/student/onboarding" &&
@@ -741,10 +756,16 @@ test("typed client wires every resource route and mutation contract", async () =
 });
 
 test("onboarding preserves the eight-step order and authoritative boundary actions", async () => {
-  const onboarding = await readFile(
-    new URL("../app/onboarding/page.tsx", import.meta.url),
-    "utf8",
-  );
+  const [onboarding, acceptanceRoutingSource] = await Promise.all([
+    readFile(
+      new URL("../app/onboarding/page.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/onboarding/offer-acceptance.ts", import.meta.url),
+      "utf8",
+    ),
+  ]);
   const expectedOrder = [
     '"offer"',
     '"about_you"',
@@ -765,6 +786,11 @@ test("onboarding preserves the eight-step order and authoritative boundary actio
   assert.match(onboarding, /completedSteps/);
   assert.match(onboarding, /expectedVersion: onboarding\.version/);
   assert.match(onboarding, /acceptAdmissionOffer/);
+  assert.match(onboarding, /getPostAcceptanceRoute\(acceptance\)/);
+  assert.match(
+    onboarding,
+    /if \(postAcceptanceRoute\) \{[\s\S]*window\.location\.replace\([\s\S]*return;/,
+  );
   assert.match(onboarding, /createDepositPayment/);
   assert.match(onboarding, /completeStudentOnboarding/);
   assert.match(onboarding, /Reload latest saved progress/);
@@ -790,6 +816,45 @@ test("onboarding preserves the eight-step order and authoritative boundary actio
   assert.match(
     onboarding,
     /window\.location\.replace\(tenantRuntime\.href\("\/dashboard"\)\)/,
+  );
+
+  const compiledAcceptanceRouting = ts.transpileModule(
+    acceptanceRoutingSource,
+    {
+      compilerOptions: {
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ES2022,
+      },
+    },
+  ).outputText;
+  const acceptanceRoutingUrl = `data:text/javascript;base64,${Buffer.from(compiledAcceptanceRouting).toString("base64")}`;
+  const { getPostAcceptanceRoute } = await import(acceptanceRoutingUrl);
+
+  assert.equal(
+    getPostAcceptanceRoute({
+      onboardingRequired: false,
+      initialRoute: "/dashboard",
+    }),
+    "/dashboard",
+  );
+  assert.equal(
+    getPostAcceptanceRoute({
+      onboardingRequired: false,
+      initialRoute: "/onboarding",
+    }),
+    "/dashboard",
+  );
+  assert.equal(
+    getPostAcceptanceRoute({
+      onboardingRequired: true,
+      initialRoute: "/onboarding",
+    }),
+    null,
+  );
+  assert.equal(
+    getPostAcceptanceRoute({}),
+    null,
+    "older success responses must retain the configured onboarding flow",
   );
 });
 
@@ -931,22 +996,11 @@ test("tenant points stay visible and enrollment tasks advertise their reward", a
 });
 
 test("campus event visuals are data-driven, accessible, and backed by local assets", async () => {
-  const [campusPage, contracts, demoSeed, tenantContent, styles] =
+  const [campusPage, contracts, styles] =
     await Promise.all([
       readFile(new URL("../app/campus-life/page.tsx", import.meta.url), "utf8"),
       readFile(
         new URL("../../../packages/contracts/src/index.ts", import.meta.url),
-        "utf8",
-      ),
-      readFile(
-        new URL("../../../tools/demo-api/src/seed.js", import.meta.url),
-        "utf8",
-      ),
-      readFile(
-        new URL(
-          "../../../tools/demo-api/src/tenant-content.js",
-          import.meta.url,
-        ),
         "utf8",
       ),
       readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
@@ -961,15 +1015,47 @@ test("campus event visuals are data-driven, accessible, and backed by local asse
   assert.match(styles, /\.campus-carousel--theme-career/);
   assert.match(styles, /\.campus-carousel--theme-community/);
 
-  const source = `${demoSeed}\n${tenantContent}`;
   for (const asset of [
     "welcome-week-block-party.webp",
     "first-year-research-showcase.webp",
     "internship-ready-lab.webp",
   ]) {
-    assert.match(source, new RegExp(asset.replace(".", "\\.")));
     await access(new URL(`../public/media/events/${asset}`, import.meta.url));
   }
+});
+
+test("experience updates open once with an accessible decision flow", async () => {
+  const [contracts, apiClient, shell, styles] = await Promise.all([
+    readFile(
+      new URL("../../../packages/contracts/src/index.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/components/portal-shell.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(contracts, /interface StudentExperienceUpdate/);
+  assert.match(contracts, /experienceUpdates: StudentExperienceUpdate\[\]/);
+  assert.match(contracts, /status: "pending" \| "deferred"/);
+  assert.match(contracts, /status: "acknowledged" \| "deferred"/);
+  assert.match(apiClient, /experience-updates\/\$\{encodeURIComponent\(updateId\)\}\/decision/);
+  assert.match(apiClient, /request<StudentExperienceUpdateDecision>/);
+
+  assert.match(shell, /role="dialog"/);
+  assert.match(shell, /aria-modal="true"/);
+  assert.match(shell, /aria-labelledby="experience-update-title"/);
+  assert.match(shell, /hasPresentedExperienceUpdate\.current = true/);
+  assert.match(shell, /child\.setAttribute\("inert", ""\)/);
+  assert.match(shell, /onDecision\("handle_now"\)/);
+  assert.match(shell, /onDecision\("later"\)/);
+  assert.match(shell, /\/enrollment\/requirements\/\$\{encodeURIComponent/);
+  assert.match(shell, /window\.location\.assign\(tenantRuntime\.href\(destination\)\)/);
+  assert.match(styles, /\.experience-update-dialog/);
+  assert.match(styles, /\.experience-update-dialog__actions/);
 });
 
 test("the web command wrapper forwards isolated host and port arguments", async () => {

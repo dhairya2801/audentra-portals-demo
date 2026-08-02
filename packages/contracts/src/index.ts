@@ -113,7 +113,9 @@ export interface AcceptOfferResponse {
   offerId: string;
   offerStatus: "accepted";
   journeyId: string;
-  journeyStatus: "in_progress";
+  journeyStatus: "in_progress" | "completed";
+  onboardingRequired: boolean;
+  initialRoute: "/onboarding" | "/dashboard";
   projectionVersion: number;
   acceptedAt: string;
 }
@@ -294,6 +296,29 @@ export interface UpdateStudentHousingPlanInput {
   residenceOption?: Exclude<HousingResidenceOption, null>;
 }
 
+export interface StudentExperienceUpdate {
+  id: string;
+  kind: "onboarding" | "enrollment" | "academics" | "campus_life";
+  title: string;
+  description: string;
+  requirementSlug: string | null;
+  status: "pending" | "deferred";
+  version: number;
+  createdAt: string;
+}
+
+export interface DecideStudentExperienceUpdateInput {
+  action: "handle_now" | "later";
+  expectedVersion: number;
+}
+
+export interface StudentExperienceUpdateDecision {
+  id: string;
+  status: "acknowledged" | "deferred";
+  version: number;
+  requirementSlug: string | null;
+}
+
 export interface StudentBootstrap {
   authenticated: true;
   tenant?: {
@@ -319,6 +344,7 @@ export interface StudentBootstrap {
   };
   rewards?: StudentRewardSummary;
   unreadMessageCount: number;
+  experienceUpdates: StudentExperienceUpdate[];
   initialRoute: "/onboarding" | "/dashboard";
   generatedAt: string;
 }

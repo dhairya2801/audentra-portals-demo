@@ -48,6 +48,12 @@ test.describe("document misuse through the enrollment UI", () => {
       "/enrollment/requirements/financial-aid-verification",
     );
     const fileInput = page.locator('input[type="file"]');
+    const actionStatus = page.locator(
+      ".requirement-workspace__action-heading .resource-status",
+    );
+    await expect(actionStatus).toBeVisible();
+    const initialActionStatus = (await actionStatus.textContent())?.trim();
+    expect(initialActionStatus).toBeTruthy();
 
     await fileInput.setInputFiles({
       name: "restaurant-menu.pdf",
@@ -75,9 +81,7 @@ test.describe("document misuse through the enrollment UI", () => {
     await expect(
       page.getByRole("button", { name: "Confirm selected fields" }),
     ).toHaveCount(0);
-    await expect(
-      page.locator(".requirement-workspace__action-heading"),
-    ).toContainText(/ready/i);
+    await expect(actionStatus).toHaveText(initialActionStatus!);
 
     await fileInput.setInputFiles({
       name: "fafsa-verification.pdf",

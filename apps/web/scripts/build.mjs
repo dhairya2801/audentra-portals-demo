@@ -5,10 +5,8 @@ import { fileURLToPath } from "node:url";
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const command = process.argv[2] ?? "build";
 const commandArguments = process.argv.slice(3);
-const cli = resolve(
-  scriptDirectory,
-  "../node_modules/vinext/dist/cli.js",
-);
+const vinextModule = fileURLToPath(import.meta.resolve("vinext"));
+const cli = resolve(dirname(vinextModule), "cli.js");
 const result = spawnSync(process.execPath, [cli, command, ...commandArguments], {
   cwd: resolve(scriptDirectory, ".."),
   env: {

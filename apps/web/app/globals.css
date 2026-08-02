@@ -5589,6 +5589,66 @@ a {
   gap: 0.7rem;
 }
 
+.experience-update-backdrop {
+  z-index: 100;
+}
+
+.experience-update-dialog {
+  border-top: 4px solid var(--gold);
+  outline: none;
+}
+
+.experience-update-dialog__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: -3.7rem 0 1.7rem 3.3rem;
+}
+
+.experience-update-dialog__meta span,
+.experience-update-dialog__meta small {
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: var(--mint-light);
+  color: var(--forest);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.experience-update-dialog__meta small {
+  background: transparent;
+  color: var(--ink-soft);
+}
+
+.confirmation-dialog > .experience-update-dialog__guidance {
+  margin: -0.5rem 0 1.5rem;
+  padding: 0.85rem 1rem;
+  border-left: 3px solid var(--gold);
+  background: var(--mint-light);
+  color: var(--ink);
+}
+
+@media (max-width: 520px) {
+  .experience-update-dialog {
+    padding: 1.5rem;
+  }
+
+  .experience-update-dialog__meta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-top: -3.2rem;
+  }
+
+  .experience-update-dialog__actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);

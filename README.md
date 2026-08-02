@@ -1,238 +1,92 @@
-# VV Enrollment Platform
+# Audentra Portals
 
-Production-oriented foundation for a stateful student enrollment portal.
-Authentication-aware entry routing sends a first-time student into resumable
-onboarding and sends a returning student directly to their dashboard.
+Next.js/React portals for Audentra students and staff. The web application is
+built with Next.js 16, React 19, TypeScript, Tailwind CSS, Vite/Vinext, and the
+Cloudflare runtime tooling already used by the project.
 
-The codebase is a modular monolith plus an independently deployable outbox
-worker. That keeps transactions and early product development simple while
-preserving clear service boundaries for a later Kubernetes migration.
-
-## What is implemented
-
-- One-time, server-persisted, eight-step onboarding with ordered validation,
-  optimistic versions, resume behavior, and completion gating
-- Credential sign-up/sign-in with normalized unique contacts, scrypt password
-  hashing, hashed opaque sessions, revocation, and account-scoped preview data
-- Responsive dashboard plus enrollment, requirement detail, documents,
-  messages, appointments, payments, profile, and help pages
-- Tenant-aware staff operations with authenticated preview access, a personal
-  Action Center, shared Jira-style task board, student records, inquiries,
-  journey/content editors, knowledge, Core Plays, and Edward-assisted drafts
-- Working profile saves, message read state, appointment scheduling, original
-  document uploads with reviewable structured extraction, simulated deposits,
-  and idempotent offer acceptance
-- Edward AI with a bounded student context, OpenRouter integration, usage
-  reporting, safe navigation actions, and a useful no-key guided mode
-- Loading, empty, validation, failure, retry, confirmation, and success states
-- NestJS/Fastify API with validation, correlation IDs, typed errors, and CORS
-- PostgreSQL schema, deterministic seed, migrations, audit log, idempotency
-  records, and transactional outbox
-- Batched, allowlisted student activity ingestion
-- Outbox worker with leases, bounded retries, dead-lettering, event receipts,
-  and a student dashboard projection
-- Stateful, no-dependency preview API for running the entire portal without
-  Docker while keeping the frontend on the same typed contracts
-- Local PostgreSQL, Keycloak, MinIO, Mailpit, API, worker, and web stack
-- Unit, contract, rendered-HTML, and integration tests plus CI
+The FastAPI application and Python worker are maintained separately in
+[`Audentra-ai/Audentra-platform`](https://github.com/Audentra-ai/Audentra-platform).
 
 ## Repository layout
 
 ```text
-apps/
-  api/       Student portal API and PostgreSQL migrations
-  web/       Student portal user interface
-  worker/    Transactional outbox processor and projections
-packages/
-  contracts/ Shared API and event contracts
-infra/       Dockerfiles, Compose stack, and local service configuration
-docs/        Architecture, security, tracking, agentic, and feature flows
-tools/       Stateful no-Docker preview API and local launch script
+apps/web/                 Student and staff portal routes, UI, and assets
+packages/contracts/       Temporary snapshot of the platform API contracts
+tools/browser-e2e/        Browser journeys run against a platform environment
+infra/docker/             Frontend-only container build
+docs/                     Portal behavior, acceptance, and operations notes
 ```
 
-## Run the portal now, without Docker
+## Local development
 
-Requirements: Node.js 22 LTS and npm. The repository pins `22.23.1` in
-`.nvmrc`; use that version for the same runtime as CI.
+Requirements: Node.js 22 and a compatible Audentra Platform API.
 
 ```bash
-npm run demo:reset
-npm run dev:portal
+npm ci
+copy .env.example .env.local
+npm run dev
 ```
 
-Open <http://localhost:3000/aster> or <http://localhost:3000/harvard>, create
-an account with an email, international
-phone number, and password, then complete onboarding. Protected routes require
-the HTTP-only credential session cookie; the dashboard remains gated until
-onboarding is complete. Each account receives its own student state file and
-upload directory. Profile changes, read messages, appointments, payments,
-documents, provider responses, and reviewed extraction results persist in the
-ignored `tools/demo-api/.data/` directory.
+The portal defaults to `http://localhost:3000` and the API defaults to
+`http://localhost:4000`. On macOS or Linux, use `cp` instead of `copy`.
 
-`npm run dev:portal` keeps both processes in the foreground. API request lines
-contain `service:"vv-demo-api"` and a `requestId`. A document attempt also
-prints `document_extraction_started`, any bounded retry/failure, and
-`document_extraction_completed` with the same document/request IDs, provider,
-model, course count, terminal status, and duration. Do not redirect this command
-to a file when you want to watch parsing live.
-
-For a detached local process with captured logs, use:
+Useful commands:
 
 ```bash
-npm run portal:start
-npm run portal:status
-npm run portal:stop
+npm run dev
+npm run typecheck
+npm run lint
+npm test
+npm run build
+npm run start
 ```
 
-`portal:start` returns immediately. It recognizes an already-running VV portal
-even when its PID file is stale, refuses to start when another application owns
-either required port, and never falls back to a different web port. On Windows,
-the runner starts Node directly rather than creating nested `npm.cmd` shells.
-`portal:stop` terminates the complete managed process tree. The PID file and
-captured logs are local runtime artifacts and are not committed.
+## API boundary
 
-Use `npm run demo:reset` while the server is stopped to restore the deterministic
-first-visit scenario. This remains a development fixture; do not enter real
-student, document, or payment data.
+All production browser traffic uses `NEXT_PUBLIC_API_BASE_URL` and sends
+credentials. Separate frontend and backend origins therefore require the
+platform to allow the exact portal origin, credentialed CORS, and the
+`X-Tenant-Slug` header. Authentication cookies must use secure cross-site
+settings when the two deployments are on different sites.
 
-### Enable Edward and document extraction
+`packages/contracts` is deliberately marked as a temporary vendored snapshot.
+The platform copy is canonical. Before teams change the two repositories
+independently, replace this folder with a compiled, versioned
+`@audentra/api-client` generated from the platform's OpenAPI schema.
 
-The portal works without an LLM key: Edward uses a deterministic navigation
-guide and uploaded originals remain available with extraction marked as waiting
-for configuration. To enable the real agentic paths:
+The first history split retains the existing `@vv/*` package names to minimize
+risk. Rename them to `@audentra/*` in a dedicated follow-up change after both
+repositories are green.
+
+## Browser journeys
+
+Browser E2E no longer boots a hidden backend from this repository. Start or
+deploy a compatible platform environment, then run:
 
 ```bash
-cp .env.example .env
+E2E_API_BASE_URL=http://localhost:4000 npm run test:e2e
 ```
 
-Set `OPENROUTER_API_KEY` in `.env`, optionally choose
-`OPENROUTER_MODEL`, and restart `npm run dev:portal`. The launcher reads the
-root `.env`; the key stays server-side and is never included in the web bundle.
-PDF/JPEG/PNG uploads are capped at 10 MB. PDFs are preprocessed locally with
-Python/PyMuPDF into bounded text and rendered page images, then sent as
-multimodal evidence to the configured model. The model returns JSON-only text;
-the server normalizes, bounds, and review-gates the result.
-Extracted fields must be selected by the student before they enter the review
-state.
+PowerShell:
 
-Student gamification is tenant-owned. Each university can configure its point
-name, task/page reward rules, enabled state, and bookstore conversion; awarded
-values are preserved in an idempotent ledger. See
-[`docs/19-tenant-rewards.md`](docs/19-tenant-rewards.md).
+```powershell
+$env:E2E_API_BASE_URL = "http://localhost:4000"
+npm run test:e2e
+```
 
-For faster transcript extraction, also set `GROQ_API_KEY` and
-`TRANSCRIPT_PARSING=groq`. That path uses `GROQ_MODEL` (currently
-`qwen/qwen3.6-27b` by default). Both transcript providers receive one 2,048px
-JPEG per PDF page, together with that page's extracted text; a six-page
-transcript therefore produces six independent vision requests. Set
-`TRANSCRIPT_PARSING=openrouter` to use the configured OpenRouter multimodal
-model instead. Non-transcript documents remain on the OpenRouter multimodal
-path.
+The platform exposes development-only fixture reset and credential adapters for
+these deterministic journeys. They fail closed in production; see
+[`docs/integration-testing.md`](docs/integration-testing.md).
 
-The complete Compose stack exposes the same routes through the Nest API. It
-stores document metadata and review state in PostgreSQL, stores originals in
-MinIO through the S3 API, and atomically claims extraction work so an
-idempotent upload replay does not spend LLM tokens twice.
+## Container build
 
-## Run the complete local stack
-
-Requirements: Docker Desktop with Compose, Node.js 22 LTS (see `.nvmrc`), and
-npm.
+Build from the repository root so the workspace contract package is available:
 
 ```bash
-cp .env.example .env
-docker compose --env-file .env -f infra/compose.yaml up --build
+docker build -f infra/docker/web.Dockerfile \
+  --build-arg NEXT_PUBLIC_API_BASE_URL=https://api.example.com \
+  --build-arg NEXT_PUBLIC_SITE_URL=https://portal.example.com \
+  .
 ```
 
-Then open:
-
-- Student portal: <http://localhost:3000>
-- API readiness: <http://localhost:4000/health/ready>
-- Mailpit: <http://localhost:8025>
-- Keycloak: <http://localhost:8080>
-- MinIO console: <http://localhost:9001>
-
-The Compose migration job applies the schema and loads the deterministic demo
-student automatically. Data remains in named volumes between restarts.
-
-## Run checks without Docker
-
-Each deployable package has its own lockfile and can be verified independently:
-
-```bash
-npm --prefix packages/contracts ci --workspaces=false
-npm --prefix apps/api ci --workspaces=false
-npm --prefix apps/worker ci --workspaces=false
-npm --prefix apps/web ci --workspaces=false
-
-npm --prefix packages/contracts run typecheck
-npm --prefix apps/api run typecheck
-npm --prefix apps/api test
-npm --prefix apps/worker run typecheck
-npm --prefix apps/worker test
-npm --prefix apps/web run typecheck
-npm --prefix apps/web run lint
-npm --prefix apps/web test
-npm --prefix tools/demo-api test
-```
-
-API and worker unit/integration tests use isolated in-memory or mocked
-boundaries. CI additionally starts PostgreSQL, applies the real migration and
-seed, and builds every package.
-
-## Architectural documentation
-
-Start with [the documentation index](docs/README.md), then read the
-[current implementation map](docs/14-current-implementation-map.md),
-[domain model reference](docs/15-domain-model-reference.md), and
-[deployment/security runbook](docs/16-deployment-security-and-cicd.md). The
-[system architecture](docs/01-system-architecture.md) and
-[student feature flows](docs/03-student-portal-feature-flows.md) explain the
-longer-term design. The
-[agentic runtime guide](docs/11-agentic-runtime.md) covers Edward, document
-extraction, cost controls, and the path from the local adapter to production.
-The
-[multi-tenant student portal architecture](docs/architecture/multi-tenant-student-portal.md)
-documents local path-based tenants and the verified-hostname Kubernetes target.
-
-The [release changelog](CHANGELOG.md) links detailed notes for
-[student users](docs/changelog/2026-07-31-student-experience.md) and
-[staff users](docs/changelog/2026-07-31-staff-operations.md). The
-[staff implementation and operations guide](docs/24-staff-portal-implementation-and-operations.md)
-documents routes, shared state, managed configuration, local operation, testing,
-CI/CD behavior, and production gaps.
-
-The no-Docker credential adapter is intentionally isolated from domain logic.
-The PostgreSQL migrations define the production identity boundary: a
-single-use, hashed student invitation links an already-admitted student to a
-credential account; password and session tokens are never stored in plaintext;
-email/SMS verification delivery remains provider-adapted. Replacing the local
-JSON adapter with that service or institutional OIDC does not change student
-domain ownership or frontend API contracts.
-
-## Continue this project with Codex
-
-Start with the portable [Codex continuation handoff](CODEX_RESUME.md). It
-contains the current state, verified test boundary, known next issue, and a
-paste-ready prompt for a fresh Codex task. The
-[sanitized visible session history](docs/codex-session-visible-history.md) is
-available when an earlier product decision needs more context.
-
-The native Codex task database is machine-local, so a Git clone cannot make the
-original task appear in `codex resume`. The checked-in handoff provides the
-safe repository-based continuation path without committing secrets, internal
-reasoning, local student data, or raw session records.
-
-## Deployed preview
-
-The synthetic-data preview is available at
-<https://aster.34-30-254-45.sslip.io>. It runs the production web build, the
-account-isolated preview API, and Caddy on a hardened Google Compute Engine
-`e2-micro`.
-
-The host uses IAP-only SSH, OS Login, Shielded VM Secure Boot, default-deny
-firewalls, root-owned releases, and sandboxed containers. A successful push to
-`main` runs the full CI suite and then deploys the exact Git commit through
-keyless GitHub OIDC/Google Workload Identity Federation. See the
-[runbook](docs/16-deployment-security-and-cicd.md) and
-[changelog](CHANGELOG.md).
+Public PDFs and images are intentionally included in the image context.

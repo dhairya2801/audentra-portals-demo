@@ -44,6 +44,7 @@ import {
   getStudentHousingPlan,
   updateStudentOnboarding,
 } from "../lib/api-client";
+import { getPostAcceptanceRoute } from "./offer-acceptance";
 
 const onboardingSteps: {
   key: OnboardingStep;
@@ -2180,8 +2181,13 @@ function OnboardingFlow({
     try {
       if (viewingStep === "offer" && offer.status === "offered") {
         const key = offerKey.current ?? (offerKey.current = crypto.randomUUID());
-        await acceptAdmissionOffer(offer.id, key);
+        const acceptance = await acceptAdmissionOffer(offer.id, key);
         offerKey.current = null;
+        const postAcceptanceRoute = getPostAcceptanceRoute(acceptance);
+        if (postAcceptanceRoute) {
+          window.location.replace(tenantRuntime.href(postAcceptanceRoute));
+          return;
+        }
         setOffer((current) => ({ ...current, status: "accepted" }));
       }
       if (

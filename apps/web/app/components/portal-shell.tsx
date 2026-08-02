@@ -1,9 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import type { StudentExperienceUpdate } from "@vv/contracts";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useActivityTracking } from "../hooks/use-activity-tracking";
-import { useApiResource } from "../hooks/use-api-resource";
-import { getStudentBootstrap } from "../lib/api-client";
+import { useApiAction, useApiResource } from "../hooks/use-api-resource";
+import {
+  decideStudentExperienceUpdate,
+  getStudentBootstrap,
+} from "../lib/api-client";
 import { EdwardAssistant } from "./edward-assistant";
 import { ErrorState, LoadingState, PortalMark } from "./portal-ui";
 import { TenantLink as Link } from "./tenant-link";
@@ -104,6 +108,140 @@ function bookstoreCredit(cents: number) {
   }).format(cents / 100);
 }
 
+const experienceKindLabels: Record<StudentExperienceUpdate["kind"], string> = {
+  onboarding: "Onboarding",
+  enrollment: "Enrollment",
+  academics: "Academics",
+  campus_life: "Campus life",
+};
+
+function ExperienceUpdateDialog({
+  update,
+  institutionName,
+  busy,
+  error,
+  onDecision,
+}: {
+  update: StudentExperienceUpdate;
+  institutionName: string;
+  busy: boolean;
+  error: string | null;
+  onDecision: (action: "handle_now" | "later") => Promise<void>;
+}) {
+  const dialog = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const element = dialog.current;
+    if (!element) return;
+
+    const previousFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const previousOverflow = document.body.style.overflow;
+    const backdrop = element.parentElement;
+    const shell = backdrop?.parentElement;
+    const background = shell
+      ? Array.from(shell.children).filter((child) => child !== backdrop)
+      : [];
+    const previousInert = background.map((child) => ({
+      child,
+      inert: child.hasAttribute("inert"),
+    }));
+
+    background.forEach((child) => child.setAttribute("inert", ""));
+    document.body.style.overflow = "hidden";
+    element.focus();
+
+    return () => {
+      previousInert.forEach(({ child, inert }) => {
+        if (!inert) child.removeAttribute("inert");
+      });
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [update.id]);
+
+  const trapFocus = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Tab") return;
+    const controls = Array.from(
+      dialog.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      ) ?? [],
+    );
+    if (controls.length === 0) {
+      event.preventDefault();
+      dialog.current?.focus();
+      return;
+    }
+    const first = controls[0];
+    const last = controls.at(-1);
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first?.focus();
+    }
+  };
+
+  return (
+    <div className="dialog-backdrop experience-update-backdrop">
+      <section
+        ref={dialog}
+        className="confirmation-dialog experience-update-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="experience-update-title"
+        aria-describedby="experience-update-description"
+        aria-busy={busy}
+        tabIndex={-1}
+        onKeyDown={trapFocus}
+      >
+        <span className="confirmation-dialog__symbol" aria-hidden="true">
+          !
+        </span>
+        <div className="experience-update-dialog__meta">
+          <span>{experienceKindLabels[update.kind]}</span>
+          <small>
+            {update.status === "deferred" ? "Saved reminder" : "New update"}
+          </small>
+        </div>
+        <p className="eyebrow">An update from {institutionName}</p>
+        <h2 id="experience-update-title">{update.title}</h2>
+        <p id="experience-update-description">{update.description}</p>
+        <p className="experience-update-dialog__guidance">
+          You can take care of this now or save it for the next time you open
+          your portal.
+        </p>
+        {error ? (
+          <p className="inline-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <div className="dialog-actions experience-update-dialog__actions">
+          <button
+            className="button button--secondary"
+            type="button"
+            disabled={busy}
+            onClick={() => void onDecision("later")}
+          >
+            {busy ? "Saving…" : "Remind me later"}
+          </button>
+          <button
+            className="button"
+            type="button"
+            disabled={busy}
+            onClick={() => void onDecision("handle_now")}
+          >
+            {busy ? "Opening…" : "Handle now"}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export function PortalShell({
   active,
   eyebrow,
@@ -122,13 +260,17 @@ export function PortalShell({
   const tenantRuntime = useTenant();
   const { tenant } = tenantRuntime;
   const [menuOpen, setMenuOpen] = useState(false);
+  const [experienceUpdate, setExperienceUpdate] =
+    useState<StudentExperienceUpdate | null>(null);
+  const hasPresentedExperienceUpdate = useRef(false);
   const { track } = useActivityTracking();
+  const experienceDecision = useApiAction(decideStudentExperienceUpdate);
+  const runExperienceDecision = experienceDecision.run;
   const loadBootstrap = useCallback(
     (signal: AbortSignal) => getStudentBootstrap(signal),
     [],
   );
   const identity = useApiResource(loadBootstrap);
-  const reloadIdentity = identity.reload;
   const refreshIdentity = identity.refresh;
   const needsOnboarding =
     identity.data?.onboarding.required &&
@@ -146,24 +288,56 @@ export function PortalShell({
   }, [needsOnboarding, needsSignIn, tenantRuntime]);
 
   useEffect(() => {
+    if (
+      identity.status !== "ready" ||
+      needsOnboarding ||
+      needsSignIn ||
+      hasPresentedExperienceUpdate.current
+    ) {
+      return;
+    }
+    const nextUpdate = (identity.data.experienceUpdates ?? []).find(
+      (update) => update.status === "pending" || update.status === "deferred",
+    );
+    const frame = window.requestAnimationFrame(() => {
+      if (hasPresentedExperienceUpdate.current || !nextUpdate) return;
+      hasPresentedExperienceUpdate.current = true;
+      setExperienceUpdate(nextUpdate);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [identity.data, identity.status, needsOnboarding, needsSignIn]);
+
+  const handleExperienceDecision = useCallback(
+    async (action: "handle_now" | "later") => {
+      if (!experienceUpdate) return;
+      const current = experienceUpdate;
+      let decision;
+      try {
+        decision = await runExperienceDecision(current.id, {
+          action,
+          expectedVersion: current.version,
+        });
+      } catch {
+        return;
+      }
+
+      setExperienceUpdate(null);
+      if (action === "handle_now") {
+        const destination = decision.requirementSlug
+          ? `/enrollment/requirements/${encodeURIComponent(decision.requirementSlug)}`
+          : "/enrollment";
+        window.location.assign(tenantRuntime.href(destination));
+      }
+    },
+    [experienceUpdate, runExperienceDecision, tenantRuntime],
+  );
+
+  useEffect(() => {
     track("ui.portal_section_viewed.v1", {
       section: active,
       entry_point: "portal_navigation",
     });
   }, [active, track]);
-
-  useEffect(() => {
-    const refreshStudentRecord = () => reloadIdentity();
-    window.addEventListener(
-      "vv:student-record-changed",
-      refreshStudentRecord,
-    );
-    return () =>
-      window.removeEventListener(
-        "vv:student-record-changed",
-        refreshStudentRecord,
-      );
-  }, [reloadIdentity]);
 
   useEffect(() => {
     const interval = window.setInterval(refreshIdentity, 15_000);
@@ -365,6 +539,16 @@ export function PortalShell({
         <EdwardAssistant
           studentName={identity.data.student.preferredName}
           variant="floating"
+        />
+      ) : null}
+
+      {experienceUpdate ? (
+        <ExperienceUpdateDialog
+          update={experienceUpdate}
+          institutionName={tenant.shortName}
+          busy={experienceDecision.status === "loading"}
+          error={experienceDecision.message}
+          onDecision={handleExperienceDecision}
         />
       ) : null}
     </div>

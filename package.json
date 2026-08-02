@@ -1,5 +1,5 @@
 {
-  "name": "vv-enrollment-platform",
+  "name": "audentra-portals",
   "version": "0.1.0",
   "private": true,
   "workspaces": [
@@ -11,24 +11,11 @@
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev": "npm --workspace @vv/web run dev",
     "dev:web": "npm --workspace @vv/web run dev",
-    "dev:api": "npm --workspace @vv/api run dev",
-    "dev:worker": "npm --workspace @vv/worker run dev",
-    "dev:portal": "node tools/run-student-portal.mjs",
-    "portal:start": "node tools/portal-process.mjs start",
-    "portal:stop": "node tools/portal-process.mjs stop",
-    "portal:status": "node tools/portal-process.mjs status",
-    "test:portal-lifecycle": "node --test tools/test/portal-lifecycle.test.mjs",
-    "demo:reset": "npm --prefix tools/demo-api run reset",
-    "test:demo-api": "npm --prefix tools/demo-api test",
+    "start": "npm --workspace @vv/web run start",
     "test:e2e": "playwright test",
-    "crm:graph": "npm --workspace @vv/state-effects run generate",
-    "crm:graph:check": "npm --workspace @vv/state-effects run generate:check",
-    "cgc:index": "cgc --db kuzudb --path ./tmp/codegraphcontext index .",
-    "cgc:update": "cgc --db kuzudb --path ./tmp/codegraphcontext update .",
-    "cgc:report": "cgc --db kuzudb --path ./tmp/codegraphcontext report --output ./docs/generated/codegraphcontext-report.md",
-    "db:migrate": "npm --workspace @vv/api run db:migrate",
-    "db:seed": "npm --workspace @vv/api run db:seed"
+    "test:contracts": "npm --workspace @vv/contracts run typecheck"
   },
   "engines": {
     "node": ">=22.13.0 <23"

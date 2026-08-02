@@ -15,7 +15,7 @@ flowchart LR
     Auth["🛡️ Tenant isolation<br/>SSO / OIDC · Roles · Permissions"]
   end
 
-  subgraph BE["⚙️ NestJS Application API"]
+  subgraph BE["⚙️ FastAPI Application API"]
     StudentAPI["📋 Student domain<br/>Onboarding · Requirements · Profile<br/>Appointments · Payments"]
     StaffAPI["🗂️ Staff operations<br/>Work items · Reviews · Student context"]
     ConfigAPI["🧩 Configuration service<br/>Journey YAML · Events · Catalog"]

@@ -64,6 +64,11 @@ export function useApiResource<T>(
     setRequestVersion((current) => current + 1);
   }, []);
 
+  useEffect(() => {
+    window.addEventListener("vv:student-record-changed", refresh);
+    return () => window.removeEventListener("vv:student-record-changed", refresh);
+  }, [refresh]);
+
   return { ...state, reload, refresh };
 }
 
