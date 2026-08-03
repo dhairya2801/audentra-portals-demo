@@ -1,0 +1,20 @@
+flowchart TB
+  URL["Tenant URL<br/>/aster or /harvard"] --> Tenant["TenantProvider<br/>branding + safe links"]
+  Browser["Browser signals<br/>focus · visible · online"] --> Coordinator["ServerStateProvider<br/>reconciliation revision"]
+  Mutation["Successful API mutation"] --> Event["vv:student-record-changed"]
+  Event --> Coordinator
+  Tenant --> Page["Page / feature component"]
+  Coordinator --> Resource["useApiResource"]
+  Page --> Resource
+  Resource -->|"initial read"| Loading["loading"]
+  Resource -->|"canonical response"| Ready["ready + lastUpdatedAt"]
+  Ready -->|"background refresh"| Stale["ready + isRefreshing"]
+  Stale -->|"temporary failure"| Recoverable["ready + refreshError<br/>last good data retained"]
+  Recoverable -->|"online / focus / retry"| Resource
+  Resource -->|"401 / 403"| AuthError["error<br/>protected data cleared"]
+  Resource --> Client["api-client.ts<br/>cookie + X-Tenant-Slug"]
+  Client --> API["FastAPI"]
+  API --> DB["PostgreSQL"]
+  API --> Files["Object storage"]
+  DB --> Worker["Outbox / document worker"]
+  Worker --> DB

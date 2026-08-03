@@ -341,11 +341,8 @@ export function PortalShell({
 
   useEffect(() => {
     const interval = window.setInterval(refreshIdentity, 15_000);
-    const refreshOnFocus = () => refreshIdentity();
-    window.addEventListener("focus", refreshOnFocus);
     return () => {
       window.clearInterval(interval);
-      window.removeEventListener("focus", refreshOnFocus);
     };
   }, [refreshIdentity]);
 

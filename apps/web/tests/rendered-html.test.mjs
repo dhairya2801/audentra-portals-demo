@@ -362,6 +362,14 @@ test("typed client wires every resource route and mutation contract", async () =
     );
     await client.getStudentRequirements();
     await client.getStudentRequirement("requirement/1");
+    await client.submitStudentRequirementResponse(
+      "requirement/1",
+      {
+        expectedVersion: 4,
+        response: { selectedOption: "on_campus" },
+      },
+      "requirement-response-12345678",
+    );
     await client.getStudentMessages();
     await client.markStudentMessageRead("message/1");
     await client.getStudentDocuments();
@@ -600,6 +608,7 @@ test("typed client wires every resource route and mutation contract", async () =
     "/v1/student/onboarding/complete",
     "/v1/student/requirements",
     "/v1/student/requirements/requirement%2F1",
+    "/v1/student/requirements/requirement%2F1/responses",
     "/v1/student/messages",
     "/v1/student/messages/message%2F1/read",
     "/v1/student/documents",
@@ -670,6 +679,18 @@ test("typed client wires every resource route and mutation contract", async () =
     ],
     "complete-12345678",
   );
+  const requirementResponse = requestByPath.get(
+    "/v1/student/requirements/requirement%2F1/responses",
+  );
+  assert.equal(requirementResponse.init.method, "POST");
+  assert.equal(
+    requirementResponse.init.headers["Idempotency-Key"],
+    "requirement-response-12345678",
+  );
+  assert.deepEqual(JSON.parse(requirementResponse.init.body), {
+    expectedVersion: 4,
+    response: { selectedOption: "on_campus" },
+  });
   assert.equal(
     requestByPath.get("/v1/student/documents").init.headers["Idempotency-Key"],
     "document-12345678",
@@ -856,6 +877,49 @@ test("onboarding preserves the eight-step order and authoritative boundary actio
     null,
     "older success responses must retain the configured onboarding flow",
   );
+});
+
+test("coordinates recoverable server state and generates the dashboard brief", async () => {
+  const [
+    dashboard,
+    brief,
+    resourceHook,
+    coordinator,
+    requirementPage,
+    uploader,
+  ] = await Promise.all([
+    readFile(new URL("../app/student-dashboard.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/components/dashboard-edward-brief.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/hooks/use-api-resource.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/components/server-state-provider.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/enrollment/requirements/[slug]/page.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/components/document-upload.tsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(dashboard, /DashboardEdwardBrief/);
+  assert.doesNotMatch(dashboard, /Your enrollment is moving/);
+  assert.match(brief, /askEdward/);
+  assert.match(brief, /Preparing your latest insights/);
+  assert.match(brief, /Retry brief/);
+  assert.match(brief, /refreshError/);
+  assert.match(resourceHook, /current\.data === null \|\| authenticationFailure/);
+  assert.match(resourceHook, /status: "ready"[\s\S]*refreshError: message/);
+  assert.match(coordinator, /vv:student-record-changed/);
+  assert.match(coordinator, /connection_restored/);
+  assert.match(coordinator, /visibilitychange/);
+  assert.match(requirementPage, /Check now/);
+  assert.match(requirementPage, /15_000/);
+  assert.match(uploader, /retry automatically/);
+  assert.match(uploader, /15_000/);
 });
 
 test("DSM feedback surfaces remain connected to portal data and safe fallbacks", async () => {
@@ -1056,6 +1120,302 @@ test("experience updates open once with an accessible decision flow", async () =
   assert.match(shell, /window\.location\.assign\(tenantRuntime\.href\(destination\)\)/);
   assert.match(styles, /\.experience-update-dialog/);
   assert.match(styles, /\.experience-update-dialog__actions/);
+});
+
+test("staff journeys share a typed, accessible flow builder", async () => {
+  const [builder, formBuilder, onboarding, modelSource, staffPortal, contracts, styles] = await Promise.all([
+    readFile(
+      new URL("../app/staff/journey-flow-builder.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/staff/onboarding-form-builder.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/onboarding/page.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/staff/journey-flow-model.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/staff/staff-portal.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../../../packages/contracts/src/index.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(staffPortal, /<JourneyFlowBuilder/);
+  assert.match(staffPortal, /kind=\{kind\}/);
+  assert.match(staffPortal, /Published changes stay versioned/);
+  assert.doesNotMatch(staffPortal, /New journeys use the new version/);
+
+  assert.match(builder, /draggable=\{!busy && !item\.studentStep\}/);
+  assert.match(builder, /dataTransfer\.setData\("text\/plain", item\.id\)/);
+  assert.match(builder, /Move \$\{item\.title\} up/);
+  assert.match(builder, /Move \$\{item\.title\} down/);
+  assert.match(builder, /role="switch"/);
+  assert.match(builder, /aria-checked=\{item\.active\}/);
+  assert.match(builder, />\s*Add step\s*</);
+  assert.match(builder, /createJourneyTaskId\(kind, ids\)/);
+  assert.match(builder, /createJourneyFlowId\(/);
+  assert.match(builder, /noCompatMode: false/);
+  assert.match(builder, /workingConfigurationRef = useRef\(configuration\)/);
+  assert.match(
+    builder,
+    /expectedVersion: workingConfigurationRef\.current\.version/,
+  );
+  assert.match(builder, /workingConfigurationRef\.current = updatedConfiguration/);
+  assert.match(builder, /setWorkingConfiguration\(updatedConfiguration\)/);
+  assert.match(builder, /setTasks\(parsedTasks\(updatedConfiguration, kind\)\)/);
+  assert.match(builder, /configuration=\{workingConfiguration\}/);
+  assert.match(builder, /Confirm delete/);
+  assert.match(builder, /task\.active = nextActive/);
+  assert.match(builder, /className=\"staff-editor-backdrop\"/);
+  assert.match(builder, /Built-in onboarding screen/);
+  assert.match(builder, /Journey list label/);
+  assert.match(builder, /Student page section label/);
+  assert.match(builder, /Student page heading/);
+  assert.match(builder, /Student page introduction/);
+  assert.match(builder, /ResponsibleOfficeSelect/);
+  assert.match(builder, /Required system screen/);
+  assert.match(builder, /identity_quick_upload/);
+  assert.match(builder, /This preview and the student page read the same published configuration/);
+  assert.match(builder, /item\.kind === "onboarding" && Boolean\(item\.studentStep\)/);
+  assert.match(builder, /item\.studentStep \? "Edit screen" : "Edit step"/);
+  assert.match(builder, /disabled=\{busy \|\| Boolean\(item\.studentStep\)\}/);
+  assert.match(builder, /Synced to the student checklist/);
+  assert.match(builder, /Edit synced item/);
+  assert.match(builder, /flow\.status !== "published"/);
+  assert.match(
+    builder,
+    /candidate\.kind === kind && candidate\.status === "published"/,
+  );
+
+  for (const type of [
+    "approval",
+    "form",
+    "single_select",
+    "multiple_select",
+    "upload_file",
+    "signature",
+    "payment",
+  ]) {
+    assert.match(builder, new RegExp(`value: "${type}"`));
+  }
+  assert.match(builder, /submission_type: submissionTypeForTask\(selectedType\)/);
+  assert.match(builder, /name="options"/);
+  assert.match(builder, /Selection steps need at least two options/);
+  assert.match(builder, /validateFormFields\(formFields\)/);
+  assert.match(builder, /name="maximumSelections"/);
+  assert.match(builder, /name="acceptedFileTypes"/);
+  assert.match(builder, /name="documentCategories"/);
+  assert.match(builder, /task\.docusign_template_id = templateId/);
+  assert.match(builder, /task\.accepted_mime_types = acceptedMimeTypes/);
+  assert.match(builder, /task\.signature_template_id/);
+  assert.match(builder, /task\.accepted_file_types/);
+  assert.match(builder, /mimeType\.includes\("\/"\)/);
+  assert.match(builder, /DocuSign \(configuration only\)/);
+  assert.match(builder, /live DocuSign connection must be configured separately/i);
+  assert.match(
+    builder,
+    /selectedType === "payment" && item\.id !== "enrollment_deposit"/,
+  );
+  assert.match(
+    builder,
+    /option\.value === "payment" && item\.id !== "enrollment_deposit"/,
+  );
+  assert.match(builder, /Payment \(built-in enrollment deposit only\)/);
+  assert.match(builder, /id: "response"/);
+  assert.match(builder, /title: "Your response"/);
+  assert.match(builder, /field_type: "text"/);
+  assert.match(builder, /specializedForm = \["profile_verification", "housing_preference"\]/);
+  assert.match(builder, /selectedType !== "form"[\s\S]{0,80}delete existingInput\.fields/);
+  assert.match(builder, /remove its configured form/);
+  assert.match(formBuilder, /aria-label="Student form builder"/);
+  assert.match(formBuilder, /Live student preview/);
+  assert.match(formBuilder, /New field type/);
+  assert.match(formBuilder, /disabled: true/);
+  assert.doesNotMatch(formBuilder, /required: field\.required/);
+  assert.match(formBuilder, /dataTransfer\.setData\("text\/plain", field\.id\)/);
+  assert.match(onboarding, /ConfiguredAboutYouFields/);
+  assert.match(onboarding, /custom__\$\{field\.id\}/);
+  assert.match(onboarding, /label: configured\?\.label \|\| candidate\.label/);
+  assert.match(staffPortal, /staff-event-image-dropzone/);
+  assert.match(staffPortal, /onDrop=\{dropImage\}/);
+  assert.match(staffPortal, /maximum 5 MB/);
+  for (const alias of [
+    "maximumSelections",
+    "signatureProvider",
+    "docusignTemplateId",
+    "signatureTemplateId",
+    "acceptedMimeTypes",
+    "acceptedFileTypes",
+    "documentCategories",
+  ]) {
+    assert.match(builder, new RegExp(`delete existingInput\\[key\\]`));
+    assert.ok(builder.includes(`"${alias}"`), `${alias} must be scrubbed from task.input`);
+  }
+  assert.match(contracts, /active\?: boolean/);
+  assert.match(
+    contracts,
+    /submissionType: "form" \| "document" \| "payment" \| "appointment" \| "none"/,
+  );
+  assert.match(styles, /\.staff-journey-list li\.is-inactive/);
+  assert.match(styles, /\.staff-journey-list li\.is-drop-target/);
+  assert.match(styles, /\.staff-form-builder__workspace/);
+  assert.match(styles, /\.staff-event-image-dropzone\.is-dragging/);
+
+  const compiledModel = ts.transpileModule(modelSource, {
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const modelUrl = `data:text/javascript;base64,${Buffer.from(compiledModel).toString("base64")}`;
+  const model = await import(modelUrl);
+
+  assert.equal(model.submissionTypeForTask("approval"), "form");
+  assert.equal(model.submissionTypeForTask("single_select"), "form");
+  assert.equal(model.submissionTypeForTask("multiple_select"), "form");
+  assert.equal(model.submissionTypeForTask("upload_file"), "document");
+  assert.equal(model.submissionTypeForTask("signature"), "form");
+  assert.equal(model.submissionTypeForTask("payment"), "payment");
+  assert.deepEqual(model.moveJourneyTask(["a", "b", "c"], "b", "up"), [
+    "b",
+    "a",
+    "c",
+  ]);
+  assert.deepEqual(model.dropJourneyTask(["a", "b", "c"], "a", "c"), [
+    "b",
+    "c",
+    "a",
+  ]);
+
+  const generatedId = model.createJourneyTaskId(
+    "onboarding",
+    new Set(["new_onboarding_step_aaaaaaaaaaaa"]),
+    (() => {
+      const values = [
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      ];
+      return () => values.shift();
+    })(),
+  );
+  assert.equal(generatedId, "new_onboarding_step_bbbbbbbbbbbb");
+  assert.match(generatedId, /^[a-z][a-z0-9_]*$/);
+  assert.equal(
+    model.createJourneyFlowId("onboarding", new Set(["onboarding_flow"])),
+    "onboarding_flow_2",
+  );
+});
+
+test("generic requirement interactions submit typed, idempotent responses", async () => {
+  const [action, responseModelSource, requirementPage, client, contracts, styles] = await Promise.all([
+    readFile(
+      new URL("../app/components/requirement-response-action.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/components/requirement-response-model.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/enrollment/requirements/[slug]/page.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../../../packages/contracts/src/index.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(client, /requirements\/\$\{encodeURIComponent\(requirementId\)\}\/responses/);
+  assert.match(client, /request<SubmitStudentRequirementResponseResult>/);
+  assert.match(action, /expectedVersion: requirement\.version/);
+  assert.match(action, /Idempotency|idempotencyKey/);
+  assert.match(action, /idempotencyKeyRef = useRef/);
+  assert.match(action, /submissionInFlightRef\.current/);
+  assert.match(action, /idempotencyKeyRef\.current = intentKey/);
+  assert.match(action, /\{ acknowledged: true \}/);
+  assert.match(action, /\{ approved: true \}/);
+  assert.match(action, /\{ values \}/);
+  assert.match(action, /\{ selectedOption \}/);
+  assert.match(action, /\{ selectedOptions \}/);
+  assert.match(action, /signerName/);
+  assert.match(action, /signatureMethod/);
+  assert.match(action, /\{ appointmentId \}/);
+  assert.match(action, /getStudentAppointments/);
+  assert.doesNotMatch(action, /Paste.*appointment|appointment UUID/i);
+  assert.match(action, /live\s+connection is not configured yet/);
+  assert.match(action, /visibleConfiguredFields\(fields, currentValues\)/);
+  assert.match(action, /valuesFromForm\([\s\S]{0,100}visibleFields/);
+  assert.match(action, /visibleFields\.map/);
+  assert.match(requirementPage, /<RequirementResponseAction/);
+  assert.match(
+    requirementPage,
+    /requirement\.code === "profile_verification"[\s\S]{0,100}kind === "profile"[\s\S]{0,100}requirement\.interactionType === "form"/,
+  );
+  assert.match(
+    requirementPage,
+    /requirement\.code === "housing_preference"[\s\S]{0,100}kind === "housing"[\s\S]{0,120}\["form", "selection_flow"\]\.includes\(requirement\.interactionType\)/,
+  );
+  assert.match(
+    requirementPage,
+    /requirement\.submissionType === "document"[\s\S]{0,120}requirement\.interactionType === "upload_file"/,
+  );
+  assert.match(
+    requirementPage,
+    /requirement\.code === "enrollment_deposit"[\s\S]{0,100}kind === "payment"[\s\S]{0,100}requirement\.interactionType === "payment"/,
+  );
+  assert.match(contracts, /type StudentRequirementInteractionType/);
+  assert.match(contracts, /interface SubmitStudentRequirementResponseInput/);
+  assert.match(contracts, /interface StudentRequirementResponseRecord/);
+  assert.match(styles, /\.requirement-response-card/);
+
+  const compiledResponseModel = ts.transpileModule(responseModelSource, {
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const responseModelUrl = `data:text/javascript;base64,${Buffer.from(compiledResponseModel).toString("base64")}`;
+  const responseModel = await import(responseModelUrl);
+  const conditionalFields = [
+    {
+      id: "choice",
+      title: "Choice",
+      field_type: "single_select",
+      required: true,
+      options: ["yes", "no"],
+    },
+    {
+      id: "details",
+      title: "Details",
+      field_type: "text",
+      required: true,
+      when: { field: "choice", equals: "yes" },
+    },
+  ];
+  assert.deepEqual(
+    responseModel.visibleConfiguredFields(conditionalFields, {}).map((field) => field.id),
+    ["choice"],
+  );
+  assert.deepEqual(
+    responseModel
+      .visibleConfiguredFields(conditionalFields, { choice: "no", details: "stale" })
+      .map((field) => field.id),
+    ["choice"],
+  );
+  assert.deepEqual(
+    responseModel
+      .visibleConfiguredFields(conditionalFields, { choice: "yes" })
+      .map((field) => field.id),
+    ["choice", "details"],
+  );
 });
 
 test("the web command wrapper forwards isolated host and port arguments", async () => {

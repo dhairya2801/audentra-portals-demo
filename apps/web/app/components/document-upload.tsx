@@ -8,7 +8,6 @@ import { documentProcessingModeForCategory } from "@vv/contracts";
 import {
   type ChangeEvent,
   type DragEvent,
-  type FormEvent,
   useEffect,
   useMemo,
   useRef,
@@ -119,8 +118,12 @@ export function DocumentUpload({
     : "manual_review";
   const parsingEnabled = processingMode !== "manual_review";
   const classificationOnly = processingMode === "classification_only";
+  const reconciledActiveDocument = activeDocument
+    ? documents.find((item) => item.document?.id === activeDocument.id)?.document ??
+      activeDocument
+    : activeDocument;
   const serverProcessing =
-    activeDocument?.extraction?.status === "processing";
+    reconciledActiveDocument?.extraction?.status === "processing";
   useEffect(() => {
     onUploadedRef.current = onUploaded;
   }, [onUploaded]);
@@ -166,7 +169,7 @@ export function DocumentUpload({
       .split(",")
       .map((entry) => Date.parse(entry.slice(entry.indexOf(":") + 1)))
       .filter(Number.isFinite);
-    const stopPollingAt =
+    const expectedCompletionAt =
       deadlines.length > 0
         ? Math.max(...deadlines) + 10_000
         : Date.now() + 100_000;
@@ -211,17 +214,27 @@ export function DocumentUpload({
                 ? `${acceptedCount} document${acceptedCount === 1 ? "" : "s"} ${completedVerb}; ${attentionCount} stored document${attentionCount === 1 ? " needs" : "s need"} attention.`
                 : `${acceptedCount} document${acceptedCount === 1 ? "" : "s"} ${completedVerb} and ready for your review.`,
             );
-          } else if (stillProcessing && Date.now() < stopPollingAt) {
-            void poll();
           } else if (stillProcessing) {
-            setBundleMessage(
-              "The original is safely stored, but parsing is taking longer than expected. You can leave this page and return later.",
-            );
+            if (Date.now() >= expectedCompletionAt) {
+              setBundleMessage(
+                "The original is safely stored. Parsing is taking longer than expected, so this page will keep checking in the background.",
+              );
+            }
+            void poll();
+          } else if (changed.length === 0) {
+            // The upload response is authoritative, but a temporarily stale list
+            // projection must not terminate reconciliation.
+            void poll();
           }
         } catch {
-          if (!cancelled && Date.now() < stopPollingAt) void poll();
+          if (!cancelled) {
+            setBundleMessage(
+              "The connection was interrupted. Your original is safely stored and this page will retry automatically.",
+            );
+            void poll();
+          }
         }
-      }, Math.min(5_000, 1_000 + attempts * 500));
+      }, Date.now() >= expectedCompletionAt ? 15_000 : Math.min(5_000, 1_000 + attempts * 500));
     };
 
     void poll();
@@ -310,8 +323,7 @@ export function DocumentUpload({
     );
   };
 
-  const submitDocument = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const submitDocument = async () => {
     if (serverProcessing) {
       setBundleMessage(
         `${activeDocument?.fileName ?? "The current document"} is still being parsed. Another upload will be available when this attempt finishes or fails.`,
@@ -417,9 +429,8 @@ export function DocumentUpload({
   };
 
   return (
-    <form
+    <div
       className="document-dropzone"
-      onSubmit={submitDocument}
     >
       <label
         onDragEnter={(event) => {
@@ -460,7 +471,7 @@ export function DocumentUpload({
       </label>
       {serverProcessing ? (
         <p className="action-feedback" role="status">
-          <strong>{activeDocument?.fileName ?? "Your document"}</strong> is
+          <strong>{reconciledActiveDocument?.fileName ?? "Your document"}</strong> is
           safely stored and still being parsed. You can leave this page and
           return; another upload stays locked until this attempt finishes or
           fails.
@@ -527,7 +538,8 @@ export function DocumentUpload({
       ) : null}
       <button
         className="button button--accent"
-        type="submit"
+        type="button"
+        onClick={() => void submitDocument()}
         disabled={
           isUploading ||
           serverProcessing ||
@@ -562,7 +574,7 @@ export function DocumentUpload({
               ? "document-type check only; no financial-field extraction"
             : "direct staff review"}
       </p>
-    </form>
+    </div>
   );
 }
 

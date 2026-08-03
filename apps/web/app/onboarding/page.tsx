@@ -1,19 +1,24 @@
 "use client";
 
 import type {
+  AboutYouConfigurableField,
   AdmissionOfferSummary,
   CampusLifeFeed,
   OnboardingEmergencyContact,
   OnboardingFamilyPermission,
   OnboardingStep,
   StudentDashboard,
+  StudentDocument,
   StudentOnboarding,
   StudentOnboardingData,
+  StudentOnboardingScreenConfiguration,
   StudentPaymentList,
   StudentProfile,
   StudentHousingPlan,
+  StudentRequirementInputField,
   UpdateStudentOnboardingInput,
 } from "@vv/contracts";
+import { DocumentUpload } from "../components/document-upload";
 import { TenantLink as Link } from "../components/tenant-link";
 import {
   type FormEvent,
@@ -173,6 +178,13 @@ function editableOnboardingData(data: StudentOnboardingData) {
   return editableData;
 }
 
+function realProfileName(value: string | null | undefined, placeholder: string) {
+  const normalized = value?.trim();
+  return normalized && normalized.toLowerCase() !== placeholder.toLowerCase()
+    ? normalized
+    : undefined;
+}
+
 type OnboardingPageData = {
   onboarding: StudentOnboarding;
   dashboard: StudentDashboard;
@@ -191,12 +203,14 @@ function formatMoney(cents: number) {
 }
 
 function OnboardingProgress({
+  steps,
   current,
   active,
   completed,
   skipped,
   onNavigate,
 }: {
+  steps: typeof onboardingSteps;
   current: OnboardingStep;
   active: OnboardingStep;
   completed: OnboardingStep[];
@@ -204,7 +218,7 @@ function OnboardingProgress({
   onNavigate: (step: OnboardingStep) => void;
 }) {
   const { tenant } = useTenant();
-  const activeIndex = onboardingSteps.findIndex((step) => step.key === active);
+  const activeIndex = steps.findIndex((step) => step.key === active);
 
   return (
     <aside className="onboarding-progress" aria-label="Onboarding progress">
@@ -218,10 +232,10 @@ function OnboardingProgress({
       <div className="onboarding-progress__heading">
         <p className="eyebrow">Getting started</p>
         <h2>Your path to {tenant.shortName}</h2>
-        <p>{completed.length} of {onboardingSteps.length} steps saved</p>
+        <p>{completed.length} of {steps.length} steps saved</p>
       </div>
       <ol>
-        {onboardingSteps.map((step, index) => {
+        {steps.map((step, index) => {
           const isComplete = completed.includes(step.key);
           const isCurrent = step.key === current;
           const wasSkipped = skipped.includes(step.key);
@@ -1567,6 +1581,138 @@ function ReviewAndSignFields({ data }: { data: StudentOnboardingData }) {
   );
 }
 
+const aboutYouInputNames: Record<string, keyof StudentOnboardingData> = {
+  first_name: "firstName",
+  last_name: "lastName",
+  preferred_name: "preferredName",
+  personal_email: "personalEmail",
+  mobile_phone: "mobilePhone",
+  citizenship_status: "citizenshipStatus",
+  street_address: "streetAddress",
+  city: "city",
+  state_or_province: "stateOrProvince",
+  postal_code: "postalCode",
+  country: "country",
+  residency_verification_path: "residencyVerificationPath",
+};
+
+const configuredChoiceValues: Record<string, Record<string, string>> = {
+  citizenship_status: {
+    "U.S. citizen": "us_citizen",
+    "U.S. permanent resident": "permanent_resident",
+    "Other eligible noncitizen / status": "eligible_noncitizen",
+    "International student · F-1 or J-1": "international",
+  },
+  residency_verification_path: {
+    "Review my permanent address": "home_address_review",
+    "I will provide supporting documents": "document_upload",
+    "I need an advisor review": "advisor_review",
+  },
+};
+
+function configuredFieldName(field: StudentRequirementInputField) {
+  return aboutYouInputNames[field.id] ?? `custom__${field.id}`;
+}
+
+function configuredFieldValue(
+  field: StudentRequirementInputField,
+  data: StudentOnboardingData,
+) {
+  const coreName = aboutYouInputNames[field.id];
+  return coreName ? data[coreName] : data.customFields?.[field.id];
+}
+
+function optionValue(field: StudentRequirementInputField, option: string) {
+  return configuredChoiceValues[field.id]?.[option] ?? option;
+}
+
+function ConfiguredAboutYouFields({
+  fields,
+  data,
+}: {
+  fields: StudentRequirementInputField[];
+  data: StudentOnboardingData;
+}) {
+  return (
+    <fieldset className="form-section">
+      <legend>Your information</legend>
+      <p>Review the fields configured by your university before continuing.</p>
+      <div className="form-grid">
+        {fields.map((field) => {
+          const name = configuredFieldName(field);
+          const current = configuredFieldValue(field, data);
+          if (field.field_type === "checkbox") {
+            return (
+              <label className="confirmation-check" key={field.id}>
+                <input
+                  name={name}
+                  type="checkbox"
+                  value="yes"
+                  defaultChecked={current === true}
+                  required={field.required}
+                />
+                <span><strong>{field.title}</strong></span>
+              </label>
+            );
+          }
+          if (field.field_type === "multiple_select") {
+            const selected = Array.isArray(current) ? current.map(String) : [];
+            return (
+              <fieldset className="field configured-multiple-choice" key={field.id}>
+                <legend>{field.title}{field.required ? " *" : ""}</legend>
+                {(field.options ?? []).map((option, index) => {
+                  const value = optionValue(field, option);
+                  return (
+                    <label key={option}>
+                      <input
+                        name={name}
+                        type="checkbox"
+                        value={value}
+                        defaultChecked={selected.includes(value)}
+                        required={field.required && index === 0 && selected.length === 0}
+                      />
+                      {option}
+                    </label>
+                  );
+                })}
+              </fieldset>
+            );
+          }
+          if (field.field_type === "single_select") {
+            return (
+              <label className="field" key={field.id}>
+                <span>{field.title}</span>
+                <select
+                  name={name}
+                  defaultValue={typeof current === "string" ? current : ""}
+                  required={field.required}
+                >
+                  <option value="" disabled>Choose one</option>
+                  {(field.options ?? []).map((option) => (
+                    <option key={option} value={optionValue(field, option)}>{option}</option>
+                  ))}
+                </select>
+              </label>
+            );
+          }
+          return (
+            <label className="field" key={field.id}>
+              <span>{field.title}</span>
+              <input
+                name={name}
+                type={field.field_type === "phone" ? "tel" : field.field_type}
+                defaultValue={typeof current === "string" ? current : ""}
+                required={field.required}
+                maxLength={field.field_type === "email" ? 254 : 180}
+              />
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
 function StepFields({
   step,
   data,
@@ -1574,6 +1720,7 @@ function StepFields({
   depositPaid,
   housingPlan,
   campusLife,
+  screenConfiguration,
 }: {
   step: OnboardingStep;
   data: StudentOnboardingData;
@@ -1581,8 +1728,68 @@ function StepFields({
   depositPaid: boolean;
   housingPlan: StudentHousingPlan;
   campusLife: CampusLifeFeed;
+  screenConfiguration?: StudentOnboardingScreenConfiguration;
 }) {
   const { tenant } = useTenant();
+  const aboutYouRoot = useRef<HTMLDivElement>(null);
+  const [identityPrefillMessage, setIdentityPrefillMessage] = useState<string | null>(null);
+  const requiredFields = new Set<AboutYouConfigurableField>(
+    screenConfiguration?.requiredFields ?? [
+      "firstName",
+      "lastName",
+      "preferredName",
+      "personalEmail",
+      "mobilePhone",
+      "citizenshipStatus",
+    ],
+  );
+  const fieldRequired = (field: AboutYouConfigurableField) => requiredFields.has(field);
+  const prefillIdentity = useCallback((document: StudentDocument) => {
+    const extraction = document.extraction;
+    if (extraction?.status === "processing") {
+      setIdentityPrefillMessage("Your ID is uploaded. We will prefill available details when parsing finishes.");
+      return;
+    }
+    if (extraction?.status !== "completed" || extraction.documentType !== "identity") {
+      setIdentityPrefillMessage(
+        "Your ID is safely stored. Enter any missing details manually while staff review continues.",
+      );
+      return;
+    }
+    const values = new Map(
+      extraction.fields.map((field) => [field.key, String(field.value ?? "").trim()]),
+    );
+    const fullName = extraction.studentName?.trim() ?? "";
+    const nameParts = fullName.split(/\s+/).filter(Boolean);
+    const inferredFirst = values.get("first_name") || nameParts[0] || "";
+    const inferredLast =
+      values.get("last_name") || (nameParts.length > 1 ? nameParts.slice(1).join(" ") : "");
+    const candidates: Record<string, string> = {
+      firstName: inferredFirst,
+      lastName: inferredLast,
+      preferredName: values.get("preferred_name") || inferredFirst,
+      mobilePhone: values.get("mobile_phone") || "",
+      streetAddress: values.get("street_address") || "",
+      city: values.get("city") || "",
+      stateOrProvince: values.get("state_or_province") || "",
+      postalCode: values.get("postal_code") || "",
+      country: values.get("country") || "",
+    };
+    let filled = 0;
+    for (const [name, value] of Object.entries(candidates)) {
+      const input = aboutYouRoot.current?.querySelector<HTMLInputElement>(`[name="${name}"]`);
+      if (input && !input.value.trim() && value) {
+        input.value = value;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        filled += 1;
+      }
+    }
+    setIdentityPrefillMessage(
+      filled > 0
+        ? `${filled} field${filled === 1 ? " was" : "s were"} prefilled from your ID. Please review before continuing.`
+        : "Your ID was parsed. Review the details below and fill any fields that remain empty.",
+    );
+  }, []);
   switch (step) {
     case "offer":
       return (
@@ -1630,7 +1837,34 @@ function StepFields({
       );
     case "about_you":
       return (
-        <>
+        <div className="onboarding-about-you" ref={aboutYouRoot}>
+          {screenConfiguration?.identityQuickUpload !== false ? (
+            <section className="form-section onboarding-id-prefill" aria-labelledby="identity-prefill-title">
+              <div>
+                <p className="eyebrow">Quick fill · optional</p>
+                <h2 id="identity-prefill-title">Use an ID to fill identity details</h2>
+                <p>
+                  Upload a passport, national ID, or driver&apos;s license. We fill only
+                  details the parser can read, and you review every value before saving.
+                </p>
+              </div>
+              <DocumentUpload
+                categoryHint="identity"
+                expectedLabel="an ID image or PDF"
+                onUploaded={prefillIdentity}
+              />
+              {identityPrefillMessage ? (
+                <p className="action-feedback" role="status">{identityPrefillMessage}</p>
+              ) : null}
+            </section>
+          ) : null}
+          {screenConfiguration?.fields?.length ? (
+            <ConfiguredAboutYouFields
+              fields={screenConfiguration.fields}
+              data={data}
+            />
+          ) : (
+            <>
           <fieldset className="form-section">
             <legend>We know a lot already. Make sure it still feels like you.</legend>
             <p>
@@ -1642,7 +1876,7 @@ function StepFields({
                 <span>Legal first name</span>
                 <input
                   name="firstName"
-                  required
+                  required={fieldRequired("firstName")}
                   maxLength={120}
                   autoComplete="given-name"
                   defaultValue={data.firstName ?? ""}
@@ -1652,7 +1886,7 @@ function StepFields({
                 <span>Legal last name</span>
                 <input
                   name="lastName"
-                  required
+                  required={fieldRequired("lastName")}
                   maxLength={120}
                   autoComplete="family-name"
                   defaultValue={data.lastName ?? ""}
@@ -1662,7 +1896,7 @@ function StepFields({
                 <span>What should we call you?</span>
                 <input
                   name="preferredName"
-                  required
+                  required={fieldRequired("preferredName")}
                   maxLength={120}
                   autoComplete="nickname"
                   defaultValue={data.preferredName ?? ""}
@@ -1673,7 +1907,7 @@ function StepFields({
                 <input
                   name="personalEmail"
                   type="email"
-                  required
+                  required={fieldRequired("personalEmail")}
                   maxLength={254}
                   autoComplete="email"
                   defaultValue={data.personalEmail ?? ""}
@@ -1684,7 +1918,7 @@ function StepFields({
                 <input
                   name="mobilePhone"
                   type="tel"
-                  required
+                  required={fieldRequired("mobilePhone")}
                   maxLength={32}
                   autoComplete="tel"
                   inputMode="tel"
@@ -1697,7 +1931,7 @@ function StepFields({
                 <select
                   name="citizenshipStatus"
                   defaultValue={data.citizenshipStatus ?? ""}
-                  required
+                  required={fieldRequired("citizenshipStatus")}
                 >
                   <option value="" disabled>Choose one</option>
                   <option value="us_citizen">U.S. citizen</option>
@@ -1709,7 +1943,16 @@ function StepFields({
             </div>
           </fieldset>
           <fieldset className="form-section">
-            <legend>Your permanent home address</legend>
+            <legend>
+              Your permanent home address
+              {!([
+                "streetAddress",
+                "city",
+                "stateOrProvince",
+                "postalCode",
+                "country",
+              ] as AboutYouConfigurableField[]).some(fieldRequired) ? " · optional" : ""}
+            </legend>
             <p>
               This helps {tenant.shortName} prepare your initial tuition
               classification.
@@ -1724,7 +1967,7 @@ function StepFields({
                   defaultValue={data.streetAddress ?? ""}
                   autoComplete="street-address"
                   maxLength={180}
-                  required
+                  required={fieldRequired("streetAddress")}
                 />
               </label>
               <label className="field">
@@ -1742,7 +1985,7 @@ function StepFields({
                   defaultValue={data.city ?? ""}
                   autoComplete="address-level2"
                   maxLength={120}
-                  required
+                  required={fieldRequired("city")}
                 />
               </label>
               <label className="field">
@@ -1752,7 +1995,7 @@ function StepFields({
                   defaultValue={data.stateOrProvince ?? ""}
                   autoComplete="address-level1"
                   maxLength={120}
-                  required
+                  required={fieldRequired("stateOrProvince")}
                 />
               </label>
               <label className="field">
@@ -1762,7 +2005,7 @@ function StepFields({
                   defaultValue={data.postalCode ?? ""}
                   autoComplete="postal-code"
                   maxLength={32}
-                  required
+                  required={fieldRequired("postalCode")}
                 />
               </label>
               <label className="field">
@@ -1771,7 +2014,7 @@ function StepFields({
                   name="country"
                   defaultValue={data.country ?? ""}
                   autoComplete="country-name"
-                  required
+                  required={fieldRequired("country")}
                 >
                   <option value="" disabled>Choose one</option>
                   <option value="United States">United States</option>
@@ -1787,7 +2030,10 @@ function StepFields({
             </div>
           </fieldset>
           <fieldset className="form-section">
-            <legend>How should residency be verified?</legend>
+            <legend>
+              How should residency be verified?
+              {!fieldRequired("residencyVerificationPath") ? " · optional" : ""}
+            </legend>
             <p>
               Choose the review path that fits your situation. A selection
               starts review but does not determine residency by itself.
@@ -1817,13 +2063,15 @@ function StepFields({
                   label={label}
                   description={description}
                   defaultChecked={data.residencyVerificationPath === value}
-                  required
+                  required={fieldRequired("residencyVerificationPath")}
                   key={value}
                 />
               ))}
             </div>
           </fieldset>
-        </>
+            </>
+          )}
+        </div>
       );
     case "housing":
       return (
@@ -1915,6 +2163,7 @@ function dataFromForm(
   step: OnboardingStep,
   form: HTMLFormElement,
   current: StudentOnboardingData,
+  screenConfiguration?: StudentOnboardingScreenConfiguration,
 ): StudentOnboardingData {
   const values = new FormData(form);
   const next = { ...current };
@@ -1924,33 +2173,64 @@ function dataFromForm(
       return next;
     case "about_you":
       {
-        const citizenshipStatus = values.get(
-          "citizenshipStatus",
-        ) as StudentOnboardingData["citizenshipStatus"];
+        const citizenshipStatus = values.has("citizenshipStatus")
+          ? (values.get("citizenshipStatus") as StudentOnboardingData["citizenshipStatus"])
+          : next.citizenshipStatus;
+        const customFields = { ...next.customFields };
+        for (const field of screenConfiguration?.fields ?? []) {
+          if (aboutYouInputNames[field.id]) continue;
+          const name = `custom__${field.id}`;
+          customFields[field.id] =
+            field.field_type === "multiple_select"
+              ? values.getAll(name).map(String)
+              : field.field_type === "checkbox"
+                ? values.get(name) === "yes"
+                : String(values.get(name) ?? "").trim();
+        }
       return {
         ...next,
-        firstName: String(values.get("firstName") ?? "").trim(),
-        lastName: String(values.get("lastName") ?? "").trim(),
-        preferredName: String(values.get("preferredName") ?? "").trim(),
-        personalEmail: String(values.get("personalEmail") ?? "")
-          .trim()
-          .toLowerCase(),
-        mobilePhone: normalizedPhone(values, "mobilePhone"),
+        firstName: values.has("firstName")
+          ? String(values.get("firstName") ?? "").trim()
+          : next.firstName,
+        lastName: values.has("lastName")
+          ? String(values.get("lastName") ?? "").trim()
+          : next.lastName,
+        preferredName: values.has("preferredName")
+          ? String(values.get("preferredName") ?? "").trim()
+          : next.preferredName,
+        personalEmail: values.has("personalEmail")
+          ? String(values.get("personalEmail") ?? "").trim().toLowerCase()
+          : next.personalEmail,
+        mobilePhone: values.has("mobilePhone")
+          ? normalizedPhone(values, "mobilePhone")
+          : next.mobilePhone,
         citizenshipStatus,
         communicationPreference: next.communicationPreference ?? "email",
-        residencyStatus:
-          citizenshipStatus === "international"
+        residencyStatus: values.has("citizenshipStatus")
+          ? citizenshipStatus === "international"
             ? "international"
-            : "domestic",
-        residencyVerificationPath: values.get(
-          "residencyVerificationPath",
-        ) as StudentOnboardingData["residencyVerificationPath"],
-        streetAddress: String(values.get("streetAddress") ?? "").trim(),
-        addressLine2: optionalFormString(values, "addressLine2"),
-        city: String(values.get("city") ?? "").trim(),
-        stateOrProvince: String(values.get("stateOrProvince") ?? "").trim(),
-        postalCode: String(values.get("postalCode") ?? "").trim(),
-        country: String(values.get("country") ?? "").trim(),
+            : "domestic"
+          : next.residencyStatus,
+        residencyVerificationPath: values.has("residencyVerificationPath")
+          ? (optionalFormString(values, "residencyVerificationPath") as StudentOnboardingData["residencyVerificationPath"])
+          : next.residencyVerificationPath,
+        streetAddress: values.has("streetAddress")
+          ? optionalFormString(values, "streetAddress")
+          : next.streetAddress,
+        addressLine2: values.has("addressLine2")
+          ? optionalFormString(values, "addressLine2")
+          : next.addressLine2,
+        city: values.has("city") ? optionalFormString(values, "city") : next.city,
+        stateOrProvince: values.has("stateOrProvince")
+          ? optionalFormString(values, "stateOrProvince")
+          : next.stateOrProvince,
+        postalCode: values.has("postalCode")
+          ? optionalFormString(values, "postalCode")
+          : next.postalCode,
+        country: values.has("country")
+          ? optionalFormString(values, "country")
+          : next.country,
+        customFields,
       };
       }
     case "housing":
@@ -2147,12 +2427,28 @@ function OnboardingFlow({
     [],
   );
   const complete = useApiAction(completeAction);
-  const stepIndex = onboardingSteps.findIndex(
+  const configuredSteps = onboardingSteps.map((candidate) => {
+    const configured = onboarding.screenConfigurations?.[candidate.key];
+    const tenantCopy = (value: string) =>
+      value.replaceAll("Aster", tenant.shortName);
+    return {
+      ...candidate,
+      label: configured?.label || candidate.label,
+      title: tenantCopy(configured?.title || candidate.title),
+      subtitle: tenantCopy(configured?.description || candidate.subtitle),
+    };
+  });
+  const withScreenConfiguration = (result: StudentOnboarding): StudentOnboarding => ({
+    ...result,
+    configurationVersion: result.configurationVersion ?? onboarding.configurationVersion,
+    screenConfigurations: result.screenConfigurations ?? onboarding.screenConfigurations,
+  });
+  const stepIndex = configuredSteps.findIndex(
     (step) => step.key === viewingStep,
   );
-  const step = onboardingSteps[stepIndex] || onboardingSteps[0];
+  const step = configuredSteps[stepIndex] || configuredSteps[0];
   const viewingActiveStep = viewingStep === onboarding.currentStep;
-  const allStepsSaved = onboardingSteps.every(({ key }) =>
+  const allStepsSaved = configuredSteps.every(({ key }) =>
     onboarding.completedSteps.includes(key),
   );
   const offerCannotAdvance =
@@ -2175,6 +2471,7 @@ function OnboardingFlow({
         viewingStep,
         event.currentTarget,
         onboarding.data,
+        onboarding.screenConfigurations?.[viewingStep],
       ),
     );
 
@@ -2206,7 +2503,7 @@ function OnboardingFlow({
         currentStep: viewingStep,
         data: nextData,
       });
-      setOnboarding(result);
+      setOnboarding(withScreenConfiguration(result));
       if (viewingActiveStep) {
         setViewingStep(result.currentStep);
       }
@@ -2229,7 +2526,7 @@ function OnboardingFlow({
     try {
       const result = await complete.run(onboarding.version, key);
       completeKey.current = null;
-      setOnboarding(result);
+      setOnboarding(withScreenConfiguration(result));
     } catch (caught) {
       setError(getApiErrorMessage(caught));
     }
@@ -2245,7 +2542,7 @@ function OnboardingFlow({
         data: editableOnboardingData(onboarding.data),
         skip: true,
       });
-      setOnboarding(result);
+      setOnboarding(withScreenConfiguration(result));
       setViewingStep(result.currentStep);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (caught) {
@@ -2256,6 +2553,7 @@ function OnboardingFlow({
   return (
     <div className="onboarding-shell">
       <OnboardingProgress
+        steps={configuredSteps}
         current={viewingStep}
         active={onboarding.currentStep}
         completed={onboarding.completedSteps}
@@ -2271,14 +2569,14 @@ function OnboardingFlow({
               <small>University</small>
             </span>
           </Link>
-          <span>{onboarding.completedSteps.length}/{onboardingSteps.length} saved</span>
+          <span>{onboarding.completedSteps.length}/{configuredSteps.length} saved</span>
         </header>
         <div className="onboarding-stage">
           <header className="onboarding-title">
             <div className="onboarding-title__count">
               <span>Step</span>
               <strong>{stepIndex + 1}</strong>
-              <small>of {onboardingSteps.length}</small>
+              <small>of {configuredSteps.length}</small>
             </div>
             <div>
               <p className="eyebrow">{step.label}</p>
@@ -2299,6 +2597,7 @@ function OnboardingFlow({
               depositPaid={depositPaid}
               housingPlan={housingPlan}
               campusLife={campusLife}
+              screenConfiguration={onboarding.screenConfigurations?.[viewingStep]}
             />
             {error || save.message || complete.message ? (
               <p className="field-error" role="alert">
@@ -2419,13 +2718,12 @@ function OnboardingResource() {
           data: {
             ...onboarding.data,
             firstName:
-              onboarding.data.firstName || profile.firstName || undefined,
+              onboarding.data.firstName || realProfileName(profile.firstName, "Student"),
             lastName:
-              onboarding.data.lastName || profile.lastName || undefined,
+              onboarding.data.lastName || realProfileName(profile.lastName, "Account"),
             preferredName:
               onboarding.data.preferredName ||
-              profile.preferredName ||
-              undefined,
+              realProfileName(profile.preferredName, "Student"),
             personalEmail:
               onboarding.data.personalEmail || profile.email || undefined,
             mobilePhone:

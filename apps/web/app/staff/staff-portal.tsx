@@ -5,7 +5,6 @@ import type {
   CatalogCourse,
   StaffCorePlay,
   StaffInquiry,
-  StaffJourneyBlueprintItem,
   StaffKnowledgeCard,
   StaffManagedConfiguration,
   StaffManagedConfigurationKind,
@@ -15,6 +14,7 @@ import type {
 } from "@vv/contracts";
 import { dump, load } from "js-yaml";
 import {
+  type DragEvent as ReactDragEvent,
   type FormEvent,
   useCallback,
   useEffect,
@@ -41,12 +41,14 @@ import {
   updateStaffKnowledgeCard,
   updateStaffManagedConfiguration,
   updateStaffWorkItem,
+  uploadStaffPortalMedia,
 } from "../lib/api-client";
 import {
   StaffSignIn,
   StudentInspector,
   WorkItemCard,
 } from "./staff-action-center";
+import { JourneyFlowBuilder } from "./journey-flow-builder";
 
 type StaffView =
   | "overview"
@@ -254,6 +256,26 @@ function utcInputValue(value: string) {
 
 function utcIsoValue(value: FormDataEntryValue | null) {
   return new Date(`${String(value)}:00.000Z`).toISOString();
+}
+
+function optionalUtcIsoValue(value: FormDataEntryValue | null) {
+  return String(value ?? "").trim() ? utcIsoValue(value) : null;
+}
+
+function newManagedEventId(title: string, records: Array<Record<string, unknown>>) {
+  const base = title
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 120) || "campus-event";
+  const existing = new Set(records.map((record) => String(record.id)));
+  if (!existing.has(base)) return base;
+  for (let suffix = 2; suffix < 1000; suffix += 1) {
+    const candidate = `${base}-${suffix}`;
+    if (!existing.has(candidate)) return candidate;
+  }
+  return `${base}-${crypto.randomUUID().slice(0, 8)}`;
 }
 
 function managementLabel(
@@ -1058,181 +1080,44 @@ function ConfigurationAssistant({
   );
 }
 
-function JourneyEditor({
-  item,
-  configuration,
-  onSaved,
-  onClose,
-}: {
-  item: StaffJourneyBlueprintItem;
-  configuration: StaffManagedConfiguration;
-  onSaved: () => void;
-  onClose: () => void;
-}) {
-  const action = useApiAction(updateStaffManagedConfiguration);
-  const [editorError, setEditorError] = useState<string | null>(null);
-
-  const save = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setEditorError(null);
-    const form = new FormData(event.currentTarget);
-    try {
-      const document = editableConfigurationDocument(configuration);
-      const flows = managedRecords(document, "flows");
-      let task: Record<string, unknown> | undefined;
-      for (const flow of flows) {
-        const tasks = Array.isArray(flow.tasks)
-          ? (flow.tasks as Array<Record<string, unknown>>)
-          : [];
-        task = tasks.find((candidate) => candidate.id === item.id);
-        if (task) break;
-      }
-      if (!task) throw new Error("This journey step is no longer available.");
-      Object.assign(task, {
-        title: String(form.get("title")),
-        description: String(form.get("description")),
-        owner: String(form.get("owner")),
-        task_type: String(form.get("taskType")),
-        submission_type: String(form.get("submissionType")),
-        points: Number(form.get("points")),
-        required: form.get("required") === "on",
-        depends_on: String(form.get("dependsOn"))
-          .split(",")
-          .map((value) => value.trim())
-          .filter(Boolean),
-      });
-      await action.run("journeys", {
-        expectedVersion: configuration.version,
-        yaml: configurationYaml(document),
-        changeSummary: `Updated journey step ${item.title}.`,
-      });
-      onSaved();
-      onClose();
-    } catch (error) {
-      setEditorError(
-        error instanceof Error ? error.message : "The journey step could not be saved.",
-      );
-    }
-  };
-
-  return (
-    <aside className="staff-editor-panel" aria-label="Edit journey step">
-      <header>
-        <div>
-          <p className="eyebrow">Student journey</p>
-          <h2>Edit {item.title}</h2>
-        </div>
-        <button type="button" aria-label="Close editor" onClick={onClose}>
-          ×
-        </button>
-      </header>
-      <form onSubmit={save}>
-        <label>
-          Step name
-          <input name="title" defaultValue={item.title} required maxLength={160} />
-        </label>
-        <label>
-          Student instructions
-          <textarea
-            className="staff-editor-panel__body"
-            name="description"
-            defaultValue={item.description}
-            required
-            maxLength={1200}
-          />
-        </label>
-        <div className="staff-form-grid">
-          <label>
-            Task type
-            <select name="taskType" defaultValue={item.taskType ?? "form"}>
-              <option value="information">Information</option>
-              <option value="form">Form</option>
-              <option value="upload_file">File upload</option>
-              <option value="approval">Approval</option>
-              <option value="single_select">Single selection</option>
-              <option value="multiple_select">Multiple selection</option>
-              <option value="selection_flow">Selection flow</option>
-              <option value="signature">Signature</option>
-              <option value="payment">Payment</option>
-              <option value="scheduling">Scheduling</option>
-            </select>
-          </label>
-          <label>
-            Submission
-            <select
-              name="submissionType"
-              defaultValue={item.submissionType ?? "form"}
-            >
-              <option value="none">None</option>
-              <option value="form">Form</option>
-              <option value="document">Document</option>
-              <option value="payment">Payment</option>
-              <option value="appointment">Appointment</option>
-            </select>
-          </label>
-          <label>
-            Owner
-            <input name="owner" defaultValue={item.owner} required maxLength={120} />
-          </label>
-          <label>
-            Points
-            <input
-              name="points"
-              type="number"
-              min="0"
-              max="10000"
-              defaultValue={item.points ?? 0}
-              required
-            />
-          </label>
-        </div>
-        <label>
-          Depends on step IDs
-          <input name="dependsOn" defaultValue={item.dependsOn.join(", ")} />
-        </label>
-        <label className="staff-checkbox">
-          <input name="required" type="checkbox" defaultChecked={item.required} />
-          Required for students
-        </label>
-        <div className="staff-student-impact-note">
-          Publishing creates a new configuration version. Completed student
-          work is not rewritten.
-        </div>
-        {editorError || action.message ? (
-          <p className="field-error" role="alert">
-            {editorError ?? action.message}
-          </p>
-        ) : null}
-        <footer>
-          <button className="button button--secondary" type="button" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className="button button--primary"
-            type="submit"
-            disabled={action.status === "loading"}
-          >
-            {action.status === "loading" ? "Publishing…" : "Save and publish"}
-          </button>
-        </footer>
-      </form>
-    </aside>
-  );
-}
-
 function EventEditor({
   campusEvent,
   configuration,
   onSaved,
   onClose,
 }: {
-  campusEvent: CampusEvent;
+  campusEvent: CampusEvent | null;
   configuration: StaffManagedConfiguration;
   onSaved: () => void;
   onClose: () => void;
 }) {
   const action = useApiAction(updateStaffManagedConfiguration);
+  const mediaAction = useApiAction(uploadStaffPortalMedia);
   const [editorError, setEditorError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageDragging, setImageDragging] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  const selectImage = (file: File | null) => {
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setEditorError("Choose a JPEG, PNG, or WebP event image.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setEditorError("The event image must be 5 MB or smaller.");
+      return;
+    }
+    setEditorError(null);
+    setImageFile(file);
+  };
+
+  const dropImage = (event: ReactDragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setImageDragging(false);
+    selectImage(event.dataTransfer.files.item(0));
+  };
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1240,12 +1125,22 @@ function EventEditor({
     const form = new FormData(event.currentTarget);
     try {
       const document = editableConfigurationDocument(configuration);
-      const record = managedRecords(document, "events").find(
-        (candidate) => candidate.id === campusEvent.id,
-      );
-      if (!record) throw new Error("This event is no longer available.");
+      const records = managedRecords(document, "events");
+      const title = String(form.get("title")).trim();
+      let record = campusEvent
+        ? records.find((candidate) => candidate.id === campusEvent.id)
+        : undefined;
+      if (campusEvent && !record) throw new Error("This event is no longer available.");
+      if (!record) {
+        record = { id: newManagedEventId(title, records) };
+        records.push(record);
+      }
+      let imageUrl = String(form.get("imageUrl") ?? "").trim() || null;
+      if (imageFile) {
+        imageUrl = (await mediaAction.run(imageFile)).publicUrl;
+      }
       Object.assign(record, {
-        title: String(form.get("title")),
+        title,
         description: String(form.get("description")),
         starts_at: utcIsoValue(form.get("startsAt")),
         ends_at: utcIsoValue(form.get("endsAt")),
@@ -1255,11 +1150,18 @@ function EventEditor({
         accent: String(form.get("accent")),
         visual_theme: String(form.get("visualTheme")),
         registration_url: String(form.get("registrationUrl")).trim() || null,
+        image_url: imageUrl,
+        image_alt: String(form.get("imageAlt")).trim() || null,
+        image_attribution: String(form.get("imageAttribution")).trim() || null,
+        advertisement_starts_at: optionalUtcIsoValue(form.get("advertisementStartsAt")),
+        advertisement_ends_at: optionalUtcIsoValue(form.get("advertisementEndsAt")),
       });
       await action.run("campus_life", {
         expectedVersion: configuration.version,
         yaml: configurationYaml(document),
-        changeSummary: `Updated campus event ${campusEvent.title}.`,
+        changeSummary: campusEvent
+          ? `Updated campus event ${campusEvent.title}.`
+          : `Created campus event ${title}.`,
       });
       onSaved();
       onClose();
@@ -1270,12 +1172,34 @@ function EventEditor({
     }
   };
 
+  const remove = async () => {
+    if (!campusEvent) return;
+    setEditorError(null);
+    try {
+      const document = editableConfigurationDocument(configuration);
+      document.events = managedRecords(document, "events").filter(
+        (candidate) => candidate.id !== campusEvent.id,
+      );
+      await action.run("campus_life", {
+        expectedVersion: configuration.version,
+        yaml: configurationYaml(document),
+        changeSummary: `Removed campus event ${campusEvent.title}.`,
+      });
+      onSaved();
+      onClose();
+    } catch (error) {
+      setEditorError(
+        error instanceof Error ? error.message : "The event could not be removed.",
+      );
+    }
+  };
+
   return (
     <aside className="staff-editor-panel" aria-label="Edit campus event">
       <header>
         <div>
           <p className="eyebrow">Student carousel</p>
-          <h2>Edit event</h2>
+          <h2>{campusEvent ? "Edit event" : "Add event"}</h2>
         </div>
         <button type="button" aria-label="Close editor" onClick={onClose}>
           ×
@@ -1284,21 +1208,21 @@ function EventEditor({
       <form onSubmit={save}>
         <label>
           Event title
-          <input name="title" defaultValue={campusEvent.title} required maxLength={180} />
+          <input name="title" defaultValue={campusEvent?.title ?? ""} required maxLength={180} />
         </label>
         <label>
           Description
           <textarea
             className="staff-editor-panel__body"
             name="description"
-            defaultValue={campusEvent.description}
+            defaultValue={campusEvent?.description ?? ""}
             required
             maxLength={1500}
           />
         </label>
         <label>
           Location
-          <input name="location" defaultValue={campusEvent.location} required />
+          <input name="location" defaultValue={campusEvent?.location ?? ""} required />
         </label>
         <div className="staff-form-grid">
           <label>
@@ -1306,7 +1230,7 @@ function EventEditor({
             <input
               name="startsAt"
               type="datetime-local"
-              defaultValue={utcInputValue(campusEvent.startsAt)}
+              defaultValue={campusEvent ? utcInputValue(campusEvent.startsAt) : ""}
               required
             />
           </label>
@@ -1315,13 +1239,13 @@ function EventEditor({
             <input
               name="endsAt"
               type="datetime-local"
-              defaultValue={utcInputValue(campusEvent.endsAt)}
+              defaultValue={campusEvent ? utcInputValue(campusEvent.endsAt) : ""}
               required
             />
           </label>
           <label>
             Category
-            <select name="category" defaultValue={campusEvent.category}>
+            <select name="category" defaultValue={campusEvent?.category ?? "social"}>
               <option value="academic">Academic</option>
               <option value="social">Social</option>
               <option value="career">Career</option>
@@ -1331,7 +1255,7 @@ function EventEditor({
           </label>
           <label>
             Accent
-            <select name="accent" defaultValue={campusEvent.accent}>
+            <select name="accent" defaultValue={campusEvent?.accent ?? "gold"}>
               <option value="gold">Gold</option>
               <option value="navy">Navy</option>
               <option value="blue">Blue</option>
@@ -1342,7 +1266,7 @@ function EventEditor({
             Visual theme
             <select
               name="visualTheme"
-              defaultValue={campusEvent.visualTheme ?? "community"}
+              defaultValue={campusEvent?.visualTheme ?? "community"}
             >
               <option value="festival">Festival</option>
               <option value="discovery">Discovery</option>
@@ -1351,24 +1275,141 @@ function EventEditor({
             </select>
           </label>
         </div>
+        <section className="staff-type-configuration staff-event-image-editor">
+          <div>
+            <strong>Event image</strong>
+            <p>Upload a JPEG, PNG, or WebP image up to 5 MB for the student carousel.</p>
+          </div>
+          {campusEvent?.imageUrl && !imageFile ? (
+            <img
+              src={campusEvent.imageUrl}
+              alt={campusEvent.imageAlt ?? "Current event image"}
+            />
+          ) : null}
+          <div
+            className={`staff-event-image-dropzone${imageDragging ? " is-dragging" : ""}`}
+            role="button"
+            tabIndex={0}
+            aria-label="Upload or drop an event image"
+            onClick={() => imageInputRef.current?.click()}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                imageInputRef.current?.click();
+              }
+            }}
+            onDragEnter={(event) => {
+              event.preventDefault();
+              setImageDragging(true);
+            }}
+            onDragOver={(event) => event.preventDefault()}
+            onDragLeave={() => setImageDragging(false)}
+            onDrop={dropImage}
+          >
+            <input
+              ref={imageInputRef}
+              name="imageFile"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+              onChange={(event) => selectImage(event.target.files?.item(0) ?? null)}
+            />
+            <span className="staff-event-image-dropzone__icon" aria-hidden="true">↑</span>
+            <strong>{imageFile ? imageFile.name : "Drop an event image here"}</strong>
+            <span>
+              {imageFile
+                ? `${Math.max(1, Math.round(imageFile.size / 1024))} KB selected · click to replace`
+                : "or click to browse · JPEG, PNG, or WebP · maximum 5 MB"}
+            </span>
+          </div>
+          <label>
+            Or use an image URL
+            <input name="imageUrl" type="url" defaultValue={campusEvent?.imageUrl ?? ""} />
+          </label>
+          <label>
+            Image alt text
+            <input name="imageAlt" defaultValue={campusEvent?.imageAlt ?? ""} maxLength={500} />
+          </label>
+          <label>
+            Image attribution
+            <input
+              name="imageAttribution"
+              defaultValue={campusEvent?.imageAttribution ?? ""}
+              maxLength={500}
+            />
+          </label>
+        </section>
+        <section className="staff-type-configuration">
+          <div>
+            <strong>Advertisement window</strong>
+            <p>Leave both blank to publish immediately and keep the event visible.</p>
+          </div>
+          <div className="staff-form-grid">
+            <label>
+              Advertise from (UTC)
+              <input
+                name="advertisementStartsAt"
+                type="datetime-local"
+                defaultValue={
+                  campusEvent?.advertisementStartsAt
+                    ? utcInputValue(campusEvent.advertisementStartsAt)
+                    : ""
+                }
+              />
+            </label>
+            <label>
+              Advertise until (UTC)
+              <input
+                name="advertisementEndsAt"
+                type="datetime-local"
+                defaultValue={
+                  campusEvent?.advertisementEndsAt
+                    ? utcInputValue(campusEvent.advertisementEndsAt)
+                    : ""
+                }
+              />
+            </label>
+          </div>
+        </section>
         <label>
           Registration URL
           <input
             name="registrationUrl"
             type="url"
-            defaultValue={campusEvent.registrationUrl ?? ""}
+            defaultValue={campusEvent?.registrationUrl ?? ""}
           />
         </label>
         <label className="staff-checkbox">
-          <input name="featured" type="checkbox" defaultChecked={campusEvent.featured} />
+          <input name="featured" type="checkbox" defaultChecked={campusEvent?.featured ?? true} />
           Feature in the student carousel
         </label>
         <div className="staff-student-impact-note">
           Saving publishes this event to the student Campus Life carousel.
         </div>
-        {editorError || action.message ? (
+        {campusEvent ? (
+          <section className="staff-delete-confirmation">
+            {confirmingDelete ? (
+              <div role="alert">
+                <strong>Remove {campusEvent.title}?</strong>
+                <p>The event will disappear from the student carousel after publishing.</p>
+                <div>
+                  <button className="button button--secondary" type="button" onClick={() => setConfirmingDelete(false)}>
+                    Keep event
+                  </button>
+                  <button className="button staff-button--danger" type="button" disabled={action.status === "loading"} onClick={() => void remove()}>
+                    Confirm remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button className="button staff-button--danger-outline" type="button" onClick={() => setConfirmingDelete(true)}>
+                Remove event
+              </button>
+            )}
+          </section>
+        ) : null}
+        {editorError || action.message || mediaAction.message ? (
           <p className="field-error" role="alert">
-            {editorError ?? action.message}
+            {editorError ?? action.message ?? mediaAction.message}
           </p>
         ) : null}
         <footer>
@@ -1378,9 +1419,15 @@ function EventEditor({
           <button
             className="button button--primary"
             type="submit"
-            disabled={action.status === "loading"}
+            disabled={action.status === "loading" || mediaAction.status === "loading"}
           >
-            {action.status === "loading" ? "Publishing…" : "Save and publish"}
+            {mediaAction.status === "loading"
+              ? "Uploading image..."
+              : action.status === "loading"
+                ? "Publishing..."
+                : campusEvent
+                  ? "Save and publish"
+                  : "Create and publish"}
           </button>
         </footer>
       </form>
@@ -1574,12 +1621,6 @@ function JourneysView({
   refresh: () => void;
 }) {
   const [kind, setKind] = useState<"onboarding" | "enrollment">("onboarding");
-  const [selectedJourney, setSelectedJourney] = useState<
-    StaffJourneyBlueprintItem | undefined
-  >(undefined);
-  const items = workspace.journeyBlueprint
-    .filter((item) => item.kind === kind)
-    .sort((left, right) => left.order - right.order);
   return (
     <>
       <PageHeading
@@ -1594,10 +1635,7 @@ function JourneysView({
               type="button"
               role="tab"
               aria-selected={kind === "onboarding"}
-              onClick={() => {
-                setKind("onboarding");
-                setSelectedJourney(undefined);
-              }}
+              onClick={() => setKind("onboarding")}
             >
               Offer onboarding
             </button>
@@ -1606,50 +1644,22 @@ function JourneysView({
               type="button"
               role="tab"
               aria-selected={kind === "enrollment"}
-              onClick={() => {
-                setKind("enrollment");
-                setSelectedJourney(undefined);
-              }}
+              onClick={() => setKind("enrollment")}
             >
               Enrollment checklist
             </button>
           </div>
-          <header className="staff-panel__heading staff-panel__heading--padded">
-            <div>
-              <p className="eyebrow">Published flow</p>
-              <h2>
-                {kind === "onboarding"
-                  ? "New student onboarding"
-                  : "Post-acceptance enrollment"}
-              </h2>
-            </div>
-            <StatusPill tone="success">Live</StatusPill>
-          </header>
-          <ol className="staff-journey-list">
-            {items.map((item, index) => (
-              <li key={item.id}>
-                <button
-                  className="staff-journey-edit-trigger"
-                  type="button"
-                  aria-label={`Edit ${item.title}`}
-                  onClick={() => setSelectedJourney(item)}
-                />
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <div>
-                  <strong>{item.title}</strong>
-                  <p>{item.description}</p>
-                  <small>
-                    Owner: {item.owner} ·{" "}
-                    {item.required ? "Required" : "Optional"}
-                  </small>
-                </div>
-                <StatusPill tone="success">
-                  {(item.taskType ?? "task").replaceAll("_", " ")} ·{" "}
-                  {item.points ?? 0} points
-                </StatusPill>
-              </li>
-            ))}
-          </ol>
+          <JourneyFlowBuilder
+            key={`${kind}-${workspace.configurations.journeys.version}`}
+            kind={kind}
+            title={
+              kind === "onboarding"
+                ? "New student onboarding"
+                : "Post-acceptance enrollment"
+            }
+            configuration={workspace.configurations.journeys}
+            onSaved={refresh}
+          />
         </section>
         <ConfigurationAssistant
           key={`journeys-${workspace.configurations.journeys.version}`}
@@ -1662,24 +1672,14 @@ function JourneysView({
       <section className="staff-roadmap-note">
         <div>
           <p className="eyebrow">Version boundary</p>
-          <h2>New journeys use the new version</h2>
+          <h2>Published changes stay versioned</h2>
         </div>
         <p>
-          Publishing updates the tenant blueprint and reward rules. New
-          enrollment journeys are created from that version; completed student
-          tasks are never silently rewritten.
+          Publishing updates the tenant blueprint, reward rules, and active
+          student journeys. Completed student work remains complete while new or
+          changed tasks are reconciled into the latest version.
         </p>
       </section>
-      {selectedJourney ? (
-        <div className="staff-editor-backdrop">
-          <JourneyEditor
-            item={selectedJourney}
-            configuration={workspace.configurations.journeys}
-            onSaved={refresh}
-            onClose={() => setSelectedJourney(undefined)}
-          />
-        </div>
-      ) : null}
     </>
   );
 }
@@ -2474,7 +2474,7 @@ function CampusLifeView({
   const [selected, setSelected] = useState<
     StudentClub | null | undefined
   >(undefined);
-  const [selectedEvent, setSelectedEvent] = useState<CampusEvent | undefined>(
+  const [selectedEvent, setSelectedEvent] = useState<CampusEvent | null | undefined>(
     undefined,
   );
   return (
@@ -2492,6 +2492,13 @@ function CampusLifeView({
               onClick={() => setSelected(null)}
             >
               Add club
+            </button>
+            <button
+              className="button button--primary"
+              type="button"
+              onClick={() => setSelectedEvent(null)}
+            >
+              Add event
             </button>
           </div>
         }
@@ -2523,12 +2530,6 @@ function CampusLifeView({
           <div className="staff-event-list">
             {workspace.campusLife.events.map((event) => (
               <article key={event.id}>
-                <button
-                  className="staff-content-edit-trigger"
-                  type="button"
-                  aria-label={`Edit ${event.title}`}
-                  onClick={() => setSelectedEvent(event)}
-                />
                 <div>
                   <span>
                     {new Intl.DateTimeFormat("en-US", {
@@ -2547,6 +2548,13 @@ function CampusLifeView({
                 <StatusPill tone={event.featured ? "success" : "neutral"}>
                   {event.featured ? "Featured" : "Published"}
                 </StatusPill>
+                <button
+                  className="staff-event-edit-button"
+                  type="button"
+                  onClick={() => setSelectedEvent(event)}
+                >
+                  Edit event
+                </button>
               </article>
             ))}
           </div>
@@ -2607,7 +2615,7 @@ function CampusLifeView({
           />
         </div>
       ) : null}
-      {selectedEvent ? (
+      {selectedEvent !== undefined ? (
         <div className="staff-editor-backdrop">
           <EventEditor
             campusEvent={selectedEvent}

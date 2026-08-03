@@ -26,6 +26,7 @@ import {
 import { DocumentExtractionReview } from "../../../components/document-extraction-review";
 import { DocumentUpload } from "../../../components/document-upload";
 import { PortalShell } from "../../../components/portal-shell";
+import { RequirementResponseAction } from "../../../components/requirement-response-action";
 import {
   ActionFeedback,
   ErrorState,
@@ -616,6 +617,14 @@ function DocumentAction({
     )
     .reduce<StudentDocument | null>((latest, document) => {
       if (!latest) return document;
+      const latestTerminal = latest.extraction?.status !== "processing";
+      const documentTerminal = document.extraction?.status !== "processing";
+      if (
+        document.id === latest.id &&
+        documentTerminal !== latestTerminal
+      ) {
+        return documentTerminal ? document : latest;
+      }
       const latestActivity = Date.parse(
         latest.extraction?.processedAt ??
           latest.extraction?.processingStartedAt ??
@@ -626,7 +635,16 @@ function DocumentAction({
           document.extraction?.processingStartedAt ??
           document.createdAt,
       );
-      return documentActivity > latestActivity ? document : latest;
+      if (documentActivity > latestActivity) return document;
+      if (documentActivity < latestActivity) return latest;
+
+      // A terminal extraction can legitimately reuse the processing start
+      // timestamp. Prefer that server result over an equal-time processing
+      // projection retained by the parent route.
+      if (documentTerminal !== latestTerminal) {
+        return documentTerminal ? document : latest;
+      }
+      return latest;
     }, null);
   const extraction = selectedDocument?.extraction;
   const extractionMismatch =
@@ -662,16 +680,17 @@ function DocumentAction({
     let attempts = 0;
     let timer: number | undefined;
     const deadline = Date.parse(extraction.processingDeadlineAt ?? "");
-    const stopPollingAt = Number.isFinite(deadline)
+    const expectedCompletionAt = Number.isFinite(deadline)
       ? deadline + 10_000
       : Date.now() + 100_000;
     const poll = () => {
       refreshDocuments();
       attempts += 1;
-      if (Date.now() >= stopPollingAt) return;
       timer = window.setTimeout(
         poll,
-        Math.min(5_000, 1_000 + attempts * 500),
+        Date.now() >= expectedCompletionAt
+          ? 15_000
+          : Math.min(5_000, 1_000 + attempts * 500),
       );
     };
     timer = window.setTimeout(poll, 1_000);
@@ -783,6 +802,24 @@ function DocumentAction({
         activeDocument={selectedDocument}
         onUploaded={rememberDocument}
       />
+      {documents.refreshError && extraction?.status === "processing" ? (
+        <div className="requirement-upload__connection-warning" role="status">
+          <div>
+            <strong>Waiting for a connection to check the latest result.</strong>
+            <p>
+              Your original is safely stored. This page retries automatically when
+              the connection returns.
+            </p>
+          </div>
+          <button
+            className="button button--secondary"
+            type="button"
+            onClick={documents.refresh}
+          >
+            Check now
+          </button>
+        </div>
+      ) : null}
       {extraction ? (
         <>
           <div
@@ -1452,10 +1489,18 @@ function RequirementAction({
       </div>
     );
   }
-  if (kind === "profile") {
+  if (
+    requirement.code === "profile_verification" &&
+    kind === "profile" &&
+    requirement.interactionType === "form"
+  ) {
     return <ProfileAction onSaved={onRecordChanged} />;
   }
-  if (kind === "housing") {
+  if (
+    requirement.code === "housing_preference" &&
+    kind === "housing" &&
+    ["form", "selection_flow"].includes(requirement.interactionType)
+  ) {
     return (
       <HousingAction
         onSaved={onRecordChanged}
@@ -1463,7 +1508,10 @@ function RequirementAction({
       />
     );
   }
-  if (requirement.submissionType === "document") {
+  if (
+    requirement.submissionType === "document" &&
+    requirement.interactionType === "upload_file"
+  ) {
     return (
       <DocumentAction
         requirement={requirement}
@@ -1476,11 +1524,34 @@ function RequirementAction({
       />
     );
   }
-  if (kind === "payment") {
+  if (
+    requirement.code === "enrollment_deposit" &&
+    kind === "payment" &&
+    requirement.interactionType === "payment"
+  ) {
     return (
       <DepositPaymentAction
         dueAt={requirement.dueAt}
         onPaid={onRecordChanged}
+      />
+    );
+  }
+  if (
+    [
+      "information",
+      "approval",
+      "form",
+      "single_select",
+      "multiple_select",
+      "selection_flow",
+      "signature",
+      "scheduling",
+    ].includes(requirement.interactionType)
+  ) {
+    return (
+      <RequirementResponseAction
+        requirement={requirement}
+        onSaved={onRecordChanged}
       />
     );
   }

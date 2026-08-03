@@ -6,6 +6,7 @@ import {
 } from "@vv/contracts";
 import { useCallback, useEffect } from "react";
 import { PortalShell } from "./components/portal-shell";
+import { DashboardEdwardBrief } from "./components/dashboard-edward-brief";
 import { ErrorState, LoadingState } from "./components/portal-ui";
 import { useActivityTracking } from "./hooks/use-activity-tracking";
 import { useApiResource } from "./hooks/use-api-resource";
@@ -182,15 +183,7 @@ export function StudentDashboardPage() {
           </p>
         </section>
 
-        <section className="aster-insight-card">
-          <span className="edward-avatar" aria-hidden="true">E</span>
-          <p className="eyebrow">Edward’s brief</p>
-          <blockquote>
-            “Your enrollment is moving. Finish financial verification, then
-            review your two potential course exemptions.”
-          </blockquote>
-          <Link href="/edward">Ask Edward about this <span>→</span></Link>
-        </section>
+        <DashboardEdwardBrief projectionVersion={dashboard.projectionVersion} />
       </div>
 
       <section className="aster-section">

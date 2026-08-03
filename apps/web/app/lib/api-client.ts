@@ -50,10 +50,13 @@ import type {
   StaffManagedConfigurationKind,
   StaffOperationsWorkspace,
   StaffOutreachRun,
+  StaffPortalMediaUpload,
   StaffSession,
   StaffSignInInput,
   StaffStudentRecord,
   StaffWorkItem,
+  SubmitStudentRequirementResponseInput,
+  SubmitStudentRequirementResponseResult,
   StudentClub,
   SimulateStaffOutreachInput,
   UpdateStaffClubInput,
@@ -365,6 +368,24 @@ export function getStudentRequirement(id: string, signal?: AbortSignal) {
   );
 }
 
+export function submitStudentRequirementResponse(
+  requirementId: string,
+  input: SubmitStudentRequirementResponseInput,
+  idempotencyKey: string,
+) {
+  return request<SubmitStudentRequirementResponseResult>(
+    `/v1/student/requirements/${encodeURIComponent(requirementId)}/responses`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
 export function getStudentMessages(signal?: AbortSignal) {
   return request<StudentMessageList>("/v1/student/messages", {
     method: "GET",
@@ -621,6 +642,20 @@ export function updateStaffManagedConfiguration(
   );
 }
 
+export function uploadStaffPortalMedia(file: File) {
+  const body = new FormData();
+  body.set("file", file);
+  return request<StaffPortalMediaUpload>(
+    "/v1/staff/media",
+    {
+      method: "POST",
+      headers: staffHeaders,
+      body,
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
 export function draftStaffConfigurationWithEdward(
   input: StaffEdwardConfigurationDraftInput,
 ) {
@@ -851,13 +886,14 @@ function tenantAwareDocumentUrl(path: string) {
   return url.toString();
 }
 
-export function askEdward(input: AskEdwardInput) {
+export function askEdward(input: AskEdwardInput, signal?: AbortSignal) {
   return request<AskEdwardResponse>(
     "/v1/student/assistant/messages",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
+      signal,
     },
     {
       // Asking Edward reads the student record but does not mutate it.

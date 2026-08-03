@@ -246,6 +246,30 @@ export interface StudentOnboardingData {
   signatureConsent?: boolean;
   signedDocumentIds?: string[];
   depositChoice?: "pay_now" | "pay_later" | "waiver_or_deferral";
+  customFields?: Record<string, string | string[] | boolean>;
+}
+
+export type AboutYouConfigurableField =
+  | "firstName"
+  | "lastName"
+  | "preferredName"
+  | "personalEmail"
+  | "mobilePhone"
+  | "citizenshipStatus"
+  | "streetAddress"
+  | "city"
+  | "stateOrProvince"
+  | "postalCode"
+  | "country"
+  | "residencyVerificationPath";
+
+export interface StudentOnboardingScreenConfiguration {
+  label?: string;
+  title: string;
+  description: string;
+  requiredFields?: AboutYouConfigurableField[];
+  identityQuickUpload?: boolean;
+  fields?: StudentRequirementInputField[];
 }
 
 export interface StudentOnboarding {
@@ -254,6 +278,10 @@ export interface StudentOnboarding {
   currentStep: OnboardingStep;
   completedSteps: OnboardingStep[];
   data: StudentOnboardingData;
+  configurationVersion?: number;
+  screenConfigurations?: Partial<
+    Record<OnboardingStep, StudentOnboardingScreenConfiguration>
+  >;
   version: number;
   completedAt: string | null;
   updatedAt: string;
@@ -349,11 +377,55 @@ export interface StudentBootstrap {
   generatedAt: string;
 }
 
-export interface StudentRequirementDetail
-  extends StudentRequirementSummary {
+export type StudentRequirementInteractionType =
+  | "information"
+  | "approval"
+  | "form"
+  | "single_select"
+  | "multiple_select"
+  | "selection_flow"
+  | "upload_file"
+  | "signature"
+  | "payment"
+  | "scheduling";
+
+export interface StudentRequirementInputField {
+  id: string;
+  title: string;
+  field_type:
+    | "text"
+    | "email"
+    | "phone"
+    | "date"
+    | "checkbox"
+    | "single_select"
+    | "multiple_select";
+  required: boolean;
+  options?: string[];
+  maximum_selections?: number;
+  when?: { field: string; equals: string };
+}
+
+export interface StudentRequirementInputConfig {
+  options?: string[];
+  maximumSelections?: number;
+  fields?: StudentRequirementInputField[];
+  flow?: StudentRequirementInputField[];
+  signatureProvider?: "built_in" | "docusign";
+  docusignTemplateId?: string;
+  acceptedMimeTypes?: string[];
+  documentCategories?: string[];
+  [key: string]: unknown;
+}
+
+export interface StudentRequirementDetail extends StudentRequirementSummary {
   slug: string;
   journeyId: string;
-  submissionType: "form" | "document" | "payment" | "none";
+  version: number;
+  submissionType: "form" | "document" | "payment" | "appointment" | "none";
+  flowKind: "onboarding" | "enrollment";
+  interactionType: StudentRequirementInteractionType;
+  inputConfig: StudentRequirementInputConfig;
   documentCategory: StudentDocumentCategory | null;
   responsibleOffice: string;
   dependencyCodes: string[];
@@ -374,6 +446,44 @@ export interface StudentRequirementDetail
       validityDays: number | null;
     }>;
   };
+}
+
+export type StudentRequirementResponseValue =
+  | string
+  | number
+  | boolean
+  | string[]
+  | null;
+
+export type StudentRequirementResponsePayload =
+  | { acknowledged: true }
+  | { approved: true }
+  | { values: Record<string, StudentRequirementResponseValue> }
+  | { selectedOption: string }
+  | { selectedOptions: string[] }
+  | {
+      accepted: true;
+      signerName: string;
+      signatureMethod?: "typed" | "drawn";
+    }
+  | { appointmentId: string };
+
+export interface SubmitStudentRequirementResponseInput {
+  expectedVersion: number;
+  response: StudentRequirementResponsePayload;
+}
+
+export interface StudentRequirementResponseRecord {
+  id: string;
+  interactionType: StudentRequirementInteractionType;
+  data: Record<string, unknown>;
+  version: number;
+  submittedAt: string;
+}
+
+export interface SubmitStudentRequirementResponseResult
+  extends StudentRequirementDetail {
+  response: StudentRequirementResponseRecord;
 }
 
 const requirementSlugByCode = {
@@ -793,6 +903,8 @@ export interface StaffJourneyBlueprintItem {
   owner: string;
   required: boolean;
   published: boolean;
+  /** Defaults to true for configuration versions published before task activation controls. */
+  active?: boolean;
   order: number;
   taskType:
     | "information"
@@ -806,6 +918,18 @@ export interface StaffJourneyBlueprintItem {
     | "payment"
     | "scheduling";
   submissionType: "none" | "form" | "document" | "payment" | "appointment";
+  selectionOptions?: string[];
+  maximumSelections?: number | null;
+  signatureProvider?: "built_in" | "docusign" | null;
+  docusignTemplateId?: string | null;
+  /** @deprecated Read only for configuration versions authored before canonical naming. */
+  signatureTemplateId?: string | null;
+  acceptedMimeTypes?: string[];
+  /** @deprecated Read only for configuration versions authored before canonical naming. */
+  acceptedFileTypes?: string[];
+  documentCategories?: string[];
+  interactionType?: StudentRequirementInteractionType;
+  inputConfig?: StudentRequirementInputConfig;
   points: number;
   studentStep: string | null;
   dependsOn: string[];
@@ -1340,8 +1464,19 @@ export interface CampusEvent {
   imageAlt?: string | null;
   imageAttribution?: string | null;
   imageSourceUrl?: string | null;
+  advertisementStartsAt?: string | null;
+  advertisementEndsAt?: string | null;
   source?: PortalContentSource | null;
   registrationUrl?: string | null;
+}
+
+export interface StaffPortalMediaUpload {
+  fileName: string;
+  mimeType: "image/jpeg" | "image/png" | "image/webp";
+  sizeBytes: number;
+  sha256: string;
+  publicPath: string;
+  publicUrl: string;
 }
 
 export interface StudentClubSocialLink {

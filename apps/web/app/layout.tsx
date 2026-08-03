@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ServerStateProvider } from "./components/server-state-provider";
 import { TenantProvider } from "./components/tenant-provider";
 import "./globals.css";
 
@@ -50,7 +51,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <TenantProvider>{children}</TenantProvider>
+        <TenantProvider>
+          <ServerStateProvider>{children}</ServerStateProvider>
+        </TenantProvider>
       </body>
     </html>
   );
