@@ -16,11 +16,13 @@ import {
 } from "react";
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
 import {
+  ApiClientError,
   getStaffActionCenter,
   getStaffStudentRecord,
   reviewStaffDocument,
   signInStaff,
   signOutStaff,
+  signUpStaff,
   updateStaffStudentPreferences,
   updateStaffWorkItem,
 } from "../lib/api-client";
@@ -57,6 +59,20 @@ const housingOptions: Array<{ value: HousingPreference; label: string }> = [
   { value: "family", label: "Living with family" },
   { value: "undecided", label: "Undecided" },
 ];
+
+type StaffAuthMode = "sign_in" | "sign_up";
+type StaffAuthField =
+  | "email"
+  | "password"
+  | "passwordConfirmation"
+  | "institutionAccessCode";
+type StaffAuthFieldErrors = Partial<Record<StaffAuthField, string>>;
+
+const staffEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const staffAuthErrorMessage = (error: unknown) =>
+  error instanceof ApiClientError
+    ? error.message
+    : "We couldn't access your staff account. Check your connection and try again.";
 
 function formatDate(value: string | null) {
   if (!value) return "No due date";
@@ -118,79 +134,269 @@ export function WorkItemCard({
 
 export function StaffSignIn({ onSignedIn }: { onSignedIn: () => void }) {
   const tenantRuntime = useTenant();
-  const signIn = useApiAction(signInStaff);
-  const localStaffEmail = `priya.shah@${tenantRuntime.tenant.slug}.example.edu`;
+  const [mode, setMode] = useState<StaffAuthMode>("sign_in");
+  const [fieldErrors, setFieldErrors] = useState<StaffAuthFieldErrors>({});
+  const signIn = useApiAction(signInStaff, staffAuthErrorMessage);
+  const signUp = useApiAction(signUpStaff, staffAuthErrorMessage);
+  const activeAction = mode === "sign_in" ? signIn : signUp;
+  const isBusy = signIn.status === "loading" || signUp.status === "loading";
+
+  const chooseMode = (nextMode: StaffAuthMode) => {
+    setMode(nextMode);
+    setFieldErrors({});
+    signIn.reset();
+    signUp.reset();
+  };
 
   const enter = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const email = String(form.get("email") ?? "").trim();
+    const password = String(form.get("password") ?? "");
+    const passwordConfirmation = String(
+      form.get("passwordConfirmation") ?? "",
+    );
+    const institutionAccessCode = String(
+      form.get("institutionAccessCode") ?? "",
+    );
+    const errors = validateStaffAuthFields({
+      mode,
+      email,
+      password,
+      passwordConfirmation,
+      institutionAccessCode,
+    });
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      const firstInvalidField = (
+        [
+          "email",
+          "password",
+          "passwordConfirmation",
+          "institutionAccessCode",
+        ] as const
+      ).find((field) => errors[field]);
+      if (firstInvalidField) {
+        const field = event.currentTarget.elements.namedItem(firstInvalidField);
+        if (field instanceof HTMLElement) field.focus();
+      }
+      return;
+    }
+    setFieldErrors({});
     try {
-      await signIn.run({
-        email: String(form.get("email")),
-        password: String(form.get("password")),
-      });
+      if (mode === "sign_up") {
+        await signUp.run({ email, password, institutionAccessCode });
+      } else {
+        await signIn.run({ email, password });
+      }
       onSignedIn();
     } catch {
-      // The shared action state renders the safe API message.
+      // Keep the submitted form available for a corrected retry.
     }
   };
 
   return (
     <main className="staff-entry">
-      <section className="staff-entry__card">
+      <section className="staff-entry__card" aria-labelledby="staff-auth-title">
         <PortalMark />
         <p className="eyebrow">{tenantRuntime.tenant.name}</p>
-        <h1>Staff sign in</h1>
+        <h1 id="staff-auth-title">
+          {mode === "sign_up" ? "Create staff account" : "Staff sign in"}
+        </h1>
         <p>
-          Sign in to coordinate enrollment work, manage student experiences,
-          and review assigned student decisions.
+          {mode === "sign_up"
+            ? "Claim your pre-approved university staff identity and choose your own password."
+            : "Sign in to coordinate enrollment work, manage student experiences, and review assigned student decisions."}
         </p>
         <div className="staff-entry__notice">
-          <strong>Local testing account</strong>
+          <strong>University-approved access</strong>
           <span>
-            Priya: {localStaffEmail}
-            <br />
-            Password: AsterStaff2027!
+            New accounts require an active staff record and the private
+            institution access code supplied by your administrator.
           </span>
         </div>
-        <form className="staff-auth-form" onSubmit={enter}>
+        <div
+          className="auth-mode-switch staff-auth-mode-switch"
+          role="tablist"
+          aria-label="Staff account access"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "sign_in"}
+            className={mode === "sign_in" ? "is-active" : undefined}
+            onClick={() => chooseMode("sign_in")}
+          >
+            Sign in
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "sign_up"}
+            className={mode === "sign_up" ? "is-active" : undefined}
+            onClick={() => chooseMode("sign_up")}
+          >
+            Create account
+          </button>
+        </div>
+        <form key={mode} className="staff-auth-form" noValidate onSubmit={enter}>
           <label>
             Staff email
             <input
+              aria-describedby={fieldErrors.email ? "staff-email-error" : undefined}
+              aria-invalid={fieldErrors.email ? true : undefined}
               name="email"
               type="email"
-              autoComplete="username"
-              defaultValue={localStaffEmail}
+              autoComplete="email"
               required
+              maxLength={254}
+              placeholder="you@university.edu"
+              onChange={() =>
+                setFieldErrors((current) => ({ ...current, email: undefined }))
+              }
             />
+            {fieldErrors.email ? (
+              <small className="field-error" id="staff-email-error" role="alert">
+                {fieldErrors.email}
+              </small>
+            ) : null}
           </label>
           <label>
             Password
             <input
+              aria-describedby={
+                mode === "sign_up"
+                  ? fieldErrors.password
+                    ? "staff-password-help staff-password-error"
+                    : "staff-password-help"
+                  : fieldErrors.password
+                    ? "staff-password-error"
+                    : undefined
+              }
+              aria-invalid={fieldErrors.password ? true : undefined}
               name="password"
               type="password"
-              autoComplete="current-password"
-              defaultValue="AsterStaff2027!"
+              autoComplete={mode === "sign_up" ? "new-password" : "current-password"}
               required
+              minLength={mode === "sign_up" ? 12 : 1}
+              maxLength={128}
+              onChange={() =>
+                setFieldErrors((current) => ({
+                  ...current,
+                  password: undefined,
+                  passwordConfirmation: undefined,
+                }))
+              }
             />
+            {mode === "sign_up" ? (
+              <small id="staff-password-help">
+                At least 12 characters, including a letter and number.
+              </small>
+            ) : null}
+            {fieldErrors.password ? (
+              <small className="field-error" id="staff-password-error" role="alert">
+                {fieldErrors.password}
+              </small>
+            ) : null}
           </label>
-          {signIn.message ? (
+          {mode === "sign_up" ? (
+            <>
+              <label>
+                Confirm password
+                <input
+                  aria-describedby={
+                    fieldErrors.passwordConfirmation
+                      ? "staff-password-confirmation-error"
+                      : undefined
+                  }
+                  aria-invalid={
+                    fieldErrors.passwordConfirmation ? true : undefined
+                  }
+                  name="passwordConfirmation"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={12}
+                  maxLength={128}
+                  onChange={() =>
+                    setFieldErrors((current) => ({
+                      ...current,
+                      passwordConfirmation: undefined,
+                    }))
+                  }
+                />
+                {fieldErrors.passwordConfirmation ? (
+                  <small
+                    className="field-error"
+                    id="staff-password-confirmation-error"
+                    role="alert"
+                  >
+                    {fieldErrors.passwordConfirmation}
+                  </small>
+                ) : null}
+              </label>
+              <label>
+                Institution access code
+                <input
+                  aria-describedby={
+                    fieldErrors.institutionAccessCode
+                      ? "staff-access-code-help staff-access-code-error"
+                      : "staff-access-code-help"
+                  }
+                  aria-invalid={
+                    fieldErrors.institutionAccessCode ? true : undefined
+                  }
+                  name="institutionAccessCode"
+                  type="password"
+                  autoComplete="off"
+                  required
+                  minLength={16}
+                  maxLength={256}
+                  onChange={() =>
+                    setFieldErrors((current) => ({
+                      ...current,
+                      institutionAccessCode: undefined,
+                    }))
+                  }
+                />
+                <small id="staff-access-code-help">
+                  This code is provided privately by your university administrator.
+                </small>
+                {fieldErrors.institutionAccessCode ? (
+                  <small
+                    className="field-error"
+                    id="staff-access-code-error"
+                    role="alert"
+                  >
+                    {fieldErrors.institutionAccessCode}
+                  </small>
+                ) : null}
+              </label>
+            </>
+          ) : null}
+          {activeAction.message ? (
             <p className="field-error" role="alert">
-              {signIn.message}
+              {activeAction.message}
             </p>
           ) : null}
           <button
             className="button button--primary"
             type="submit"
-            disabled={signIn.status === "loading"}
+            disabled={isBusy}
           >
-            {signIn.status === "loading" ? "Signing in…" : "Sign in"}
+            {activeAction.status === "loading"
+              ? mode === "sign_up"
+                ? "Creating account..."
+                : "Signing in..."
+              : mode === "sign_up"
+                ? "Create staff account"
+                : "Sign in"}
           </button>
         </form>
         <small className="staff-auth-boundary">
-          The local credential adapter hashes passwords and issues an
-          HTTP-only staff session. Institutional deployments replace it with
-          university SSO and role mapping.
+          Passwords and access codes are never displayed or prefilled. Passwords
+          are stored as one-way hashes and authentication uses an HTTP-only,
+          revocable staff session.
         </small>
         <Link className="text-link" href="/sign-in">
           Return to student sign in
@@ -198,6 +404,43 @@ export function StaffSignIn({ onSignedIn }: { onSignedIn: () => void }) {
       </section>
     </main>
   );
+}
+
+function validateStaffAuthFields(input: {
+  mode: StaffAuthMode;
+  email: string;
+  password: string;
+  passwordConfirmation: string;
+  institutionAccessCode: string;
+}): StaffAuthFieldErrors {
+  const errors: StaffAuthFieldErrors = {};
+  if (!input.email) {
+    errors.email = "Enter your university staff email address.";
+  } else if (!staffEmailPattern.test(input.email.normalize("NFKC"))) {
+    errors.email = "Enter a valid university email address.";
+  }
+
+  if (input.mode === "sign_up") {
+    if (input.password.length < 12 || input.password.length > 128) {
+      errors.password = "Use a password between 12 and 128 characters.";
+    } else if (
+      !/[A-Za-z]/.test(input.password) ||
+      !/[0-9]/.test(input.password)
+    ) {
+      errors.password = "Include at least one letter and one number.";
+    }
+    if (!input.passwordConfirmation) {
+      errors.passwordConfirmation = "Enter your password again.";
+    } else if (input.passwordConfirmation !== input.password) {
+      errors.passwordConfirmation = "The passwords do not match.";
+    }
+    if (input.institutionAccessCode.length < 16) {
+      errors.institutionAccessCode = "Enter the institution access code you received.";
+    }
+  } else if (!input.password) {
+    errors.password = "Enter your password.";
+  }
+  return errors;
 }
 
 export function StudentInspector({

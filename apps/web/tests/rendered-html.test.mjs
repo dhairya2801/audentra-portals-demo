@@ -445,7 +445,12 @@ test("typed client wires every resource route and mutation contract", async () =
     await client.signOutDemoStudent();
     await client.signInStaff({
       email: "priya.shah@aster.example.edu",
-      password: "AsterStaff2027!",
+      password: "Individual-staff-password-2027",
+    });
+    await client.signUpStaff({
+      email: "priya.shah@aster.example.edu",
+      password: "Individual-staff-password-2027",
+      institutionAccessCode: "private-institution-access-code-2027",
     });
     await client.getStaffActionCenter();
     await client.getStaffOperationsWorkspace();
@@ -628,6 +633,7 @@ test("typed client wires every resource route and mutation contract", async () =
     "/v1/auth/demo/start-guided-onboarding",
     "/v1/auth/demo/sign-out",
     "/v1/auth/staff/sign-in",
+    "/v1/auth/staff/sign-up",
     "/v1/staff/action-center",
     "/v1/staff/workspace",
     "/v1/staff/knowledge-base",
@@ -877,6 +883,19 @@ test("onboarding preserves the eight-step order and authoritative boundary actio
     null,
     "older success responses must retain the configured onboarding flow",
   );
+});
+
+test("staff authentication never exposes or prefills credentials", async () => {
+  const source = await readFile(
+    new URL("../app/staff/staff-action-center.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /Staff account access/);
+  assert.match(source, /Institution access code/);
+  assert.match(source, /signUpStaff/);
+  assert.doesNotMatch(source, /AsterStaff2027|Local testing account|Password:/);
+  assert.doesNotMatch(source, /defaultValue=.*password/i);
 });
 
 test("coordinates recoverable server state and generates the dashboard brief", async () => {

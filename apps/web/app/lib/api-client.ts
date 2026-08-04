@@ -53,6 +53,7 @@ import type {
   StaffPortalMediaUpload,
   StaffSession,
   StaffSignInInput,
+  StaffSignUpInput,
   StaffStudentRecord,
   StaffWorkItem,
   SubmitStudentRequirementResponseInput,
@@ -573,6 +574,14 @@ export function getStudentDocumentProfilePhotoUrl(documentId: string) {
 
 export function signInStaff(input: StaffSignInInput) {
   return request<StaffSession>("/v1/auth/staff/sign-in", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function signUpStaff(input: StaffSignUpInput) {
+  return request<StaffSession>("/v1/auth/staff/sign-up", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),

@@ -10617,6 +10617,11 @@ a {
   line-height: 1.45;
 }
 
+.staff-auth-mode-switch {
+  width: 100%;
+  margin-bottom: 0;
+}
+
 .staff-shell {
   min-height: 100vh;
   background: #f4f5f2;
@@ -13924,6 +13929,17 @@ a {
   background: #fff;
   color: #1f2d43;
   font: inherit;
+}
+
+.staff-auth-form small {
+  color: #7a8490;
+  font-size: 0.62rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.staff-auth-form small.field-error {
+  color: #9b1c1c;
 }
 
 .staff-auth-form .button {

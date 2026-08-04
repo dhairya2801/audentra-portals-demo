@@ -814,6 +814,10 @@ export interface StaffSignInInput {
   password: string;
 }
 
+export interface StaffSignUpInput extends StaffSignInInput {
+  institutionAccessCode: string;
+}
+
 export interface UpdateStaffWorkItemInput {
   expectedVersion: number;
   status?: StaffWorkItemStatus;
