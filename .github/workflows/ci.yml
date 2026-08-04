@@ -41,3 +41,95 @@ jobs:
 
       # Browser journeys intentionally run outside this job. They require a
       # compatible Audentra Platform environment via E2E_API_BASE_URL.
+
+  deploy-preview:
+    name: Deploy GCP preview
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: preview
+    concurrency:
+      group: audentra-portals-preview
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GCP_PROJECT_ID: even-advantage-502610-n1
+      GCP_REGION: us-central1
+      GCP_ZONE: us-central1-a
+      GCP_INSTANCE: deneme-harness
+      SITE_HOST: aster.34-30-254-45.sslip.io
+      ARTIFACT_REPOSITORY: audentra-portals
+      ARTIFACT_IMAGE: web
+      GCP_WORKLOAD_IDENTITY_PROVIDER: projects/39355369148/locations/global/workloadIdentityPools/github-vv-edgent/providers/github
+      GCP_SERVICE_ACCOUNT: vv-edgent-cd@even-advantage-502610-n1.iam.gserviceaccount.com
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - id: google-auth
+        name: Exchange GitHub OIDC token for short-lived Google credentials
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+
+      - name: Install Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+
+      - name: Build and push immutable portals image
+        run: |
+          image_uri="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPOSITORY}/${ARTIFACT_IMAGE}:${GITHUB_SHA}"
+          if gcloud artifacts docker images describe "${image_uri}" --quiet >/dev/null 2>&1; then
+            echo "Immutable portals image already exists; reusing ${image_uri}."
+            exit 0
+          fi
+          docker build \
+            --file infra/docker/web.Dockerfile \
+            --build-arg "NEXT_PUBLIC_API_BASE_URL=https://${SITE_HOST}" \
+            --build-arg "NEXT_PUBLIC_SITE_URL=https://${SITE_HOST}" \
+            --tag "${image_uri}" \
+            .
+          docker push "${image_uri}"
+
+      - name: Package reviewed deployment configuration
+        run: |
+          git archive \
+            --format=tar.gz \
+            --output="${RUNNER_TEMP}/audentra-portals-release-${GITHUB_SHA}.tar.gz" \
+            "${GITHUB_SHA}" \
+            infra/preview-vm
+
+      - name: Upload immutable release through IAP
+        run: >-
+          gcloud compute scp
+          "${RUNNER_TEMP}/audentra-portals-release-${GITHUB_SHA}.tar.gz"
+          "${GCP_INSTANCE}:/tmp/"
+          --project="${GCP_PROJECT_ID}"
+          --zone="${GCP_ZONE}"
+          --tunnel-through-iap
+          --ssh-key-expire-after=30m
+          --quiet
+
+      - name: Deploy and health-check portals
+        run: >-
+          gcloud compute ssh
+          "${GCP_INSTANCE}"
+          --project="${GCP_PROJECT_ID}"
+          --zone="${GCP_ZONE}"
+          --tunnel-through-iap
+          --ssh-key-expire-after=30m
+          --quiet
+          --command="sudo /usr/local/sbin/audentra-portals-deploy ${GITHUB_SHA}"
