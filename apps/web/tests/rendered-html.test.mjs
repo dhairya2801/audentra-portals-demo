@@ -898,6 +898,31 @@ test("staff authentication never exposes or prefills credentials", async () => {
   assert.doesNotMatch(source, /defaultValue=.*password/i);
 });
 
+test("staff authentication forms survive ambient focus refreshes", async () => {
+  const [resourceHook, staffPortal, legacyCenter] = await Promise.all([
+    readFile(new URL("../app/hooks/use-api-resource.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/staff/staff-portal.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/staff/staff-action-center.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(resourceHook, /refreshOnAmbient\?: boolean/);
+  assert.match(
+    resourceHook,
+    /options\.refreshOnAmbient === false \? 0 : coordinator\.revision/,
+  );
+  assert.match(
+    staffPortal,
+    /useApiResource\(loadWorkspace, \{\s*refreshOnAmbient: false/,
+  );
+  assert.match(
+    legacyCenter,
+    /useApiResource\(loadCenter, \{\s*refreshOnAmbient: false/,
+  );
+});
+
 test("coordinates recoverable server state and generates the dashboard brief", async () => {
   const [
     dashboard,

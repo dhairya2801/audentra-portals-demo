@@ -22,6 +22,15 @@ export type ResourceState<T> = (
     }) &
   ResourceMetadata;
 
+type UseApiResourceOptions = {
+  /**
+   * Ambient refreshes are useful for authenticated screens, but an
+   * unauthenticated route must keep its form mounted while the user moves
+   * between windows or restores the tab.
+   */
+  refreshOnAmbient?: boolean;
+};
+
 function messageFor(error: unknown) {
   if (error instanceof ApiClientError) {
     if (error.status === 401 || error.status === 403) {
@@ -34,8 +43,11 @@ function messageFor(error: unknown) {
 
 export function useApiResource<T>(
   loader: (signal: AbortSignal) => Promise<T>,
+  options: UseApiResourceOptions = {},
 ) {
   const coordinator = useServerStateCoordinator();
+  const ambientRevision =
+    options.refreshOnAmbient === false ? 0 : coordinator.revision;
   const [requestVersion, setRequestVersion] = useState(0);
   const [state, setState] = useState<ResourceState<T>>({
     status: "loading",
@@ -113,7 +125,7 @@ export function useApiResource<T>(
       });
 
     return () => controller.abort();
-  }, [coordinator.revision, loader, requestVersion]);
+  }, [ambientRevision, loader, requestVersion]);
 
   const reload = useCallback(() => {
     setState((current) => ({

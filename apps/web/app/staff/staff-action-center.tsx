@@ -1096,7 +1096,9 @@ export default function LegacyStaffActionCenter() {
     (signal: AbortSignal) => getStaffActionCenter(signal),
     [],
   );
-  const center = useApiResource(loadCenter);
+  const center = useApiResource(loadCenter, {
+    refreshOnAmbient: false,
+  });
   const refresh = center.refresh;
 
   useEffect(() => {

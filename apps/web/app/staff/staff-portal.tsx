@@ -3418,7 +3418,9 @@ export default function StaffPortal() {
     (signal: AbortSignal) => getStaffOperationsWorkspace(signal),
     [],
   );
-  const workspace = useApiResource(loadWorkspace);
+  const workspace = useApiResource(loadWorkspace, {
+    refreshOnAmbient: false,
+  });
   const refresh = workspace.refresh;
 
   useEffect(() => {
