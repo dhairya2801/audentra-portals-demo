@@ -430,6 +430,7 @@ export async function uploadStudentDocument(
     uploadBundleId?: string;
   },
   idempotencyKey: string,
+  signal: AbortSignal = AbortSignal.timeout(120_000),
 ) {
   const form = new FormData();
   form.set("file", file);
@@ -446,6 +447,7 @@ export async function uploadStudentDocument(
     method: "POST",
     headers: { "Idempotency-Key": idempotencyKey },
     body: form,
+    signal,
   });
 }
 
@@ -488,6 +490,7 @@ export async function uploadStudentDocumentBundle(
 ): Promise<StudentDocumentUploadBundleResult[]> {
   const results: StudentDocumentUploadBundleResult[] = [];
   const uploadBundleId = crypto.randomUUID();
+  const bundleDeadline = AbortSignal.timeout(300_000);
 
   for (const entry of entries) {
     callbacks.onFileStart?.(entry);
@@ -496,6 +499,7 @@ export async function uploadStudentDocumentBundle(
         entry.file,
         { ...context, uploadBundleId },
         entry.idempotencyKey,
+        AbortSignal.any([bundleDeadline, AbortSignal.timeout(120_000)]),
       );
       const result: StudentDocumentUploadBundleResult = {
         status: "uploaded",

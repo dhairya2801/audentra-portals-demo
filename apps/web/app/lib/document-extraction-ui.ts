@@ -1,5 +1,6 @@
 import type {
   StudentDocument,
+  StudentDocumentCategory,
   StudentDocumentExtraction,
 } from "@vv/contracts";
 
@@ -12,6 +13,23 @@ export type DocumentExtractionFailurePresentation = {
   title: string;
   guidance: string;
 };
+
+export function latestDocumentForCategory(
+  documents: readonly StudentDocument[],
+  category: StudentDocumentCategory,
+): StudentDocument | null {
+  return documents
+    .filter(
+      (document) =>
+        document.category === category && document.status !== "placeholder",
+    )
+    .reduce<StudentDocument | null>((latest, document) => {
+      if (!latest) return document;
+      return Date.parse(document.createdAt) > Date.parse(latest.createdAt)
+        ? document
+        : latest;
+    }, null);
+}
 
 export type DocumentExtractionProjectionState = {
   document: StudentDocument;

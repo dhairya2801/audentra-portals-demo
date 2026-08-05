@@ -9,6 +9,7 @@ import type {
   OnboardingStep,
   StudentDashboard,
   StudentDocument,
+  StudentDocumentList,
   StudentOnboarding,
   StudentOnboardingData,
   StudentOnboardingScreenConfiguration,
@@ -18,6 +19,7 @@ import type {
   StudentRequirementInputField,
   UpdateStudentOnboardingInput,
 } from "@vv/contracts";
+import { DocumentExtractionReview } from "../components/document-extraction-review";
 import { DocumentUpload } from "../components/document-upload";
 import { TenantLink as Link } from "../components/tenant-link";
 import {
@@ -26,6 +28,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -41,6 +44,7 @@ import {
   completeStudentOnboarding,
   createDepositPayment,
   getStudentDashboard,
+  getStudentDocuments,
   getCampusLife,
   getStudentBootstrap,
   getStudentOnboarding,
@@ -49,6 +53,12 @@ import {
   getStudentHousingPlan,
   updateStudentOnboarding,
 } from "../lib/api-client";
+import {
+  beginDocumentExtractionProjection,
+  type DocumentExtractionProjectionState,
+  latestDocumentForCategory,
+  reconcileDocumentExtractionProjection,
+} from "../lib/document-extraction-ui";
 import { getPostAcceptanceRoute } from "./offer-acceptance";
 
 const onboardingSteps: {
@@ -192,6 +202,7 @@ type OnboardingPageData = {
   profile: StudentProfile;
   housingPlan: StudentHousingPlan;
   campusLife: CampusLifeFeed;
+  documents: StudentDocumentList;
 };
 
 function formatMoney(cents: number) {
@@ -1713,6 +1724,83 @@ function ConfiguredAboutYouFields({
   );
 }
 
+type IdentityPrefillCandidates = Partial<
+  Record<
+    | "firstName"
+    | "lastName"
+    | "preferredName"
+    | "mobilePhone"
+    | "streetAddress"
+    | "city"
+    | "stateOrProvince"
+    | "postalCode"
+    | "country",
+    string
+  >
+>;
+
+function identityPrefillCandidates(
+  document: StudentDocument | null,
+): IdentityPrefillCandidates {
+  const extraction = document?.extraction;
+  if (
+    document?.status === "rejected" ||
+    extraction?.status !== "completed" ||
+    extraction.documentType !== "identity"
+  ) {
+    return {};
+  }
+  const values = new Map(
+    extraction.fields.map((field) => [
+      field.key,
+      String(field.value ?? "").trim(),
+    ]),
+  );
+  const fullName = extraction.studentName?.trim() ?? "";
+  const nameParts = fullName.split(/\s+/).filter(Boolean);
+  const inferredFirst = values.get("first_name") || nameParts[0] || "";
+  const inferredLast =
+    values.get("last_name") ||
+    (nameParts.length > 1 ? nameParts.slice(1).join(" ") : "");
+  return {
+    firstName: inferredFirst,
+    lastName: inferredLast,
+    preferredName: values.get("preferred_name") || inferredFirst,
+    mobilePhone: values.get("mobile_phone") || "",
+    streetAddress: values.get("street_address") || "",
+    city: values.get("city") || "",
+    stateOrProvince: values.get("state_or_province") || "",
+    postalCode: values.get("postal_code") || "",
+    country: values.get("country") || "",
+  };
+}
+
+function restoredIdentityMessage(document: StudentDocument | null) {
+  const extraction = document?.extraction;
+  if (document?.status === "rejected") {
+    return "This stored ID was not accepted. Add a replacement file or contact Enrollment Services if you need help.";
+  }
+  if (extraction?.status === "processing") {
+    return "Your ID is uploaded. We will prefill available details when parsing finishes.";
+  }
+  if (extraction?.status === "failed") {
+    return "Your ID is safely stored, but automatic parsing needs attention. Use Retry parsing below without uploading it again.";
+  }
+  if (extraction?.status === "pending_configuration") {
+    return "Your ID is safely stored, but automatic parsing is not configured yet. You can retry below when the service is available.";
+  }
+  if (extraction?.status === "completed" && extraction.documentType === "identity") {
+    return "Available identity details were prefilled from your stored ID. Please review them before continuing.";
+  }
+  if (extraction?.status === "completed") {
+    return "The file is safely stored, but it was not recognized as an identity document. Add the correct ID file or ask staff to review it.";
+  }
+  if (document) {
+    return "Your ID is safely stored. Enter any missing details manually or ask staff to review the original.";
+  }
+  return null;
+}
+
 function StepFields({
   step,
   data,
@@ -1721,6 +1809,8 @@ function StepFields({
   housingPlan,
   campusLife,
   screenConfiguration,
+  identityDocument,
+  onIdentityDocumentChanged,
 }: {
   step: OnboardingStep;
   data: StudentOnboardingData;
@@ -1729,10 +1819,33 @@ function StepFields({
   housingPlan: StudentHousingPlan;
   campusLife: CampusLifeFeed;
   screenConfiguration?: StudentOnboardingScreenConfiguration;
+  identityDocument: StudentDocument | null;
+  onIdentityDocumentChanged: (document: StudentDocument) => void;
 }) {
   const { tenant } = useTenant();
   const aboutYouRoot = useRef<HTMLDivElement>(null);
-  const [identityPrefillMessage, setIdentityPrefillMessage] = useState<string | null>(null);
+  const identityQuickUploadEnabled =
+    screenConfiguration?.identityQuickUpload !== false;
+  const restoredPrefill = identityQuickUploadEnabled
+    ? identityPrefillCandidates(identityDocument)
+    : {};
+  const prefilledData: StudentOnboardingData = {
+    ...data,
+    firstName: data.firstName || restoredPrefill.firstName,
+    lastName: data.lastName || restoredPrefill.lastName,
+    preferredName: data.preferredName || restoredPrefill.preferredName,
+    mobilePhone: data.mobilePhone || restoredPrefill.mobilePhone,
+    streetAddress: data.streetAddress || restoredPrefill.streetAddress,
+    city: data.city || restoredPrefill.city,
+    stateOrProvince: data.stateOrProvince || restoredPrefill.stateOrProvince,
+    postalCode: data.postalCode || restoredPrefill.postalCode,
+    country: data.country || restoredPrefill.country,
+  };
+  const [identityPrefillMessage, setIdentityPrefillMessage] = useState<
+    string | null
+  >(() =>
+    identityQuickUploadEnabled ? restoredIdentityMessage(identityDocument) : null,
+  );
   const requiredFields = new Set<AboutYouConfigurableField>(
     screenConfiguration?.requiredFields ?? [
       "firstName",
@@ -1745,36 +1858,17 @@ function StepFields({
   );
   const fieldRequired = (field: AboutYouConfigurableField) => requiredFields.has(field);
   const prefillIdentity = useCallback((document: StudentDocument) => {
+    onIdentityDocumentChanged(document);
     const extraction = document.extraction;
     if (extraction?.status === "processing") {
       setIdentityPrefillMessage("Your ID is uploaded. We will prefill available details when parsing finishes.");
       return;
     }
     if (extraction?.status !== "completed" || extraction.documentType !== "identity") {
-      setIdentityPrefillMessage(
-        "Your ID is safely stored. Enter any missing details manually while staff review continues.",
-      );
+      setIdentityPrefillMessage(restoredIdentityMessage(document));
       return;
     }
-    const values = new Map(
-      extraction.fields.map((field) => [field.key, String(field.value ?? "").trim()]),
-    );
-    const fullName = extraction.studentName?.trim() ?? "";
-    const nameParts = fullName.split(/\s+/).filter(Boolean);
-    const inferredFirst = values.get("first_name") || nameParts[0] || "";
-    const inferredLast =
-      values.get("last_name") || (nameParts.length > 1 ? nameParts.slice(1).join(" ") : "");
-    const candidates: Record<string, string> = {
-      firstName: inferredFirst,
-      lastName: inferredLast,
-      preferredName: values.get("preferred_name") || inferredFirst,
-      mobilePhone: values.get("mobile_phone") || "",
-      streetAddress: values.get("street_address") || "",
-      city: values.get("city") || "",
-      stateOrProvince: values.get("state_or_province") || "",
-      postalCode: values.get("postal_code") || "",
-      country: values.get("country") || "",
-    };
+    const candidates = identityPrefillCandidates(document);
     let filled = 0;
     for (const [name, value] of Object.entries(candidates)) {
       const input = aboutYouRoot.current?.querySelector<HTMLInputElement>(`[name="${name}"]`);
@@ -1789,7 +1883,7 @@ function StepFields({
         ? `${filled} field${filled === 1 ? " was" : "s were"} prefilled from your ID. Please review before continuing.`
         : "Your ID was parsed. Review the details below and fill any fields that remain empty.",
     );
-  }, []);
+  }, [onIdentityDocumentChanged]);
   switch (step) {
     case "offer":
       return (
@@ -1838,7 +1932,7 @@ function StepFields({
     case "about_you":
       return (
         <div className="onboarding-about-you" ref={aboutYouRoot}>
-          {screenConfiguration?.identityQuickUpload !== false ? (
+          {identityQuickUploadEnabled ? (
             <section className="form-section onboarding-id-prefill" aria-labelledby="identity-prefill-title">
               <div>
                 <p className="eyebrow">Quick fill · optional</p>
@@ -1849,10 +1943,26 @@ function StepFields({
                 </p>
               </div>
               <DocumentUpload
+                activeDocument={identityDocument}
                 categoryHint="identity"
                 expectedLabel="an ID image or PDF"
                 onUploaded={prefillIdentity}
               />
+              {identityDocument?.status === "rejected" ? (
+                <div className="extraction-state extraction-state--error" role="alert">
+                  <strong>This ID needs a replacement</strong>
+                  <p>
+                    The original remains in your student record, but it was not
+                    accepted. Add a clearer or correct identity document above.
+                  </p>
+                </div>
+              ) : identityDocument ? (
+                <DocumentExtractionReview
+                  key={`${identityDocument.id}:${identityDocument.extraction?.status ?? "stored"}`}
+                  document={identityDocument}
+                  onDocumentChanged={prefillIdentity}
+                />
+              ) : null}
               {identityPrefillMessage ? (
                 <p className="action-feedback" role="status">{identityPrefillMessage}</p>
               ) : null}
@@ -1861,7 +1971,7 @@ function StepFields({
           {screenConfiguration?.fields?.length ? (
             <ConfiguredAboutYouFields
               fields={screenConfiguration.fields}
-              data={data}
+              data={prefilledData}
             />
           ) : (
             <>
@@ -1879,7 +1989,7 @@ function StepFields({
                   required={fieldRequired("firstName")}
                   maxLength={120}
                   autoComplete="given-name"
-                  defaultValue={data.firstName ?? ""}
+                  defaultValue={prefilledData.firstName ?? ""}
                 />
               </label>
               <label className="field">
@@ -1889,7 +1999,7 @@ function StepFields({
                   required={fieldRequired("lastName")}
                   maxLength={120}
                   autoComplete="family-name"
-                  defaultValue={data.lastName ?? ""}
+                  defaultValue={prefilledData.lastName ?? ""}
                 />
               </label>
               <label className="field">
@@ -1899,7 +2009,7 @@ function StepFields({
                   required={fieldRequired("preferredName")}
                   maxLength={120}
                   autoComplete="nickname"
-                  defaultValue={data.preferredName ?? ""}
+                  defaultValue={prefilledData.preferredName ?? ""}
                 />
               </label>
               <label className="field">
@@ -1923,7 +2033,7 @@ function StepFields({
                   autoComplete="tel"
                   inputMode="tel"
                   placeholder="+1 555 010 0300"
-                  defaultValue={data.mobilePhone ?? ""}
+                  defaultValue={prefilledData.mobilePhone ?? ""}
                 />
               </label>
               <label className="field">
@@ -1964,7 +2074,7 @@ function StepFields({
                 <span>Street address</span>
                 <input
                   name="streetAddress"
-                  defaultValue={data.streetAddress ?? ""}
+                  defaultValue={prefilledData.streetAddress ?? ""}
                   autoComplete="street-address"
                   maxLength={180}
                   required={fieldRequired("streetAddress")}
@@ -1982,7 +2092,7 @@ function StepFields({
                 <span>City</span>
                 <input
                   name="city"
-                  defaultValue={data.city ?? ""}
+                  defaultValue={prefilledData.city ?? ""}
                   autoComplete="address-level2"
                   maxLength={120}
                   required={fieldRequired("city")}
@@ -1992,7 +2102,7 @@ function StepFields({
                 <span>State / province</span>
                 <input
                   name="stateOrProvince"
-                  defaultValue={data.stateOrProvince ?? ""}
+                  defaultValue={prefilledData.stateOrProvince ?? ""}
                   autoComplete="address-level1"
                   maxLength={120}
                   required={fieldRequired("stateOrProvince")}
@@ -2002,7 +2112,7 @@ function StepFields({
                 <span>ZIP / postal code</span>
                 <input
                   name="postalCode"
-                  defaultValue={data.postalCode ?? ""}
+                  defaultValue={prefilledData.postalCode ?? ""}
                   autoComplete="postal-code"
                   maxLength={32}
                   required={fieldRequired("postalCode")}
@@ -2012,7 +2122,7 @@ function StepFields({
                 <span>Country</span>
                 <select
                   name="country"
-                  defaultValue={data.country ?? ""}
+                  defaultValue={prefilledData.country ?? ""}
                   autoComplete="country-name"
                   required={fieldRequired("country")}
                 >
@@ -2393,6 +2503,7 @@ function OnboardingFlow({
   initialPayments,
   housingPlan,
   campusLife,
+  initialDocuments,
   reload,
 }: {
   initial: StudentOnboarding;
@@ -2400,6 +2511,7 @@ function OnboardingFlow({
   initialPayments: StudentPaymentList;
   housingPlan: StudentHousingPlan;
   campusLife: CampusLifeFeed;
+  initialDocuments: StudentDocumentList;
   reload: () => void;
 }) {
   const tenantRuntime = useTenant();
@@ -2411,6 +2523,41 @@ function OnboardingFlow({
   const [offer, setOffer] = useState(dashboard.offer);
   const [depositPaid, setDepositPaid] = useState(
     initialPayments.items.some((payment) => payment.status === "succeeded"),
+  );
+  const serverIdentityDocument = latestDocumentForCategory(
+    initialDocuments.items,
+    "identity",
+  );
+  const [identityDocumentProjection, setIdentityDocumentProjection] =
+    useState<DocumentExtractionProjectionState | null>(null);
+  const identityDocument = useMemo(() => {
+    if (!identityDocumentProjection) return serverIdentityDocument;
+    if (!serverIdentityDocument) return identityDocumentProjection.document;
+    if (serverIdentityDocument.id !== identityDocumentProjection.document.id) {
+      return Date.parse(serverIdentityDocument.createdAt) >
+        Date.parse(identityDocumentProjection.document.createdAt)
+        ? serverIdentityDocument
+        : identityDocumentProjection.document;
+    }
+    return reconcileDocumentExtractionProjection(
+      identityDocumentProjection,
+      serverIdentityDocument,
+    ).document;
+  }, [identityDocumentProjection, serverIdentityDocument]);
+  const rememberIdentityDocument = useCallback(
+    (document: StudentDocument) => {
+      setIdentityDocumentProjection((current) =>
+        beginDocumentExtractionProjection(
+          document,
+          current?.document.id === document.id
+            ? current.document
+            : serverIdentityDocument?.id === document.id
+              ? serverIdentityDocument
+              : null,
+        ),
+      );
+    },
+    [serverIdentityDocument],
   );
   const [error, setError] = useState<string | null>(null);
   const completeKey = useRef<string | null>(null);
@@ -2597,6 +2744,8 @@ function OnboardingFlow({
               depositPaid={depositPaid}
               housingPlan={housingPlan}
               campusLife={campusLife}
+              identityDocument={identityDocument}
+              onIdentityDocumentChanged={rememberIdentityDocument}
               screenConfiguration={onboarding.screenConfigurations?.[viewingStep]}
             />
             {error || save.message || complete.message ? (
@@ -2704,6 +2853,7 @@ function OnboardingResource() {
         profile,
         housingPlan,
         campusLife,
+        documents,
       ] = await Promise.all([
         getStudentOnboarding(signal),
         getStudentDashboard(signal),
@@ -2711,6 +2861,7 @@ function OnboardingResource() {
         getStudentProfile(signal),
         getStudentHousingPlan(signal),
         getCampusLife(signal),
+        getStudentDocuments(signal),
       ]);
       return {
         onboarding: {
@@ -2737,6 +2888,7 @@ function OnboardingResource() {
         profile,
         housingPlan,
         campusLife,
+        documents,
       };
     },
     [],
@@ -2787,6 +2939,7 @@ function OnboardingResource() {
       initialPayments={onboarding.data.payments}
       housingPlan={onboarding.data.housingPlan}
       campusLife={onboarding.data.campusLife}
+      initialDocuments={onboarding.data.documents}
       reload={onboarding.reload}
       key={onboarding.data.onboarding.version}
     />

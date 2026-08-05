@@ -1176,6 +1176,58 @@ test("reconciles document extraction failure and retry projections", async () =>
     extractionUi.defaultAcceptedDocumentExtractionFieldKeys({ fields: [] }),
     [],
   );
+
+  const latestIdentity = extractionUi.latestDocumentForCategory(
+    [
+      {
+        id: "identity-old",
+        category: "identity",
+        status: "uploaded",
+        createdAt: "2026-08-05T07:10:00.000Z",
+      },
+      {
+        id: "identity-new",
+        category: "identity",
+        status: "uploaded",
+        createdAt: "2026-08-05T07:20:00.000Z",
+      },
+      {
+        id: "transcript-newer",
+        category: "transcript",
+        status: "uploaded",
+        createdAt: "2026-08-05T07:30:00.000Z",
+      },
+    ],
+    "identity",
+  );
+  assert.equal(latestIdentity.id, "identity-new");
+});
+
+test("onboarding restores identity extraction state and bounds upload waits", async () => {
+  const [onboarding, uploader, client] = await Promise.all([
+    readFile(new URL("../app/onboarding/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/document-upload.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(onboarding, /getStudentDocuments\(signal\)/);
+  assert.match(
+    onboarding,
+    /latestDocumentForCategory\(\s*initialDocuments\.items,\s*"identity",?\s*\)/,
+  );
+  assert.match(onboarding, /activeDocument=\{identityDocument\}/);
+  assert.match(onboarding, /DocumentExtractionReview/);
+  assert.match(onboarding, /identityQuickUploadEnabled[\s\S]*identityPrefillCandidates/);
+  assert.match(onboarding, /document\?\.status === "rejected"/);
+  assert.match(onboarding, /reconcileDocumentExtractionProjection/);
+  assert.match(onboarding, /rememberIdentityDocument/);
+  assert.match(client, /AbortSignal\.timeout\(120_000\)/);
+  assert.match(client, /bundleDeadline = AbortSignal\.timeout\(300_000\)/);
+  assert.match(client, /AbortSignal\.any\(\[bundleDeadline/);
+  assert.match(uploader, /requestController = new AbortController\(\)/);
+  assert.match(uploader, /requestController\?\.abort\(\)/);
+  assert.match(uploader, /if \(cancelled\) return;[\s\S]*const stillProcessing/);
+  assert.match(uploader, /finally \{[\s\S]*setIsUploading\(false\)/);
 });
 
 test("document views retain retry authority and expose failed extraction alerts", async () => {

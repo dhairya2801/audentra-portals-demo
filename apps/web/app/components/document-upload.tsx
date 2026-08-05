@@ -206,6 +206,7 @@ export function DocumentUpload({
     const observedCurrentProcessing = new Set<string>();
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let requestController: AbortController | undefined;
     let attempts = 0;
     const deadlines = processingDeadlineKey
       .split(",")
@@ -220,8 +221,13 @@ export function DocumentUpload({
       timer = setTimeout(async () => {
         if (cancelled) return;
         attempts += 1;
+        requestController = new AbortController();
+        const requestTimeout = setTimeout(
+          () => requestController?.abort(),
+          10_000,
+        );
         try {
-          const latest = await getStudentDocuments();
+          const latest = await getStudentDocuments(requestController.signal);
           const changed = latest.items
             .filter((item) => watchedIds.has(item.id))
             .map((candidate) => {
@@ -262,6 +268,7 @@ export function DocumentUpload({
               await onUploadedRef.current(document);
             }
           }
+          if (cancelled) return;
 
           const stillProcessing = changed.some(
             (document) => document.extraction?.status === "processing",
@@ -298,6 +305,9 @@ export function DocumentUpload({
             );
             void poll();
           }
+        } finally {
+          clearTimeout(requestTimeout);
+          requestController = undefined;
         }
       }, Date.now() >= expectedCompletionAt ? 15_000 : Math.min(5_000, 1_000 + attempts * 500));
     };
@@ -306,6 +316,7 @@ export function DocumentUpload({
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
+      requestController?.abort();
     };
   }, [
     categoryHint,
@@ -419,78 +430,94 @@ export function DocumentUpload({
     );
     setIsUploading(true);
 
-    const results = await uploadStudentDocumentBundle(
-      queuedDocuments.map(({ file, idempotencyKey }) => ({
-        file,
-        idempotencyKey,
-      })),
-      { categoryHint, requirementId },
-      {
-        onFileStart: (entry) => {
-          setDocuments((current) =>
-            current.map((item) =>
-              item.idempotencyKey === entry.idempotencyKey
-                ? { ...item, status: "uploading", message: null }
-                : item,
-            ),
-          );
+    try {
+      const results = await uploadStudentDocumentBundle(
+        queuedDocuments.map(({ file, idempotencyKey }) => ({
+          file,
+          idempotencyKey,
+        })),
+        { categoryHint, requirementId },
+        {
+          onFileStart: (entry) => {
+            setDocuments((current) =>
+              current.map((item) =>
+                item.idempotencyKey === entry.idempotencyKey
+                  ? { ...item, status: "uploading", message: null }
+                  : item,
+              ),
+            );
+          },
+          onFileSettled: (result) => {
+            setDocuments((current) =>
+              current.map((item) =>
+                item.idempotencyKey === result.idempotencyKey
+                  ? resultToDocumentState(item, result)
+                  : item,
+              ),
+            );
+          },
         },
-        onFileSettled: (result) => {
-          setDocuments((current) =>
-            current.map((item) =>
-              item.idempotencyKey === result.idempotencyKey
-                ? resultToDocumentState(item, result)
-                : item,
-            ),
-          );
-        },
-      },
-    );
+      );
 
-    const uploaded = results.filter(
-      (result): result is Extract<StudentDocumentUploadBundleResult, { status: "uploaded" }> =>
-        result.status === "uploaded",
-    );
-    for (const result of uploaded) {
-      try {
-        await onUploaded(result.document);
-      } catch {
-        // The original document and extraction were saved. A parent refresh can retry later.
+      const uploaded = results.filter(
+        (
+          result,
+        ): result is Extract<
+          StudentDocumentUploadBundleResult,
+          { status: "uploaded" }
+        > => result.status === "uploaded",
+      );
+      for (const result of uploaded) {
+        try {
+          await onUploaded(result.document);
+        } catch {
+          // The original document and extraction were saved. A parent refresh can retry later.
+        }
       }
-    }
 
-    const failedCount = results.length - uploaded.length;
-    const acceptedCount = uploaded.filter(
-      (result) =>
-        result.document.extraction?.status === "completed" &&
-        matchesExpectedCategory(result.document, categoryHint),
-    ).length;
-    const processingCount = uploaded.filter(
-      (result) => result.document.extraction?.status === "processing",
-    ).length;
-    const manualReviewCount = uploaded.filter(
-      (result) =>
-        result.document.processingMode === "manual_review" &&
-        result.document.status === "under_review",
-    ).length;
-    const storedForAttentionCount = uploaded.length - acceptedCount;
-    const completedVerb = classificationOnly ? "checked" : "parsed";
-    setBundleMessage(
-      failedCount > 0
-        ? `${uploaded.length} stored; ${failedCount} need${
-            failedCount === 1 ? "s" : ""
-          } attention before upload could finish.`
-        : processingCount > 0
-          ? `${uploaded.length} original document${uploaded.length === 1 ? " is" : "s are"} safely stored. Edward is ${classificationOnly ? "checking document types" : `extracting ${processingCount === uploaded.length ? "them" : "the remaining files"}`} in the background.`
-        : manualReviewCount === uploaded.length && manualReviewCount > 0
-          ? `${manualReviewCount} original document${manualReviewCount === 1 ? " was" : "s were"} safely stored and sent for staff review.`
-        : storedForAttentionCount > 0
-          ? `${acceptedCount} document${acceptedCount === 1 ? "" : "s"} ${completedVerb}; ${storedForAttentionCount} safely stored but need${
-              storedForAttentionCount === 1 ? "s" : ""
-            } parsing attention.`
-          : `${acceptedCount} document${acceptedCount === 1 ? "" : "s"} ${completedVerb} and ready for your review.`
-    );
-    setIsUploading(false);
+      const failedCount = results.length - uploaded.length;
+      const acceptedCount = uploaded.filter(
+        (result) =>
+          result.document.extraction?.status === "completed" &&
+          matchesExpectedCategory(result.document, categoryHint),
+      ).length;
+      const processingCount = uploaded.filter(
+        (result) => result.document.extraction?.status === "processing",
+      ).length;
+      const manualReviewCount = uploaded.filter(
+        (result) =>
+          result.document.processingMode === "manual_review" &&
+          result.document.status === "under_review",
+      ).length;
+      const storedForAttentionCount = uploaded.length - acceptedCount;
+      const completedVerb = classificationOnly ? "checked" : "parsed";
+      setBundleMessage(
+        failedCount > 0
+          ? `${uploaded.length} stored; ${failedCount} need${
+              failedCount === 1 ? "s" : ""
+            } attention before upload could finish.`
+          : processingCount > 0
+            ? `${uploaded.length} original document${uploaded.length === 1 ? " is" : "s are"} safely stored. Edward is ${classificationOnly ? "checking document types" : `extracting ${processingCount === uploaded.length ? "them" : "the remaining files"}`} in the background.`
+            : manualReviewCount === uploaded.length && manualReviewCount > 0
+              ? `${manualReviewCount} original document${manualReviewCount === 1 ? " was" : "s were"} safely stored and sent for staff review.`
+              : storedForAttentionCount > 0
+                ? `${acceptedCount} document${acceptedCount === 1 ? "" : "s"} ${completedVerb}; ${storedForAttentionCount} safely stored but need${
+                    storedForAttentionCount === 1 ? "s" : ""
+                  } parsing attention.`
+                : `${acceptedCount} document${acceptedCount === 1 ? "" : "s"} ${completedVerb} and ready for your review.`,
+      );
+    } catch (error) {
+      setDocuments((current) =>
+        current.map((item) =>
+          item.status === "uploading"
+            ? { ...item, status: "error", message: getUploadErrorMessage(error) }
+            : item,
+        ),
+      );
+      setBundleMessage(getUploadErrorMessage(error));
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -624,7 +651,11 @@ export function DocumentUpload({
             : parsingEnabled
               ? "Uploading and extracting…"
             : "Uploading securely…"
-          : documents.some((item) => item.status === "error" && !item.validationError)
+          : documents.length === 0
+            ? "Select a file above to upload"
+            : documents.some(
+                  (item) => item.status === "error" && !item.validationError,
+                )
             ? "Retry files needing attention"
             : categoryHint === "transcript"
               ? "Upload transcript files"
