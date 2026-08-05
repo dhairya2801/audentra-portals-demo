@@ -19,6 +19,12 @@ import {
   uploadStudentDocumentBundle,
   type StudentDocumentUploadBundleResult,
 } from "../lib/api-client";
+import {
+  currentDocumentProjection,
+  processingDocumentProjections,
+  reconcileProcessingPollProjection,
+  terminalDocumentProjectionFingerprint,
+} from "../lib/document-extraction-ui";
 
 const maximumFileBytes = 10 * 1024 * 1024;
 const maximumBundleBytes = 30 * 1024 * 1024;
@@ -51,24 +57,29 @@ function getUploadErrorMessage(error: unknown) {
   return "We couldn’t upload this file. Check your connection and try again.";
 }
 
-function statusLabel(item: SelectedDocument) {
+function statusLabel(
+  item: SelectedDocument,
+  activeDocument?: StudentDocument | null,
+) {
+  const document =
+    activeDocument?.id === item.document?.id ? activeDocument : item.document;
   if (item.validationError) return item.validationError;
   if (item.status === "queued") return "Ready to upload";
   if (item.status === "uploading") return "Saving original document…";
   if (item.status === "uploaded") {
     if (
-      item.document?.processingMode === "manual_review" &&
-      item.document.status === "under_review"
+      document?.processingMode === "manual_review" &&
+      document.status === "under_review"
     ) {
       return "Original stored for staff review";
     }
-    const extraction = item.document?.extraction;
+    const extraction = document?.extraction;
     return extraction?.status === "processing"
-      ? item.document?.processingMode === "classification_only"
+      ? document?.processingMode === "classification_only"
         ? "Original saved; Edward is checking the document type"
         : "Original saved; Edward is extracting it"
       : extraction?.status === "completed"
-      ? `${item.document?.processingMode === "classification_only" ? "Classified" : "Extracted"} as ${extraction.documentType.replaceAll("_", " ")}`
+      ? `${document?.processingMode === "classification_only" ? "Classified" : "Extracted"} as ${extraction.documentType.replaceAll("_", " ")}`
       : extraction?.status === "failed"
         ? "Stored; parsing needs attention"
         : extraction?.status === "pending_configuration"
@@ -113,55 +124,86 @@ export function DocumentUpload({
   const [isUploading, setIsUploading] = useState(false);
   const [bundleMessage, setBundleMessage] = useState<string | null>(null);
   const onUploadedRef = useRef(onUploaded);
+  const processingDocumentsRef = useRef<readonly StudentDocument[]>([]);
+  const supersededTerminalFingerprintsRef = useRef(new Map<string, string>());
+  const previousActiveDocumentRef = useRef(activeDocument);
   const processingMode = categoryHint
     ? documentProcessingModeForCategory(categoryHint)
     : "manual_review";
   const parsingEnabled = processingMode !== "manual_review";
   const classificationOnly = processingMode === "classification_only";
-  const reconciledActiveDocument = activeDocument
-    ? documents.find((item) => item.document?.id === activeDocument.id)?.document ??
-      activeDocument
-    : activeDocument;
+  const localActiveDocument = activeDocument
+    ? documents.find((item) => item.document?.id === activeDocument.id)?.document
+    : null;
+  const reconciledActiveDocument = currentDocumentProjection(
+    localActiveDocument,
+    activeDocument,
+  );
   const serverProcessing =
     reconciledActiveDocument?.extraction?.status === "processing";
   useEffect(() => {
     onUploadedRef.current = onUploaded;
   }, [onUploaded]);
-  const processingDocumentIds = useMemo(
+  const processingDocuments = useMemo(
     () =>
-      documents
-        .filter(
-          (item) =>
-            item.status === "uploaded" &&
-            item.document?.extraction?.status === "processing",
-        )
-        .map((item) => item.document?.id)
-        .filter((id): id is string => Boolean(id))
-        .sort(),
-    [documents],
+      processingDocumentProjections(
+        documents
+          .filter((item) => item.status === "uploaded")
+          .map((item) => item.document)
+          .filter((document): document is StudentDocument => Boolean(document)),
+        reconciledActiveDocument,
+      ),
+    [documents, reconciledActiveDocument],
   );
+  const processingDocumentIds = processingDocuments
+    .map((document) => document.id)
+    .sort();
   const processingDocumentKey = processingDocumentIds.join(",");
   const processingDeadlineKey = useMemo(
     () =>
-      documents
-        .filter(
-          (item) =>
-            item.status === "uploaded" &&
-            item.document?.extraction?.status === "processing",
-        )
+      processingDocuments
         .map(
-          (item) =>
-            `${item.document?.id ?? ""}:${item.document?.extraction?.processingDeadlineAt ?? ""}`,
+          (document) =>
+            `${document.id}:${document.extraction?.processingDeadlineAt ?? ""}`,
         )
         .sort()
         .join(","),
-    [documents],
+    [processingDocuments],
   );
+  useEffect(() => {
+    processingDocumentsRef.current = processingDocuments;
+  }, [processingDocuments]);
+  useEffect(() => {
+    const previousActiveDocument = previousActiveDocumentRef.current;
+    if (activeDocument) previousActiveDocumentRef.current = activeDocument;
+    if (!reconciledActiveDocument) return;
+    if (reconciledActiveDocument.extraction?.status !== "processing") {
+      supersededTerminalFingerprintsRef.current.delete(
+        reconciledActiveDocument.id,
+      );
+      return;
+    }
+    const fingerprint =
+      terminalDocumentProjectionFingerprint(localActiveDocument) ??
+      (previousActiveDocument?.id === reconciledActiveDocument.id
+        ? terminalDocumentProjectionFingerprint(previousActiveDocument)
+        : null);
+    if (fingerprint) {
+      supersededTerminalFingerprintsRef.current.set(
+        reconciledActiveDocument.id,
+        fingerprint,
+      );
+    }
+  }, [activeDocument, localActiveDocument, reconciledActiveDocument]);
 
   useEffect(() => {
     if (!processingDocumentKey) return;
 
     const watchedIds = new Set(processingDocumentKey.split(","));
+    const processingById = new Map(
+      processingDocumentsRef.current.map((document) => [document.id, document]),
+    );
+    const observedCurrentProcessing = new Set<string>();
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let attempts = 0;
@@ -180,7 +222,30 @@ export function DocumentUpload({
         attempts += 1;
         try {
           const latest = await getStudentDocuments();
-          const changed = latest.items.filter((item) => watchedIds.has(item.id));
+          const changed = latest.items
+            .filter((item) => watchedIds.has(item.id))
+            .map((candidate) => {
+              const processingDocument = processingById.get(candidate.id);
+              if (!processingDocument) return candidate;
+              const reconciled = reconcileProcessingPollProjection(
+                processingDocument,
+                candidate,
+                {
+                  supersededTerminalFingerprint:
+                    supersededTerminalFingerprintsRef.current.get(candidate.id),
+                  observedCurrentProcessing: observedCurrentProcessing.has(
+                    candidate.id,
+                  ),
+                },
+              );
+              if (reconciled.observedCurrentProcessing) {
+                observedCurrentProcessing.add(candidate.id);
+              }
+              if (reconciled.document.extraction?.status === "processing") {
+                processingById.set(candidate.id, reconciled.document);
+              }
+              return reconciled.document;
+            });
           if (cancelled) return;
 
           setDocuments((current) =>
@@ -508,7 +573,8 @@ export function DocumentUpload({
               <li key={item.id}>
                 <strong>{item.file.name}</strong>
                 {" · "}
-                {formatFileSize(item.file.size)} · {statusLabel(item)}
+                {formatFileSize(item.file.size)} ·{" "}
+                {statusLabel(item, reconciledActiveDocument)}
                 {item.status !== "uploading" && item.status !== "uploaded" ? (
                   <button
                     type="button"

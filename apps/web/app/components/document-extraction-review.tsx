@@ -4,10 +4,8 @@ import type { StudentDocument } from "@vv/contracts";
 import { useCallback, useRef, useState } from "react";
 import { useApiAction } from "../hooks/use-api-resource";
 import { confirmStudentDocumentExtraction } from "../lib/api-client";
-import {
-  canRetryDocumentExtraction,
-  DocumentExtractionRetry,
-} from "./document-extraction-retry";
+import { documentExtractionFailurePresentation } from "../lib/document-extraction-ui";
+import { DocumentExtractionRetry } from "./document-extraction-retry";
 import { ActionFeedback } from "./portal-ui";
 
 /**
@@ -80,15 +78,12 @@ export function DocumentExtractionReview({
   }
 
   if (extraction.status === "failed") {
-    const retryable = canRetryDocumentExtraction(document);
+    const failure = documentExtractionFailurePresentation(extraction);
     return (
-      <div className="extraction-state extraction-state--error">
-        <strong>
-          {retryable
-            ? "The original is safe, but extraction needs a retry"
-            : "The original is safe, but this parser cannot complete it"}
-        </strong>
+      <div className="extraction-state extraction-state--error" role="alert">
+        <strong>{failure.title}</strong>
         <p>{extraction.summary}</p>
+        <p className="muted">{failure.guidance}</p>
         {extraction.warnings.length ? (
           <ul className="extraction-warnings">
             {extraction.warnings.map((warning) => (

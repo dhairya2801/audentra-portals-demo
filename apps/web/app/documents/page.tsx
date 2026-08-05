@@ -4,11 +4,8 @@ import type {
   StudentDocument,
   StudentDocumentList,
 } from "@vv/contracts";
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  canRetryDocumentExtraction,
-  DocumentExtractionRetry,
-} from "../components/document-extraction-retry";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DocumentExtractionRetry } from "../components/document-extraction-retry";
 import { DocumentUpload } from "../components/document-upload";
 import { PortalShell } from "../components/portal-shell";
 import {
@@ -25,6 +22,14 @@ import {
   getStudentDocumentContentUrl,
   getStudentDocuments,
 } from "../lib/api-client";
+import {
+  beginDocumentExtractionProjection,
+  defaultAcceptedDocumentExtractionFieldKeys,
+  documentExtractionFailurePresentation,
+  preferredDocumentProjection,
+  reconcileDocumentExtractionProjection,
+  type DocumentExtractionProjectionState,
+} from "../lib/document-extraction-ui";
 
 const exampleDocuments = [
   {
@@ -74,12 +79,12 @@ function ExtractionReview({
   onDocumentChanged,
 }: {
   document: StudentDocument;
-  onDocumentChanged: () => void;
+  onDocumentChanged: (document: StudentDocument) => void;
 }) {
   const extraction = document.extraction;
   const intentKey = useRef<string | null>(null);
   const [acceptedKeys, setAcceptedKeys] = useState(
-    () => new Set(extraction?.fields.map((field) => field.key) ?? []),
+    () => new Set(defaultAcceptedDocumentExtractionFieldKeys(extraction)),
   );
   const confirmAction = useCallback(
     (fieldKeys: string[], key: string) =>
@@ -128,15 +133,12 @@ function ExtractionReview({
   }
 
   if (extraction.status === "failed") {
-    const retryable = canRetryDocumentExtraction(document);
+    const failure = documentExtractionFailurePresentation(extraction);
     return (
-      <div className="extraction-state extraction-state--error">
-        <strong>
-          {retryable
-            ? "The original is safe, but extraction needs a retry"
-            : "The original is safe, but this parser cannot complete it"}
-        </strong>
+      <div className="extraction-state extraction-state--error" role="alert">
+        <strong>{failure.title}</strong>
         <p>{extraction.summary}</p>
+        <p className="muted">{failure.guidance}</p>
         {extraction.warnings.length ? (
           <ul className="extraction-warnings">
             {extraction.warnings.map((warning) => (
@@ -179,9 +181,9 @@ function ExtractionReview({
     const key =
       intentKey.current ?? (intentKey.current = crypto.randomUUID());
     try {
-      await confirm.run([...acceptedKeys], key);
+      const changed = await confirm.run([...acceptedKeys], key);
       intentKey.current = null;
-      onDocumentChanged();
+      onDocumentChanged(changed);
     } catch {
       // Keep the idempotency key for a safe retry of the same confirmation.
     }
@@ -268,10 +270,10 @@ function ExtractionReview({
 
 function DocumentWorkspace({
   list,
-  reload,
+  onDocumentChanged,
 }: {
   list: StudentDocumentList;
-  reload: () => void;
+  onDocumentChanged: (document: StudentDocument) => void;
 }) {
   return (
     <>
@@ -285,7 +287,7 @@ function DocumentWorkspace({
             overwrites verified profile information.
           </p>
         </div>
-        <DocumentUpload onUploaded={() => reload()} />
+        <DocumentUpload onUploaded={onDocumentChanged} />
       </section>
 
       <div className="documents-layout">
@@ -408,8 +410,9 @@ function DocumentWorkspace({
                         </dl>
                       ) : (
                         <ExtractionReview
+                          key={`${document.id}:${document.extraction?.status ?? "none"}:${document.extraction?.processedAt ?? ""}`}
                           document={document}
-                          onDocumentChanged={reload}
+                          onDocumentChanged={onDocumentChanged}
                         />
                       )}
                     </div>
@@ -488,6 +491,28 @@ function DocumentWorkspace({
   );
 }
 
+function applyDocumentProjections(
+  list: StudentDocumentList,
+  projections: Readonly<Record<string, DocumentExtractionProjectionState>>,
+): StudentDocumentList {
+  const documentsById = new Map(
+    list.items.map((document) => [document.id, document]),
+  );
+  for (const projection of Object.values(projections)) {
+    documentsById.set(
+      projection.document.id,
+      preferredDocumentProjection(
+        documentsById.get(projection.document.id),
+        projection,
+      ),
+    );
+  }
+  const items = [...documentsById.values()].sort(
+    (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
+  );
+  return { ...list, items, total: Math.max(list.total, items.length) };
+}
+
 export default function DocumentsPage() {
   const loadDocuments = useCallback(
     (signal: AbortSignal) => getStudentDocuments(signal),
@@ -495,19 +520,101 @@ export default function DocumentsPage() {
   );
   const documents = useApiResource(loadDocuments);
   const refreshDocuments = documents.refresh;
-
-  const hasPendingExtraction =
-    documents.data?.items.some(
-      (document) => document.extraction?.status === "processing",
-    ) ?? false;
+  const [documentProjections, setDocumentProjections] = useState<
+    Record<string, DocumentExtractionProjectionState>
+  >({});
+  const projectedDocuments = useMemo(
+    () =>
+      documents.data
+        ? applyDocumentProjections(documents.data, documentProjections)
+        : null,
+    [documentProjections, documents.data],
+  );
+  const pendingDocuments = useMemo(
+    () =>
+      projectedDocuments?.items.filter(
+        (document) => document.extraction?.status === "processing",
+      ) ?? [],
+    [projectedDocuments],
+  );
+  const pendingDocumentKey = pendingDocuments
+    .map((document) => document.id)
+    .sort()
+    .join(",");
+  const pendingDocumentsRef = useRef<readonly StudentDocument[]>([]);
+  useEffect(() => {
+    pendingDocumentsRef.current = pendingDocuments;
+  }, [pendingDocuments]);
+  const rememberDocumentProjection = useCallback(
+    (document: StudentDocument) => {
+      setDocumentProjections((current) => {
+        const previousDocument =
+          current[document.id]?.document ??
+          documents.data?.items.find((candidate) => candidate.id === document.id);
+        return {
+          ...current,
+          [document.id]: beginDocumentExtractionProjection(
+            document,
+            previousDocument,
+          ),
+        };
+      });
+      refreshDocuments();
+    },
+    [documents.data, refreshDocuments],
+  );
 
   useEffect(() => {
-    if (!hasPendingExtraction) return;
-    const interval = window.setInterval(() => {
-      void refreshDocuments();
-    }, 2_500);
-    return () => window.clearInterval(interval);
-  }, [hasPendingExtraction, refreshDocuments]);
+    if (!pendingDocumentKey) return;
+    let cancelled = false;
+    let timer: number | undefined;
+    const poll = () => {
+      timer = window.setTimeout(async () => {
+        try {
+          const latest = await getStudentDocuments();
+          if (cancelled) return;
+          setDocumentProjections((current) => {
+            let changed = false;
+            const next = { ...current };
+            for (const pendingDocument of pendingDocumentsRef.current) {
+              const candidate = latest.items.find(
+                (item) => item.id === pendingDocument.id,
+              );
+              if (!candidate) continue;
+              const projection =
+                current[pendingDocument.id] ??
+                beginDocumentExtractionProjection(pendingDocument);
+              const updatedProjection = reconcileDocumentExtractionProjection(
+                projection,
+                candidate,
+              );
+              if (
+                projection.document !== updatedProjection.document ||
+                projection.supersededTerminalFingerprint !==
+                  updatedProjection.supersededTerminalFingerprint ||
+                projection.observedCurrentProcessing !==
+                  updatedProjection.observedCurrentProcessing
+              ) {
+                next[pendingDocument.id] = updatedProjection;
+                changed = true;
+              }
+            }
+            return changed ? next : current;
+          });
+          refreshDocuments();
+        } catch {
+          refreshDocuments();
+        } finally {
+          if (!cancelled) poll();
+        }
+      }, 2_500);
+    };
+    poll();
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [pendingDocumentKey, refreshDocuments]);
 
   return (
     <PortalShell
@@ -521,7 +628,10 @@ export default function DocumentsPage() {
       ) : documents.status === "error" ? (
         <ErrorState message={documents.error} onRetry={documents.reload} />
       ) : (
-        <DocumentWorkspace list={documents.data} reload={documents.refresh} />
+        <DocumentWorkspace
+          list={projectedDocuments ?? documents.data}
+          onDocumentChanged={rememberDocumentProjection}
+        />
       )}
     </PortalShell>
   );

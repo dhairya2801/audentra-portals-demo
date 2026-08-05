@@ -966,6 +966,277 @@ test("coordinates recoverable server state and generates the dashboard brief", a
   assert.match(uploader, /15_000/);
 });
 
+test("reconciles document extraction failure and retry projections", async () => {
+  const source = await readFile(
+    new URL("../app/lib/document-extraction-ui.ts", import.meta.url),
+    "utf8",
+  );
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
+  const extractionUi = await import(moduleUrl);
+  const processing = {
+    id: "document-1",
+    createdAt: "2026-08-05T07:16:53.000Z",
+    extraction: { status: "processing" },
+  };
+  const failed = {
+    ...processing,
+    status: "uploaded",
+    extraction: {
+      status: "failed",
+      failureCode: "unknown",
+      retryable: true,
+      processedAt: "2026-08-05T07:17:12.000Z",
+      summary: "The previous parsing attempt could not be completed.",
+    },
+  };
+
+  const settled = extractionUi.currentDocumentProjection(processing, failed);
+  assert.equal(settled.extraction.status, "failed");
+  assert.deepEqual(
+    extractionUi.processingDocumentProjections([failed], settled),
+    [],
+  );
+
+  const retried = extractionUi.currentDocumentProjection(failed, processing);
+  assert.equal(retried.extraction.status, "processing");
+  assert.deepEqual(
+    extractionUi.processingDocumentProjections([failed], retried).map(
+      (document) => document.id,
+    ),
+    ["document-1"],
+  );
+
+  const supersededFingerprint =
+    extractionUi.terminalDocumentProjectionFingerprint(failed);
+  const staleListResult = extractionUi.reconcileProcessingPollProjection(
+    retried,
+    failed,
+    {
+      supersededTerminalFingerprint: supersededFingerprint,
+      observedCurrentProcessing: false,
+    },
+  );
+  assert.equal(staleListResult.document.extraction.status, "processing");
+  assert.equal(staleListResult.observedCurrentProcessing, false);
+
+  const currentListResult = extractionUi.reconcileProcessingPollProjection(
+    retried,
+    processing,
+    {
+      supersededTerminalFingerprint: supersededFingerprint,
+      observedCurrentProcessing: false,
+    },
+  );
+  assert.equal(currentListResult.observedCurrentProcessing, true);
+
+  const terminalAfterObservedProcessing =
+    extractionUi.reconcileProcessingPollProjection(
+      currentListResult.document,
+      failed,
+      {
+        supersededTerminalFingerprint: supersededFingerprint,
+        observedCurrentProcessing:
+          currentListResult.observedCurrentProcessing,
+      },
+    );
+  assert.equal(
+    terminalAfterObservedProcessing.document.extraction.status,
+    "failed",
+  );
+
+  const optimisticRetry = extractionUi.beginDocumentExtractionProjection(
+    processing,
+    failed,
+  );
+  const optimisticAfterStaleList =
+    extractionUi.reconcileDocumentExtractionProjection(
+      optimisticRetry,
+      failed,
+    );
+  assert.equal(
+    optimisticAfterStaleList.document.extraction.status,
+    "processing",
+  );
+  const optimisticAfterCurrentList =
+    extractionUi.reconcileDocumentExtractionProjection(
+      optimisticAfterStaleList,
+      processing,
+    );
+  assert.equal(optimisticAfterCurrentList.observedCurrentProcessing, true);
+  const optimisticAfterTerminal =
+    extractionUi.reconcileDocumentExtractionProjection(
+      optimisticAfterCurrentList,
+      failed,
+    );
+  assert.equal(optimisticAfterTerminal.document.extraction.status, "failed");
+
+  const newerFailure = {
+    ...failed,
+    extraction: {
+      ...failed.extraction,
+      processedAt: "2026-08-05T07:18:30.000Z",
+    },
+  };
+  const terminalListResult = extractionUi.reconcileProcessingPollProjection(
+    currentListResult.document,
+    newerFailure,
+    {
+      supersededTerminalFingerprint: supersededFingerprint,
+      observedCurrentProcessing:
+        currentListResult.observedCurrentProcessing,
+    },
+  );
+  assert.equal(terminalListResult.document.extraction.status, "failed");
+
+  const completedProjection = extractionUi.beginDocumentExtractionProjection({
+    ...processing,
+    status: "needs_review",
+    extraction: {
+      status: "completed",
+      processedAt: "2026-08-05T07:18:30.000Z",
+      verifiedAt: null,
+      summary: "The retry completed.",
+    },
+  });
+  assert.equal(
+    extractionUi.preferredDocumentProjection(failed, completedProjection)
+      .extraction.status,
+    "completed",
+  );
+  const newerServerRepresentation = {
+    ...completedProjection.document,
+    status: "accepted",
+  };
+  assert.equal(
+    extractionUi.preferredDocumentProjection(
+      newerServerRepresentation,
+      completedProjection,
+    ).status,
+    "accepted",
+  );
+
+  const confirmedProjection = extractionUi.beginDocumentExtractionProjection({
+    ...completedProjection.document,
+    status: "under_review",
+    extraction: {
+      ...completedProjection.document.extraction,
+      verifiedAt: "2026-08-05T07:19:00.000Z",
+      acceptedFieldKeys: ["student_name"],
+    },
+  });
+  assert.equal(
+    extractionUi.preferredDocumentProjection(
+      completedProjection.document,
+      confirmedProjection,
+    ).status,
+    "under_review",
+  );
+  const confirmedServerRepresentation = {
+    ...confirmedProjection.document,
+    status: "accepted",
+  };
+  assert.equal(
+    extractionUi.preferredDocumentProjection(
+      confirmedServerRepresentation,
+      confirmedProjection,
+    ).status,
+    "accepted",
+  );
+
+  const invalidResponse = extractionUi.documentExtractionFailurePresentation({
+    failureCode: "invalid_response",
+    retryable: true,
+  });
+  assert.match(invalidResponse.title, /usable result/i);
+  assert.match(invalidResponse.guidance, /without uploading/i);
+
+  const unknown = extractionUi.documentExtractionFailurePresentation({
+    failureCode: "unknown",
+    retryable: true,
+  });
+  assert.match(unknown.title, /unexpected problem/i);
+  assert.match(unknown.guidance, /clearer PDF, JPEG, or PNG/i);
+
+  assert.deepEqual(
+    extractionUi.defaultAcceptedDocumentExtractionFieldKeys({
+      fields: [
+        { key: "student_name" },
+        { key: "date_of_birth" },
+      ],
+    }),
+    ["student_name", "date_of_birth"],
+  );
+  assert.deepEqual(
+    extractionUi.defaultAcceptedDocumentExtractionFieldKeys({ fields: [] }),
+    [],
+  );
+});
+
+test("document views retain retry authority and expose failed extraction alerts", async () => {
+  const [documentsPage, uploader, extractionReview, requirementPage] =
+    await Promise.all([
+      readFile(new URL("../app/documents/page.tsx", import.meta.url), "utf8"),
+      readFile(
+        new URL("../app/components/document-upload.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../app/components/document-extraction-review.tsx",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../app/enrollment/requirements/[slug]/page.tsx",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    ]);
+
+  assert.match(documentsPage, /onDocumentChanged: \(document: StudentDocument\)/);
+  assert.match(documentsPage, /const changed = await confirm\.run/);
+  assert.match(documentsPage, /onDocumentChanged\(changed\)/);
+  assert.match(documentsPage, /documentProjections/);
+  assert.match(documentsPage, /pendingDocumentKey/);
+  assert.match(documentsPage, /beginDocumentExtractionProjection/);
+  assert.match(documentsPage, /reconcileDocumentExtractionProjection/);
+  assert.match(
+    documentsPage,
+    /key=\{`\$\{document\.id\}:\$\{document\.extraction\?\.status/,
+  );
+  assert.match(
+    documentsPage,
+    /extraction-state extraction-state--error" role="alert"/,
+  );
+  assert.match(
+    extractionReview,
+    /extraction-state extraction-state--error" role="alert"/,
+  );
+  assert.match(uploader, /previousActiveDocumentRef/);
+  assert.match(
+    uploader,
+    /terminalDocumentProjectionFingerprint\(previousActiveDocument\)/,
+  );
+  assert.match(requirementPage, /requirementDocumentOverride/);
+  assert.match(requirementPage, /documentOverrideProjection/);
+  assert.match(requirementPage, /transcriptDocumentProjection/);
+  assert.match(requirementPage, /reconcileTranscriptServerProjection/);
+  assert.match(requirementPage, /reconcileDocumentExtractionProjection/);
+  assert.match(
+    requirementPage,
+    /selectedDocument = requirementDocumentOverrideProjection\s*\? serverDocument/,
+  );
+});
+
 test("DSM feedback surfaces remain connected to portal data and safe fallbacks", async () => {
   const [financials, campusLife, edward, shell, enrollment] =
     await Promise.all([

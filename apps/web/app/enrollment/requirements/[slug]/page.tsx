@@ -47,6 +47,13 @@ import {
   updateStudentHousingPlan,
   updateStudentProfile,
 } from "../../../lib/api-client";
+import {
+  beginDocumentExtractionProjection,
+  currentDocumentProjection,
+  documentExtractionFailurePresentation,
+  reconcileDocumentExtractionProjection,
+  type DocumentExtractionProjectionState,
+} from "../../../lib/document-extraction-ui";
 
 type RequirementKind =
   | "profile"
@@ -566,12 +573,14 @@ function DocumentAction({
   reviewPlacement = "inline",
   onDocumentSelected,
   documentOverride,
+  documentOverrideProjection,
 }: {
   requirement: StudentRequirementDetail;
   onUploaded: (document: StudentDocument) => void;
   reviewPlacement?: "inline" | "context";
   onDocumentSelected?: (document: StudentDocument | null) => void;
   documentOverride?: StudentDocument | null;
+  documentOverrideProjection?: DocumentExtractionProjectionState | null;
 }) {
   const [recentDocument, setRecentDocument] =
     useState<StudentDocument | null>(null);
@@ -606,47 +615,42 @@ function DocumentAction({
       null,
     );
   }, [documents.data, documents.status, requirement.id]);
-  const selectedDocument = [
-    recentDocument,
-    documentOverride,
+  const requirementDocumentOverride =
+    documentOverride?.requirementId === requirement.id ? documentOverride : null;
+  const requirementDocumentOverrideProjection =
+    documentOverrideProjection?.document.id === requirementDocumentOverride?.id
+      ? documentOverrideProjection
+      : null;
+  let serverDocument = currentDocumentProjection(
     latestStoredDocument,
-  ]
-    .filter(
-      (document): document is StudentDocument =>
-        document?.requirementId === requirement.id,
-    )
-    .reduce<StudentDocument | null>((latest, document) => {
-      if (!latest) return document;
-      const latestTerminal = latest.extraction?.status !== "processing";
-      const documentTerminal = document.extraction?.status !== "processing";
-      if (
-        document.id === latest.id &&
-        documentTerminal !== latestTerminal
-      ) {
-        return documentTerminal ? document : latest;
-      }
-      const latestActivity = Date.parse(
-        latest.extraction?.processedAt ??
-          latest.extraction?.processingStartedAt ??
-          latest.createdAt,
-      );
-      const documentActivity = Date.parse(
-        document.extraction?.processedAt ??
-          document.extraction?.processingStartedAt ??
-          document.createdAt,
-      );
-      if (documentActivity > latestActivity) return document;
-      if (documentActivity < latestActivity) return latest;
-
-      // A terminal extraction can legitimately reuse the processing start
-      // timestamp. Prefer that server result over an equal-time processing
-      // projection retained by the parent route.
-      if (documentTerminal !== latestTerminal) {
-        return documentTerminal ? document : latest;
-      }
-      return latest;
-    }, null);
+    requirementDocumentOverride,
+  );
+  if (
+    requirementDocumentOverride &&
+    requirementDocumentOverrideProjection &&
+    latestStoredDocument?.id === requirementDocumentOverride.id
+  ) {
+    serverDocument = reconcileDocumentExtractionProjection(
+      requirementDocumentOverrideProjection,
+      latestStoredDocument,
+    ).document;
+  }
+  const recentRequirementDocument =
+    recentDocument?.requirementId === requirement.id
+      ? recentDocument
+      : null;
+  // Once the parent owns a retry projection, preserve the reconciled server
+  // object so an observed processing response advances that projection. The
+  // local mutation response remains the fallback before the parent update is
+  // committed (and for non-transcript document actions).
+  const selectedDocument = requirementDocumentOverrideProjection
+    ? serverDocument
+    : currentDocumentProjection(serverDocument, recentRequirementDocument);
   const extraction = selectedDocument?.extraction;
+  const extractionFailure =
+    extraction?.status === "failed"
+      ? documentExtractionFailurePresentation(extraction)
+      : null;
   const extractionMismatch =
     extraction?.status === "completed" &&
     requirement.documentCategory &&
@@ -834,10 +838,11 @@ function DocumentAction({
                   : extraction.status === "pending_configuration"
                     ? "Document stored; parsing is not configured"
                     : extraction.status === "failed"
-                      ? "Document stored; parsing needs attention"
+                      ? extractionFailure?.title
                       : "Document parsing is in progress"}
               </strong>
               <p>{extraction.summary}</p>
+              {extractionFailure ? <p>{extractionFailure.guidance}</p> : null}
               {extraction.warnings.length ? (
                 <ul>
                   {extraction.warnings.map((warning) => (
@@ -1463,6 +1468,7 @@ function RequirementAction({
   onRecordChanged,
   onDocumentSelected,
   activeDocument,
+  activeDocumentProjection,
   onHousingPreviewChange,
 }: {
   requirement: StudentRequirementDetail;
@@ -1470,6 +1476,7 @@ function RequirementAction({
   onRecordChanged: () => void;
   onDocumentSelected?: (document: StudentDocument | null) => void;
   activeDocument?: StudentDocument | null;
+  activeDocumentProjection?: DocumentExtractionProjectionState | null;
   onHousingPreviewChange?: (selection: HousingPreviewSelection) => void;
 }) {
   if (requirement.status === "blocked") {
@@ -1521,6 +1528,9 @@ function RequirementAction({
           kind === "transcript" ? onDocumentSelected : undefined
         }
         documentOverride={kind === "transcript" ? activeDocument : undefined}
+        documentOverrideProjection={
+          kind === "transcript" ? activeDocumentProjection : undefined
+        }
       />
     );
   }
@@ -1576,8 +1586,9 @@ export default function RequirementDetailPage() {
   const params = useParams<{ slug: string | string[] }>();
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
-  const [transcriptDocument, setTranscriptDocument] =
-    useState<StudentDocument | null>(null);
+  const [transcriptDocumentProjection, setTranscriptDocumentProjection] =
+    useState<DocumentExtractionProjectionState | null>(null);
+  const transcriptDocument = transcriptDocumentProjection?.document ?? null;
   const [housingSelection, setHousingSelection] =
     useState<HousingPreviewSelection | null>(null);
   const loadRequirement = useCallback(
@@ -1595,10 +1606,23 @@ export default function RequirementDetailPage() {
   }, [requirement]);
   const refreshAfterTranscriptChange = useCallback(
     (document: StudentDocument) => {
-      setTranscriptDocument(document);
+      setTranscriptDocumentProjection((current) =>
+        beginDocumentExtractionProjection(document, current?.document),
+      );
       refreshAfterRecordChange();
     },
     [refreshAfterRecordChange],
+  );
+  const reconcileTranscriptServerProjection = useCallback(
+    (document: StudentDocument | null) => {
+      if (!document) return;
+      setTranscriptDocumentProjection((current) => {
+        if (!current) return beginDocumentExtractionProjection(document);
+        if (current.document === document) return current;
+        return reconcileDocumentExtractionProjection(current, document);
+      });
+    },
+    [],
   );
 
   const pageDescription =
@@ -1646,8 +1670,9 @@ export default function RequirementDetailPage() {
               requirement={requirement.data}
               kind={kind ?? "other"}
               onRecordChanged={refreshAfterRecordChange}
-              onDocumentSelected={setTranscriptDocument}
+              onDocumentSelected={reconcileTranscriptServerProjection}
               activeDocument={transcriptDocument}
+              activeDocumentProjection={transcriptDocumentProjection}
               onHousingPreviewChange={setHousingSelection}
             />
           </section>
