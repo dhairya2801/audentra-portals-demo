@@ -36,6 +36,19 @@ function priority(requirement: StudentRequirementSummary) {
   return requirement.blocking ? 20 : 30;
 }
 
+function configuredPriority(requirement: StudentRequirementSummary) {
+  return typeof requirement.priority === "number" &&
+    Number.isFinite(requirement.priority)
+    ? requirement.priority
+    : 0;
+}
+
+function dueTime(requirement: StudentRequirementSummary) {
+  if (!requirement.dueAt) return Number.POSITIVE_INFINITY;
+  const parsed = Date.parse(requirement.dueAt);
+  return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
+}
+
 export function prioritizeDashboardRequirements(
   requirements: StudentRequirementSummary[],
 ) {
@@ -44,6 +57,11 @@ export function prioritizeDashboardRequirements(
     .filter(({ requirement }) => !isTerminal(requirement))
     .sort(
       (left, right) =>
+        configuredPriority(right.requirement) -
+          configuredPriority(left.requirement) ||
+        (right.requirement.reward?.points ?? 0) -
+          (left.requirement.reward?.points ?? 0) ||
+        dueTime(left.requirement) - dueTime(right.requirement) ||
         priority(left.requirement) - priority(right.requirement) ||
         left.index - right.index,
     )

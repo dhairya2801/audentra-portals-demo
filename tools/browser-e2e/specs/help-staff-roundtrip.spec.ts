@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { resetAndAuthenticateDemoStudent } from "../support/demo-session";
+import {
+  resetAndAuthenticateDemoStudent,
+  signInDemoStaff,
+} from "../support/demo-session";
 
 test.describe("student and staff inquiry round trip", () => {
   test.beforeEach(async ({ request, context, baseURL }) => {
@@ -27,7 +30,7 @@ test.describe("student and staff inquiry round trip", () => {
     await expect(
       page.getByRole("heading", { name: "Staff sign in" }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await signInDemoStaff(page);
     await expect(
       page.getByRole("heading", { name: /Today.*enrollment work/ }),
     ).toBeVisible();

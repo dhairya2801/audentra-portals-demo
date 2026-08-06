@@ -29,6 +29,8 @@ export interface StudentRequirementSummary {
   description: string;
   status: RequirementStatus;
   blocking: boolean;
+  priority?: number;
+  order?: number;
   dueAt: string | null;
   progressPercent: number;
   reward?: {
@@ -301,6 +303,23 @@ export interface CompleteStudentOnboardingInput {
 export interface StudentHousingPlan {
   preference: HousingPreference | null;
   residenceOption: HousingResidenceOption;
+  residencePreferences?: Exclude<HousingResidenceOption, null>[];
+  roomType?: string | null;
+  bathroomPreference?: string | null;
+  roommateMatching?: string | null;
+  knownRoommateName?: string | null;
+  knownRoommateEmail?: string | null;
+  sleepSchedule?: string | null;
+  studyHabits?: string | null;
+  roomNoise?: string | null;
+  cleanliness?: string | null;
+  guestPreference?: string | null;
+  temperaturePreference?: string | null;
+  smokeVapeCompatibility?: string | null;
+  substanceFreeHousing?: boolean | null;
+  genderInclusiveHousing?: boolean | null;
+  accessibleHousingInformation?: boolean | null;
+  livingLearningCommunities?: string[];
   residences: StudentHousingResidence[];
   version: number;
   updatedAt: string;
@@ -322,6 +341,23 @@ export interface UpdateStudentHousingPlanInput {
   expectedVersion: number;
   preference: HousingPreference;
   residenceOption?: Exclude<HousingResidenceOption, null>;
+  residencePreferences?: Exclude<HousingResidenceOption, null>[] | null;
+  roomType?: string | null;
+  bathroomPreference?: string | null;
+  roommateMatching?: string | null;
+  knownRoommateName?: string | null;
+  knownRoommateEmail?: string | null;
+  sleepSchedule?: string | null;
+  studyHabits?: string | null;
+  roomNoise?: string | null;
+  cleanliness?: string | null;
+  guestPreference?: string | null;
+  temperaturePreference?: string | null;
+  smokeVapeCompatibility?: string | null;
+  substanceFreeHousing?: boolean | null;
+  genderInclusiveHousing?: boolean | null;
+  accessibleHousingInformation?: boolean | null;
+  livingLearningCommunities?: string[] | null;
 }
 
 export interface StudentExperienceUpdate {
@@ -534,6 +570,8 @@ export interface StudentMessage {
   subject: string;
   body: string;
   senderName: string;
+  kind?: string;
+  href?: string | null;
   sentAt: string;
   readAt: string | null;
 }
@@ -909,7 +947,9 @@ export interface StaffJourneyBlueprintItem {
   published: boolean;
   /** Defaults to true for configuration versions published before task activation controls. */
   active?: boolean;
+  priority?: number;
   order: number;
+  dueOffsetDays?: number | null;
   taskType:
     | "information"
     | "form"
@@ -1410,7 +1450,19 @@ export interface FinancialDocumentRequirement {
   description: string;
   status: "not_started" | "submitted" | "under_review" | "verified" | "action_required";
   dueAt: string | null;
+  documentId?: string | null;
   href: string;
+}
+
+export interface FinancialPaymentScheduleItem {
+  id: string;
+  kind: "deposit" | "installment";
+  label: string;
+  amountCents: number;
+  enrollmentFeeCents: number;
+  dueAt: string;
+  status: "paid" | "due" | "projected";
+  projected: boolean;
 }
 
 export interface FinancialAward {
@@ -1441,6 +1493,7 @@ export interface StudentFinancials {
     enrollmentFeeCents: number;
     status: "available" | "enrolled";
   }[];
+  paymentSchedule?: FinancialPaymentScheduleItem[];
   sap: {
     status: "meeting" | "warning" | "probation" | "not_meeting" | "appeal_pending";
     cumulativeGpa: number;

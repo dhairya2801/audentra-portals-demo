@@ -58,7 +58,10 @@ test("all student portal routes render and the dynamic requirement route resolve
     assert.equal(response.status, 200, `${route} should render`);
     const html = await response.text();
     assert.match(html, /Aster University|Aster/);
-    assert.doesNotMatch(html, /404|Page not found/i);
+    assert.doesNotMatch(
+      html,
+      /<h1[^>]*>\s*404\s*<\/h1>|\bPage not found\b/i,
+    );
   }
 
   const signInResponse = await render("/sign-in");
@@ -81,7 +84,10 @@ test("tenant routes render and preserve tenant-aware internal destinations", asy
     ]) {
       const response = await render(route);
       assert.equal(response.status, 200, `${route} should render`);
-      assert.doesNotMatch(await response.text(), /404|Page not found/i);
+      assert.doesNotMatch(
+        await response.text(),
+        /<h1[^>]*>\s*404\s*<\/h1>|\bPage not found\b/i,
+      );
     }
   }
 
@@ -180,6 +186,12 @@ test("keeps housing and deposit actions inside their enrollment tasks", async ()
 
   assert.match(requirementPage, /aster-residence-hall-room\.jpg/);
   assert.match(requirementPage, /onHousingPreviewChange/);
+  assert.match(requirementPage, /name="roommateMatching"/);
+  assert.match(requirementPage, /name="knownRoommateName"/);
+  assert.match(requirementPage, /name="knownRoommateEmail"/);
+  assert.match(requirementPage, /housingCompatibilityFields\.map/);
+  assert.match(requirementPage, /livingLearningCommunities/);
+  assert.match(requirementPage, /ExpandedUpdateStudentHousingPlanInput/);
   assert.match(
     requirementPage,
     /Residence and room details can be[\s\S]*decided later/,
@@ -250,7 +262,10 @@ test("dashboard enrollment CTA advances, waits, and completes from requirement s
     },
   }).outputText;
   const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
-  const { selectDashboardEnrollmentAction } = await import(moduleUrl);
+  const {
+    prioritizeDashboardRequirements,
+    selectDashboardEnrollmentAction,
+  } = await import(moduleUrl);
   const requirement = (code, status, blocking = true) => ({
     id: code,
     code,
@@ -308,6 +323,23 @@ test("dashboard enrollment CTA advances, waits, and completes from requirement s
     label: "Enrollment complete",
     href: "/enrollment",
   });
+
+  const prioritized = prioritizeDashboardRequirements([
+    {
+      ...requirement("lower_points", "ready"),
+      priority: 25,
+      reward: { points: 100, earned: false },
+    },
+    {
+      ...requirement("higher_priority", "ready"),
+      priority: 90,
+      reward: { points: 10, earned: false },
+    },
+  ]);
+  assert.deepEqual(
+    prioritized.map((item) => item.code),
+    ["higher_priority", "lower_points"],
+  );
 });
 
 test("typed client wires every resource route and mutation contract", async () => {
@@ -961,7 +993,16 @@ test("coordinates recoverable server state and generates the dashboard brief", a
   assert.match(coordinator, /connection_restored/);
   assert.match(coordinator, /visibilitychange/);
   assert.match(requirementPage, /Check now/);
-  assert.match(requirementPage, /15_000/);
+  const restoreGate = requirementPage.indexOf('documents.status === "loading"');
+  const gatedUploader = requirementPage.indexOf("<DocumentUpload", restoreGate);
+  assert.ok(restoreGate >= 0, "document restore must expose an initial loading gate");
+  assert.ok(
+    gatedUploader > restoreGate,
+    "the uploader must not render before the existing-document lookup resolves",
+  );
+  assert.match(requirementPage, /Checking for an existing upload/);
+  assert.match(requirementPage, /could not restore your existing document record/);
+  assert.match(requirementPage, /onRetry=\{documents\.reload\}/);
   assert.match(uploader, /retry automatically/);
   assert.match(uploader, /15_000/);
 });
@@ -1261,6 +1302,9 @@ test("document views retain retry authority and expose failed extraction alerts"
   assert.match(documentsPage, /pendingDocumentKey/);
   assert.match(documentsPage, /beginDocumentExtractionProjection/);
   assert.match(documentsPage, /reconcileDocumentExtractionProjection/);
+  assert.match(documentsPage, /useSearchParams/);
+  assert.match(documentsPage, /submitted-document--highlighted/);
+  assert.match(documentsPage, /scrollIntoView/);
   assert.match(
     documentsPage,
     /key=\{`\$\{document\.id\}:\$\{document\.extraction\?\.status/,
@@ -1320,6 +1364,11 @@ test("DSM feedback surfaces remain connected to portal data and safe fallbacks",
   assert.match(financials, /function FinancialAidDonut/);
   assert.match(financials, /award\.type !== "work_study"/);
   assert.match(financials, /not counted as[\s\S]*accepted aid/);
+  assert.match(financials, /How this award works/);
+  assert.match(financials, /FinancialDocumentAction/);
+  assert.match(financials, /document\.documentId/);
+  assert.match(financials, /FinancialPaymentSchedule/);
+  assert.match(financials, /Projected from your enrolled plan/);
   assert.match(campusLife, /clubCategory/);
   assert.match(campusLife, /Filter clubs by category/);
   assert.match(edward, /webkitSpeechRecognition/);
@@ -1327,6 +1376,12 @@ test("DSM feedback surfaces remain connected to portal data and safe fallbacks",
   assert.match(edward, /Microphone access was blocked/);
   assert.match(shell, /tenant\.admissionsEmail/);
   assert.match(enrollment, /OptionalSupportChecklist/);
+  assert.match(enrollment, /<StudentCalendar/);
+  assert.match(enrollment, /title="Enrollment deadlines"/);
+  assert.match(enrollment, /Action needed/);
+  assert.match(enrollment, /In review/);
+  assert.match(enrollment, /Completed/);
+  assert.match(enrollment, /requirementPriority\(right\)/);
 });
 
 test("student routes enforce bootstrap gating and expose no dead static links", async () => {
@@ -1553,6 +1608,22 @@ test("staff journeys share a typed, accessible flow builder", async () => {
   assert.match(builder, /disabled=\{busy \|\| Boolean\(item\.studentStep\)\}/);
   assert.match(builder, /Synced to the student checklist/);
   assert.match(builder, /Edit synced item/);
+  assert.match(builder, /<JourneyDependencyMap/);
+  assert.match(builder, /How steps unlock/);
+  assert.match(builder, /journeySuccessorIds/);
+  assert.match(builder, /Priority \{task\.priority\}/);
+  assert.match(builder, /name="priority"/);
+  assert.match(builder, /name="dueOffsetDays"/);
+  assert.match(builder, /className="staff-dependency-picker"/);
+  assert.match(builder, /selectedDependencies/);
+  assert.match(builder, /validateJourneyDependencies\(candidateGraph\)/);
+  assert.match(builder, /task\.due_days_after_acceptance = dueOffsetDays/);
+  assert.match(builder, /depends_on: dependencies/);
+  assert.match(builder, /role="dialog"/);
+  assert.match(builder, /aria-modal="true"/);
+  assert.match(builder, /event\.key === "Escape"/);
+  assert.match(builder, /panel\.querySelectorAll<HTMLElement>/);
+  assert.match(builder, /editorTriggerRef\.current\?\.focus/);
   assert.match(builder, /flow\.status !== "published"/);
   assert.match(
     builder,
@@ -1658,6 +1729,31 @@ test("staff journeys share a typed, accessible flow builder", async () => {
     "c",
     "a",
   ]);
+  const dependencyGraph = [
+    { id: "start", dependsOn: [] },
+    { id: "profile", dependsOn: ["start"] },
+    { id: "housing", dependsOn: ["start"] },
+  ];
+  assert.deepEqual(model.journeySuccessorIds(dependencyGraph, "start"), [
+    "profile",
+    "housing",
+  ]);
+  assert.deepEqual(model.journeyGraphLevels(dependencyGraph), [
+    ["start"],
+    ["profile", "housing"],
+  ]);
+  assert.equal(model.validateJourneyDependencies(dependencyGraph), null);
+  assert.match(
+    model.validateJourneyDependencies([{ id: "loop", dependsOn: ["loop"] }]),
+    /cannot depend on itself/,
+  );
+  assert.match(
+    model.validateJourneyDependencies([
+      { id: "one", dependsOn: ["two"] },
+      { id: "two", dependsOn: ["one"] },
+    ]),
+    /Dependency cycle/,
+  );
 
   const generatedId = model.createJourneyTaskId(
     "onboarding",
@@ -1722,6 +1818,11 @@ test("generic requirement interactions submit typed, idempotent responses", asyn
   assert.match(action, /valuesFromForm\([\s\S]{0,100}visibleFields/);
   assert.match(action, /visibleFields\.map/);
   assert.match(requirementPage, /<RequirementResponseAction/);
+  assert.match(requirementPage, /getStudentRequirements/);
+  assert.match(requirementPage, /terminalRequirementStatuses\.has/);
+  assert.match(requirementPage, /What this unlocks/);
+  assert.match(requirementPage, /successor\.slug/);
+  assert.match(requirementPage, /dependency\.slug/);
   assert.match(
     requirementPage,
     /requirement\.code === "profile_verification"[\s\S]{0,100}kind === "profile"[\s\S]{0,100}requirement\.interactionType === "form"/,
@@ -1792,4 +1893,40 @@ test("the web command wrapper forwards isolated host and port arguments", async 
   );
   assert.match(buildScript, /process\.argv\.slice\(3\)/);
   assert.match(buildScript, /\[cli, command, \.\.\.commandArguments\]/);
+});
+
+test("dynamic portal destinations reject stored script and cross-origin path tricks", async () => {
+  const source = await readFile(
+    new URL("../app/lib/safe-destination.ts", import.meta.url),
+    "utf8",
+  );
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
+  const { safePortalDestination } = await import(moduleUrl);
+
+  assert.deepEqual(safePortalDestination("/campus-life", "/dashboard"), {
+    href: "/campus-life",
+    external: false,
+  });
+  assert.deepEqual(safePortalDestination("https://events.example.edu/register", "/campus-life"), {
+    href: "https://events.example.edu/register",
+    external: true,
+  });
+  for (const unsafe of [
+    "javascript:alert(1)",
+    "//evil.example/path",
+    "/\\evil.example/path",
+    "/%5cevil.example/path",
+    "https://user:password@evil.example/path",
+  ]) {
+    assert.deepEqual(safePortalDestination(unsafe, "/campus-life"), {
+      href: "/campus-life",
+      external: false,
+    });
+  }
 });

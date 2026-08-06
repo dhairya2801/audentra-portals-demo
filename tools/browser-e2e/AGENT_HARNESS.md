@@ -31,3 +31,8 @@ intentional: clearing npm or Playwright caches must not turn every scenario
 into a delayed missing-browser failure or require another browser download.
 On Windows the harness terminates the exact isolated portal process tree so
 Playwright can exit promptly after the last assertion.
+
+Staff journeys require an environment-only synthetic credential. Set the same
+random value as `VV_STAFF_BOOTSTRAP_PASSWORD` for the isolated demo API and as
+`E2E_STAFF_PASSWORD` for Playwright. Never commit the value or place it in a
+tracked environment file.

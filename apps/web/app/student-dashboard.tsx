@@ -2,12 +2,17 @@
 
 import {
   studentRequirementSlug,
+  type FinancialDocumentRequirement,
   type StudentRequirementSummary,
 } from "@vv/contracts";
 import { useCallback, useEffect } from "react";
 import { PortalShell } from "./components/portal-shell";
 import { DashboardEdwardBrief } from "./components/dashboard-edward-brief";
+import { DashboardCampusEvents } from "./components/dashboard-campus-events";
+import { DashboardFinancialSnapshot } from "./components/dashboard-financial-snapshot";
+import dashboardStyles from "./components/student-dashboard-experience.module.css";
 import { ErrorState, LoadingState } from "./components/portal-ui";
+import { StudentCalendar } from "./components/student-calendar";
 import { useActivityTracking } from "./hooks/use-activity-tracking";
 import { useApiResource } from "./hooks/use-api-resource";
 import {
@@ -20,6 +25,8 @@ import {
   prioritizeDashboardRequirements,
   selectDashboardEnrollmentAction,
 } from "./lib/enrollment-dashboard-action";
+import { dashboardStudentCalendarEntries } from "./lib/student-calendar";
+import { safePortalDestination } from "./lib/safe-destination";
 import { TenantLink as Link } from "./components/tenant-link";
 import { useTenant } from "./components/tenant-provider";
 
@@ -48,6 +55,44 @@ function requirementState(item: StudentRequirementSummary) {
   return item.progressPercent > 0 ? "In progress" : "To do";
 }
 
+function DashboardDocumentTask({
+  document,
+  position,
+}: {
+  document: FinancialDocumentRequirement;
+  position: number;
+}) {
+  const fallback = document.documentId
+    ? `/documents?document=${encodeURIComponent(document.documentId)}`
+    : "/documents";
+  const destination = safePortalDestination(document.href, fallback);
+  const content = (
+    <>
+      <span className="aster-task-number">{String(position).padStart(2, "0")}</span>
+      <div>
+        <small>Financial aid · action needed</small>
+        <h3>{document.title}</h3>
+        <p>{document.description}</p>
+      </div>
+      <span aria-hidden="true">{destination.external ? "↗" : "→"}</span>
+    </>
+  );
+  return destination.external ? (
+    <a
+      className="aster-task-card"
+      href={destination.href}
+      target="_blank"
+      rel="noreferrer"
+    >
+      {content}
+    </a>
+  ) : (
+    <Link className="aster-task-card" href={destination.href}>
+      {content}
+    </Link>
+  );
+}
+
 export function StudentDashboardPage() {
   const { tenant } = useTenant();
   const load = useCallback(async (signal: AbortSignal) => {
@@ -57,7 +102,13 @@ export function StudentDashboardPage() {
       getStudentAcademics(signal),
       getCampusLife(signal),
     ]);
-    return { dashboard, financials, academics, campus };
+    return {
+      dashboard,
+      financials,
+      academics,
+      campus,
+      loadedAt: new Date().toISOString(),
+    };
   }, []);
   const resource = useApiResource(load);
   const { track } = useActivityTracking();
@@ -85,7 +136,7 @@ export function StudentDashboardPage() {
     );
   }
 
-  const { dashboard, financials, academics, campus } = resource.data;
+  const { dashboard, financials, academics, campus, loadedAt } = resource.data;
   const pendingRequirements = prioritizeDashboardRequirements(
     dashboard.journey.requirements,
   ).slice(0, 3);
@@ -103,6 +154,11 @@ export function StudentDashboardPage() {
     (recommendation) =>
       ["suggested", "needs_review"].includes(recommendation.status),
   );
+  const calendarEntries = dashboardStudentCalendarEntries({
+    dashboard,
+    financials,
+    campusEvents: campus.events,
+  });
 
   return (
     <PortalShell
@@ -214,21 +270,21 @@ export function StudentDashboardPage() {
           ))}
           {actionDocuments.slice(0, Math.max(0, 3 - pendingRequirements.length)).map(
             (document, index) => (
-              <Link className="aster-task-card" href={document.href} key={document.id}>
-                <span className="aster-task-number">
-                  {String(pendingRequirements.length + index + 1).padStart(2, "0")}
-                </span>
-                <div>
-                  <small>Financial aid · action needed</small>
-                  <h3>{document.title}</h3>
-                  <p>{document.description}</p>
-                </div>
-                <span aria-hidden="true">→</span>
-              </Link>
+              <DashboardDocumentTask
+                document={document}
+                position={pendingRequirements.length + index + 1}
+                key={document.id}
+              />
             ),
           )}
         </div>
       </section>
+
+      <div className={dashboardStyles.overview}>
+        <StudentCalendar entries={calendarEntries} />
+        <DashboardCampusEvents events={campus.events} asOf={loadedAt} />
+        <DashboardFinancialSnapshot financials={financials} />
+      </div>
 
       <section className="aster-domain-grid">
         <Link className="aster-domain-card aster-domain-card--financial" href="/financials">

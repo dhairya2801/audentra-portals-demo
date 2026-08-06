@@ -7,6 +7,7 @@ import {
 import {
   authenticateDemoStudent,
   resetDemoStudent,
+  signInDemoStaff,
 } from "../support/demo-session";
 
 const JOURNEY_INSTRUCTION =
@@ -140,9 +141,7 @@ test.describe("staff-to-student live experience synchronization", () => {
       await expect(
         staffPage.getByRole("heading", { name: "Staff sign in" }),
       ).toBeVisible();
-      await staffPage
-        .getByRole("button", { name: "Sign in", exact: true })
-        .click();
+      await signInDemoStaff(staffPage);
       await expect(
         staffPage.getByRole("heading", { name: /Today.*enrollment work/ }),
       ).toBeVisible();

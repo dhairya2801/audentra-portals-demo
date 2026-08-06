@@ -4,6 +4,7 @@ import type {
   StudentDocument,
   StudentDocumentList,
 } from "@vv/contracts";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DocumentExtractionRetry } from "../components/document-extraction-retry";
 import { DocumentUpload } from "../components/document-upload";
@@ -271,9 +272,11 @@ function ExtractionReview({
 function DocumentWorkspace({
   list,
   onDocumentChanged,
+  highlightedDocumentId,
 }: {
   list: StudentDocumentList;
   onDocumentChanged: (document: StudentDocument) => void;
+  highlightedDocumentId: string | null;
 }) {
   return (
     <>
@@ -314,7 +317,19 @@ function DocumentWorkspace({
                   ? "Signed document"
                   : "Submitted document";
                 return (
-                  <li key={document.id}>
+                  <li
+                    id={`document-${document.id}`}
+                    className={
+                      highlightedDocumentId === document.id
+                        ? "submitted-document--highlighted"
+                        : undefined
+                    }
+                    aria-current={
+                      highlightedDocumentId === document.id ? "true" : undefined
+                    }
+                    tabIndex={highlightedDocumentId === document.id ? -1 : undefined}
+                    key={document.id}
+                  >
                     <div className="submitted-document__preview" aria-hidden="true">
                       <span>
                         {document.mimeType === "application/pdf" ? "PDF" : "IMG"}
@@ -514,6 +529,8 @@ function applyDocumentProjections(
 }
 
 export default function DocumentsPage() {
+  const searchParams = useSearchParams();
+  const highlightedDocumentId = searchParams.get("document");
   const loadDocuments = useCallback(
     (signal: AbortSignal) => getStudentDocuments(signal),
     [],
@@ -530,6 +547,7 @@ export default function DocumentsPage() {
         : null,
     [documentProjections, documents.data],
   );
+  const scrolledDocumentId = useRef<string | null>(null);
   const pendingDocuments = useMemo(
     () =>
       projectedDocuments?.items.filter(
@@ -616,6 +634,26 @@ export default function DocumentsPage() {
     };
   }, [pendingDocumentKey, refreshDocuments]);
 
+  useEffect(() => {
+    if (!highlightedDocumentId) {
+      scrolledDocumentId.current = null;
+      return;
+    }
+    if (
+      !projectedDocuments ||
+      scrolledDocumentId.current === highlightedDocumentId
+    ) {
+      return;
+    }
+    const target = window.document.getElementById(
+      `document-${highlightedDocumentId}`,
+    );
+    if (!target) return;
+    scrolledDocumentId.current = highlightedDocumentId;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.focus({ preventScroll: true });
+  }, [highlightedDocumentId, projectedDocuments]);
+
   return (
     <PortalShell
       active="documents"
@@ -631,6 +669,7 @@ export default function DocumentsPage() {
         <DocumentWorkspace
           list={projectedDocuments ?? documents.data}
           onDocumentChanged={rememberDocumentProjection}
+          highlightedDocumentId={highlightedDocumentId}
         />
       )}
     </PortalShell>

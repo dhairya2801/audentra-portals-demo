@@ -6,6 +6,7 @@ import { ErrorState, LoadingState } from "../components/portal-ui";
 import { useActivityTracking } from "../hooks/use-activity-tracking";
 import { useApiResource } from "../hooks/use-api-resource";
 import { getCampusLife } from "../lib/api-client";
+import { safePortalDestination } from "../lib/safe-destination";
 import { useTenant } from "../components/tenant-provider";
 import { TenantLink as Link } from "../components/tenant-link";
 
@@ -87,6 +88,21 @@ export default function CampusLifePage() {
   const events = campus.data.events;
   const activeEvent = events[eventIndex] ?? events[0];
   const date = activeEvent ? eventDate(activeEvent.startsAt) : null;
+  const activeRegistration = safePortalDestination(
+    activeEvent?.registrationUrl,
+    "/campus-life",
+  );
+  const hasActiveRegistration =
+    Boolean(activeEvent?.registrationUrl) &&
+    activeRegistration.href !== "/campus-life";
+  const activeSource = safePortalDestination(
+    activeEvent?.source?.url,
+    "/campus-life",
+  );
+  const activeImageSource = safePortalDestination(
+    activeEvent?.imageSourceUrl,
+    "/campus-life",
+  );
 
   const showEvent = (index: number) => {
     const normalized = (index + events.length) % events.length;
@@ -152,10 +168,10 @@ export default function CampusLifePage() {
             <p className="eyebrow">Featured this month · {activeEvent.category}</p>
             <h2>{activeEvent.title}</h2>
             <p>{activeEvent.description}</p>
-            {activeEvent.source ? (
+            {activeEvent.source && activeSource.external ? (
               <a
                 className="campus-source-link"
-                href={activeEvent.source.url}
+                href={activeSource.href}
                 target="_blank"
                 rel="noreferrer"
               >
@@ -170,21 +186,23 @@ export default function CampusLifePage() {
             <div className="campus-carousel__meta">
               <span>◷ {date.time}</span>
               <span>⌖ {activeEvent.location}</span>
-              {activeEvent.registrationUrl ? (
+              {hasActiveRegistration && activeRegistration.external ? (
                 <a
-                  href={activeEvent.registrationUrl}
+                  href={activeRegistration.href}
                   target="_blank"
                   rel="noreferrer"
                 >
                   Registration details ↗
                 </a>
+              ) : hasActiveRegistration ? (
+                <Link href={activeRegistration.href}>Registration details →</Link>
               ) : null}
             </div>
             {activeEvent.imageAttribution ? (
-              activeEvent.imageSourceUrl ? (
+              activeImageSource.external ? (
                 <a
                   className="campus-carousel__credit"
-                  href={activeEvent.imageSourceUrl}
+                  href={activeImageSource.href}
                   target="_blank"
                   rel="noreferrer"
                 >

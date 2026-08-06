@@ -6,8 +6,10 @@ import type {
   StudentRequirementList,
 } from "@vv/contracts";
 import { TenantLink as Link } from "../components/tenant-link";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { PortalShell } from "../components/portal-shell";
+import { StudentCalendar } from "../components/student-calendar";
+import type { StudentCalendarEntry } from "../lib/student-calendar";
 import {
   EmptyState,
   ErrorState,
@@ -56,6 +58,58 @@ const terminalRequirementStatuses = new Set([
   "waived",
   "not_applicable",
 ]);
+
+type EnrollmentSegment = "action" | "review" | "complete";
+type PrioritizedRequirement = StudentRequirementDetail & { priority?: number };
+
+const enrollmentSegments: Array<{
+  id: EnrollmentSegment;
+  title: string;
+  description: string;
+}> = [
+  {
+    id: "action",
+    title: "Action needed",
+    description: "Tasks you can work on now, including prerequisites that explain what unlocks next.",
+  },
+  {
+    id: "review",
+    title: "In review",
+    description: "Submitted work currently being checked by the responsible university office.",
+  },
+  {
+    id: "complete",
+    title: "Completed",
+    description: "Finished, waived, or not-applicable requirements kept here for reference.",
+  },
+];
+
+function enrollmentSegment(item: StudentRequirementDetail): EnrollmentSegment {
+  if (terminalRequirementStatuses.has(item.status)) return "complete";
+  if (item.status === "submitted" || item.status === "under_review") return "review";
+  return "action";
+}
+
+function requirementPriority(item: StudentRequirementDetail) {
+  const value = (item as PrioritizedRequirement).priority;
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function requirementDueTime(item: StudentRequirementDetail) {
+  if (!item.dueAt) return Number.POSITIVE_INFINITY;
+  const time = Date.parse(item.dueAt);
+  return Number.isFinite(time) ? time : Number.POSITIVE_INFINITY;
+}
+
+function sortEnrollmentRequirements(items: readonly StudentRequirementDetail[]) {
+  return [...items].sort(
+    (left, right) =>
+      requirementPriority(right) - requirementPriority(left) ||
+      (right.reward?.points ?? 0) - (left.reward?.points ?? 0) ||
+      requirementDueTime(left) - requirementDueTime(right) ||
+      left.title.localeCompare(right.title),
+  );
+}
 
 function normalizedProgress(progressPercent: number) {
   if (!Number.isFinite(progressPercent)) return 0;
@@ -140,6 +194,9 @@ function RequirementItem({
             </span>
           ) : null}
           {item.blocking ? <span>Required</span> : <span>Optional</span>}
+          {requirementPriority(item) > 0 ? (
+            <span>Priority {requirementPriority(item)}</span>
+          ) : null}
         </div>
         {item.reward ? (
           <div
@@ -293,6 +350,40 @@ export default function EnrollmentPage() {
     enrollment.status === "ready"
       ? progressForRequirements(enrollment.data.requirements.items)
       : 0;
+  const groupedRequirements = useMemo(() => {
+    const groups: Record<EnrollmentSegment, StudentRequirementDetail[]> = {
+      action: [],
+      review: [],
+      complete: [],
+    };
+    if (enrollment.status !== "ready") return groups;
+    for (const item of enrollment.data.requirements.items) {
+      groups[enrollmentSegment(item)].push(item);
+    }
+    for (const segment of enrollmentSegments) {
+      groups[segment.id] = sortEnrollmentRequirements(groups[segment.id]);
+    }
+    return groups;
+  }, [enrollment.data, enrollment.status]);
+  const enrollmentDeadlines = useMemo<StudentCalendarEntry[]>(() => {
+    if (enrollment.status !== "ready") return [];
+    return enrollment.data.requirements.items.flatMap((item) =>
+      item.dueAt
+        ? [
+            {
+              id: `enrollment-${item.id}`,
+              kind: "enrollment" as const,
+              title: item.title,
+              description: item.description,
+              startsAt: item.dueAt,
+              status: item.status,
+              href: `/enrollment/requirements/${encodeURIComponent(item.slug)}`,
+              actionLabel: requirementActionLabel(item),
+            },
+          ]
+        : [],
+    );
+  }, [enrollment.data, enrollment.status]);
 
   return (
     <PortalShell
@@ -316,6 +407,7 @@ export default function EnrollmentPage() {
           }
         />
       ) : (
+        <div className="enrollment-experience-layout">
         <div className="resource-layout resource-layout--enrollment">
           <div className="enrollment-checklist-column">
             <PageCard
@@ -339,30 +431,53 @@ export default function EnrollmentPage() {
                 </div>
               }
             >
-              <ul className="resource-list">
-                {enrollment.data.requirements.items.map((item) => (
-                  <RequirementItem item={item} onView={viewTask} key={item.id} />
+              <div className="enrollment-segments">
+                {enrollmentSegments.map((segment) => (
+                  <section
+                    className={`enrollment-segment enrollment-segment--${segment.id}`}
+                    aria-labelledby={`enrollment-segment-${segment.id}`}
+                    key={segment.id}
+                  >
+                    <header className="enrollment-segment__heading">
+                      <div>
+                        <h3 id={`enrollment-segment-${segment.id}`}>{segment.title}</h3>
+                        <p>{segment.description}</p>
+                      </div>
+                      <span>{groupedRequirements[segment.id].length}</span>
+                    </header>
+                    {groupedRequirements[segment.id].length > 0 ? (
+                      <ul className="resource-list">
+                        {groupedRequirements[segment.id].map((item) => (
+                          <RequirementItem item={item} onView={viewTask} key={item.id} />
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="enrollment-segment__empty">
+                        {segment.id === "action"
+                          ? "You have no open actions in this section."
+                          : segment.id === "review"
+                            ? "Nothing is waiting for review."
+                            : "Completed tasks will collect here."}
+                      </p>
+                    )}
+                  </section>
                 ))}
-              </ul>
+              </div>
             </PageCard>
             <OptionalSupportChecklist onboarding={enrollment.data.onboarding} />
           </div>
           <aside className="resource-aside">
-            <div className="aside-note">
-              <span aria-hidden="true">?</span>
-              <h2>Why these steps?</h2>
-              <p>
-                Each requirement protects your student record or prepares a
-                university service before arrival.
-              </p>
-              <Link href="/help">Learn about enrollment</Link>
-            </div>
             <nav className="aside-links" aria-label="Related enrollment services">
               <Link href="/documents">Manage documents <span>→</span></Link>
               <Link href="/payments">View payments <span>→</span></Link>
               <Link href="/appointments">Meet an advisor <span>→</span></Link>
             </nav>
           </aside>
+        </div>
+        <StudentCalendar
+          entries={enrollmentDeadlines}
+          title="Enrollment deadlines"
+        />
         </div>
       )}
     </PortalShell>

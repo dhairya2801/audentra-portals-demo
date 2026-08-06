@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { signInDemoStaff } from "../support/demo-session";
 
 async function expectJourneyPublish(page: Page, trigger: () => Promise<void>) {
   const responsePromise = page.waitForResponse(
@@ -35,7 +36,7 @@ test.describe("staff portal journeys", () => {
     await expect(
       page.getByRole("heading", { name: "Staff sign in" }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await signInDemoStaff(page);
 
     await expect(
       page.getByRole("heading", { name: /Today.*enrollment work/ }),
@@ -60,7 +61,7 @@ test.describe("staff portal journeys", () => {
     page,
   }) => {
     await page.goto("/aster/staff");
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await signInDemoStaff(page);
     await expect(
       page.getByRole("heading", { name: /Today.*enrollment work/ }),
     ).toBeVisible();
@@ -72,6 +73,9 @@ test.describe("staff portal journeys", () => {
       .click();
     await expect(
       page.getByRole("heading", { name: "Onboarding and enrollment", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "How steps unlock" }).first(),
     ).toBeVisible();
 
     const onboardingBuilder = page
@@ -92,11 +96,12 @@ test.describe("staff portal journeys", () => {
 
     const aboutYouStep = onboardingBuilder
       .locator(".staff-journey-list > li")
-      .filter({ hasText: "Tell us about you" });
+      .filter({ hasText: /^(?:About you|Tell us about you)/ });
+    await expect(aboutYouStep).toBeVisible();
     await aboutYouStep.getByRole("button", { name: "Edit screen" }).click();
     const builtInPanel = page.getByLabel("Edit built-in onboarding screen");
     await expect(builtInPanel.getByLabel("Journey list label")).toHaveValue(
-      "Tell us about you",
+      /^(?:About you|Tell us about you)$/,
     );
     await expect(builtInPanel.getByLabel("Student page section label")).toHaveValue(
       "About you",
@@ -105,7 +110,7 @@ test.describe("staff portal journeys", () => {
       "Identity & home address",
     );
     await expect(builtInPanel.getByLabel("Responsible office")).toHaveValue(
-      "Enrollment Services",
+      "Admissions",
     );
     await expect(builtInPanel.getByLabel("Student form builder")).toBeVisible();
     await expect(builtInPanel.getByLabel("Student page preview")).toContainText(
@@ -118,9 +123,18 @@ test.describe("staff portal journeys", () => {
 
     await onboardingBuilder.getByRole("button", { name: "Add step" }).click();
     const addOnboarding = page.getByLabel("Add journey step");
+    await expect(addOnboarding).toHaveAttribute("role", "dialog");
+    await expect(addOnboarding).toHaveAttribute("aria-modal", "true");
     await expect(addOnboarding.locator(".staff-journey-task-id code")).toHaveText(
       /^new_onboarding_step_[a-z0-9]+$/,
     );
+    await expect(addOnboarding.getByLabel("Priority")).toBeVisible();
+    await expect(
+      addOnboarding.getByLabel("Due after acceptance (days)"),
+    ).toBeVisible();
+    await expect(
+      addOnboarding.getByRole("group", { name: "Prerequisites" }),
+    ).toBeVisible();
     await addOnboarding.getByLabel("Input / action type").selectOption("signature");
     await expect(addOnboarding.getByLabel("E-signature provider")).toBeVisible();
     await addOnboarding.getByLabel("E-signature provider").selectOption("docusign");
@@ -155,6 +169,13 @@ test.describe("staff portal journeys", () => {
     await expect(addEnrollment.locator(".staff-journey-task-id code")).toHaveText(
       /^new_enrollment_step_[a-z0-9]+$/,
     );
+    await expect(addEnrollment.getByLabel("Priority")).toBeVisible();
+    await expect(
+      addEnrollment.getByLabel("Due after acceptance (days)"),
+    ).toBeVisible();
+    await expect(
+      addEnrollment.getByRole("group", { name: "Prerequisites" }),
+    ).toBeVisible();
     await addEnrollment
       .getByLabel("Input / action type")
       .selectOption("upload_file");
@@ -163,13 +184,51 @@ test.describe("staff portal journeys", () => {
     await addEnrollment.getByRole("button", { name: "Cancel" }).click();
   });
 
+  test("shows priority, due-date, and dependency controls in the journey graph", async ({
+    page,
+  }) => {
+    await page.goto("/aster/staff");
+    await signInDemoStaff(page);
+    await expect(
+      page.getByRole("heading", { name: /Today.*enrollment work/ }),
+    ).toBeVisible();
+    await openJourneys(page);
+    await expect(
+      page.getByRole("heading", { name: "How steps unlock" }).first(),
+    ).toBeVisible();
+
+    const onboardingBuilder = page
+      .locator("section.staff-panel")
+      .filter({
+        has: page.getByRole("heading", {
+          name: "New student onboarding",
+          exact: true,
+        }),
+      });
+    const addStep = onboardingBuilder.getByRole("button", { name: "Add step" });
+    await addStep.click();
+    const editor = page.getByRole("dialog", { name: "Add journey step" });
+    await expect(editor).toBeVisible();
+    await expect(editor.getByLabel("Priority")).toBeVisible();
+    await expect(
+      editor.getByLabel("Due after acceptance (days)"),
+    ).toBeVisible();
+    await expect(
+      editor.getByRole("group", { name: "Prerequisites" }),
+    ).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(editor).toHaveCount(0);
+    await expect(addStep).toBeFocused();
+  });
+
   test("publishes, reorders, deactivates, and deletes a sacrificial step", async ({
     page,
   }) => {
     const marker = Date.now().toString(36);
     const title = `Journey builder test ${marker}`;
     await page.goto("/aster/staff");
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await signInDemoStaff(page);
     await expect(
       page.getByRole("heading", { name: /Today.*enrollment work/ }),
     ).toBeVisible();
@@ -255,7 +314,7 @@ test.describe("staff portal journeys", () => {
 
   test("campus event images use a validated drag-and-drop control", async ({ page }) => {
     await page.goto("/harvard/staff");
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await signInDemoStaff(page, "harvard");
     await expect(
       page.getByRole("heading", { name: /Today.*enrollment work/ }),
     ).toBeVisible();

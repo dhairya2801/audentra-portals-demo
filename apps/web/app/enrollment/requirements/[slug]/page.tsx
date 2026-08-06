@@ -12,6 +12,7 @@ import type {
   UpdateStudentHousingPlanInput,
   UpdateStudentProfileInput,
 } from "@vv/contracts";
+import { studentRequirementSlug } from "@vv/contracts";
 import Image from "next/image";
 import { TenantLink as Link } from "../../../components/tenant-link";
 import { useParams } from "next/navigation";
@@ -44,6 +45,7 @@ import {
   getStudentProfile,
   getStudentPayments,
   getStudentRequirement,
+  getStudentRequirements,
   updateStudentHousingPlan,
   updateStudentProfile,
 } from "../../../lib/api-client";
@@ -63,6 +65,12 @@ type RequirementKind =
   | "document"
   | "payment"
   | "other";
+
+const terminalRequirementStatuses = new Set([
+  "completed",
+  "waived",
+  "not_applicable",
+]);
 
 type ResidenceOption = Exclude<HousingResidenceOption, null>;
 
@@ -146,6 +154,53 @@ type HousingPreviewSelection = {
   preference: HousingPreference;
   residenceOption: ResidenceOption | null;
 };
+
+type ExpandedStudentHousingPlan = StudentHousingPlan & {
+  residencePreferences?: ResidenceOption[];
+  roomType?: string | null;
+  bathroomPreference?: string | null;
+  roommateMatching?: string | null;
+  knownRoommateName?: string | null;
+  knownRoommateEmail?: string | null;
+  sleepSchedule?: string | null;
+  studyHabits?: string | null;
+  roomNoise?: string | null;
+  cleanliness?: string | null;
+  guestPreference?: string | null;
+  temperaturePreference?: string | null;
+  smokeVapeCompatibility?: string | null;
+  substanceFreeHousing?: boolean | null;
+  genderInclusiveHousing?: boolean | null;
+  accessibleHousingInformation?: boolean | null;
+  livingLearningCommunities?: string[];
+};
+
+type ExpandedUpdateStudentHousingPlanInput = UpdateStudentHousingPlanInput &
+  Omit<ExpandedStudentHousingPlan, keyof StudentHousingPlan | "version" | "updatedAt">;
+
+const housingCompatibilityFields = [
+  ["sleepSchedule", "Sleep schedule", [["early", "Early bird"], ["middle", "Usually 11–1"], ["night", "Night owl"], ["changes", "It changes"]]],
+  ["studyHabits", "Study habits", [["room", "Mostly in my room"], ["elsewhere", "Mostly elsewhere"], ["mix", "A mix"], ["late_room", "Late-night room study"]]],
+  ["roomNoise", "Room noise", [["quiet", "Usually quiet"], ["headphones", "Music with headphones"], ["background", "Background sound"], ["social", "Lively and social"]]],
+  ["cleanliness", "Cleanliness", [["everything_in_place", "Everything in place"], ["tidy", "Tidy but lived-in"], ["relaxed", "Pretty relaxed"]]],
+  ["guestPreference", "Guests", [["rarely", "Rarely"], ["notice", "Sometimes, with notice"], ["active", "I like an active room"]]],
+  ["temperaturePreference", "Temperature", [["cool", "Cool"], ["middle", "In the middle"], ["warm", "Warm"]]],
+  ["smokeVapeCompatibility", "Roommate substance preference", [["smoke_free", "Substance-free roommate"], ["off_campus_only", "Okay if use is only off campus"], ["no_preference", "No preference"]]],
+] as const;
+
+const livingLearningCommunityOptions = [
+  ["first_year_launch", "First-Year Launch"],
+  ["honors_house", "Honors House"],
+  ["stem_innovation", "STEM + Innovation"],
+  ["arts_collective", "Arts Collective"],
+  ["wellbeing_commons", "Wellbeing Commons"],
+  ["substance_free_living", "Substance-Free Living"],
+] as const;
+
+function nullableFormValue(form: FormData, name: string) {
+  const value = String(form.get(name) ?? "").trim();
+  return value || null;
+}
 
 function humanize(value: string) {
   return value
@@ -365,16 +420,29 @@ function HousingActionForm({
   onSaved: (plan: StudentHousingPlan) => void;
   onPreviewChange: (selection: HousingPreviewSelection) => void;
 }) {
+  const expandedPlan = plan as ExpandedStudentHousingPlan;
   const [preference, setPreference] = useState<HousingPreference | null>(
     plan.preference,
   );
   const [residenceOption, setResidenceOption] = useState<ResidenceOption | null>(
     plan.residenceOption,
   );
+  const [residencePreferences, setResidencePreferences] = useState<ResidenceOption[]>(
+    () =>
+      expandedPlan.residencePreferences?.length
+        ? [...expandedPlan.residencePreferences]
+        : plan.residenceOption
+          ? [plan.residenceOption]
+          : [],
+  );
   const [version, setVersion] = useState(plan.version);
+  const [roommateMatching, setRoommateMatching] = useState(
+    expandedPlan.roommateMatching ?? "",
+  );
   const saveHousing = useApiAction(
     useCallback(
-      (input: UpdateStudentHousingPlanInput) => updateStudentHousingPlan(input),
+      (input: ExpandedUpdateStudentHousingPlanInput) =>
+        updateStudentHousingPlan(input),
       [],
     ),
   );
@@ -390,16 +458,81 @@ function HousingActionForm({
     event.preventDefault();
     if (!preference) return;
     saveHousing.reset();
+    const form = new FormData(event.currentTarget);
 
     try {
       const saved = await saveHousing.run({
         expectedVersion: version,
         preference,
         ...(preference === "on_campus" && residenceOption
-          ? { residenceOption }
+          ? {
+              residenceOption,
+            }
           : {}),
+        residencePreferences:
+          preference === "on_campus" ? residencePreferences : [],
+        roomType:
+          preference === "on_campus" ? nullableFormValue(form, "roomType") : null,
+        bathroomPreference:
+          preference === "on_campus"
+            ? nullableFormValue(form, "bathroomPreference")
+            : null,
+        roommateMatching:
+          preference === "on_campus"
+            ? nullableFormValue(form, "roommateMatching")
+            : null,
+        knownRoommateName:
+          preference === "on_campus" && roommateMatching === "known_roommate"
+            ? nullableFormValue(form, "knownRoommateName")
+            : null,
+        knownRoommateEmail:
+          preference === "on_campus" && roommateMatching === "known_roommate"
+            ? nullableFormValue(form, "knownRoommateEmail")?.toLowerCase() ?? null
+            : null,
+        sleepSchedule:
+          preference === "on_campus"
+            ? nullableFormValue(form, "sleepSchedule")
+            : null,
+        studyHabits:
+          preference === "on_campus" ? nullableFormValue(form, "studyHabits") : null,
+        roomNoise:
+          preference === "on_campus" ? nullableFormValue(form, "roomNoise") : null,
+        cleanliness:
+          preference === "on_campus" ? nullableFormValue(form, "cleanliness") : null,
+        guestPreference:
+          preference === "on_campus"
+            ? nullableFormValue(form, "guestPreference")
+            : null,
+        temperaturePreference:
+          preference === "on_campus"
+            ? nullableFormValue(form, "temperaturePreference")
+            : null,
+        smokeVapeCompatibility:
+          preference === "on_campus"
+            ? nullableFormValue(form, "smokeVapeCompatibility")
+            : null,
+        substanceFreeHousing:
+          preference === "on_campus" && form.has("substanceFreeHousing"),
+        genderInclusiveHousing:
+          preference === "on_campus" && form.has("genderInclusiveHousing"),
+        accessibleHousingInformation:
+          preference === "on_campus" && form.has("accessibleHousingInformation"),
+        livingLearningCommunities:
+          preference === "on_campus"
+            ? form.getAll("livingLearningCommunities").map(String)
+            : [],
       });
       setVersion(saved.version);
+      setPreference(saved.preference);
+      setResidenceOption(saved.residenceOption);
+      setResidencePreferences(
+        saved.residencePreferences?.length
+          ? [...saved.residencePreferences]
+          : saved.residenceOption
+            ? [saved.residenceOption]
+            : [],
+      );
+      setRoommateMatching(saved.roommateMatching ?? "");
       onSaved(saved);
     } catch {
       // Leave the selected choices intact so the student can retry.
@@ -435,6 +568,7 @@ function HousingActionForm({
                     setPreference(choice.value);
                     if (choice.value !== "on_campus") {
                       setResidenceOption(null);
+                      setResidencePreferences([]);
                     }
                   }}
                   required
@@ -452,6 +586,7 @@ function HousingActionForm({
         </div>
       </fieldset>
       {preference === "on_campus" ? (
+        <>
         <fieldset className="housing-choice-fieldset housing-choice-fieldset--residence">
           <legend>Pick a residence style</legend>
           <p>
@@ -462,7 +597,10 @@ function HousingActionForm({
             <button
               className="text-button"
               type="button"
-              onClick={() => setResidenceOption(null)}
+              onClick={() => {
+                setResidenceOption(null);
+                setResidencePreferences([]);
+              }}
             >
               Clear residence selection and decide later
             </button>
@@ -482,7 +620,13 @@ function HousingActionForm({
                   <input
                     checked={selected}
                     name="residence-option"
-                    onChange={() => setResidenceOption(option.value)}
+                    onChange={() => {
+                      setResidenceOption(option.value);
+                      setResidencePreferences((current) => [
+                        option.value,
+                        ...current.filter((value) => value !== option.value),
+                      ].slice(0, 3));
+                    }}
                     type="radio"
                     value={option.value}
                   />
@@ -509,6 +653,128 @@ function HousingActionForm({
             })}
           </div>
         </fieldset>
+        <fieldset className="housing-choice-fieldset housing-roommate-preferences">
+          <legend>Room and roommate preferences</legend>
+          <p>Optional — these details help Housing make a compatible placement.</p>
+          <div className="form-grid">
+            <label className="field">
+              <span>Room type</span>
+              <select name="roomType" defaultValue={expandedPlan.roomType ?? ""}>
+                <option value="">Decide later</option>
+                <option value="single">Single</option>
+                <option value="double">Double</option>
+                <option value="triple">Triple</option>
+                <option value="quad">Quad</option>
+                <option value="suite">Suite</option>
+                <option value="no_preference">No preference</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Bathroom preference</span>
+              <select
+                name="bathroomPreference"
+                defaultValue={expandedPlan.bathroomPreference ?? ""}
+              >
+                <option value="">Decide later</option>
+                <option value="shared_floor">Shared floor bathroom</option>
+                <option value="suite">Suite bathroom</option>
+                <option value="private">Private bathroom</option>
+                <option value="no_preference">No preference</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Roommate matching</span>
+              <select
+                name="roommateMatching"
+                value={roommateMatching}
+                onChange={(event) => setRoommateMatching(event.target.value)}
+              >
+                <option value="">Decide later</option>
+                <option value="match_preferences">Match me from my preferences</option>
+                <option value="known_roommate">I know my roommate</option>
+                <option value="browse_later">Let me browse profiles later</option>
+              </select>
+            </label>
+          </div>
+          {roommateMatching === "known_roommate" ? (
+            <div className="form-grid housing-known-roommate">
+              <label className="field">
+                <span>Roommate full name</span>
+                <input
+                  name="knownRoommateName"
+                  defaultValue={expandedPlan.knownRoommateName ?? ""}
+                  autoComplete="name"
+                  maxLength={160}
+                />
+              </label>
+              <label className="field">
+                <span>Roommate email</span>
+                <input
+                  name="knownRoommateEmail"
+                  type="email"
+                  defaultValue={expandedPlan.knownRoommateEmail ?? ""}
+                  autoComplete="email"
+                  maxLength={254}
+                />
+              </label>
+            </div>
+          ) : null}
+        </fieldset>
+        <fieldset className="housing-choice-fieldset housing-compatibility-preferences">
+          <legend>Shared-space compatibility</legend>
+          <p>Honest routine preferences help reduce avoidable roommate friction.</p>
+          <div className="form-grid">
+            {housingCompatibilityFields.map(([name, label, options]) => (
+              <label className="field" key={name}>
+                <span>{label}</span>
+                <select
+                  name={name}
+                  defaultValue={String(expandedPlan[name] ?? "")}
+                >
+                  <option value="">Decide later</option>
+                  {options.map(([value, optionLabel]) => (
+                    <option value={value} key={value}>{optionLabel}</option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+          <div className="choice-grid choice-grid--multi housing-community-preferences">
+            {[
+              ["substanceFreeHousing", "Substance-free floor or community", expandedPlan.substanceFreeHousing],
+              ["genderInclusiveHousing", "Gender-inclusive housing", expandedPlan.genderInclusiveHousing],
+              ["accessibleHousingInformation", "Accessible housing information", expandedPlan.accessibleHousingInformation],
+            ].map(([name, label, checked]) => (
+              <label className="choice-card" key={String(name)}>
+                <input
+                  name={String(name)}
+                  type="checkbox"
+                  defaultChecked={checked === true}
+                />
+                <span aria-hidden="true" />
+                <div><strong>{String(label)}</strong></div>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <fieldset className="housing-choice-fieldset housing-living-learning">
+          <legend>Living-learning communities</legend>
+          <div className="choice-grid choice-grid--multi">
+            {livingLearningCommunityOptions.map(([value, label]) => (
+              <label className="choice-card" key={value}>
+                <input
+                  name="livingLearningCommunities"
+                  type="checkbox"
+                  value={value}
+                  defaultChecked={expandedPlan.livingLearningCommunities?.includes(value)}
+                />
+                <span aria-hidden="true" />
+                <div><strong>{label}</strong></div>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        </>
       ) : null}
       <ActionFeedback
         status={saveHousing.status}
@@ -664,49 +930,9 @@ function DocumentAction({
         residency: "residency",
         transcript: "transcript",
       }[requirement.documentCategory];
-  const refreshDocuments = documents.refresh;
-
   useEffect(() => {
     onDocumentSelected?.(selectedDocument);
   }, [onDocumentSelected, selectedDocument]);
-
-  // A document job survives navigation and process restarts. Resume polling
-  // from the server record too—not only from files uploaded during the current
-  // React component lifetime—so refreshing this route cannot freeze a stale
-  // "processing" snapshot.
-  useEffect(() => {
-    // A file selected in this mounted uploader is already polled by the
-    // uploader so its per-file status can update. This route-level poll is the
-    // recovery path for a refreshed/reopened page.
-    if (extraction?.status !== "processing") {
-      return;
-    }
-    let attempts = 0;
-    let timer: number | undefined;
-    const deadline = Date.parse(extraction.processingDeadlineAt ?? "");
-    const expectedCompletionAt = Number.isFinite(deadline)
-      ? deadline + 10_000
-      : Date.now() + 100_000;
-    const poll = () => {
-      refreshDocuments();
-      attempts += 1;
-      timer = window.setTimeout(
-        poll,
-        Date.now() >= expectedCompletionAt
-          ? 15_000
-          : Math.min(5_000, 1_000 + attempts * 500),
-      );
-    };
-    timer = window.setTimeout(poll, 1_000);
-    return () => {
-      if (timer) window.clearTimeout(timer);
-    };
-  }, [
-    extraction?.status,
-    extraction?.processingDeadlineAt,
-    refreshDocuments,
-    selectedDocument?.id,
-  ]);
 
   useEffect(() => {
     if (
@@ -799,13 +1025,23 @@ function DocumentAction({
           </ul>
         </section>
       ) : null}
-      <DocumentUpload
-        requirementId={requirement.id}
-        categoryHint={requirement.documentCategory ?? undefined}
-        expectedLabel={expectedLabel}
-        activeDocument={selectedDocument}
-        onUploaded={rememberDocument}
-      />
+      {documents.status === "loading" ? (
+        <InlineResourceState label="Checking for an existing upload…" />
+      ) : documents.status === "error" ? (
+        <InlineResourceState
+          label=""
+          message={`We could not restore your existing document record. ${documents.error}`}
+          onRetry={documents.reload}
+        />
+      ) : (
+        <DocumentUpload
+          requirementId={requirement.id}
+          categoryHint={requirement.documentCategory ?? undefined}
+          expectedLabel={expectedLabel}
+          activeDocument={selectedDocument}
+          onUploaded={rememberDocument}
+        />
+      )}
       {documents.refreshError && extraction?.status === "processing" ? (
         <div className="requirement-upload__connection-warning" role="status">
           <div>
@@ -1470,6 +1706,7 @@ function RequirementAction({
   activeDocument,
   activeDocumentProjection,
   onHousingPreviewChange,
+  prerequisite,
 }: {
   requirement: StudentRequirementDetail;
   kind: RequirementKind;
@@ -1478,6 +1715,7 @@ function RequirementAction({
   activeDocument?: StudentDocument | null;
   activeDocumentProjection?: DocumentExtractionProjectionState | null;
   onHousingPreviewChange?: (selection: HousingPreviewSelection) => void;
+  prerequisite?: Pick<StudentRequirementDetail, "slug" | "title"> | null;
 }) {
   if (requirement.status === "blocked") {
     return (
@@ -1489,8 +1727,16 @@ function RequirementAction({
             This action will unlock automatically when the earlier enrollment
             requirement is complete.
           </p>
-          <Link className="button button--secondary" href="/enrollment">
-            Back to enrollment <span aria-hidden="true">→</span>
+          <Link
+            className="button button--secondary"
+            href={
+              prerequisite
+                ? `/enrollment/requirements/${encodeURIComponent(prerequisite.slug)}`
+                : "/enrollment"
+            }
+          >
+            {prerequisite ? `Open ${prerequisite.title}` : "Back to enrollment"}{" "}
+            <span aria-hidden="true">→</span>
           </Link>
         </div>
       </div>
@@ -1596,6 +1842,11 @@ export default function RequirementDetailPage() {
     [slug],
   );
   const requirement = useApiResource(loadRequirement);
+  const loadRequirements = useCallback(
+    (signal: AbortSignal) => getStudentRequirements(signal),
+    [],
+  );
+  const requirements = useApiResource(loadRequirements);
   const kind = useMemo(
     () => (requirement.status === "ready" ? requirementKind(requirement.data) : null),
     [requirement.data, requirement.status],
@@ -1603,7 +1854,8 @@ export default function RequirementDetailPage() {
   const refreshAfterRecordChange = useCallback(() => {
     setPreviewRefreshKey((current) => current + 1);
     requirement.refresh();
-  }, [requirement]);
+    requirements.refresh();
+  }, [requirement, requirements]);
   const refreshAfterTranscriptChange = useCallback(
     (document: StudentDocument) => {
       setTranscriptDocumentProjection((current) =>
@@ -1629,6 +1881,35 @@ export default function RequirementDetailPage() {
     kind === "transcript"
       ? "Upload your transcript to discover potential course exemptions and unlock AI-powered course and career planning."
       : "Complete this step here. Your enrollment record will update as soon as Aster receives the change.";
+  const relatedRequirements = requirements.status === "ready"
+    ? requirements.data.items
+    : [];
+  const requirementByCode = new Map(
+    relatedRequirements.map((item) => [item.code, item]),
+  );
+  const prerequisites = requirement.status === "ready"
+    ? requirement.data.dependencyCodes.map((code) => ({
+        code,
+        requirement: requirementByCode.get(code) ?? null,
+      }))
+    : [];
+  const firstPrerequisiteRecord =
+    prerequisites.find(
+      (item) =>
+        item.requirement &&
+        !terminalRequirementStatuses.has(item.requirement.status),
+    ) ?? prerequisites.find((item) => !item.requirement);
+  const firstPrerequisite = firstPrerequisiteRecord
+    ? firstPrerequisiteRecord.requirement ?? {
+        slug: studentRequirementSlug(firstPrerequisiteRecord.code),
+        title: humanize(firstPrerequisiteRecord.code),
+      }
+    : null;
+  const successors = requirement.status === "ready"
+    ? relatedRequirements.filter((item) =>
+        item.dependencyCodes.includes(requirement.data.code),
+      )
+    : [];
 
   return (
     <PortalShell
@@ -1674,6 +1955,7 @@ export default function RequirementDetailPage() {
               activeDocument={transcriptDocument}
               activeDocumentProjection={transcriptDocumentProjection}
               onHousingPreviewChange={setHousingSelection}
+              prerequisite={firstPrerequisite}
             />
           </section>
           <aside className="requirement-workspace__context">
@@ -1732,11 +2014,58 @@ export default function RequirementDetailPage() {
               <section className="requirement-context-card requirement-context-card--dependency">
                 <p className="eyebrow">Complete first</p>
                 <h2>Before this task</h2>
+                {requirements.status === "error" ? (
+                  <div className="requirement-dependency-warning" role="status">
+                    <p>
+                      Live prerequisite statuses are temporarily unavailable. The
+                      task links below still use their stable enrollment routes.
+                    </p>
+                    <button
+                      className="text-button"
+                      type="button"
+                      onClick={requirements.reload}
+                    >
+                      Retry status check
+                    </button>
+                  </div>
+                ) : null}
                 <ul>
-                  {requirement.data.dependencyCodes.map((code) => (
+                  {prerequisites.map(({ code, requirement: dependency }) => (
                     <li key={code}>
                       <span aria-hidden="true">→</span>
-                      {humanize(code)}
+                      {dependency ? (
+                        <Link
+                          href={`/enrollment/requirements/${encodeURIComponent(dependency.slug)}`}
+                        >
+                          {dependency.title}
+                        </Link>
+                      ) : (
+                        <Link
+                          href={`/enrollment/requirements/${encodeURIComponent(
+                            studentRequirementSlug(code),
+                          )}`}
+                        >
+                          {humanize(code)}
+                        </Link>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+            {successors.length > 0 ? (
+              <section className="requirement-context-card requirement-context-card--successors">
+                <p className="eyebrow">What this unlocks</p>
+                <h2>Next connected tasks</h2>
+                <ul>
+                  {successors.map((successor) => (
+                    <li key={successor.id}>
+                      <Link
+                        href={`/enrollment/requirements/${encodeURIComponent(successor.slug)}`}
+                      >
+                        <span>{successor.title}</span>
+                        <StatusPill value={successor.status} />
+                      </Link>
                     </li>
                   ))}
                 </ul>

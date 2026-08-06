@@ -11,12 +11,14 @@ import {
   getStudentFinancials,
   selectFinancialPaymentPlan,
 } from "../lib/api-client";
+import { safePortalDestination } from "../lib/safe-destination";
 
 function money(cents: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(cents / 100);
 }
 
@@ -29,6 +31,62 @@ function awardLabel(award: FinancialAward) {
   }[award.type];
 }
 
+function awardExplanation(award: FinancialAward) {
+  const typeExplanation = {
+    grant: "Grants generally do not need to be repaid when eligibility requirements remain satisfied.",
+    scholarship: "Scholarships are gift aid and may carry enrollment, academic, or donor conditions.",
+    loan: "Loans must be repaid. Review the lender, interest, fees, and disbursement terms before accepting.",
+    work_study: "Work-study is earned as wages through eligible employment; it is not an upfront credit on your bill.",
+  }[award.type];
+  const statusExplanation = award.requiresAction
+    ? "Your aid file currently needs a decision or follow-up before this award is final."
+    : award.status === "accepted"
+      ? "This award is included in the accepted-aid total shown above."
+      : award.status === "pending"
+        ? "This award is still being reviewed and is not yet counted as accepted aid."
+        : award.status === "declined"
+          ? "This award is not included in your accepted aid."
+          : "This award is available for your review.";
+  return `${typeExplanation} ${statusExplanation}`;
+}
+
+function financialDocumentHref(document: StudentFinancials["requiredDocuments"][number]) {
+  const documentId = document.documentId;
+  const fallback = documentId
+    ? `/documents?document=${encodeURIComponent(documentId)}`
+    : "/documents";
+  const destination = safePortalDestination(document.href, fallback);
+  if (!destination.external && destination.href === "/documents" && documentId) {
+    return `${destination.href}?document=${encodeURIComponent(documentId)}`;
+  }
+  return destination.href;
+}
+
+function FinancialDocumentAction({
+  document,
+}: {
+  document: StudentFinancials["requiredDocuments"][number];
+}) {
+  const href = financialDocumentHref(document);
+  const label =
+    document.status === "verified"
+      ? "View record"
+      : ["submitted", "under_review"].includes(document.status)
+        ? "View submission status"
+        : document.status === "action_required"
+          ? "Resolve requirement"
+          : "Complete requirement";
+  return /^https:\/\//i.test(href) ? (
+    <a href={href} target="_blank" rel="noreferrer">
+      {label} <span aria-hidden="true">↗</span>
+    </a>
+  ) : (
+    <Link href={href}>
+      {label} <span aria-hidden="true">→</span>
+    </Link>
+  );
+}
+
 const fundingColors = {
   grant: "#2f7d5b",
   scholarship: "#f2b824",
@@ -36,6 +94,68 @@ const fundingColors = {
   payments: "#44a6a8",
   balance: "#d9dee6",
 } as const;
+
+type FinancialPaymentScheduleItem = {
+  id: string;
+  kind: "deposit" | "installment";
+  label: string;
+  amountCents: number;
+  enrollmentFeeCents: number;
+  dueAt: string;
+  status: "paid" | "due" | "projected";
+  projected: boolean;
+};
+
+function FinancialPaymentSchedule({
+  items,
+}: {
+  items: readonly FinancialPaymentScheduleItem[];
+}) {
+  if (items.length === 0) return null;
+  return (
+    <section className="aster-section financial-payment-schedule">
+      <div className="aster-section__heading">
+        <div>
+          <p className="eyebrow">Dates and amounts</p>
+          <h2>Payment schedule</h2>
+        </div>
+        <Link href="/payments">Open payment history →</Link>
+      </div>
+      <ol>
+        {items.map((item) => (
+          <li className={`financial-payment-schedule__item is-${item.status}`} key={item.id}>
+            <time dateTime={item.dueAt}>
+              {new Intl.DateTimeFormat("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+                timeZone: "UTC",
+              }).format(new Date(item.dueAt))}
+            </time>
+            <div>
+              <span>{item.kind === "deposit" ? "Enrollment deposit" : "Plan installment"}</span>
+              <h3>{item.label}</h3>
+              <p>
+                {item.status === "paid"
+                  ? "Payment recorded."
+                  : item.projected
+                    ? "Projected from your enrolled plan; billing dates can change before statements are issued."
+                    : "Current amount due on the university record."}
+              </p>
+            </div>
+            <div>
+              <strong>{money(item.amountCents)}</strong>
+              {item.enrollmentFeeCents > 0 ? (
+                <small>+ {money(item.enrollmentFeeCents)} enrollment fee</small>
+              ) : null}
+              <StatusPill value={item.status} />
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
 
 function FinancialAidDonut({
   financials,
@@ -263,6 +383,23 @@ export default function FinancialsPage() {
                       <small>{awardLabel(award)} · {award.source}</small>
                       <h3>{award.name}</h3>
                       {award.requiresAction ? <em>Decision required</em> : null}
+                      <details className="financial-award-details">
+                        <summary>How this award works</summary>
+                        <p>{awardExplanation(award)}</p>
+                        <dl>
+                          <div>
+                            <dt>Offered</dt>
+                            <dd>{money(award.offeredAmountCents)}</dd>
+                          </div>
+                          <div>
+                            <dt>Accepted</dt>
+                            <dd>{money(award.acceptedAmountCents)}</dd>
+                          </div>
+                        </dl>
+                        {award.requiresAction ? (
+                          <Link href="/appointments">Ask Financial Aid about this award →</Link>
+                        ) : null}
+                      </details>
                     </div>
                     <div>
                       <strong>{money(award.offeredAmountCents)}</strong>
@@ -331,14 +468,36 @@ export default function FinancialsPage() {
                         </small>
                       ) : null}
                     </div>
-                    <Link href={document.href}>
-                      {document.status === "verified" ? "View" : "Complete"} →
-                    </Link>
+                    <div className="financial-document-actions">
+                      <FinancialDocumentAction document={document} />
+                      <details>
+                        <summary>Status details</summary>
+                        <p>
+                          {document.status === "verified"
+                            ? "Financial Aid has verified this record. Keep it available for reference."
+                            : document.status === "under_review"
+                              ? "Your submission is with Financial Aid. No new upload is needed unless the office contacts you."
+                              : document.status === "submitted"
+                                ? "Your document was received and is waiting to enter review."
+                                : document.status === "action_required"
+                                  ? "Open this requirement to see what needs correction or additional evidence."
+                                  : "This document is still needed before your aid file can be finalized."}
+                        </p>
+                      </details>
+                    </div>
                   </li>
                 ))}
               </ul>
             </section>
           </div>
+
+          <FinancialPaymentSchedule
+            items={
+              (financials.data as StudentFinancials & {
+                paymentSchedule?: FinancialPaymentScheduleItem[];
+              }).paymentSchedule ?? []
+            }
+          />
 
           <section className="aster-section">
             <div className="aster-section__heading">

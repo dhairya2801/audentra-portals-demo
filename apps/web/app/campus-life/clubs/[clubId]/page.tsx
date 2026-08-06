@@ -8,6 +8,7 @@ import { TenantLink as Link } from "../../../components/tenant-link";
 import { ErrorState, LoadingState } from "../../../components/portal-ui";
 import { useApiResource } from "../../../hooks/use-api-resource";
 import { getCampusLife } from "../../../lib/api-client";
+import { safePortalDestination } from "../../../lib/safe-destination";
 import { useTenant } from "../../../components/tenant-provider";
 
 function eventParts(event: StudentClubEvent) {
@@ -97,6 +98,7 @@ export default function ClubDetailPage() {
   const events = [...(club.events ?? [])].sort((left, right) =>
     left.startsAt.localeCompare(right.startsAt),
   );
+  const clubSource = safePortalDestination(club.source?.url, "/campus-life");
 
   return (
     <PortalShell
@@ -121,17 +123,23 @@ export default function ClubDetailPage() {
             <a className="button button--accent" href={`mailto:${club.contactChannel}`}>
               Join or ask a question
             </a>
-            {club.socialLinks?.map((social) => (
-              <a
-                className="club-detail-social"
-                href={social.url}
-                target="_blank"
-                rel="noreferrer"
-                key={social.url}
-              >
-                {social.label} ↗
-              </a>
-            ))}
+            {club.socialLinks?.map((social) => {
+              const destination = safePortalDestination(
+                social.url,
+                "/campus-life",
+              );
+              return destination.external ? (
+                <a
+                  className="club-detail-social"
+                  href={destination.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  key={social.url}
+                >
+                  {social.label} ↗
+                </a>
+              ) : null;
+            })}
           </div>
         </div>
         <div className="club-detail-hero__status">
@@ -153,6 +161,13 @@ export default function ClubDetailPage() {
             {events.length ? (
               events.map((event) => {
                 const date = eventParts(event);
+                const registration = safePortalDestination(
+                  event.registrationUrl,
+                  "/campus-life",
+                );
+                const hasRegistration =
+                  Boolean(event.registrationUrl) &&
+                  registration.href !== "/campus-life";
                 return (
                   <article className="club-event-card" key={event.id}>
                     <time dateTime={event.startsAt}>
@@ -170,14 +185,16 @@ export default function ClubDetailPage() {
                         <span>⌖ {event.location}</span>
                       </div>
                     </div>
-                    {event.registrationUrl ? (
+                    {hasRegistration && registration.external ? (
                       <a
-                        href={event.registrationUrl}
+                        href={registration.href}
                         target="_blank"
                         rel="noreferrer"
                       >
                         Register ↗
                       </a>
+                    ) : hasRegistration ? (
+                      <Link href={registration.href}>Register →</Link>
                     ) : (
                       <a href={`mailto:${club.contactChannel}?subject=${encodeURIComponent(event.title)}`}>
                         Ask about it →
@@ -215,10 +232,10 @@ export default function ClubDetailPage() {
             <span>Latest from the team</span>
             <p>{club.latestUpdate}</p>
           </section>
-          {club.source ? (
+          {club.source && clubSource.external ? (
             <a
               className="club-detail-source"
-              href={club.source.url}
+              href={clubSource.href}
               target="_blank"
               rel="noreferrer"
             >

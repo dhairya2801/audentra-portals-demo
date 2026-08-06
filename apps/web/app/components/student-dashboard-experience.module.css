@@ -1,0 +1,10 @@
+.overview {
+  display: grid;
+  min-width: 0;
+  gap: clamp(20px, 3vw, 30px);
+  margin-block: clamp(24px, 4vw, 38px);
+}
+
+.overview > * {
+  min-width: 0;
+}

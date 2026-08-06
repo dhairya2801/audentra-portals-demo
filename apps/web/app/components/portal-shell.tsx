@@ -10,6 +10,8 @@ import {
 } from "../lib/api-client";
 import { EdwardAssistant } from "./edward-assistant";
 import { ErrorState, LoadingState, PortalMark } from "./portal-ui";
+import { RewardCelebration } from "./reward-celebration";
+import { StudentNotificationCenter } from "./student-notification-center";
 import { TenantLink as Link } from "./tenant-link";
 import { useTenant } from "./tenant-provider";
 
@@ -341,8 +343,17 @@ export function PortalShell({
 
   useEffect(() => {
     const interval = window.setInterval(refreshIdentity, 15_000);
+    const refreshAfterStudentAction = () => refreshIdentity();
+    window.addEventListener(
+      "vv:student-record-changed",
+      refreshAfterStudentAction,
+    );
     return () => {
       window.clearInterval(interval);
+      window.removeEventListener(
+        "vv:student-record-changed",
+        refreshAfterStudentAction,
+      );
     };
   }, [refreshIdentity]);
 
@@ -408,17 +419,10 @@ export function PortalShell({
           <Link className="aster-help-link" href="/help">
             Student support
           </Link>
-          <Link
-            className="aster-notification-link"
-            href="/messages"
-            aria-label={`${identity.data.unreadMessageCount} unread notifications`}
-          >
-            <span aria-hidden="true">●</span>
-            Notifications
-            {identity.data.unreadMessageCount > 0 ? (
-              <strong>{identity.data.unreadMessageCount}</strong>
-            ) : null}
-          </Link>
+          <StudentNotificationCenter
+            fallbackUnreadCount={identity.data.unreadMessageCount}
+            suppressTransient={Boolean(experienceUpdate)}
+          />
           <Link
             className="aster-student"
             href="/profile"
@@ -546,6 +550,15 @@ export function PortalShell({
           busy={experienceDecision.status === "loading"}
           error={experienceDecision.message}
           onDecision={handleExperienceDecision}
+        />
+      ) : null}
+
+      {!experienceUpdate && identity.data.rewards ? (
+        <RewardCelebration
+          tenantSlug={tenant.slug}
+          studentId={identity.data.student.id}
+          pointName={identity.data.rewards.pointName}
+          lifetimePoints={identity.data.rewards.lifetimePoints}
         />
       ) : null}
     </div>

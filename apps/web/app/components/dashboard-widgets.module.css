@@ -1,0 +1,376 @@
+.events,
+.financial {
+  border: 1px solid #dfe6ee;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 18px 50px rgba(20, 43, 71, 0.07);
+  overflow: hidden;
+}
+
+.widgetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px 26px 18px;
+}
+
+.widgetHeader p {
+  margin: 0 0 4px;
+  color: #728095;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.widgetHeader h2 {
+  margin: 0;
+  color: #142b48;
+  font-size: clamp(1.25rem, 2vw, 1.7rem);
+}
+
+.widgetHeader > a,
+.eventControls > a {
+  color: #214e7a;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.eventControls {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.eventControls button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid #d9e2ec;
+  border-radius: 10px;
+  background: #fff;
+  color: #173f6f;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.eventControls button:hover,
+.eventControls button:focus-visible {
+  background: #f2f6fa;
+  border-color: #8ba6c2;
+}
+
+.eventControls button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.eventRail {
+  display: grid;
+  grid-auto-columns: minmax(270px, 30%);
+  grid-auto-flow: column;
+  gap: 16px;
+  margin: 0;
+  padding: 4px 26px 28px;
+  overflow-x: auto;
+  list-style: none;
+  scroll-padding-inline: 26px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+}
+
+.eventCard {
+  position: relative;
+  min-height: 330px;
+  border: 1px solid #e2e7ed;
+  border-radius: 18px;
+  background: #f5f8fb;
+  overflow: hidden;
+  scroll-snap-align: start;
+}
+
+.eventCard > img,
+.eventArt {
+  display: grid;
+  width: 100%;
+  height: 122px;
+  place-items: center;
+  object-fit: cover;
+  background:
+    linear-gradient(135deg, rgba(23, 63, 111, 0.9), rgba(39, 118, 90, 0.76)),
+    #173f6f;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 3rem;
+  font-weight: 900;
+}
+
+.eventDate {
+  position: absolute;
+  top: 92px;
+  left: 18px;
+  display: grid;
+  width: 52px;
+  min-height: 58px;
+  place-content: center;
+  border: 3px solid #fff;
+  border-radius: 12px;
+  background: #f2b824;
+  color: #17324f;
+  text-align: center;
+}
+
+.eventDate span {
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.eventDate strong {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.eventBody {
+  display: flex;
+  min-height: 190px;
+  padding: 38px 18px 18px;
+  flex-direction: column;
+}
+
+.eventBody > small {
+  color: #54708c;
+  font-size: 0.67rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.eventBody h3 {
+  margin: 5px 0 7px;
+  color: #142b48;
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+
+.eventBody > p {
+  display: -webkit-box;
+  margin: 0 0 12px;
+  overflow: hidden;
+  color: #5a6b7e;
+  font-size: 0.78rem;
+  line-height: 1.48;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.eventBody > div {
+  display: grid;
+  gap: 3px;
+  margin-top: auto;
+  color: #53687e;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.eventBody > a {
+  margin-top: 13px;
+  color: #214e7a;
+  font-size: 0.75rem;
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.eventEmpty {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 26px 26px;
+  padding: 22px;
+  border-radius: 16px;
+  background: #f4f7fa;
+  color: #52667d;
+}
+
+.eventEmpty > span {
+  color: #d19d1b;
+  font-size: 2rem;
+}
+
+.eventEmpty strong {
+  color: #17324f;
+}
+
+.eventEmpty p {
+  margin: 3px 0 0;
+  font-size: 0.82rem;
+}
+
+.financialBody {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.85fr) minmax(300px, 1.15fr);
+  gap: 30px;
+  padding: 8px 26px 28px;
+}
+
+.donutWrap {
+  position: relative;
+  display: grid;
+  min-height: 250px;
+  place-items: center;
+}
+
+.donut {
+  width: min(100%, 250px);
+  transform: rotate(-90deg);
+}
+
+.donut > circle:first-child,
+.donutSegment {
+  fill: none;
+  stroke-width: 5.2;
+}
+
+.donut > circle:first-child {
+  stroke: #e8edf3;
+}
+
+.donutSegment {
+  transition: stroke-dasharray 300ms ease;
+}
+
+.donutWrap > div {
+  position: absolute;
+  display: grid;
+  max-width: 125px;
+  text-align: center;
+}
+
+.donutWrap span {
+  color: #65768a;
+  font-size: 0.66rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.donutWrap strong {
+  color: #17324f;
+  font-size: 1.45rem;
+}
+
+.financialDetails {
+  display: grid;
+  align-content: center;
+  gap: 18px;
+}
+
+.financialDetails > ul {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.financialDetails li {
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f7f9fb;
+  color: #536579;
+  font-size: 0.78rem;
+}
+
+.financialDetails li i {
+  width: 9px;
+  height: 9px;
+  border-radius: 99px;
+}
+
+.financialDetails li strong {
+  color: #193754;
+}
+
+.financialMetrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.financialMetrics > div {
+  display: grid;
+  align-content: space-between;
+  gap: 8px;
+  min-height: 82px;
+  padding: 11px;
+  border: 1px solid #e3e9ef;
+  border-radius: 12px;
+}
+
+.financialMetrics span {
+  color: #6a798c;
+  font-size: 0.65rem;
+  line-height: 1.3;
+}
+
+.financialMetrics strong {
+  color: #17324f;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 900px) {
+  .eventRail {
+    grid-auto-columns: minmax(265px, 58%);
+  }
+
+  .financialBody {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .widgetHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 21px 18px 16px;
+  }
+
+  .eventControls {
+    width: 100%;
+  }
+
+  .eventControls > a {
+    margin-left: auto;
+  }
+
+  .eventRail {
+    grid-auto-columns: 84%;
+    padding-inline: 18px;
+    scroll-padding-inline: 18px;
+  }
+
+  .financialBody {
+    padding-inline: 18px;
+  }
+
+  .financialMetrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eventRail {
+    scroll-behavior: auto;
+  }
+
+  .donutSegment {
+    transition: none;
+  }
+}

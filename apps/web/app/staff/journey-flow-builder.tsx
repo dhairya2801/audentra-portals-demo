@@ -9,6 +9,7 @@ import { dump, load } from "js-yaml";
 import {
   type DragEvent as ReactDragEvent,
   type FormEvent,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -20,10 +21,13 @@ import {
   createJourneyFlowId,
   createJourneyTaskId,
   dropJourneyTask,
+  journeyGraphLevels,
+  journeySuccessorIds,
   type JourneyFlowKind,
   type JourneyTaskType,
   moveJourneyTask,
   submissionTypeForTask,
+  validateJourneyDependencies,
 } from "./journey-flow-model";
 import {
   aboutYouDefaultFields,
@@ -51,6 +55,8 @@ interface JourneyBuilderTask extends StaffJourneyBlueprintItem {
   screenLabel: string | null;
   screenTitle: string | null;
   screenDescription: string | null;
+  priority: number;
+  dueOffsetDays: number | null;
 }
 
 const aboutYouFieldBindings: Partial<
@@ -355,6 +361,12 @@ function parsedTasks(
             ? input.screen_description
             : null,
         points: Number.isFinite(Number(task.points)) ? Number(task.points) : 0,
+        priority: Number.isInteger(Number(task.priority))
+          ? Math.min(100, Math.max(0, Number(task.priority)))
+          : 0,
+        dueOffsetDays: Number.isInteger(Number(task.due_days_after_acceptance))
+          ? Number(task.due_days_after_acceptance)
+          : null,
         studentStep:
           typeof task.student_step === "string" ? task.student_step : null,
         dependsOn: stringList(task.depends_on),
@@ -385,15 +397,89 @@ function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
+function JourneyDependencyMap({
+  tasks,
+  onSelect,
+}: {
+  tasks: JourneyBuilderTask[];
+  onSelect: (item: JourneyBuilderTask) => void;
+}) {
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const levels = journeyGraphLevels(tasks);
+  const graphError = validateJourneyDependencies(tasks);
+
+  return (
+    <section className="staff-journey-map" aria-labelledby="journey-map-title">
+      <header className="staff-journey-map__heading">
+        <div>
+          <p className="eyebrow">Dependency map</p>
+          <h3 id="journey-map-title">How steps unlock</h3>
+          <p>
+            Columns group steps by their earliest unlock stage. Each card lists
+            its actual prerequisites and the steps it unlocks.
+          </p>
+        </div>
+        <span>{tasks.length} nodes</span>
+      </header>
+      {graphError ? (
+        <p className="field-error staff-journey-map__error" role="alert">
+          {graphError}
+        </p>
+      ) : null}
+      <div className="staff-journey-map__levels">
+        {levels.map((taskIds, levelIndex) => (
+          <div className="staff-journey-map__level" key={taskIds.join(":")}>
+            <span className="staff-journey-map__stage">Stage {levelIndex + 1}</span>
+            <div>
+              {taskIds.map((taskId) => {
+                const task = taskById.get(taskId);
+                if (!task) return null;
+                const successorIds = journeySuccessorIds(tasks, task.id);
+                return (
+                  <button
+                    className={`staff-journey-map__node${task.active ? "" : " is-inactive"}`}
+                    type="button"
+                    onClick={() => onSelect(task)}
+                    key={task.id}
+                  >
+                    <span>
+                      {task.dependsOn.length === 0
+                        ? "Start"
+                        : `After ${task.dependsOn.length}`}
+                      {task.active ? "" : " · Inactive"}
+                    </span>
+                    <strong>{task.title}</strong>
+                    <small>{task.kind === "onboarding" ? "Onboarding" : "Enrollment"}</small>
+                    <small>
+                      Priority {task.priority} · {task.points} points
+                    </small>
+                    <small>
+                      {successorIds.length > 0
+                        ? `Unlocks ${successorIds.map((id) => taskById.get(id)?.title ?? id).join(", ")}`
+                        : "End of this branch"}
+                    </small>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function JourneyTaskEditor({
   item,
   isNew,
+  dependencyTasks,
   configuration,
   onConfigurationSaved,
   onClose,
 }: {
   item: JourneyBuilderTask;
   isNew: boolean;
+  dependencyTasks: JourneyBuilderTask[];
   configuration: StaffManagedConfiguration;
   onConfigurationSaved: (configuration: StaffManagedConfiguration) => void;
   onClose: () => void;
@@ -433,8 +519,62 @@ function JourneyTaskEditor({
     }
     return [];
   });
+  const [selectedDependencies, setSelectedDependencies] = useState(
+    () => new Set(item.dependsOn),
+  );
+  const panelRef = useRef<HTMLElement>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const builtInOnboardingScreen = item.kind === "onboarding" && Boolean(item.studentStep);
+  const dependencyCandidates = dependencyTasks.filter(
+    (candidate) => candidate.id !== item.id && !candidate.studentStep,
+  );
+  const unavailableDependencies = [...selectedDependencies].filter(
+    (dependency) => !dependencyTasks.some((candidate) => candidate.id === dependency),
+  );
+  const successorTasks = dependencyTasks.filter((candidate) =>
+    candidate.dependsOn.includes(item.id),
+  );
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    const focusFrame = window.requestAnimationFrame(() => panel?.focus());
+    const handleKeyboard = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !panel) return;
+      const focusable = Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute("hidden"));
+      if (focusable.length === 0) {
+        event.preventDefault();
+        panel.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const activeElement = document.activeElement;
+      if (
+        event.shiftKey &&
+        (activeElement === first || !panel.contains(activeElement))
+      ) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyboard);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", handleKeyboard);
+    };
+  }, [onClose]);
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -465,13 +605,61 @@ function JourneyTaskEditor({
       const description = String(form.get("description") ?? "").trim();
       const selectedType = taskType(form.get("taskType"));
       const options = formList(form.get("options"));
-      const dependencies = formList(form.get("dependsOn")).filter(
+      const dependencies = [...selectedDependencies].filter(
         (dependency) => dependency !== item.id,
       );
+      const points = Number(form.get("points"));
+      const priority = Number(form.get("priority"));
+      const dueOffsetValue = String(form.get("dueOffsetDays") ?? "").trim();
+      const dueOffsetDays = dueOffsetValue === "" ? null : Number(dueOffsetValue);
 
       if (!title || !description) {
         throw new Error("Step name and student instructions are required.");
       }
+      if (!Number.isInteger(points) || points < 0 || points > 10_000) {
+        throw new Error("Points must be a whole number between 0 and 10,000.");
+      }
+      if (!Number.isInteger(priority) || priority < 0 || priority > 100) {
+        throw new Error("Priority must be a whole number between 0 and 100.");
+      }
+      if (
+        dueOffsetDays !== null &&
+        (!Number.isInteger(dueOffsetDays) || dueOffsetDays < 0 || dueOffsetDays > 3_650)
+      ) {
+        throw new Error(
+          "Due date offset must be blank or a whole number between 0 and 3,650.",
+        );
+      }
+      const dependencyById = new Map(
+        dependencyTasks.map((candidate) => [candidate.id, candidate]),
+      );
+      const unavailableDependency = dependencies.find(
+        (dependency) => !dependencyById.has(dependency),
+      );
+      if (unavailableDependency) {
+        throw new Error(
+          `Dependency ${unavailableDependency} is no longer available. Clear it and try again.`,
+        );
+      }
+      if (form.get("active") === "on") {
+        const inactiveDependency = dependencies.find(
+          (dependency) => dependencyById.get(dependency)?.active === false,
+        );
+        if (inactiveDependency) {
+          throw new Error(
+            `Activate ${dependencyById.get(inactiveDependency)?.title ?? inactiveDependency} before using it as a prerequisite.`,
+          );
+        }
+      }
+      const candidateGraph = dependencyTasks
+        .filter((candidate) => candidate.id !== item.id)
+        .map((candidate) => ({
+          id: candidate.id,
+          dependsOn: candidate.dependsOn,
+        }));
+      candidateGraph.push({ id: item.id, dependsOn: dependencies });
+      const dependencyError = validateJourneyDependencies(candidateGraph);
+      if (dependencyError) throw new Error(dependencyError);
       if (selectedType === "payment" && item.id !== "enrollment_deposit") {
         throw new Error(
           "Payment actions are only available for the built-in enrollment deposit step.",
@@ -485,11 +673,17 @@ function JourneyTaskEditor({
         owner: String(form.get("owner") ?? "").trim(),
         task_type: selectedType,
         submission_type: submissionTypeForTask(selectedType),
-        points: Number(form.get("points")),
+        points,
+        priority,
         required: form.get("required") === "on",
         active: form.get("active") === "on",
         depends_on: dependencies,
       });
+      if (dueOffsetDays === null) {
+        delete task.due_days_after_acceptance;
+      } else {
+        task.due_days_after_acceptance = dueOffsetDays;
+      }
 
       const existingInput = managedRecord(task.input) ?? {};
       task.input = existingInput;
@@ -697,7 +891,11 @@ function JourneyTaskEditor({
     return (
       <aside
         className="staff-editor-panel"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
         aria-label="Edit built-in onboarding screen"
+        tabIndex={-1}
       >
         <header>
           <div>
@@ -802,7 +1000,11 @@ function JourneyTaskEditor({
   return (
     <aside
       className="staff-editor-panel"
+      ref={panelRef}
+      role="dialog"
+      aria-modal="true"
       aria-label={isNew ? "Add journey step" : "Edit journey step"}
+      tabIndex={-1}
     >
       <header>
         <div>
@@ -868,6 +1070,29 @@ function JourneyTaskEditor({
               max="10000"
               defaultValue={item.points}
               required
+            />
+          </label>
+          <label>
+            Priority
+            <input
+              name="priority"
+              type="number"
+              min="0"
+              max="100"
+              defaultValue={item.priority}
+              required
+            />
+            <small>Higher-priority steps appear first for students.</small>
+          </label>
+          <label>
+            Due after acceptance (days)
+            <input
+              name="dueOffsetDays"
+              type="number"
+              min="0"
+              max="3650"
+              defaultValue={item.dueOffsetDays ?? ""}
+              placeholder="No relative due date"
             />
           </label>
         </div>
@@ -976,10 +1201,75 @@ function JourneyTaskEditor({
             fields when you publish.
           </div>
         ) : null}
-        <label>
-          Depends on step IDs
-          <input name="dependsOn" defaultValue={item.dependsOn.join(", ")} />
-        </label>
+        <fieldset className="staff-dependency-picker">
+          <legend>Prerequisites</legend>
+          <p>
+            Select every step that must be completed first. The dependency map
+            updates after publishing and cycles are rejected before anything is saved.
+          </p>
+          {dependencyCandidates.length > 0 || unavailableDependencies.length > 0 ? (
+            <div className="staff-dependency-picker__options">
+              {unavailableDependencies.map((dependency) => (
+                <label className="is-unavailable" key={dependency}>
+                  <input
+                    name="dependsOn"
+                    type="checkbox"
+                    value={dependency}
+                    checked
+                    onChange={() => {
+                      setSelectedDependencies((current) => {
+                        const next = new Set(current);
+                        next.delete(dependency);
+                        return next;
+                      });
+                    }}
+                  />
+                  <span>
+                    <strong>Unavailable prerequisite</strong>
+                    <small>{dependency} · Clear this stale reference before publishing</small>
+                  </span>
+                </label>
+              ))}
+              {dependencyCandidates.map((candidate) => (
+                <label key={`${candidate.flowId}:${candidate.id}`}>
+                  <input
+                    name="dependsOn"
+                    type="checkbox"
+                    value={candidate.id}
+                    checked={selectedDependencies.has(candidate.id)}
+                    onChange={(event) => {
+                      setSelectedDependencies((current) => {
+                        const next = new Set(current);
+                        if (event.target.checked) next.add(candidate.id);
+                        else next.delete(candidate.id);
+                        return next;
+                      });
+                    }}
+                  />
+                  <span>
+                    <strong>{candidate.title}</strong>
+                    <small>
+                      {candidate.kind === "onboarding" ? "Onboarding" : "Enrollment"}
+                      {candidate.active ? "" : " · Inactive"} · {candidate.id}
+                    </small>
+                  </span>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <p className="staff-dependency-picker__empty">
+              Add another configurable step before creating a prerequisite.
+            </p>
+          )}
+        </fieldset>
+        <div className="staff-dependency-successors" role="note">
+          <strong>Steps currently unlocked by this one</strong>
+          <p>
+            {successorTasks.length > 0
+              ? successorTasks.map((candidate) => candidate.title).join(", ")
+              : "No existing step currently uses this as a prerequisite."}
+          </p>
+        </div>
         <div className="staff-form-grid">
           <label className="staff-checkbox">
             <input name="required" type="checkbox" defaultChecked={item.required} />
@@ -1090,6 +1380,17 @@ export function JourneyFlowBuilder({
       return [];
     }
   }, [workingConfiguration, kind]);
+  const dependencyTasks = useMemo(() => {
+    try {
+      const candidates = [
+        ...parsedTasks(workingConfiguration, "onboarding"),
+        ...parsedTasks(workingConfiguration, "enrollment"),
+      ];
+      return [...new Map(candidates.map((task) => [task.id, task])).values()];
+    } catch {
+      return parsed.tasks;
+    }
+  }, [parsed.tasks, workingConfiguration]);
   const [tasks, setTasks] = useState(parsed.tasks);
   const [selected, setSelected] = useState<{
     item: JourneyBuilderTask;
@@ -1100,6 +1401,20 @@ export function JourneyFlowBuilder({
   const [operationError, setOperationError] = useState<string | null>(null);
   const action = useApiAction(updateStaffManagedConfiguration);
   const busy = action.status === "loading";
+  const editorTriggerRef = useRef<HTMLElement | null>(null);
+
+  const openEditor = (item: JourneyBuilderTask, isNew: boolean) => {
+    editorTriggerRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    setSelected({ item, isNew });
+  };
+
+  const closeEditor = () => {
+    setSelected(null);
+    window.requestAnimationFrame(() => editorTriggerRef.current?.focus());
+  };
 
   const acceptPublishedConfiguration = (
     updatedConfiguration: StaffManagedConfiguration,
@@ -1239,9 +1554,8 @@ export function JourneyFlowBuilder({
             kind,
             new Set(flows.map((candidate) => String(candidate.id))),
           );
-      setSelected({
-        isNew: true,
-        item: {
+      openEditor(
+        {
           id,
           kind,
           flowId,
@@ -1278,12 +1592,15 @@ export function JourneyFlowBuilder({
           screenTitle: null,
           screenDescription: null,
           points: 0,
+          priority: 0,
+          dueOffsetDays: null,
           studentStep: null,
           dependsOn: [],
           flow: [],
           configurationVersion: workingConfigurationRef.current.version,
         },
-      });
+        true,
+      );
     } catch (error) {
       setOperationError(errorMessage(error, "A new journey step could not be started."));
     }
@@ -1341,7 +1658,7 @@ export function JourneyFlowBuilder({
                   <strong>{item.title}</strong>
                   <small>{taskTypeLabel(item.taskType)} · {item.required ? "Required" : "Optional"}</small>
                 </div>
-                <button type="button" disabled={busy} onClick={() => setSelected({ item, isNew: false })}>
+                <button type="button" disabled={busy} onClick={() => openEditor(item, false)}>
                   Edit synced item
                 </button>
               </li>
@@ -1349,10 +1666,17 @@ export function JourneyFlowBuilder({
           </ul>
         </section>
       ) : null}
+      {dependencyTasks.length > 0 ? (
+        <JourneyDependencyMap
+          tasks={dependencyTasks}
+          onSelect={(item) => openEditor(item, false)}
+        />
+      ) : null}
       <ol className="staff-journey-list" aria-describedby={instructionId}>
         {tasks.map((item, index) => {
           const previous = tasks[index - 1];
           const next = tasks[index + 1];
+          const successorIds = journeySuccessorIds(dependencyTasks, item.id);
           return (
             <li
               key={`${item.flowId}:${item.id}`}
@@ -1405,6 +1729,20 @@ export function JourneyFlowBuilder({
                   <small>
                     Owner: {item.owner} · {item.required ? "Required" : "Optional"}
                   </small>
+                  <small>
+                    Priority {item.priority}
+                    {item.dueOffsetDays === null
+                      ? " · No relative due date"
+                      : ` · Due ${item.dueOffsetDays} days after acceptance`}
+                  </small>
+                  <small>
+                    {item.dependsOn.length > 0
+                      ? `Prerequisites: ${item.dependsOn.join(", ")}`
+                      : "No prerequisites"}
+                    {successorIds.length > 0
+                      ? ` · Unlocks: ${successorIds.join(", ")}`
+                      : " · No successors"}
+                  </small>
                 </div>
                 <div className="staff-journey-task__status">
                   {item.studentStep ? (
@@ -1423,7 +1761,7 @@ export function JourneyFlowBuilder({
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => setSelected({ item, isNew: false })}
+                    onClick={() => openEditor(item, false)}
                   >
                     {item.studentStep ? "Edit screen" : "Edit step"}
                   </button>
@@ -1495,9 +1833,10 @@ export function JourneyFlowBuilder({
             key={`${selected.item.id}:${selected.isNew ? "new" : "edit"}`}
             item={selected.item}
             isNew={selected.isNew}
+            dependencyTasks={dependencyTasks}
             configuration={workingConfiguration}
             onConfigurationSaved={acceptPublishedConfiguration}
-            onClose={() => setSelected(null)}
+            onClose={closeEditor}
           />
         </div>
       ) : null}
