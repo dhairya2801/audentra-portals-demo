@@ -73,6 +73,11 @@ registry_token="$(
 printf '%s' "$registry_token" \
   | docker --config "$docker_config" login \
       --username oauth2accesstoken --password-stdin "$registry_host" >/dev/null
+# Docker does not prune images used by running containers. Reclaiming only
+# unused images before a pull protects the active release (and its rollback
+# path) while preventing the small preview VM's image cache from blocking a
+# new, otherwise safe release.
+docker image prune --all --force >/dev/null || true
 docker --config "$docker_config" pull "$image_uri"
 docker image inspect "$image_uri" >/dev/null
 

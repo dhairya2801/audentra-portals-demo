@@ -132,4 +132,4 @@ jobs:
           --tunnel-through-iap
           --ssh-key-expire-after=30m
           --quiet
-          --command="sudo /usr/local/sbin/audentra-portals-deploy ${GITHUB_SHA}"
+          --command="sudo docker image prune --all --force && sudo /usr/local/sbin/audentra-portals-deploy ${GITHUB_SHA}"
