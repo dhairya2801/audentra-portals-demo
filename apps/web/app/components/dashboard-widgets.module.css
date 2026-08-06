@@ -325,6 +325,104 @@
   font-size: 0.82rem;
 }
 
+.financialCard.financialCard {
+  min-height: 14rem;
+}
+
+.financialCard > .financialCardBody {
+  display: grid;
+  grid-template-columns: minmax(92px, 0.72fr) minmax(0, 1.28fr);
+  align-items: center;
+  gap: 14px;
+  margin-top: 11px;
+  padding: 0 0 14px;
+  border: 0;
+}
+
+.compactDonutWrap {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  place-items: center;
+}
+
+.compactDonutWrap .donut {
+  width: min(100%, 132px);
+}
+
+.compactDonutWrap > div {
+  position: absolute;
+  display: grid;
+  max-width: 76px;
+  text-align: center;
+}
+
+.compactDonutWrap span {
+  color: #72643e;
+  font-size: 0.45rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.compactDonutWrap strong {
+  color: #17243a;
+  font-size: clamp(0.7rem, 1.25vw, 0.98rem);
+}
+
+.financialCardDetails {
+  min-width: 0;
+}
+
+.financialCardDetails h2 {
+  margin: 0;
+  color: #17243a;
+  font-size: 1rem;
+}
+
+.financialCardDetails > p {
+  margin: 4px 0 9px;
+  color: #6b707a;
+  font-size: 0.56rem;
+  line-height: 1.4;
+}
+
+.financialCardDetails ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.financialCardDetails li {
+  display: grid;
+  grid-template-columns: 7px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px;
+  color: #6c6f73;
+  font-size: 0.49rem;
+}
+
+.financialCardDetails li i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.financialCardDetails li strong {
+  color: #17243a;
+  font-size: 0.52rem;
+}
+
+.financialCard > .financialCardFooter {
+  margin-top: auto;
+}
+
+.financialCardFooter strong {
+  text-align: right;
+}
+
 @media (max-width: 900px) {
   .eventRail {
     grid-auto-columns: minmax(265px, 58%);
@@ -361,6 +459,16 @@
   }
 
   .financialMetrics {
+    grid-template-columns: 1fr;
+  }
+
+  .financialCard > .financialCardBody {
+    grid-template-columns: 112px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 390px) {
+  .financialCard > .financialCardBody {
     grid-template-columns: 1fr;
   }
 }

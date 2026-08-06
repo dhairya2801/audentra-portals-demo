@@ -57,17 +57,14 @@ export function DashboardFinancialSnapshot({
   let offset = 0;
 
   return (
-    <section className={styles.financial} aria-labelledby="financial-snapshot-title">
-      <header className={styles.widgetHeader}>
-        <div>
-          <p>{financials.academicYear}</p>
-          <h2 id="financial-snapshot-title">Your financial snapshot</h2>
-        </div>
-        <Link href="/financials">Full financial view</Link>
-      </header>
-
-      <div className={styles.financialBody}>
-        <div className={styles.donutWrap}>
+    <Link
+      className={`aster-domain-card aster-domain-card--financial ${styles.financialCard}`}
+      href="/financials"
+      aria-labelledby="financial-snapshot-title"
+    >
+      <span>My Financials · {financials.academicYear}</span>
+      <div className={styles.financialCardBody}>
+        <div className={styles.compactDonutWrap}>
           <svg
             className={styles.donut}
             viewBox="0 0 42 42"
@@ -100,8 +97,10 @@ export function DashboardFinancialSnapshot({
           </div>
         </div>
 
-        <div className={styles.financialDetails}>
-          <ul>
+        <div className={styles.financialCardDetails}>
+          <h2 id="financial-snapshot-title">Your financial snapshot</h2>
+          <p>Accepted aid, recorded payments, and what remains at a glance.</p>
+          <ul aria-label="Financial balance breakdown">
             {segments.map((segment) => (
               <li key={segment.key}>
                 <i style={{ background: segment.color }} aria-hidden="true" />
@@ -110,22 +109,14 @@ export function DashboardFinancialSnapshot({
               </li>
             ))}
           </ul>
-          <div className={styles.financialMetrics}>
-            <div>
-              <span>Possible additional aid</span>
-              <strong>{money(financials.pendingAidCents)}</strong>
-            </div>
-            <div>
-              <span>Documents needing action</span>
-              <strong>{actionDocuments}</strong>
-            </div>
-            <div>
-              <span>Payment plan</span>
-              <strong>{enrolledPlan?.name ?? "Not selected"}</strong>
-            </div>
-          </div>
         </div>
       </div>
-    </section>
+      <div className={styles.financialCardFooter}>
+        <small>
+          {actionDocuments} document{actionDocuments === 1 ? "" : "s"} needing action
+        </small>
+        <strong>{enrolledPlan?.name ?? "Choose a payment plan"} →</strong>
+      </div>
+    </Link>
   );
 }

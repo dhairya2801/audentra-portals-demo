@@ -6,6 +6,7 @@ import { PortalShell } from "../components/portal-shell";
 import { ErrorState, LoadingState } from "../components/portal-ui";
 import { useApiResource } from "../hooks/use-api-resource";
 import { getStudentProfile } from "../lib/api-client";
+import styles from "./edward-page.module.css";
 
 export default function EdwardPage() {
   const load = useCallback(
@@ -18,10 +19,10 @@ export default function EdwardPage() {
     <PortalShell
       active="edward"
       eyebrow="Edward AI"
-      title="Your student guide, connected"
-      description="Ask one question across enrollment, finances, academics, documents, and campus life—then complete the next action in place."
+      title="Ask Edward"
+      description="Your private AI guide for questions and next steps across the student portal."
     >
-      <div className="edward-page-layout">
+      <div className={styles.page}>
         {profile.status === "loading" ? (
           <LoadingState label="Connecting Edward to your student context" />
         ) : profile.status === "error" ? (
@@ -32,38 +33,6 @@ export default function EdwardPage() {
             variant="embedded"
           />
         )}
-        <aside className="edward-capabilities">
-          <div>
-            <p className="eyebrow">Connected tools</p>
-            <h2>Edward can check</h2>
-            <ul>
-              <li><span>✓</span> Spoken questions with optional voice replies</li>
-              <li><span>✓</span> Your enrollment checklist and deadlines</li>
-              <li><span>✓</span> Aid, required documents, and balances</li>
-              <li><span>✓</span> Program requirements and course catalog</li>
-              <li><span>✓</span> Transcript-derived credit recommendations</li>
-              <li><span>✓</span> Campus events and student clubs</li>
-            </ul>
-          </div>
-          <div className="edward-boundary">
-            <span aria-hidden="true">i</span>
-            <div>
-              <strong>You stay in control</strong>
-              <p>
-                Edward can prepare or open actions. Academic exemptions, aid
-                decisions, and staff approvals remain in their authoritative
-                workflows with a full audit trail.
-              </p>
-            </div>
-          </div>
-          <div className="edward-cost-note">
-            <p className="eyebrow">Efficient by design</p>
-            <p>
-              Intent routing and database lookups happen before a model call.
-              Only a compact, permission-scoped context is sent to the LLM.
-            </p>
-          </div>
-        </aside>
       </div>
     </PortalShell>
   );

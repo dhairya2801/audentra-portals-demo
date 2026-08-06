@@ -7,7 +7,6 @@ import {
 } from "@vv/contracts";
 import { useCallback, useEffect } from "react";
 import { PortalShell } from "./components/portal-shell";
-import { DashboardEdwardBrief } from "./components/dashboard-edward-brief";
 import { DashboardCampusEvents } from "./components/dashboard-campus-events";
 import { DashboardFinancialSnapshot } from "./components/dashboard-financial-snapshot";
 import dashboardStyles from "./components/student-dashboard-experience.module.css";
@@ -21,22 +20,11 @@ import {
   getStudentDashboard,
   getStudentFinancials,
 } from "./lib/api-client";
-import {
-  prioritizeDashboardRequirements,
-  selectDashboardEnrollmentAction,
-} from "./lib/enrollment-dashboard-action";
+import { prioritizeDashboardRequirements } from "./lib/enrollment-dashboard-action";
 import { dashboardStudentCalendarEntries } from "./lib/student-calendar";
 import { safePortalDestination } from "./lib/safe-destination";
 import { TenantLink as Link } from "./components/tenant-link";
 import { useTenant } from "./components/tenant-provider";
-
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(cents / 100);
-}
 
 function shortDate(value: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -55,12 +43,10 @@ function requirementState(item: StudentRequirementSummary) {
   return item.progressPercent > 0 ? "In progress" : "To do";
 }
 
-function DashboardDocumentTask({
+function DashboardProgressDocument({
   document,
-  position,
 }: {
   document: FinancialDocumentRequirement;
-  position: number;
 }) {
   const fallback = document.documentId
     ? `/documents?document=${encodeURIComponent(document.documentId)}`
@@ -68,28 +54,35 @@ function DashboardDocumentTask({
   const destination = safePortalDestination(document.href, fallback);
   const content = (
     <>
-      <span className="aster-task-number">{String(position).padStart(2, "0")}</span>
-      <div>
+      <span className={dashboardStyles.progressTaskMarker} aria-hidden="true">
+        $
+      </span>
+      <span className={dashboardStyles.progressTaskCopy}>
         <small>Financial aid · action needed</small>
-        <h3>{document.title}</h3>
-        <p>{document.description}</p>
-      </div>
-      <span aria-hidden="true">{destination.external ? "↗" : "→"}</span>
+        <strong>{document.title}</strong>
+      </span>
+      <span className={dashboardStyles.progressTaskArrow} aria-hidden="true">
+        {destination.external ? "↗" : "→"}
+      </span>
     </>
   );
   return destination.external ? (
-    <a
-      className="aster-task-card"
-      href={destination.href}
-      target="_blank"
-      rel="noreferrer"
-    >
-      {content}
-    </a>
+    <li>
+      <a
+        className={dashboardStyles.progressTask}
+        href={destination.href}
+        target="_blank"
+        rel="noreferrer"
+      >
+        {content}
+      </a>
+    </li>
   ) : (
-    <Link className="aster-task-card" href={destination.href}>
-      {content}
-    </Link>
+    <li>
+      <Link className={dashboardStyles.progressTask} href={destination.href}>
+        {content}
+      </Link>
+    </li>
   );
 }
 
@@ -140,13 +133,6 @@ export function StudentDashboardPage() {
   const pendingRequirements = prioritizeDashboardRequirements(
     dashboard.journey.requirements,
   ).slice(0, 3);
-  const enrollmentAction = selectDashboardEnrollmentAction(
-    dashboard.journey,
-    (code) =>
-      `/enrollment/requirements/${encodeURIComponent(
-        studentRequirementSlug(code),
-      )}`,
-  );
   const actionDocuments = financials.requiredDocuments.filter(
     (document) => document.status === "action_required",
   );
@@ -166,24 +152,6 @@ export function StudentDashboardPage() {
       eyebrow="Your student home"
       title={`Welcome back, ${dashboard.student.preferredName} 👋`}
       description="Here’s what is moving forward—and what deserves your attention next."
-      actions={
-        <Link
-          className={`button ${
-            enrollmentAction.kind === "complete"
-              ? "button--complete"
-              : enrollmentAction.kind === "waiting"
-                ? "button--secondary"
-                : "button--accent"
-          }`}
-          data-enrollment-action-state={enrollmentAction.kind}
-          href={enrollmentAction.href}
-        >
-          {enrollmentAction.label}
-          {enrollmentAction.kind === "complete" ? (
-            <span aria-hidden="true">✓</span>
-          ) : null}
-        </Link>
-      }
     >
       <section className="aster-info-strip" aria-label="Student program summary">
         <div>
@@ -204,8 +172,10 @@ export function StudentDashboardPage() {
         </div>
       </section>
 
-      <div className="aster-dashboard-hero">
-        <section className="aster-card aster-progress-card">
+      <div className={`aster-dashboard-hero ${dashboardStyles.hero}`}>
+        <section
+          className={`aster-card aster-progress-card ${dashboardStyles.progressCard}`}
+        >
           <div className="aster-card__heading">
             <div>
               <p className="eyebrow">Enrollment progress</p>
@@ -234,68 +204,84 @@ export function StudentDashboardPage() {
           </div>
           <p>
             {pendingRequirements.length > 0
-              ? `${pendingRequirements.length} priority items are visible below.`
+              ? `${pendingRequirements.length} priority items need your attention.`
               : "Your current enrollment requirements are complete."}
           </p>
+
+          <div className={dashboardStyles.progressTodoHeading}>
+            <div>
+              <span>Next up</span>
+              <strong>Your enrollment to-dos</strong>
+            </div>
+            <Link href="/enrollment">View all →</Link>
+          </div>
+
+          {pendingRequirements.length > 0 || actionDocuments.length > 0 ? (
+            <ul
+              className={dashboardStyles.progressTasks}
+              aria-label="Priority enrollment to-dos"
+            >
+              {pendingRequirements.map((item) => (
+                <li key={item.id}>
+                  <Link
+                    className={dashboardStyles.progressTask}
+                    href={`/enrollment/requirements/${encodeURIComponent(
+                      studentRequirementSlug(item.code),
+                    )}`}
+                  >
+                    <span
+                      className={dashboardStyles.progressTaskMarker}
+                      aria-hidden="true"
+                    >
+                      {item.blocking ? "!" : "✓"}
+                    </span>
+                    <span className={dashboardStyles.progressTaskCopy}>
+                      <small>
+                        {requirementState(item)}
+                        {item.reward?.points
+                          ? ` · +${item.reward.points} ${tenant.shortName} Points`
+                          : ""}
+                      </small>
+                      <strong>{item.title}</strong>
+                    </span>
+                    <span
+                      className={dashboardStyles.progressTaskArrow}
+                      aria-hidden="true"
+                    >
+                      →
+                    </span>
+                  </Link>
+                </li>
+              ))}
+              {actionDocuments
+                .slice(0, Math.max(0, 3 - pendingRequirements.length))
+                .map((document) => (
+                  <DashboardProgressDocument
+                    document={document}
+                    key={document.id}
+                  />
+                ))}
+            </ul>
+          ) : (
+            <div className={dashboardStyles.progressComplete}>
+              <span aria-hidden="true">✓</span>
+              <div>
+                <strong>You are caught up</strong>
+                <p>New enrollment actions will appear here.</p>
+              </div>
+            </div>
+          )}
         </section>
 
-        <DashboardEdwardBrief projectionVersion={dashboard.projectionVersion} />
+        <StudentCalendar entries={calendarEntries} />
       </div>
 
-      <section className="aster-section">
-        <div className="aster-section__heading">
-          <div>
-            <p className="eyebrow">Your next moves</p>
-            <h2>Keep the momentum going</h2>
-          </div>
-          <Link href="/enrollment">Full enrollment checklist →</Link>
-        </div>
-        <div className="aster-task-grid">
-          {pendingRequirements.map((item, index) => (
-            <Link
-              className="aster-task-card"
-              href={`/enrollment/requirements/${encodeURIComponent(
-                studentRequirementSlug(item.code),
-              )}`}
-              key={item.id}
-            >
-              <span className="aster-task-number">{String(index + 1).padStart(2, "0")}</span>
-              <div>
-                <small>{requirementState(item)}</small>
-                <h3>{item.title}</h3>
-                <p>{item.description}</p>
-              </div>
-              <span aria-hidden="true">→</span>
-            </Link>
-          ))}
-          {actionDocuments.slice(0, Math.max(0, 3 - pendingRequirements.length)).map(
-            (document, index) => (
-              <DashboardDocumentTask
-                document={document}
-                position={pendingRequirements.length + index + 1}
-                key={document.id}
-              />
-            ),
-          )}
-        </div>
-      </section>
-
       <div className={dashboardStyles.overview}>
-        <StudentCalendar entries={calendarEntries} />
         <DashboardCampusEvents events={campus.events} asOf={loadedAt} />
-        <DashboardFinancialSnapshot financials={financials} />
       </div>
 
       <section className="aster-domain-grid">
-        <Link className="aster-domain-card aster-domain-card--financial" href="/financials">
-          <span>My Financials</span>
-          <h2>{money(financials.remainingBalanceCents)}</h2>
-          <p>Estimated balance after accepted aid and recorded payments.</p>
-          <div>
-            <small>{money(financials.acceptedAidCents)} accepted aid</small>
-            <strong>{actionDocuments.length} action item</strong>
-          </div>
-        </Link>
+        <DashboardFinancialSnapshot financials={financials} />
         <Link className="aster-domain-card" href="/classrooms">
           <span>My Classrooms</span>
           <h2>{suggestedExemptions.length} credit matches</h2>

@@ -9,7 +9,9 @@ import type {
 import { TenantLink as Link } from "./tenant-link";
 import {
   type FormEvent,
+  type KeyboardEvent,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -20,6 +22,7 @@ import {
   createDepositPayment,
 } from "../lib/api-client";
 import { useTenant } from "./tenant-provider";
+import styles from "./edward-assistant.module.css";
 
 const quickPrompts = [
   "What should I do next?",
@@ -35,6 +38,30 @@ type DisplayMessage = EdwardChatMessage & {
   contextReceipts?: AskEdwardResponse["contextReceipts"];
   widgets?: EdwardActionWidget[];
 };
+
+type Conversation = {
+  id: string;
+  title: string;
+  messages: DisplayMessage[];
+};
+
+function welcomeMessage(studentName: string): DisplayMessage {
+  return {
+    id: "welcome",
+    role: "assistant",
+    content: `Hi ${studentName} — I’m Edward, your private student guide. I can check your record and help you find the next step.`,
+    provider: "guided",
+    actions: [
+      { label: "View enrollment", href: "/enrollment" },
+      { label: "Explore classes", href: "/classrooms" },
+    ],
+  };
+}
+
+function conversationTitle(message: string) {
+  const singleLine = message.replace(/\s+/g, " ").trim();
+  return singleLine.length > 42 ? `${singleLine.slice(0, 39)}…` : singleLine;
+}
 
 type SpeechRecognitionResultEvent = Event & {
   results: {
@@ -223,19 +250,24 @@ export function EdwardAssistant({
   );
   const [listening, setListening] = useState(false);
   const [voiceReplies, setVoiceReplies] = useState(false);
-  const [messages, setMessages] = useState<DisplayMessage[]>([
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [conversations, setConversations] = useState<Conversation[]>([
     {
-      id: "welcome",
-      role: "assistant",
-      content: `Hi ${studentName}. I’m Edward. I can securely read your current enrollment, financial, academic, and campus context, then open the right action for you.`,
-      provider: "guided",
-      actions: [
-        { label: "View enrollment", href: "/enrollment" },
-        { label: "Explore classes", href: "/classrooms" },
-      ],
+      id: "initial",
+      title: "New conversation",
+      messages: [welcomeMessage(studentName)],
     },
   ]);
-  const input = useRef<HTMLInputElement>(null);
+  const [activeConversationId, setActiveConversationId] = useState("initial");
+  const activeConversation =
+    conversations.find(({ id }) => id === activeConversationId) ??
+    conversations[0];
+  const messages = useMemo(
+    () => activeConversation?.messages ?? [],
+    [activeConversation],
+  );
+  const compactInput = useRef<HTMLInputElement>(null);
+  const workspaceInput = useRef<HTMLTextAreaElement>(null);
   const transcript = useRef<HTMLDivElement>(null);
   const recognition = useRef<SpeechRecognitionInstance | null>(null);
   const { track } = useActivityTracking();
@@ -249,26 +281,45 @@ export function EdwardAssistant({
 
   useEffect(() => {
     if (!open) return;
-    input.current?.focus();
-  }, [open]);
+    (variant === "embedded"
+      ? workspaceInput.current
+      : compactInput.current
+    )?.focus();
+  }, [open, variant]);
 
   useEffect(() => {
     transcript.current?.scrollTo({
       top: transcript.current.scrollHeight,
       behavior: "smooth",
     });
-  }, [messages, sending]);
+  }, [activeConversationId, messages, sending]);
+
+  const updateConversation = (
+    conversationId: string,
+    update: (conversation: Conversation) => Conversation,
+  ) => {
+    setConversations((current) =>
+      current.map((conversation) =>
+        conversation.id === conversationId
+          ? update(conversation)
+          : conversation,
+      ),
+    );
+  };
 
   const addSystemMessage = (content: string) => {
-    setMessages((current) => [
-      ...current,
-      {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content,
-        provider: "guided",
-      },
-    ]);
+    updateConversation(activeConversationId, (conversation) => ({
+      ...conversation,
+      messages: [
+        ...conversation.messages,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content,
+          provider: "guided",
+        },
+      ],
+    }));
   };
 
   const send = async (message: string, speakResponse = voiceReplies) => {
@@ -282,7 +333,15 @@ export function EdwardAssistant({
     const history = messages
       .slice(-6)
       .map(({ role, content }) => ({ role, content }));
-    setMessages((current) => [...current, userMessage]);
+    const conversationId = activeConversationId;
+    updateConversation(conversationId, (conversation) => ({
+      ...conversation,
+      title:
+        conversation.messages.length === 1
+          ? conversationTitle(normalized)
+          : conversation.title,
+      messages: [...conversation.messages, userMessage],
+    }));
     setDraft("");
     setError(null);
     setSending(true);
@@ -299,18 +358,21 @@ export function EdwardAssistant({
           page_context: window.location.pathname,
         });
       }
-      setMessages((current) => [
-        ...current,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: response.message,
-          actions: response.suggestedActions,
-          provider: response.provider,
-          contextReceipts,
-          widgets: response.widgets ?? [],
-        },
-      ]);
+      updateConversation(conversationId, (conversation) => ({
+        ...conversation,
+        messages: [
+          ...conversation.messages,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: response.message,
+            actions: response.suggestedActions,
+            provider: response.provider,
+            contextReceipts,
+            widgets: response.widgets ?? [],
+          },
+        ],
+      }));
       if (speakResponse && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(response.message);
@@ -389,18 +451,89 @@ export function EdwardAssistant({
     void send(draft);
   };
 
+  const handleComposerKeyDown = (
+    event: KeyboardEvent<HTMLTextAreaElement>,
+  ) => {
+    if (
+      event.key !== "Enter" ||
+      event.shiftKey ||
+      event.nativeEvent.isComposing
+    ) {
+      return;
+    }
+    event.preventDefault();
+    void send(draft);
+  };
+
+  const startNewConversation = () => {
+    if (sending) return;
+    if (messages.length === 1 && activeConversation?.title === "New conversation") {
+      setHistoryOpen(false);
+      workspaceInput.current?.focus();
+      return;
+    }
+    const id = crypto.randomUUID();
+    setConversations((current) => [
+      {
+        id,
+        title: "New conversation",
+        messages: [welcomeMessage(studentName)],
+      },
+      ...current,
+    ]);
+    setActiveConversationId(id);
+    setDraft("");
+    setError(null);
+    setHistoryOpen(false);
+    window.requestAnimationFrame(() => workspaceInput.current?.focus());
+  };
+
+  const selectConversation = (conversationId: string) => {
+    if (sending || conversationId === activeConversationId) {
+      setHistoryOpen(false);
+      return;
+    }
+    setActiveConversationId(conversationId);
+    setDraft("");
+    setError(null);
+    setHistoryOpen(false);
+    window.requestAnimationFrame(() => workspaceInput.current?.focus());
+  };
+
   const panel = (
     <section
       id={variant === "floating" ? "edward-panel" : "edward-workspace"}
       className={
         variant === "floating"
           ? "edward-panel"
-          : "edward-panel edward-panel--embedded"
+          : `edward-panel edward-panel--embedded ${styles.embeddedPanel}`
       }
       role={variant === "floating" ? "dialog" : "region"}
       aria-label="Edward AI student guide"
     >
-      <header className="edward-panel__header">
+      <header
+        className={`edward-panel__header${
+          variant === "embedded" ? ` ${styles.workspaceHeader}` : ""
+        }`}
+      >
+        {variant === "embedded" ? (
+          <button
+            className={styles.historyToggle}
+            type="button"
+            aria-label={
+              historyOpen
+                ? "Close conversation history"
+                : "Open conversation history"
+            }
+            aria-expanded={historyOpen}
+            aria-controls="edward-conversation-navigation"
+            onClick={() => setHistoryOpen((current) => !current)}
+          >
+            <span aria-hidden="true" />
+            <span aria-hidden="true" />
+            <span aria-hidden="true" />
+          </button>
+        ) : null}
         <span className="edward-avatar" aria-hidden="true">
           E
         </span>
@@ -423,10 +556,24 @@ export function EdwardAssistant({
         )}
       </header>
 
-      <div ref={transcript} className="edward-transcript" aria-live="polite">
+      <div
+        ref={transcript}
+        className={`edward-transcript${
+          variant === "embedded" ? ` ${styles.embeddedTranscript}` : ""
+        }`}
+        aria-live="polite"
+      >
         {messages.map((message) => (
           <article
-            className={`edward-message edward-message--${message.role}`}
+            className={`edward-message edward-message--${message.role}${
+              variant === "embedded"
+                ? ` ${styles.embeddedMessage} ${
+                    message.role === "user"
+                      ? styles.embeddedUserMessage
+                      : styles.embeddedAssistantMessage
+                  }${message.id === "welcome" ? ` ${styles.welcomeMessage}` : ""}`
+                : ""
+            }`}
             key={message.id}
           >
             <p>{message.content}</p>
@@ -486,7 +633,12 @@ export function EdwardAssistant({
       </div>
 
       {messages.length === 1 ? (
-        <div className="edward-prompts" aria-label="Suggested questions">
+        <div
+          className={`edward-prompts${
+            variant === "embedded" ? ` ${styles.embeddedPrompts}` : ""
+          }`}
+          aria-label="Suggested questions"
+        >
           {quickPrompts.map((prompt) => (
             <button type="button" onClick={() => void send(prompt)} key={prompt}>
               {prompt}
@@ -495,20 +647,39 @@ export function EdwardAssistant({
         </div>
       ) : null}
 
-      <form className="edward-composer" onSubmit={submit}>
+      <form
+        className={`edward-composer${
+          variant === "embedded" ? ` ${styles.embeddedComposer}` : ""
+        }`}
+        onSubmit={submit}
+      >
         <label htmlFor={`edward-message-${variant}`}>
           Ask about your student journey
         </label>
         <div>
-          <input
-            ref={input}
-            id={`edward-message-${variant}`}
-            value={draft}
-            maxLength={2_000}
-            autoComplete="off"
-            placeholder="Ask about enrollment, classes, aid, or campus…"
-            onChange={(event) => setDraft(event.target.value)}
-          />
+          {variant === "embedded" ? (
+            <textarea
+              ref={workspaceInput}
+              id={`edward-message-${variant}`}
+              value={draft}
+              rows={1}
+              maxLength={2_000}
+              autoComplete="off"
+              placeholder="Message Edward"
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={handleComposerKeyDown}
+            />
+          ) : (
+            <input
+              ref={compactInput}
+              id={`edward-message-${variant}`}
+              value={draft}
+              maxLength={2_000}
+              autoComplete="off"
+              placeholder="Ask about enrollment, classes, aid, or campus…"
+              onChange={(event) => setDraft(event.target.value)}
+            />
+          )}
           <button
             className={`edward-voice-button${listening ? " is-listening" : ""}`}
             type="button"
@@ -556,14 +727,86 @@ export function EdwardAssistant({
           </button>
         ) : null}
         <small>
-          Don’t share passwords, government IDs, health details, or payment
-          credentials. Edward cannot approve academic or aid decisions.
+          Edward can make mistakes. Verify important academic, aid, and payment
+          decisions with the official record.
         </small>
       </form>
     </section>
   );
 
-  if (variant === "embedded") return panel;
+  if (variant === "embedded") {
+    return (
+      <div
+        className={`${styles.workspace}${
+          historyOpen ? ` ${styles.workspaceHistoryOpen}` : ""
+        }`}
+      >
+        <aside
+          id="edward-conversation-navigation"
+          className={styles.conversationNavigation}
+          aria-label="Edward conversation history"
+          hidden={!historyOpen}
+        >
+          <header>
+            <div>
+              <strong>Conversations</strong>
+              <small>This browser tab</small>
+            </div>
+            <button
+              type="button"
+              aria-label="Close conversation history"
+              onClick={() => setHistoryOpen(false)}
+            >
+              ×
+            </button>
+          </header>
+          <button
+            className={styles.newConversation}
+            type="button"
+            disabled={sending}
+            onClick={startNewConversation}
+          >
+            <span aria-hidden="true">+</span>
+            New conversation
+          </button>
+          <nav aria-label="Conversation list">
+            {conversations.map((conversation) => (
+              <button
+                type="button"
+                disabled={sending}
+                aria-current={
+                  conversation.id === activeConversationId ? "page" : undefined
+                }
+                onClick={() => selectConversation(conversation.id)}
+                key={conversation.id}
+              >
+                <span>{conversation.title}</span>
+                <small>
+                  {conversation.messages.length > 1
+                    ? `${conversation.messages.length - 1} messages`
+                    : "Ready when you are"}
+                </small>
+              </button>
+            ))}
+          </nav>
+          <p>
+            <span aria-hidden="true">●</span>
+            Conversations remain in memory for this tab and are not stored in
+            browser storage.
+          </p>
+        </aside>
+        {historyOpen ? (
+          <button
+            className={styles.historyBackdrop}
+            type="button"
+            aria-label="Close conversation history"
+            onClick={() => setHistoryOpen(false)}
+          />
+        ) : null}
+        {panel}
+      </div>
+    );
+  }
 
   return (
     <>

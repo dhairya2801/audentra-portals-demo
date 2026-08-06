@@ -13,8 +13,20 @@ test.describe("student experience overview", () => {
 
     const calendar = page.getByRole("heading", {
       name: "Your student calendar",
-    }).locator("..").locator("..");
+    }).locator("xpath=ancestor::section[1]");
     await expect(calendar).toBeVisible();
+    const dashboardHero = page.locator(".aster-dashboard-hero");
+    await expect(dashboardHero).toContainText("Enrollment progress");
+    await expect(dashboardHero).toContainText("Your student calendar");
+    await expect(page.getByText("Edward’s brief", { exact: true })).toHaveCount(0);
+    await expect(
+      page
+        .locator("header.aster-page-heading")
+        .getByRole("link", { name: /Submit your official transcript/i }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("list", { name: "Priority enrollment to-dos" }),
+    ).toBeVisible();
     await expect(page.getByLabel("Calendar legend")).toContainText(
       /Enrollment|Campus life|Financial aid|Payments/,
     );
@@ -24,12 +36,30 @@ test.describe("student experience overview", () => {
     await expect(
       page.getByRole("heading", { name: "Your financial snapshot" }),
     ).toBeVisible();
+    const financialCard = page
+      .getByRole("heading", { name: "Your financial snapshot" })
+      .locator("xpath=ancestor::a[1]");
+    await expect(financialCard).toHaveAttribute("href", /\/aster\/financials$/);
+    await expect(financialCard).toContainText("Estimated balance");
 
     const datedAction = calendar.locator('button[aria-pressed="false"]').first();
     if (await datedAction.count()) {
+      const actionTitle = await datedAction.getAttribute("title");
       await datedAction.click();
-      await expect(datedAction).toHaveAttribute("aria-pressed", "true");
+      await expect(
+        calendar.getByTitle(actionTitle ?? ""),
+      ).toHaveAttribute("aria-pressed", "true");
       await expect(calendar.getByRole("link").last()).toBeVisible();
+      const detailIsBelowMonth = await calendar.evaluate((root) => {
+        const detail = root.querySelector("aside");
+        const month = detail?.previousElementSibling;
+        if (!detail || !month) return false;
+        return (
+          detail.getBoundingClientRect().top >=
+          month.getBoundingClientRect().bottom - 1
+        );
+      });
+      expect(detailIsBelowMonth).toBe(true);
     }
 
     await page.getByRole("button", { name: /unread notifications/i }).click();

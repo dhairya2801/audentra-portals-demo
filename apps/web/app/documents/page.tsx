@@ -7,6 +7,7 @@ import type {
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DocumentExtractionRetry } from "../components/document-extraction-retry";
+import { DocumentContextMatches } from "../components/document-context-matches";
 import { DocumentUpload } from "../components/document-upload";
 import { PortalShell } from "../components/portal-shell";
 import {
@@ -167,6 +168,7 @@ function ExtractionReview({
             : "Document stored"}
         </strong>
         <p>{extraction.summary}</p>
+        <DocumentContextMatches matches={extraction.contextMatches} />
         {hasWarnings ? (
           <ul className="extraction-warnings">
             {extraction.warnings.map((warning) => (
@@ -203,6 +205,7 @@ function ExtractionReview({
         <span aria-hidden="true">⌄</span>
       </summary>
       <p>{extraction.summary}</p>
+      <DocumentContextMatches matches={extraction.contextMatches} />
       <div className="extraction-fields">
         {extraction.fields.map((field) => (
           <label key={field.key}>

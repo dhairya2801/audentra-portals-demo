@@ -1,0 +1,476 @@
+.workspace {
+  position: relative;
+  min-width: 0;
+}
+
+.workspaceHistoryOpen {
+  display: grid;
+  grid-template-columns: 13.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+:global(.edward-panel).embeddedPanel {
+  position: relative;
+  z-index: 1;
+  right: auto;
+  bottom: auto;
+  width: 100%;
+  height: clamp(34rem, calc(100dvh - 11rem), 48rem);
+  min-height: 34rem;
+  max-height: none;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  border-color: #dce1e7;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 18px 55px rgb(19 27 46 / 8%);
+  animation: none;
+}
+
+:global(.edward-panel__header).workspaceHeader {
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid #e6e9ed;
+  background: rgb(255 255 255 / 96%);
+  color: #162033;
+}
+
+.workspaceHeader :global(.edward-avatar) {
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 0.5rem;
+  font-size: 0.82rem;
+}
+
+.workspaceHeader > div > strong {
+  color: #162033;
+  font-family: "Hanken Grotesk", Inter, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.workspaceHeader > div > span {
+  color: #677386;
+  font-size: 0.52rem;
+}
+
+.workspaceHeader :global(.edward-secure) {
+  border: 1px solid #dfe5e9;
+  background: #f4f7f5;
+  color: #486052 !important;
+}
+
+:global(.edward-panel__header).workspaceHeader .historyToggle {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  align-content: center;
+  gap: 0.2rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: #253147;
+}
+
+:global(.edward-panel__header).workspaceHeader .historyToggle:hover,
+:global(.edward-panel__header).workspaceHeader .historyToggle:focus-visible {
+  border-color: #dce1e7;
+  background: #f4f6f8;
+}
+
+.historyToggle > span {
+  display: block;
+  width: 0.9rem;
+  height: 1.5px;
+  margin: 0 auto;
+  border-radius: 999px;
+  background: currentcolor;
+}
+
+:global(.edward-transcript).embeddedTranscript {
+  min-height: 0;
+  max-height: none;
+  gap: 1.15rem;
+  padding: 1.6rem clamp(1rem, 6vw, 3rem);
+  background: #fff;
+  overscroll-behavior: contain;
+}
+
+.embeddedTranscript .embeddedMessage {
+  width: min(100%, 46rem);
+  max-width: none;
+  align-self: center;
+}
+
+.embeddedTranscript .embeddedAssistantMessage > p {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #273348;
+  font-size: 0.78rem;
+  line-height: 1.65;
+}
+
+.embeddedTranscript .embeddedUserMessage > p {
+  width: fit-content;
+  max-width: min(84%, 35rem);
+  margin-left: auto;
+  padding: 0.68rem 0.85rem;
+  border-radius: 1rem 1rem 0.25rem 1rem;
+  background: #eef1f4;
+  box-shadow: none;
+  color: #202b3d;
+  font-size: 0.76rem;
+  line-height: 1.55;
+}
+
+.embeddedTranscript .welcomeMessage {
+  margin-top: auto;
+  margin-bottom: auto;
+  text-align: center;
+}
+
+.embeddedTranscript .welcomeMessage::before {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin: 0 auto 0.8rem;
+  place-items: center;
+  border-radius: 0.75rem;
+  background: var(--gold);
+  color: #231900;
+  content: "E";
+  font-family: "Source Serif 4", Georgia, serif;
+  font-size: 1.2rem;
+  font-weight: 750;
+}
+
+.embeddedTranscript .welcomeMessage > p {
+  max-width: 30rem;
+  margin: 0 auto;
+  color: #4b5668;
+}
+
+.embeddedTranscript .welcomeMessage :global(.edward-actions) {
+  justify-content: center;
+}
+
+.embeddedTranscript .welcomeMessage > small {
+  text-align: center;
+}
+
+.embeddedTranscript > :global(.edward-typing),
+.embeddedTranscript > :global(.edward-error) {
+  width: min(100%, 46rem);
+  align-self: center;
+}
+
+:global(.edward-prompts).embeddedPrompts {
+  display: grid;
+  width: min(calc(100% - 2rem), 46rem);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0 auto;
+  padding: 0 0 0.75rem;
+  overflow: visible;
+  border: 0;
+  background: #fff;
+}
+
+:global(.edward-prompts).embeddedPrompts > button {
+  min-width: 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #dde3e8;
+  border-radius: 0.7rem;
+  background: #fff;
+  color: #334056;
+  font-size: 0.6rem;
+  text-align: left;
+  white-space: normal;
+}
+
+:global(.edward-prompts).embeddedPrompts > button:hover,
+:global(.edward-prompts).embeddedPrompts > button:focus-visible {
+  border-color: #c8a02b;
+  background: #fffbef;
+}
+
+:global(.edward-composer).embeddedComposer {
+  width: min(100%, 50rem);
+  margin: 0 auto;
+  padding: 0.65rem 1rem 0.8rem;
+  background: #fff;
+}
+
+:global(.edward-composer).embeddedComposer > div {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.35rem;
+  padding: 0.35rem;
+  border: 1px solid #cfd6dd;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 8px 28px rgb(19 27 46 / 9%);
+}
+
+.embeddedComposer textarea {
+  min-width: 0;
+  min-height: 2.6rem;
+  max-height: 8rem;
+  resize: vertical;
+  padding: 0.67rem 0.55rem 0.45rem;
+  overflow-y: auto;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #263247;
+  font: inherit;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.embeddedComposer textarea::placeholder {
+  color: #8a94a3;
+}
+
+.embeddedComposer textarea:focus-visible {
+  outline: 0;
+}
+
+:global(.edward-composer).embeddedComposer
+  > div:has(textarea:focus-visible) {
+  border-color: #ab851d;
+  box-shadow:
+    0 0 0 3px rgb(251 191 36 / 17%),
+    0 8px 28px rgb(19 27 46 / 9%);
+}
+
+:global(.edward-composer).embeddedComposer
+  :global(.edward-voice-button),
+:global(.edward-composer).embeddedComposer
+  :global(.edward-send-button) {
+  align-self: end;
+  width: 2.45rem;
+  height: 2.45rem;
+  border-radius: 0.7rem;
+}
+
+:global(.edward-composer).embeddedComposer > small {
+  margin-top: 0.45rem;
+  color: #788395;
+  font-size: 0.48rem;
+  text-align: center;
+}
+
+.conversationNavigation {
+  display: flex;
+  min-width: 0;
+  height: clamp(34rem, calc(100dvh - 11rem), 48rem);
+  flex-direction: column;
+  padding: 0.75rem;
+  overflow: hidden;
+  border: 1px solid #dce1e7;
+  border-radius: 1rem;
+  background: #f2f4f5;
+  color: #263247;
+}
+
+.conversationNavigation[hidden] {
+  display: none;
+}
+
+.conversationNavigation > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.2rem 0.2rem 0.65rem;
+}
+
+.conversationNavigation > header > div {
+  display: grid;
+  gap: 0.05rem;
+}
+
+.conversationNavigation > header strong {
+  font-size: 0.72rem;
+}
+
+.conversationNavigation > header small,
+.conversationNavigation nav small {
+  color: #758092;
+  font-size: 0.48rem;
+}
+
+.conversationNavigation > header button {
+  display: grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  place-items: center;
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: #536074;
+  cursor: pointer;
+}
+
+.conversationNavigation > header button:hover,
+.conversationNavigation > header button:focus-visible {
+  background: #e3e7e9;
+}
+
+.newConversation {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.5rem;
+  padding: 0 0.65rem;
+  border: 1px solid #cfd6dd;
+  border-radius: 0.65rem;
+  background: #fff;
+  color: #283449;
+  cursor: pointer;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-align: left;
+}
+
+.newConversation > span {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.conversationNavigation nav {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
+  overflow-y: auto;
+}
+
+.conversationNavigation nav button {
+  display: grid;
+  gap: 0.12rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0.6rem 0.65rem;
+  border: 0;
+  border-radius: 0.55rem;
+  background: transparent;
+  color: #354156;
+  cursor: pointer;
+  text-align: left;
+}
+
+.conversationNavigation nav button:hover,
+.conversationNavigation nav button:focus-visible {
+  background: #e5e9eb;
+}
+
+.conversationNavigation nav button[aria-current="page"] {
+  background: #fff;
+  box-shadow: 0 4px 14px rgb(19 27 46 / 7%);
+}
+
+.conversationNavigation nav span {
+  overflow: hidden;
+  font-size: 0.6rem;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversationNavigation > p {
+  display: flex;
+  gap: 0.35rem;
+  margin: auto 0 0;
+  padding: 0.7rem 0.25rem 0.15rem;
+  border-top: 1px solid #dce1e7;
+  color: #758092;
+  font-size: 0.46rem;
+  line-height: 1.45;
+}
+
+.conversationNavigation > p > span {
+  color: #3d7659;
+  font-size: 0.45rem;
+}
+
+.historyBackdrop {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .workspaceHistoryOpen {
+    display: block;
+  }
+
+  :global(.edward-panel).embeddedPanel {
+    height: max(34rem, calc(100dvh - 12.5rem));
+    min-height: 34rem;
+    border-radius: 0.85rem;
+  }
+
+  .conversationNavigation {
+    position: absolute;
+    z-index: 4;
+    inset: 0 auto 0 0;
+    width: min(17rem, calc(100% - 2.75rem));
+    height: 100%;
+    border-radius: 0.85rem 0 0 0.85rem;
+    box-shadow: 18px 0 48px rgb(19 27 46 / 18%);
+  }
+
+  .historyBackdrop {
+    position: absolute;
+    z-index: 3;
+    inset: 0;
+    display: block;
+    padding: 0;
+    border: 0;
+    border-radius: 0.85rem;
+    background: rgb(19 27 46 / 36%);
+  }
+
+  :global(.edward-transcript).embeddedTranscript {
+    padding: 1.1rem 0.85rem;
+  }
+
+  :global(.edward-prompts).embeddedPrompts {
+    width: calc(100% - 1.7rem);
+    grid-template-columns: 1fr;
+  }
+
+  :global(.edward-composer).embeddedComposer {
+    padding-right: 0.7rem;
+    padding-left: 0.7rem;
+  }
+
+  .workspaceHeader > div > span {
+    max-width: 11rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 420px) {
+  :global(.edward-panel__header).workspaceHeader {
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+
+  .workspaceHeader :global(.edward-secure) {
+    display: none;
+  }
+
+  .embeddedTranscript .embeddedUserMessage > p {
+    max-width: 92%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :global(.edward-panel).embeddedPanel,
+  .conversationNavigation {
+    scroll-behavior: auto;
+  }
+}

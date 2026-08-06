@@ -1,3 +1,161 @@
+.hero {
+  grid-template-columns: minmax(15rem, 0.72fr) minmax(0, 1.6fr);
+  align-items: stretch;
+}
+
+.hero > * {
+  min-width: 0;
+}
+
+.progressCard {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.progressCard > p {
+  margin: 18px 0 0;
+  color: #686e78;
+  font-size: 0.7rem;
+}
+
+.progressTodoHeading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 25px;
+  padding-top: 19px;
+  border-top: 1px solid #e5e8ec;
+}
+
+.progressTodoHeading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.progressTodoHeading span {
+  color: #8b6a0a;
+  font-size: 0.57rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.progressTodoHeading strong {
+  color: #17243a;
+  font-size: 0.88rem;
+}
+
+.progressTodoHeading > a {
+  color: #244c76;
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.progressTasks {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.progressTask {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid #e2e7ed;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #17243a;
+  text-decoration: none;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.progressTask:hover,
+.progressTask:focus-visible {
+  border-color: color-mix(in srgb, var(--tenant-primary, #173f6f) 45%, white);
+  background: #fff;
+  transform: translateY(-1px);
+}
+
+.progressTaskMarker {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 9px;
+  background: #fff2c9;
+  color: #765400;
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.progressTaskCopy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.progressTaskCopy small {
+  overflow: hidden;
+  color: #806315;
+  font-size: 0.51rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.progressTaskCopy strong {
+  overflow: hidden;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progressTaskArrow {
+  color: #315f96;
+  font-size: 0.85rem;
+  font-weight: 900;
+}
+
+.progressComplete {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  background: #edf7f1;
+  color: #205d49;
+}
+
+.progressComplete > span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: #d5ecdf;
+  font-weight: 900;
+}
+
+.progressComplete p {
+  margin: 2px 0 0;
+  font-size: 0.68rem;
+}
+
 .overview {
   display: grid;
   min-width: 0;
@@ -7,4 +165,17 @@
 
 .overview > * {
   min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .progressTodoHeading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }

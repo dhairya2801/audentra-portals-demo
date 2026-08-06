@@ -955,7 +955,7 @@ test("staff authentication forms survive ambient focus refreshes", async () => {
   );
 });
 
-test("coordinates recoverable server state and generates the dashboard brief", async () => {
+test("coordinates recoverable server state and composes the dashboard calendar", async () => {
   const [
     dashboard,
     brief,
@@ -981,7 +981,9 @@ test("coordinates recoverable server state and generates the dashboard brief", a
     readFile(new URL("../app/components/document-upload.tsx", import.meta.url), "utf8"),
   ]);
 
-  assert.match(dashboard, /DashboardEdwardBrief/);
+  assert.match(dashboard, /<StudentCalendar entries=\{calendarEntries\}/);
+  assert.match(dashboard, /Priority enrollment to-dos/);
+  assert.doesNotMatch(dashboard, /DashboardEdwardBrief/);
   assert.doesNotMatch(dashboard, /Your enrollment is moving/);
   assert.match(brief, /askEdward/);
   assert.match(brief, /Preparing your latest insights/);
@@ -1272,7 +1274,7 @@ test("onboarding restores identity extraction state and bounds upload waits", as
 });
 
 test("document views retain retry authority and expose failed extraction alerts", async () => {
-  const [documentsPage, uploader, extractionReview, requirementPage] =
+  const [documentsPage, uploader, extractionReview, contextMatches, requirementPage] =
     await Promise.all([
       readFile(new URL("../app/documents/page.tsx", import.meta.url), "utf8"),
       readFile(
@@ -1282,6 +1284,13 @@ test("document views retain retry authority and expose failed extraction alerts"
       readFile(
         new URL(
           "../app/components/document-extraction-review.tsx",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../app/components/document-context-matches.tsx",
           import.meta.url,
         ),
         "utf8",
@@ -1317,6 +1326,10 @@ test("document views retain retry authority and expose failed extraction alerts"
     extractionReview,
     /extraction-state extraction-state--error" role="alert"/,
   );
+  assert.match(documentsPage, /DocumentContextMatches/);
+  assert.match(contextMatches, /Audentra securely checked that evidence/);
+  assert.match(contextMatches, /Your submission is complete for now and is under review/);
+  assert.match(contextMatches, /safePortalDestination/);
   assert.match(uploader, /previousActiveDocumentRef/);
   assert.match(
     uploader,
@@ -1929,4 +1942,37 @@ test("dynamic portal destinations reject stored script and cross-origin path tri
       external: false,
     });
   }
+});
+
+test("Edward separates the in-flow conversation workspace from the floating assistant", async () => {
+  const [assistant, page, workspaceStyles, globalStyles] = await Promise.all([
+    readFile(
+      new URL("../app/components/edward-assistant.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/edward/page.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL(
+        "../app/components/edward-assistant.module.css",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(assistant, /aria-controls="edward-conversation-navigation"/);
+  assert.match(assistant, /aria-controls="edward-panel"/);
+  assert.match(assistant, /Conversations remain in memory for this tab/);
+  assert.match(assistant, /variant === "embedded" \? \(/);
+  assert.match(page, /title="Ask Edward"/);
+  assert.doesNotMatch(page, /edward-capabilities/);
+  assert.match(
+    workspaceStyles,
+    /:global\(\.edward-panel\)\.embeddedPanel[\s\S]*?position: relative;/,
+  );
+  assert.match(
+    globalStyles,
+    /\.edward-panel \{[\s\S]*?position: fixed;/,
+  );
 });
