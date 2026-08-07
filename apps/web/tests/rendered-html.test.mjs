@@ -26,16 +26,18 @@ async function render(path = "/") {
   );
 }
 
-test("server-renders the branded, accessible bootstrap router", async () => {
+test("server-renders the branded, accessible portal selector", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
   assert.match(html, /<title>Audentra \| Institutional intelligence for what’s next<\/title>/i);
-  assert.match(html, /Aster University/);
-  assert.match(html, /Opening your student portal/);
-  assert.match(html, /aria-busy="true"/);
+  assert.match(html, /Institutional intelligence/);
+  assert.match(html, /Student portal/);
+  assert.match(html, /Staff portal/);
+  assert.match(html, /href="\/aster\/sign-in"/);
+  assert.match(html, /href="\/aster\/staff"/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
 });
 
@@ -357,6 +359,10 @@ test("typed client wires every resource route and mutation contract", async () =
     .replace(
       /import\s+\{\s*demoStaffFetch\s*\}\s+from\s+"\.\/demo-staff-transport";/,
       "const demoStaffFetch = async () => null;",
+    )
+    .replace(
+      /import\s+\{\s*demoStudentFetch\s*\}\s+from\s+"\.\/demo-student-transport";/,
+      "const demoStudentFetch = async () => null;",
     );
   const compiled = ts.transpileModule(executableSource, {
     compilerOptions: {
@@ -1455,7 +1461,10 @@ test("student routes enforce bootstrap gating and expose no dead static links", 
       new URL("../app/components/portal-shell.tsx", import.meta.url),
       "utf8",
     ),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/components/student-entry.tsx", import.meta.url),
+      "utf8",
+    ),
     readFile(
       new URL("../app/sign-in/sign-in-client.tsx", import.meta.url),
       "utf8",

@@ -73,6 +73,7 @@ import type {
 } from "@vv/contracts";
 import { currentTenantSlug } from "./tenant";
 import { demoStaffFetch } from "./demo-staff-transport";
+import { demoStudentFetch } from "./demo-student-transport";
 
 const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
 
@@ -149,7 +150,8 @@ async function request<T>(
   options: { notifyStudentRecordChanged?: boolean } = {},
 ): Promise<T> {
   const demoResponse = await demoStaffFetch(path, init);
-  const response = demoResponse ?? await fetch(`${API_BASE_URL}${path}`, {
+  const studentDemoResponse = demoResponse ?? await demoStudentFetch(path, init);
+  const response = studentDemoResponse ?? await fetch(`${API_BASE_URL}${path}`, {
       ...init,
       credentials: "include",
       headers: {

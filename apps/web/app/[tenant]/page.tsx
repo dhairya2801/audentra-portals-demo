@@ -1,1 +1,5 @@
-export { default } from "../page";
+import { StudentEntry } from "../components/student-entry";
+
+export default function TenantStudentEntryPage() {
+  return <StudentEntry />;
+}
