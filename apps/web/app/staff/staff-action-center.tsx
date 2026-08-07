@@ -29,6 +29,11 @@ import {
 import { TenantLink as Link } from "../components/tenant-link";
 import { PortalMark } from "../components/portal-ui";
 import { useTenant } from "../components/tenant-provider";
+import {
+  STAFF_DEMO_EMAIL,
+  STAFF_DEMO_PASSWORD,
+  staffDemoEnabled,
+} from "../lib/demo-staff-transport";
 
 const columns: Array<{
   status: StaffWorkItemStatus;
@@ -146,6 +151,18 @@ export function StaffSignIn({ onSignedIn }: { onSignedIn: () => void }) {
     setFieldErrors({});
     signIn.reset();
     signUp.reset();
+  };
+
+  const enterDemo = async () => {
+    try {
+      await signIn.run({
+        email: STAFF_DEMO_EMAIL,
+        password: STAFF_DEMO_PASSWORD,
+      });
+      onSignedIn();
+    } catch {
+      // The action exposes an accessible error and remains retryable.
+    }
   };
 
   const enter = async (event: FormEvent<HTMLFormElement>) => {
@@ -393,10 +410,27 @@ export function StaffSignIn({ onSignedIn }: { onSignedIn: () => void }) {
                 : "Sign in"}
           </button>
         </form>
+        {staffDemoEnabled && mode === "sign_in" ? (
+          <div className="staff-demo-login">
+            <span>or</span>
+            <button
+              className="button button--secondary"
+              type="button"
+              disabled={isBusy}
+              onClick={() => void enterDemo()}
+            >
+              <strong>Explore the Audentra demo</strong>
+              <small>No backend or account required</small>
+            </button>
+            <p>
+              Creates a browser-only staff session using synthetic institutional data.
+            </p>
+          </div>
+        ) : null}
         <small className="staff-auth-boundary">
-          Passwords and access codes are never displayed or prefilled. Passwords
-          are stored as one-way hashes and authentication uses an HTTP-only,
-          revocable staff session.
+          Passwords and access codes are never displayed or prefilled. {staffDemoEnabled
+            ? "Demo access is isolated to this browser and can be replaced by the production identity service."
+            : "Passwords are stored as one-way hashes and authentication uses an HTTP-only, revocable staff session."}
         </small>
         <Link className="text-link" href="/sign-in">
           Return to student sign in

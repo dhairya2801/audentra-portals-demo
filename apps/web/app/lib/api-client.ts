@@ -72,12 +72,13 @@ import type {
   UpdateStudentProfileInput,
 } from "@vv/contracts";
 import { currentTenantSlug } from "./tenant";
+import { demoStaffFetch } from "./demo-staff-transport";
 
 const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
 
-export const API_BASE_URL = (
-  configuredApiBaseUrl || "http://localhost:4000"
-).replace(/\/+$/, "");
+// A relative fallback is safe in previews and production. Real deployments
+// should set NEXT_PUBLIC_API_BASE_URL to the public Audentra API origin.
+export const API_BASE_URL = (configuredApiBaseUrl || "").replace(/\/+$/, "");
 
 export class ApiClientError extends Error {
   readonly status: number;
@@ -147,15 +148,16 @@ async function request<T>(
   init: RequestInit = {},
   options: { notifyStudentRecordChanged?: boolean } = {},
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      Accept: "application/json",
-      "X-Tenant-Slug": currentTenantSlug(),
-      ...init.headers,
-    },
-  });
+  const demoResponse = await demoStaffFetch(path, init);
+  const response = demoResponse ?? await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        "X-Tenant-Slug": currentTenantSlug(),
+        ...init.headers,
+      },
+    });
 
   if (!response.ok) {
     throw await parseError(response);

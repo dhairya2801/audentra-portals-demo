@@ -16,6 +16,7 @@
   "scripts": {
     "dev": "node scripts/build.mjs dev",
     "build": "node scripts/build.mjs",
+    "vercel-build": "next build --webpack",
     "start": "node scripts/build.mjs start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",

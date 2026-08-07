@@ -3,28 +3,32 @@ import { ServerStateProvider } from "./components/server-state-provider";
 import { TenantProvider } from "./components/tenant-provider";
 import "./globals.css";
 
+const vercelHost =
+  process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim() ||
+  process.env.VERCEL_URL?.trim();
 const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3000";
+  process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+  (vercelHost ? `https://${vercelHost}` : "http://localhost:3000");
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Student Portal | Aster University",
-    template: "%s | Aster University",
+    default: "Audentra | Institutional intelligence for what’s next",
+    template: "%s | Audentra",
   },
   description:
-    "Manage enrollment, financial aid, academics, campus life, and student support from one connected Aster University portal.",
-  applicationName: "Aster University Student Portal",
+    "Audentra helps institutions identify enrollment barriers early, prioritize students, and take the right action.",
+  applicationName: "Audentra Higher Education Intelligence Platform",
   icons: {
     icon: [{ url: "/icon.png", type: "image/png", sizes: "512x512" }],
     shortcut: "/icon.png",
   },
   openGraph: {
     type: "website",
-    siteName: "Aster University Student Portal",
-    title: "Your connected student life | Aster University",
+    siteName: "Audentra",
+    title: "Institutional intelligence for what’s next | Audentra",
     description:
-      "Enrollment, financials, classrooms, campus life, and Edward AI in one student portal.",
+      "Convert more admitted students into enrolled students with earlier signals and clearer action.",
     images: [
       {
         url: "/og.png",
@@ -36,9 +40,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Your connected student life | Aster University",
+    title: "Institutional intelligence for what’s next | Audentra",
     description:
-      "Enrollment, financials, classrooms, campus life, and Edward AI in one student portal.",
+      "Convert more admitted students into enrolled students with earlier signals and clearer action.",
     images: ["/og.png"],
   },
 };

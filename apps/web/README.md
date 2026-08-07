@@ -10,8 +10,19 @@ allowlisted activity events without blocking student actions.
 
 ## Commands
 
+This frontend has no mock-data fallback. Before using authentication or any
+portal data, start the companion `Audentra-platform` Compose stack from its
+repository root:
+
 ```bash
-npm ci --workspaces=false
+docker compose --env-file infra/.env.example -f infra/compose.yaml up --build
+```
+
+Wait for `http://localhost:4000/health/ready`, then run the frontend commands
+below from the portals repository root.
+
+```bash
+npm ci
 npm run dev
 npm run typecheck
 npm run lint
@@ -31,6 +42,13 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 The local Compose stack provides both values. In a hosted environment, set
 `NEXT_PUBLIC_SITE_URL` to the public portal origin before building so social
 metadata resolves to absolute URLs.
+
+For Vercel, deploy from the monorepo root using the checked-in `vercel.json`.
+For a backend-free staff demonstration, set
+`NEXT_PUBLIC_STAFF_DEMO_MODE=true` and omit `NEXT_PUBLIC_API_BASE_URL`. Set demo
+mode to `false` and provide the public HTTPS API origin for a real integrated
+deployment. Vercel preview hostnames are inferred for metadata when
+`NEXT_PUBLIC_SITE_URL` is omitted.
 
 Authentication is intentionally outside the UI layer. The current API uses an
 isolated demo identity resolver; the production Keycloak/JWT resolver can

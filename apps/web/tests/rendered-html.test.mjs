@@ -3,6 +3,8 @@ import { access, readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 import ts from "typescript";
 
+process.env.NEXT_PUBLIC_API_BASE_URL ??= "http://localhost:4000";
+
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
@@ -30,7 +32,7 @@ test("server-renders the branded, accessible bootstrap router", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>Student Portal \| Aster University<\/title>/i);
+  assert.match(html, /<title>Audentra \| Institutional intelligence for what’s next<\/title>/i);
   assert.match(html, /Aster University/);
   assert.match(html, /Opening your student portal/);
   assert.match(html, /aria-busy="true"/);
@@ -224,7 +226,7 @@ test("connects business actions and non-blocking tracking to the API", async () 
   ]);
 
   assert.match(client, /NEXT_PUBLIC_API_BASE_URL/);
-  assert.match(client, /http:\/\/localhost:4000/);
+  assert.match(client, /configuredApiBaseUrl \|\| ""/);
   assert.match(client, /Idempotency-Key/);
   assert.match(client, /\/v1\/activity-events\/batch/);
   assert.match(dashboard, /getStudentFinancials/);
@@ -347,10 +349,15 @@ test("typed client wires every resource route and mutation contract", async () =
     new URL("../app/lib/api-client.ts", import.meta.url),
     "utf8",
   );
-  const executableSource = source.replace(
-    /import\s+\{\s*currentTenantSlug\s*\}\s+from\s+"\.\/tenant";/,
-    'const currentTenantSlug = () => "aster";',
-  );
+  const executableSource = source
+    .replace(
+      /import\s+\{\s*currentTenantSlug\s*\}\s+from\s+"\.\/tenant";/,
+      'const currentTenantSlug = () => "aster";',
+    )
+    .replace(
+      /import\s+\{\s*demoStaffFetch\s*\}\s+from\s+"\.\/demo-staff-transport";/,
+      "const demoStaffFetch = async () => null;",
+    );
   const compiled = ts.transpileModule(executableSource, {
     compilerOptions: {
       module: ts.ModuleKind.ESNext,
@@ -918,16 +925,20 @@ test("onboarding preserves the eight-step order and authoritative boundary actio
 });
 
 test("staff authentication never exposes or prefills credentials", async () => {
-  const source = await readFile(
-    new URL("../app/staff/staff-action-center.tsx", import.meta.url),
-    "utf8",
-  );
+  const [source, transport] = await Promise.all([
+    readFile(new URL("../app/staff/staff-action-center.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/demo-staff-transport.ts", import.meta.url), "utf8"),
+  ]);
 
   assert.match(source, /Staff account access/);
   assert.match(source, /Institution access code/);
   assert.match(source, /signUpStaff/);
   assert.doesNotMatch(source, /AsterStaff2027|Local testing account|Password:/);
   assert.doesNotMatch(source, /defaultValue=.*password/i);
+  assert.match(source, /Explore the Audentra demo/);
+  assert.match(transport, /audentra:staff-demo-session:v1/);
+  assert.match(transport, /buildDemoStaffWorkspace/);
+  assert.match(transport, /if \(!staffDemoEnabled \|\| typeof window === "undefined"\) return null/);
 });
 
 test("staff authentication forms survive ambient focus refreshes", async () => {
@@ -953,6 +964,43 @@ test("staff authentication forms survive ambient focus refreshes", async () => {
     legacyCenter,
     /useApiResource\(loadCenter, \{\s*refreshOnAmbient: false/,
   );
+});
+
+test("Morning Brew is a personalized, persisted staff workspace briefing", async () => {
+  const [portal, onboarding, dashboard, edward, data, preferences, styles] = await Promise.all([
+    readFile(new URL("../app/staff/staff-portal.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/staff/morning-brew/onboarding.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/staff/morning-brew/dashboard.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/staff/morning-brew/edward-panel.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/staff/morning-brew/data.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/staff/morning-brew/preferences.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(portal, /id: "morning_brew", label: "Morning Brew"/);
+  assert.match(portal, /<MorningBrewView workspace={workspace} navigate={navigate}/);
+  assert.match(onboarding, /What do you want to know every morning\?/);
+  assert.match(onboarding, /Connect your context/);
+  assert.match(onboarding, /Build my Morning Brew/);
+  assert.match(dashboard, /Customize Morning Brew/);
+  assert.match(dashboard, /What you need to know/);
+  assert.match(dashboard, /Since yesterday/);
+  assert.match(dashboard, /Needs your attention/);
+  assert.match(dashboard, /Manage Connections/);
+  assert.match(edward, /never reach the real Edward backend/);
+  assert.match(data, /buildMorningBrewBriefing/);
+  assert.match(data, /source: "workspace"/);
+  assert.match(preferences, /audentra:morning-brew:v2/);
+  assert.match(preferences, /LEGACY_STORAGE_PREFIX/);
+  assert.match(preferences, /MorningBrewPreferenceStore/);
+  assert.match(styles, /\.brew-interest-card\.is-selected/);
+  assert.match(styles, /@media \(max-width: 520px\)/);
 });
 
 test("coordinates recoverable server state and composes the dashboard calendar", async () => {

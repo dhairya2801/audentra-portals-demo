@@ -5,7 +5,7 @@ import type {
   StudentDocumentList,
 } from "@vv/contracts";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DocumentExtractionRetry } from "../components/document-extraction-retry";
 import { DocumentContextMatches } from "../components/document-context-matches";
 import { DocumentUpload } from "../components/document-upload";
@@ -531,7 +531,7 @@ function applyDocumentProjections(
   return { ...list, items, total: Math.max(list.total, items.length) };
 }
 
-export default function DocumentsPage() {
+function DocumentsPageContent() {
   const searchParams = useSearchParams();
   const highlightedDocumentId = searchParams.get("document");
   const loadDocuments = useCallback(
@@ -676,5 +676,13 @@ export default function DocumentsPage() {
         />
       )}
     </PortalShell>
+  );
+}
+
+export default function DocumentsPage() {
+  return (
+    <Suspense fallback={<LoadingState label="Loading your documents" />}>
+      <DocumentsPageContent />
+    </Suspense>
   );
 }

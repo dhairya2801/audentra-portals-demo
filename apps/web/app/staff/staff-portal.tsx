@@ -24,7 +24,6 @@ import {
 } from "react";
 import { TenantLink as Link } from "../components/tenant-link";
 import { PortalMark } from "../components/portal-ui";
-import { useTenant } from "../components/tenant-provider";
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
 import {
   createStaffClub,
@@ -49,8 +48,10 @@ import {
   WorkItemCard,
 } from "./staff-action-center";
 import { JourneyFlowBuilder } from "./journey-flow-builder";
+import { MorningBrewView } from "./morning-brew/morning-brew";
 
 type StaffView =
+  | "morning_brew"
   | "overview"
   | "tasks"
   | "students"
@@ -64,6 +65,7 @@ type StaffView =
   | "edward";
 
 const viewOrder: StaffView[] = [
+  "morning_brew",
   "overview",
   "tasks",
   "students",
@@ -89,26 +91,27 @@ const navigation: Array<{
   {
     label: "Workspace",
     items: [
-      { id: "overview", label: "Today", icon: "01" },
-      { id: "outreach", label: "Action center", icon: "02" },
-      { id: "tasks", label: "Task board", icon: "03", badge: "tasks" },
-      { id: "students", label: "Students", icon: "04" },
-      { id: "messages", label: "Messages", icon: "05", badge: "inquiries" },
+      { id: "morning_brew", label: "Morning Brew", icon: "✦" },
+      { id: "overview", label: "Today", icon: "⌂" },
+      { id: "outreach", label: "Action center", icon: "↗" },
+      { id: "tasks", label: "Task board", icon: "✓", badge: "tasks" },
+      { id: "students", label: "Students", icon: "S" },
+      { id: "messages", label: "Messages", icon: "M", badge: "inquiries" },
     ],
   },
   {
     label: "Student experience",
     items: [
-      { id: "journeys", label: "Journeys", icon: "06" },
-      { id: "campus_life", label: "Campus life", icon: "07" },
-      { id: "academics", label: "Academics", icon: "08" },
+      { id: "journeys", label: "Journeys", icon: "J" },
+      { id: "campus_life", label: "Campus life", icon: "C" },
+      { id: "academics", label: "Academics", icon: "A" },
     ],
   },
   {
     label: "Enablement",
     items: [
-      { id: "knowledge", label: "Knowledge base", icon: "09" },
-      { id: "core_plays", label: "Core plays", icon: "10" },
+      { id: "knowledge", label: "Knowledge base", icon: "K" },
+      { id: "core_plays", label: "Core plays", icon: "P" },
       { id: "edward", label: "Edward", icon: "E" },
     ],
   },
@@ -132,6 +135,12 @@ const viewCopy: Record<
   StaffView,
   { eyebrow: string; title: string; description: string }
 > = {
+  morning_brew: {
+    eyebrow: "Executive intelligence",
+    title: "Morning Brew",
+    description:
+      "Your personalized daily briefing across enrollment, student success, and institutional operations.",
+  },
   overview: {
     eyebrow: "Enrollment operations",
     title: "Today’s enrollment work",
@@ -3277,10 +3286,9 @@ function StaffSidebar({
         ))}
       </nav>
       <div className="staff-sidebar__note">
-        <strong>Shared workspace</strong>
+        <strong>Institutional intelligence</strong>
         <p>
-          Task, student, and content updates are versioned to prevent lost
-          writes across staff sessions.
+          Convert more admitted students with earlier signals and clearer next actions.
         </p>
       </div>
     </aside>
@@ -3294,7 +3302,6 @@ function StaffWorkspaceShell({
   workspace: StaffOperationsWorkspace;
   refresh: () => void;
 }) {
-  const tenantRuntime = useTenant();
   const [view, setView] = useState<StaffView>("overview");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -3345,8 +3352,8 @@ function StaffWorkspaceShell({
         <div className="staff-brand">
           <PortalMark />
           <div>
-            <strong>{tenantRuntime.tenant.shortName} University</strong>
-            <span>Staff operations</span>
+            <strong>Audentra</strong>
+            <span>Higher Education Intelligence</span>
           </div>
         </div>
         <label className="staff-global-search">
@@ -3385,7 +3392,9 @@ function StaffWorkspaceShell({
       </div>
       <StaffSidebar view={view} workspace={workspace} navigate={navigate} />
       <main className="staff-main staff-main--workspace">
-        {view === "overview" ? (
+        {view === "morning_brew" ? (
+          <MorningBrewView workspace={workspace} navigate={navigate} />
+        ) : view === "overview" ? (
           <OverviewView workspace={workspace} navigate={navigate} />
         ) : view === "tasks" ? (
           <TaskBoardView workspace={workspace} refresh={refresh} />
