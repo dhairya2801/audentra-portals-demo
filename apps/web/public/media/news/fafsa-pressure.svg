@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 260" role="img" aria-label="A classical university administration building with columns">
+  <defs>
+    <linearGradient id="fp-sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#dbe6f5"/>
+      <stop offset="1" stop-color="#f3f1ea"/>
+    </linearGradient>
+    <linearGradient id="fp-stone" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6f4ee"/>
+      <stop offset="1" stop-color="#ddd8cc"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="260" fill="url(#fp-sky)"/>
+  <circle cx="330" cy="54" r="30" fill="#ffffff" opacity="0.6"/>
+
+  <!-- side wings -->
+  <rect x="14" y="126" width="76" height="112" fill="#cfc9bb"/>
+  <rect x="310" y="126" width="76" height="112" fill="#cfc9bb"/>
+  <g fill="#0a1f44" opacity="0.32">
+    <rect x="28" y="146" width="16" height="24" rx="2"/>
+    <rect x="52" y="146" width="16" height="24" rx="2"/>
+    <rect x="28" y="186" width="16" height="24" rx="2"/>
+    <rect x="52" y="186" width="16" height="24" rx="2"/>
+    <rect x="332" y="146" width="16" height="24" rx="2"/>
+    <rect x="356" y="146" width="16" height="24" rx="2"/>
+    <rect x="332" y="186" width="16" height="24" rx="2"/>
+    <rect x="356" y="186" width="16" height="24" rx="2"/>
+  </g>
+
+  <!-- main block -->
+  <rect x="86" y="104" width="228" height="134" fill="url(#fp-stone)"/>
+
+  <!-- pediment -->
+  <path d="M200 34 L318 106 L82 106 Z" fill="#eeeade"/>
+  <path d="M200 46 L298 106 L102 106 Z" fill="#0a1f44" opacity="0.09"/>
+  <rect x="78" y="102" width="244" height="12" rx="3" fill="#f6f4ee"/>
+  <rect x="78" y="114" width="244" height="5" fill="#6a38ff" opacity="0.5"/>
+
+  <!-- columns -->
+  <g fill="#fbfaf6">
+    <rect x="104" y="126" width="20" height="102" rx="3"/>
+    <rect x="142" y="126" width="20" height="102" rx="3"/>
+    <rect x="180" y="126" width="20" height="102" rx="3"/>
+    <rect x="218" y="126" width="20" height="102" rx="3"/>
+    <rect x="256" y="126" width="20" height="102" rx="3"/>
+  </g>
+  <g fill="#0a1f44" opacity="0.13">
+    <rect x="118" y="126" width="6" height="102"/>
+    <rect x="156" y="126" width="6" height="102"/>
+    <rect x="194" y="126" width="6" height="102"/>
+    <rect x="232" y="126" width="6" height="102"/>
+    <rect x="270" y="126" width="6" height="102"/>
+  </g>
+
+  <!-- doorway -->
+  <path d="M186 238 v-46 a14 14 0 0 1 28 0 v46 z" fill="#0a1f44" opacity="0.7"/>
+
+  <!-- steps and ground -->
+  <rect x="70" y="228" width="260" height="8" rx="2" fill="#e4dfd2"/>
+  <rect x="56" y="236" width="288" height="9" rx="2" fill="#d7d1c2"/>
+  <rect x="0" y="245" width="400" height="15" fill="#c8c2b2"/>
+
+  <!-- clock -->
+  <circle cx="200" cy="80" r="15" fill="#fbfaf6"/>
+  <circle cx="200" cy="80" r="15" fill="none" stroke="#6a38ff" stroke-width="2.5"/>
+  <path d="M200 72 v8 l6 4" fill="none" stroke="#0a1f44" stroke-width="2.5" stroke-linecap="round"/>
+</svg>
