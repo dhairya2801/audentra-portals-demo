@@ -1,65 +1,136 @@
 import {
-  BREW_CONNECTORS,
   BREW_DELIVERY_TIMES,
   BREW_DEPTH_OPTIONS,
+  BREW_INBOX_DEPTHS,
+  BREW_INCLUDES,
+  BREW_INSIGHT_DETAILS,
+  BREW_PULSE_DEFAULTS,
   BREW_READER_ROLE,
-  BREW_SECTION_OPTIONS,
-  BREW_TEAMS,
+  BREW_READING_SOURCES,
+  BREW_TOPICS,
   BREW_TONE_OPTIONS,
 } from "./catalog";
 import type {
-  BrewConnectorId,
   BrewDeliveryTime,
   BrewDepthId,
-  BrewSectionId,
-  BrewTeamId,
+  BrewIncludeId,
+  BrewInboxDepthId,
+  BrewInsightDetailId,
+  BrewPulseDefault,
+  BrewTopicId,
   BrewToneId,
 } from "./types";
 
 export type OnboardingStep = 1 | 2 | 3;
 
 export interface OnboardingDraft {
-  teams: BrewTeamId[];
-  connectors: Record<BrewConnectorId, boolean>;
+  topics: BrewTopicId[];
+  include: Record<BrewIncludeId, boolean>;
   depth: BrewDepthId;
   tone: BrewToneId;
-  sections: Record<BrewSectionId, boolean>;
   deliveryTime: BrewDeliveryTime;
+  inboxDepth: BrewInboxDepthId;
+  draftReplies: boolean;
+  calendarPrep: boolean;
+  pulseDefault: BrewPulseDefault;
+  insightDetail: BrewInsightDetailId;
+  readingSources: string[];
 }
 
-const STEP_TITLES: Record<OnboardingStep, string> = {
-  1: "Which teams should your brief follow?",
-  2: "Connect what your morning already runs on",
-  3: "How would you like it written?",
-};
+function Choice({
+  selected,
+  onClick,
+  title,
+  caption,
+  children,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  title: string;
+  caption?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <button
+      className={selected ? "brew-choice is-selected" : "brew-choice"}
+      type="button"
+      aria-pressed={selected}
+      onClick={onClick}
+    >
+      <span className="brew-choice__tick" aria-hidden="true" />
+      <strong>{title}</strong>
+      {caption ? <small>{caption}</small> : null}
+      {children}
+    </button>
+  );
+}
+
+function Switch({
+  on,
+  onClick,
+  title,
+  caption,
+}: {
+  on: boolean;
+  onClick: () => void;
+  title: string;
+  caption: string;
+}) {
+  return (
+    <button className={on ? "brew-switch is-on" : "brew-switch"} type="button" role="switch" aria-checked={on} onClick={onClick}>
+      <span>
+        <strong>{title}</strong>
+        <small>{caption}</small>
+      </span>
+      <i className="brew-toggle__switch" aria-hidden="true" />
+    </button>
+  );
+}
 
 export function MorningBrewOnboarding({
   step,
+  direction,
   firstName,
   draft,
   customizing,
-  onToggleTeam,
-  onToggleConnector,
+  onToggleTopic,
+  onToggleInclude,
+  onToggleSource,
   onChange,
-  onToggleSection,
   onStep,
   onComplete,
   onCancel,
 }: {
   step: OnboardingStep;
+  /** 1 when moving forward, -1 when going back; drives the slide direction. */
+  direction: 1 | -1;
   firstName: string;
   draft: OnboardingDraft;
   customizing: boolean;
-  onToggleTeam: (team: BrewTeamId) => void;
-  onToggleConnector: (connector: BrewConnectorId) => void;
+  onToggleTopic: (topic: BrewTopicId) => void;
+  onToggleInclude: (include: BrewIncludeId) => void;
+  onToggleSource: (source: string) => void;
   onChange: (patch: Partial<OnboardingDraft>) => void;
-  onToggleSection: (section: BrewSectionId) => void;
   onStep: (step: OnboardingStep) => void;
   onComplete: () => void;
   onCancel?: () => void;
 }) {
-  const connectedCount = BREW_CONNECTORS.filter((connector) => draft.connectors[connector.id]).length;
-  const sectionCount = BREW_SECTION_OPTIONS.filter((section) => draft.sections[section.id]).length;
+  const includedCount = BREW_INCLUDES.filter((include) => draft.include[include.id]).length;
+  const depth = BREW_DEPTH_OPTIONS.find((option) => option.id === draft.depth);
+
+  const heading =
+    step === 1
+      ? "What do you want to catch up on each morning?"
+      : step === 2
+        ? "Nice. What should we bring you?"
+        : "Last thing — how do you like it?";
+
+  const lede =
+    step === 1
+      ? "We picked a few based on what you look after. Add anything else you keep half an eye on, and drop what you don't. Nothing here is permanent."
+      : step === 2
+        ? "Your morning read gets a lot better when it knows about the rest of your day. Everything below is a polished demo — no real account is touched, and nothing leaves this browser."
+        : "Just a few quick calls on what you picked. Sensible answers are already filled in, so you can hit go whenever you like.";
 
   return (
     <section className="brew-setup" aria-labelledby="brew-setup-title">
@@ -69,224 +140,293 @@ export function MorningBrewOnboarding({
             <span className="brew-setup__cup" aria-hidden="true" />
             Morning Brew
           </span>
-          {step === 1 ? (
-            <>
-              <p className="brew-setup__welcome">Good morning, {firstName} 👋</p>
-              <h1 id="brew-setup-title">{STEP_TITLES[1]}</h1>
-              <p className="brew-setup__lede">
-                You lead Financial Aid, so we have pre-selected the three teams whose numbers usually land on
-                your desk first. Keep them, drop them, or add the ones you also watch — you can change this any
-                morning.
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="brew-setup__welcome">Step {step} of 3</p>
-              <h1 id="brew-setup-title">{STEP_TITLES[step]}</h1>
-              <p className="brew-setup__lede">
-                {step === 2
-                  ? "Your brief gets noticeably sharper when it can see the day you actually have. These are polished demo connections — no external account is contacted and nothing leaves this browser."
-                  : "Two people can follow the same teams and still want very different briefings. Set the length, the sections, and the voice."}
-              </p>
-            </>
-          )}
+          <p className="brew-setup__welcome">
+            {step === 1 ? `Hey ${firstName} 👋` : step === 2 ? "Two of three" : "Almost done"}
+          </p>
+          <h1 id="brew-setup-title">{heading}</h1>
+          <p className="brew-setup__lede">{lede}</p>
         </div>
         <ol className="brew-setup__steps" aria-label={`Step ${step} of 3`}>
           {([1, 2, 3] as OnboardingStep[]).map((value) => (
             <li className={value === step ? "is-active" : value < step ? "is-done" : ""} key={value}>
               <span aria-hidden="true">{value < step ? "✓" : value}</span>
-              <small>{value === 1 ? "Teams" : value === 2 ? "Connections" : "Format"}</small>
+              <small>{value === 1 ? "Topics" : value === 2 ? "What's in it" : "Your style"}</small>
             </li>
           ))}
         </ol>
       </header>
 
-      {step === 1 ? (
-        <>
-          <p className="brew-setup__role">
-            Signed in as <strong>{firstName}</strong> · {BREW_READER_ROLE}
-          </p>
-          <div className="brew-team-grid">
-            {BREW_TEAMS.map((team) => {
-              const selected = draft.teams.includes(team.id);
-              return (
-                <button
-                  className={`brew-team-card brew-team-card--${team.accent}${selected ? " is-selected" : ""}`}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => onToggleTeam(team.id)}
-                  key={team.id}
-                >
-                  <span className="brew-team-card__icon" aria-hidden="true">
-                    {team.icon}
-                  </span>
-                  <span className="brew-team-card__check" aria-hidden="true">
-                    {selected ? "✓" : "+"}
-                  </span>
-                  <strong>{team.title}</strong>
-                  <small className="brew-team-card__lead">{team.lead}</small>
-                  <p>{team.description}</p>
-                  {team.recommended ? (
-                    <span className="brew-team-card__flag">Suggested · {team.recommendation}</span>
-                  ) : (
-                    <span className="brew-team-card__flag brew-team-card__flag--muted">{team.recommendation}</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </>
-      ) : null}
-
-      {step === 2 ? (
-        <div className="brew-connector-grid">
-          {BREW_CONNECTORS.map((connector) => {
-            const connected = draft.connectors[connector.id];
-            return (
-              <article
-                className={connected ? "brew-connector-card is-connected" : "brew-connector-card"}
-                key={connector.id}
-              >
-                <span className={`brew-connector-logo brew-connector-logo--${connector.id}`} aria-hidden="true">
-                  {connector.icon}
-                </span>
-                <div>
-                  <strong>{connector.title}</strong>
-                  <p>{connector.vendor}</p>
-                  <small>{connector.description}</small>
-                  <em>{connector.unlocks}</em>
-                </div>
-                <button
-                  type="button"
-                  aria-pressed={connected}
-                  disabled={!connector.optional}
-                  onClick={() => connector.optional && onToggleConnector(connector.id)}
-                >
-                  {connected ? (connector.optional ? "Connected" : "Always on") : "Connect"}
-                </button>
-              </article>
-            );
-          })}
-          <aside className="brew-privacy-note">
-            <span aria-hidden="true">✓</span>
-            <div>
-              <strong>Presentation-safe connections</strong>
-              <p>
-                Email and calendar content in this demo is believable synthetic data. Only the on/off choice is
-                stored, and it stays in this browser.
-              </p>
-            </div>
-          </aside>
-        </div>
-      ) : null}
-
-      {step === 3 ? (
-        <div className="brew-format">
-          <fieldset className="brew-format__group">
-            <legend>How much do you want in front of you?</legend>
-            <div className="brew-choice-row">
-              {BREW_DEPTH_OPTIONS.map((option) => (
-                <button
-                  className={draft.depth === option.id ? "brew-choice is-selected" : "brew-choice"}
-                  type="button"
-                  aria-pressed={draft.depth === option.id}
-                  onClick={() => onChange({ depth: option.id })}
-                  key={option.id}
-                >
-                  <span className="brew-choice__tick" aria-hidden="true" />
-                  <strong>{option.title}</strong>
-                  <small>{option.readTime}</small>
-                  <p>{option.description}</p>
-                </button>
-              ))}
-            </div>
-          </fieldset>
-
-          <fieldset className="brew-format__group">
-            <legend>What should we always include?</legend>
-            <div className="brew-toggle-list">
-              {BREW_SECTION_OPTIONS.map((section) => {
-                const on = draft.sections[section.id];
+      <div className="brew-setup__stage" data-direction={direction} key={step}>
+        {step === 1 ? (
+          <>
+            <p className="brew-setup__role">
+              Signed in as <strong>{firstName}</strong> · {BREW_READER_ROLE}
+            </p>
+            <div className="brew-topic-grid">
+              {BREW_TOPICS.map((topic) => {
+                const selected = draft.topics.includes(topic.id);
                 return (
                   <button
-                    className={on ? "brew-toggle is-on" : "brew-toggle"}
+                    className={`brew-topic-card brew-topic-card--${topic.accent}${selected ? " is-selected" : ""}`}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => onToggleTopic(topic.id)}
+                    key={topic.id}
+                  >
+                    <span className="brew-topic-card__icon" aria-hidden="true">
+                      {topic.icon}
+                    </span>
+                    <span className="brew-topic-card__check" aria-hidden="true">
+                      {selected ? "✓" : "+"}
+                    </span>
+                    <strong>{topic.title}</strong>
+                    <p>{topic.blurb}</p>
+                    <small className="brew-topic-card__preview">{topic.preview}</small>
+                    <span
+                      className={
+                        topic.recommended
+                          ? "brew-topic-card__flag"
+                          : "brew-topic-card__flag brew-topic-card__flag--muted"
+                      }
+                    >
+                      {topic.recommended ? `Picked for you · ${topic.recommendation}` : topic.recommendation}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        ) : null}
+
+        {step === 2 ? (
+          <>
+            <div className="brew-include-grid">
+              {BREW_INCLUDES.map((include) => {
+                const on = draft.include[include.id];
+                return (
+                  <button
+                    className={`brew-include-card brew-include-card--${include.accent}${on ? " is-on" : ""}`}
                     type="button"
                     role="switch"
                     aria-checked={on}
-                    onClick={() => onToggleSection(section.id)}
-                    key={section.id}
+                    onClick={() => onToggleInclude(include.id)}
+                    key={include.id}
                   >
-                    <span className="brew-toggle__icon" aria-hidden="true">
-                      {section.icon}
+                    <span className="brew-include-card__icon" aria-hidden="true">
+                      {include.icon}
                     </span>
-                    <span>
-                      <strong>{section.title}</strong>
-                      <small>{section.description}</small>
+                    <span className="brew-include-card__body">
+                      <strong>{include.title}</strong>
+                      <p>{include.blurb}</p>
+                      <small>{include.source}</small>
                     </span>
                     <i className="brew-toggle__switch" aria-hidden="true" />
                   </button>
                 );
               })}
             </div>
-          </fieldset>
-
-          <div className="brew-format__split">
-            <fieldset className="brew-format__group">
-              <legend>When should it be ready?</legend>
-              <div className="brew-time-row">
-                {BREW_DELIVERY_TIMES.map((time) => (
-                  <button
-                    className={draft.deliveryTime === time.id ? "brew-time is-selected" : "brew-time"}
-                    type="button"
-                    aria-pressed={draft.deliveryTime === time.id}
-                    onClick={() => onChange({ deliveryTime: time.id })}
-                    key={time.id}
-                  >
-                    <strong>{time.label}</strong>
-                    <small>{time.caption}</small>
-                  </button>
-                ))}
+            <aside className="brew-privacy-note">
+              <span aria-hidden="true">✓</span>
+              <div>
+                <strong>Nothing here leaves your browser</strong>
+                <p>
+                  The mail and calendar you&rsquo;ll see are believable stand-ins written for this demo. We only
+                  remember which switches you flipped.
+                </p>
               </div>
-            </fieldset>
+            </aside>
+          </>
+        ) : null}
 
+        {step === 3 ? (
+          <div className="brew-format">
             <fieldset className="brew-format__group">
-              <legend>Writing style</legend>
-              <div className="brew-choice-row brew-choice-row--tone">
-                {BREW_TONE_OPTIONS.map((option) => (
-                  <button
-                    className={draft.tone === option.id ? "brew-choice is-selected" : "brew-choice"}
-                    type="button"
-                    aria-pressed={draft.tone === option.id}
-                    onClick={() => onChange({ tone: option.id })}
+              <legend>How long should it be?</legend>
+              <div className="brew-choice-row">
+                {BREW_DEPTH_OPTIONS.map((option) => (
+                  <Choice
+                    selected={draft.depth === option.id}
+                    onClick={() => onChange({ depth: option.id })}
+                    title={option.title}
+                    caption={option.readTime}
                     key={option.id}
                   >
-                    <span className="brew-choice__tick" aria-hidden="true" />
-                    <strong>{option.title}</strong>
                     <p>{option.description}</p>
-                    <q>{option.sample}</q>
-                  </button>
+                  </Choice>
                 ))}
               </div>
             </fieldset>
+
+            {draft.include.inbox ? (
+              <fieldset className="brew-format__group">
+                <legend>
+                  <span className="brew-format__tag">Your inbox</span>
+                  How much of it do you want?
+                </legend>
+                <div className="brew-choice-row">
+                  {BREW_INBOX_DEPTHS.map((option) => (
+                    <Choice
+                      selected={draft.inboxDepth === option.id}
+                      onClick={() => onChange({ inboxDepth: option.id })}
+                      title={option.title}
+                      caption={option.caption}
+                      key={option.id}
+                    />
+                  ))}
+                </div>
+                <Switch
+                  on={draft.draftReplies}
+                  onClick={() => onChange({ draftReplies: !draft.draftReplies })}
+                  title="Let Edward write the first draft"
+                  caption="A reply waiting on each message, ready for you to edit or throw away."
+                />
+              </fieldset>
+            ) : null}
+
+            {draft.include.calendar ? (
+              <fieldset className="brew-format__group">
+                <legend>
+                  <span className="brew-format__tag">Your calendar</span>
+                  Anything you want alongside it?
+                </legend>
+                <Switch
+                  on={draft.calendarPrep}
+                  onClick={() => onChange({ calendarPrep: !draft.calendarPrep })}
+                  title="Add a prep line to the meetings that matter"
+                  caption="One sentence on what you'd want to know before you walk in."
+                />
+              </fieldset>
+            ) : null}
+
+            {draft.include.numbers ? (
+              <fieldset className="brew-format__group">
+                <legend>
+                  <span className="brew-format__tag">Your numbers</span>
+                  Which comparison do you think in?
+                </legend>
+                <div className="brew-pill-row">
+                  {BREW_PULSE_DEFAULTS.map((option) => (
+                    <button
+                      className={draft.pulseDefault === option.id ? "brew-pill is-selected" : "brew-pill"}
+                      type="button"
+                      aria-pressed={draft.pulseDefault === option.id}
+                      onClick={() => onChange({ pulseDefault: option.id })}
+                      key={option.id}
+                    >
+                      <strong>{option.label}</strong>
+                      <small>{option.caption}</small>
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+            ) : null}
+
+            {draft.include.signals ? (
+              <fieldset className="brew-format__group">
+                <legend>
+                  <span className="brew-format__tag">What we spot</span>
+                  How much should we show?
+                </legend>
+                <div className="brew-choice-row">
+                  {BREW_INSIGHT_DETAILS.map((option) => (
+                    <Choice
+                      selected={draft.insightDetail === option.id}
+                      onClick={() => onChange({ insightDetail: option.id })}
+                      title={option.title}
+                      caption={option.caption}
+                      key={option.id}
+                    />
+                  ))}
+                </div>
+              </fieldset>
+            ) : null}
+
+            {draft.include.headlines ? (
+              <fieldset className="brew-format__group">
+                <legend>
+                  <span className="brew-format__tag">Your reading</span>
+                  Where should we read from?
+                </legend>
+                <div className="brew-source-row">
+                  {BREW_READING_SOURCES.map((source) => {
+                    const on = draft.readingSources.includes(source.id);
+                    return (
+                      <button
+                        className={on ? "brew-source-chip is-on" : "brew-source-chip"}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => onToggleSource(source.id)}
+                        key={source.id}
+                      >
+                        <i aria-hidden="true">{on ? "✓" : "+"}</i>
+                        <span>
+                          <strong>{source.label}</strong>
+                          <small>{source.kind}</small>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            ) : null}
+
+            <div className="brew-format__split">
+              <fieldset className="brew-format__group">
+                <legend>When do you want it?</legend>
+                <div className="brew-pill-row">
+                  {BREW_DELIVERY_TIMES.map((time) => (
+                    <button
+                      className={draft.deliveryTime === time.id ? "brew-pill is-selected" : "brew-pill"}
+                      type="button"
+                      aria-pressed={draft.deliveryTime === time.id}
+                      onClick={() => onChange({ deliveryTime: time.id })}
+                      key={time.id}
+                    >
+                      <strong>{time.label}</strong>
+                      <small>{time.caption}</small>
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              <fieldset className="brew-format__group">
+                <legend>How should we write it?</legend>
+                <div className="brew-choice-row brew-choice-row--tone">
+                  {BREW_TONE_OPTIONS.map((option) => (
+                    <Choice
+                      selected={draft.tone === option.id}
+                      onClick={() => onChange({ tone: option.id })}
+                      title={option.title}
+                      key={option.id}
+                    >
+                      <p>{option.description}</p>
+                      <q>{option.sample}</q>
+                    </Choice>
+                  ))}
+                </div>
+              </fieldset>
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
       <footer className="brew-setup__footer">
         <div>
           <strong>
             {step === 1
-              ? `${draft.teams.length} of ${BREW_TEAMS.length} teams selected`
+              ? draft.topics.length
+                ? `${draft.topics.length} ${draft.topics.length === 1 ? "topic" : "topics"} in your morning`
+                : "Nothing picked yet"
               : step === 2
-                ? `${connectedCount} of ${BREW_CONNECTORS.length} sources connected`
-                : `${sectionCount} sections · ${BREW_DEPTH_OPTIONS.find((option) => option.id === draft.depth)?.readTime}`}
+                ? `${includedCount} of ${BREW_INCLUDES.length} switched on`
+                : `${depth?.title} · ${depth?.readTime}`}
           </strong>
           <span>
             {step === 1
-              ? "Pick at least one team. You can change this any morning."
+              ? "Pick at least one. You can change this any morning."
               : step === 2
-                ? "Optional. Your brief still works without them."
-                : `Delivered every weekday at ${draft.deliveryTime.replace(/^0/, "")} AM ET.`}
+                ? "All optional — your read still works without any of them."
+                : `Ready for you every weekday at ${draft.deliveryTime.replace(/^0/, "")} AM.`}
           </span>
         </div>
         <div className="brew-setup__actions">
@@ -306,10 +446,10 @@ export function MorningBrewOnboarding({
           <button
             className="button button--primary brew-build-button"
             type="button"
-            disabled={!draft.teams.length}
+            disabled={!draft.topics.length}
             onClick={() => (step === 3 ? onComplete() : onStep((step + 1) as OnboardingStep))}
           >
-            {step === 3 ? (customizing ? "Save my Morning Brew" : "Build my Morning Brew") : "Continue"}
+            {step === 3 ? (customizing ? "Save it" : "Make my Morning Brew") : "Looks good"}
             <span aria-hidden="true">→</span>
           </button>
         </div>

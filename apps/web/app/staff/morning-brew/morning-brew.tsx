@@ -10,11 +10,10 @@ import { EdwardPanel } from "./edward-panel";
 import { MorningBrewOnboarding, type OnboardingDraft, type OnboardingStep } from "./onboarding";
 import { browserBrewPreferenceStore, DEFAULT_BREW_PREFERENCES } from "./preferences";
 import type {
-  BrewConnectorId,
   BrewDetailRef,
+  BrewIncludeId,
   BrewPreferences,
-  BrewSectionId,
-  BrewTeamId,
+  BrewTopicId,
   EdwardRequest,
   MorningBrewDestination,
 } from "./types";
@@ -22,12 +21,17 @@ import type {
 type Mode = "loading" | "onboarding" | "briefing";
 
 const draftFrom = (preferences: Omit<BrewPreferences, "version" | "updatedAt">): OnboardingDraft => ({
-  teams: [...preferences.teams],
-  connectors: { ...preferences.connectors },
+  topics: [...preferences.topics],
+  include: { ...preferences.include },
   depth: preferences.depth,
   tone: preferences.tone,
-  sections: { ...preferences.sections },
   deliveryTime: preferences.deliveryTime,
+  inboxDepth: preferences.inboxDepth,
+  draftReplies: preferences.draftReplies,
+  calendarPrep: preferences.calendarPrep,
+  pulseDefault: preferences.pulseDefault,
+  insightDetail: preferences.insightDetail,
+  readingSources: [...preferences.readingSources],
 });
 
 function LoadingBrew() {
@@ -57,6 +61,7 @@ export function MorningBrewView({
 
   const [mode, setMode] = useState<Mode>("loading");
   const [step, setStep] = useState<OnboardingStep>(1);
+  const [direction, setDirection] = useState<1 | -1>(1);
   const [draft, setDraft] = useState<OnboardingDraft>(() => draftFrom(DEFAULT_BREW_PREFERENCES));
   const [saved, setSaved] = useState<BrewPreferences | null>(null);
   const [detail, setDetail] = useState<BrewDetailRef | null>(null);
@@ -64,7 +69,7 @@ export function MorningBrewView({
 
   useEffect(() => {
     const stored = browserBrewPreferenceStore.load(scope);
-    // A short beat keeps the persisted-preference check from flashing onboarding.
+    // A short beat keeps the persisted-preference check from flashing setup.
     const timer = window.setTimeout(() => {
       if (stored) {
         setDraft(draftFrom(stored));
@@ -78,7 +83,7 @@ export function MorningBrewView({
   }, [scope]);
 
   const preferences: BrewPreferences = useMemo(
-    () => saved ?? { ...DEFAULT_BREW_PREFERENCES, ...draft, version: 3, updatedAt: "", onboardingComplete: false },
+    () => saved ?? { ...DEFAULT_BREW_PREFERENCES, ...draft, version: 4, updatedAt: "", onboardingComplete: false },
     [saved, draft],
   );
 
@@ -86,12 +91,19 @@ export function MorningBrewView({
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
+  const goToStep = (next: OnboardingStep) => {
+    setDirection(next > step ? 1 : -1);
+    setStep(next);
+    scrollToTop();
+  };
+
   const complete = () => {
-    if (!draft.teams.length) return;
+    if (!draft.topics.length) return;
     setSaved(browserBrewPreferenceStore.save(scope, { ...draft, onboardingComplete: true }));
     setDetail(null);
     setMode("briefing");
     setStep(1);
+    setDirection(1);
     scrollToTop();
   };
 
@@ -99,6 +111,7 @@ export function MorningBrewView({
     if (!saved) return;
     setDraft(draftFrom(saved));
     setStep(1);
+    setDirection(1);
     setMode("briefing");
   };
 
@@ -106,6 +119,7 @@ export function MorningBrewView({
     if (saved) setDraft(draftFrom(saved));
     setDetail(null);
     setStep(target);
+    setDirection(1);
     setMode("onboarding");
     scrollToTop();
   };
@@ -127,34 +141,34 @@ export function MorningBrewView({
     return (
       <MorningBrewOnboarding
         step={step}
+        direction={direction}
         firstName={workspace.currentStaff.name.split(" ")[0] || "there"}
         draft={draft}
         customizing={Boolean(saved?.onboardingComplete)}
-        onToggleTeam={(team: BrewTeamId) =>
+        onToggleTopic={(topic: BrewTopicId) =>
           setDraft((current) => ({
             ...current,
-            teams: current.teams.includes(team)
-              ? current.teams.filter((item) => item !== team)
-              : [...current.teams, team],
+            topics: current.topics.includes(topic)
+              ? current.topics.filter((item) => item !== topic)
+              : [...current.topics, topic],
           }))
         }
-        onToggleConnector={(connector: BrewConnectorId) =>
+        onToggleInclude={(include: BrewIncludeId) =>
           setDraft((current) => ({
             ...current,
-            connectors: { ...current.connectors, [connector]: !current.connectors[connector] },
+            include: { ...current.include, [include]: !current.include[include] },
           }))
         }
-        onToggleSection={(section: BrewSectionId) =>
+        onToggleSource={(source: string) =>
           setDraft((current) => ({
             ...current,
-            sections: { ...current.sections, [section]: !current.sections[section] },
+            readingSources: current.readingSources.includes(source)
+              ? current.readingSources.filter((item) => item !== source)
+              : [...current.readingSources, source],
           }))
         }
         onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
-        onStep={(next) => {
-          setStep(next);
-          scrollToTop();
-        }}
+        onStep={goToStep}
         onComplete={complete}
         onCancel={saved ? cancel : undefined}
       />

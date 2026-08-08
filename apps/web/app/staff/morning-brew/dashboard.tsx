@@ -1,7 +1,7 @@
 "use client";
 
 import { useTenant } from "../../components/tenant-provider";
-import { BREW_CONNECTORS } from "./catalog";
+import { BREW_INCLUDES } from "./catalog";
 import { attendeeAvatar } from "./data";
 import { EnrollmentPulse } from "./pulse";
 import type {
@@ -71,10 +71,12 @@ export function MorningBrewDashboard({
   const alerts =
     briefing.emails.filter((email) => email.priority === "high").length +
     briefing.priorities.filter((priority) => priority.level === "High").length;
-  const connectedCount = BREW_CONNECTORS.filter((connector) => preferences.connectors[connector.id]).length;
+  const includedCount = BREW_INCLUDES.filter((include) => preferences.include[include.id]).length;
 
-  const showCalendar = preferences.connectors.calendar;
-  const showEmail = preferences.connectors.outlook;
+  const showCalendar = preferences.include.calendar;
+  const showEmail = preferences.include.inbox;
+  const showImpact = preferences.insightDetail !== "headline";
+  const showRecommendation = preferences.insightDetail === "full";
   const showPriorities = briefing.priorities.length > 0;
   const showDayGrid = showCalendar || showEmail || showPriorities;
 
@@ -141,10 +143,10 @@ export function MorningBrewDashboard({
               Outlook
             </span>
             <strong>{showEmail ? briefing.inbox.unread : "—"}</strong>
-            <small>{showEmail ? "Unread emails" : "Not connected"}</small>
-            <em>{showEmail ? `${briefing.inbox.highPriority} High priority` : "Connect to see highlights"}</em>
+            <small>{showEmail ? "Unread emails" : "Turned off"}</small>
+            <em>{showEmail ? `${briefing.inbox.highPriority} High priority` : "Switch it on to see your inbox"}</em>
             <span className="brew-glance__link">
-              {showEmail ? "View highlights" : "Connect"} <i aria-hidden="true">→</i>
+              {showEmail ? "View highlights" : "Turn it on"} <i aria-hidden="true">→</i>
             </span>
           </button>
 
@@ -162,12 +164,12 @@ export function MorningBrewDashboard({
               Calendar
             </span>
             <strong>{showCalendar ? briefing.inbox.meetings : "—"}</strong>
-            <small>{showCalendar ? "Meetings today" : "Not connected"}</small>
+            <small>{showCalendar ? "Meetings today" : "Turned off"}</small>
             <em>
-              {showCalendar ? `${briefing.inbox.meetingsHighPriority} High priority` : "Connect to see your agenda"}
+              {showCalendar ? `${briefing.inbox.meetingsHighPriority} High priority` : "Switch it on to see your day"}
             </em>
             <span className="brew-glance__link">
-              {showCalendar ? "View agenda" : "Connect"} <i aria-hidden="true">→</i>
+              {showCalendar ? "View agenda" : "Turn it on"} <i aria-hidden="true">→</i>
             </span>
           </button>
 
@@ -234,23 +236,27 @@ export function MorningBrewDashboard({
                 </div>
 
                 <p className="brew-insight__summary">{insight.summary}</p>
-                <p className="brew-insight__projection">{insight.projection}</p>
+                {showImpact ? <p className="brew-insight__projection">{insight.projection}</p> : null}
 
-                <div className="brew-insight__impact">
-                  <small>{insight.impactLabel}</small>
-                  <div>
-                    {insight.impact.map((chip) => (
-                      <span className={`brew-impact brew-impact--${chip.tone}`} key={chip.label}>
-                        {chip.label}
-                      </span>
-                    ))}
+                {showImpact ? (
+                  <div className="brew-insight__impact">
+                    <small>{insight.impactLabel}</small>
+                    <div>
+                      {insight.impact.map((chip) => (
+                        <span className={`brew-impact brew-impact--${chip.tone}`} key={chip.label}>
+                          {chip.label}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                ) : null}
 
-                <div className="brew-insight__action">
-                  <small>Recommended action</small>
-                  <p>{insight.recommendedAction}</p>
-                </div>
+                {showRecommendation ? (
+                  <div className="brew-insight__action">
+                    <small>Recommended action</small>
+                    <p>{insight.recommendedAction}</p>
+                  </div>
+                ) : null}
 
                 <footer className="brew-insight__foot">
                   <span>
@@ -272,6 +278,7 @@ export function MorningBrewDashboard({
 
       <EnrollmentPulse
         kpis={briefing.kpis}
+        initialMode={preferences.pulseDefault}
         refreshedAt={`${updatedClock} ET`}
         onOpenKpi={(id: string, timeframe: BrewTimeframeId) => onOpenDetail({ kind: "kpi", id, timeframe })}
         onAskEdward={() => onAskEdward({ mode: "insights", context: "the enrollment pulse" })}
@@ -285,7 +292,7 @@ export function MorningBrewDashboard({
               <p className="brew-eyebrow" id="brew-changes-title">
                 <span aria-hidden="true">↻</span> Since yesterday
               </p>
-              <p>What actually moved in the last 24 hours across your teams.</p>
+              <p>What actually moved in the last 24 hours across your topics.</p>
             </div>
             <div className="brew-panel-head__actions">
               <EdwardChip
@@ -353,6 +360,11 @@ export function MorningBrewDashboard({
                         </button>
                       </h3>
                       <p>{meeting.detail}</p>
+                      {preferences.calendarPrep && meeting.priority === "high" && meeting.prep[0] ? (
+                        <p className="brew-prep-line">
+                          <span aria-hidden="true">✎</span> {meeting.prep[0]}
+                        </p>
+                      ) : null}
                       <span className="brew-avatars">
                         {meeting.attendees.map((attendee) => (
                           <img src={attendeeAvatar(attendee)} alt={attendee} title={attendee} key={attendee} />
@@ -414,15 +426,17 @@ export function MorningBrewDashboard({
                         <button type="button" onClick={() => onOpenDetail({ kind: "email", id: email.id })}>
                           View email
                         </button>
-                        <button
-                          className="is-edward"
-                          type="button"
-                          onClick={() =>
-                            onAskEdward({ mode: "draft_reply", context: email.subject, emailId: email.id })
-                          }
-                        >
-                          <span aria-hidden="true">E</span> Draft reply
-                        </button>
+                        {preferences.draftReplies ? (
+                          <button
+                            className="is-edward"
+                            type="button"
+                            onClick={() =>
+                              onAskEdward({ mode: "draft_reply", context: email.subject, emailId: email.id })
+                            }
+                          >
+                            <span aria-hidden="true">E</span> Draft reply
+                          </button>
+                        ) : null}
                       </span>
                     </div>
                   </li>
@@ -488,20 +502,20 @@ export function MorningBrewDashboard({
             <section className="brew-connect-card">
               <span aria-hidden="true">↗</span>
               <div>
-                <strong>Make it your morning</strong>
+                <strong>Want more of your day in here?</strong>
                 <p>
                   {!showCalendar && !showEmail
-                    ? "Connect your calendar and inbox to see today's agenda and the messages that need a decision."
+                    ? "Switch on your calendar and inbox and we'll add today's meetings and the messages that actually need you."
                     : !showCalendar
-                      ? "Connect your calendar to see today's agenda and prep notes."
-                      : "Connect your inbox to see the messages that need a decision before noon."}
+                      ? "Switch on your calendar and we'll add today's meetings, with a line on what to walk in knowing."
+                      : "Switch on your inbox and we'll pull out the messages that need a decision before noon."}
                 </p>
                 <small>
-                  {connectedCount} of {BREW_CONNECTORS.length} sources connected
+                  {includedCount} of {BREW_INCLUDES.length} switched on
                 </small>
               </div>
               <button className="button button--primary" type="button" onClick={onManageConnections}>
-                Manage connections
+                Change what&rsquo;s in it
               </button>
             </section>
           ) : null}
@@ -567,7 +581,7 @@ export function MorningBrewDashboard({
             Customize brief
           </button>
           <button type="button" onClick={onManageConnections}>
-            Manage connections
+            Change what&rsquo;s in it
           </button>
           <button
             className="brew-feedback"

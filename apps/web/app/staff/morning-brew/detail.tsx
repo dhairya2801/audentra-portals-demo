@@ -1,6 +1,6 @@
 "use client";
 
-import { BREW_TIMEFRAMES, teamById } from "./catalog";
+import { BREW_TIMEFRAMES, topicById } from "./catalog";
 import {
   BREW_CHANGES,
   BREW_EMAILS,
@@ -219,10 +219,10 @@ export function MorningBrewDetail({
   if (detail.kind === "insight") {
     const insight = BREW_INSIGHTS.find((item) => item.id === detail.id);
     if (!insight) return <NotFound onBack={onBack} />;
-    const team = teamById(insight.team);
+    const topic = topicById(insight.topic);
     return (
       <DetailShell
-        eyebrow={`${insight.label} · ${team?.title ?? "Institution"}`}
+        eyebrow={`${insight.label} · ${topic?.title ?? "Institution"}`}
         title={insight.title}
         onBack={onBack}
         meta={
@@ -341,10 +341,10 @@ export function MorningBrewDetail({
     const kpi = BREW_KPIS.find((item) => item.id === detail.id);
     if (!kpi) return <NotFound onBack={onBack} />;
     const frame = kpi.frames[detail.timeframe];
-    const team = teamById(kpi.team);
+    const topic = topicById(kpi.topic);
     return (
       <DetailShell
-        eyebrow={`Enrollment pulse · ${team?.title ?? "Institution"}`}
+        eyebrow={`Enrollment pulse · ${topic?.title ?? "Institution"}`}
         title={kpi.label}
         onBack={onBack}
         meta={
@@ -589,10 +589,10 @@ export function MorningBrewDetail({
     const priority = briefing.priorities.find((item) => item.id === detail.id)
       ?? BREW_PRIORITIES.find((item) => item.id === detail.id);
     if (!priority) return <NotFound onBack={onBack} />;
-    const team = teamById(priority.team);
+    const topic = topicById(priority.topic);
     return (
       <DetailShell
-        eyebrow={`Today's priorities · ${team?.title ?? "Institution"}`}
+        eyebrow={`Today's priorities · ${topic?.title ?? "Institution"}`}
         title={priority.title}
         onBack={onBack}
         meta={
@@ -647,10 +647,10 @@ export function MorningBrewDetail({
     const change = briefing.changes.find((item) => item.id === detail.id)
       ?? BREW_CHANGES.find((item) => item.id === detail.id);
     if (!change) return <NotFound onBack={onBack} />;
-    const team = teamById(change.team);
+    const topic = topicById(change.topic);
     return (
       <DetailShell
-        eyebrow={`Since yesterday · ${team?.title ?? "Institution"}`}
+        eyebrow={`Since yesterday · ${topic?.title ?? "Institution"}`}
         title={change.title}
         onBack={onBack}
         meta={

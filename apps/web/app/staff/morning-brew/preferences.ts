@@ -1,18 +1,20 @@
 import {
-  BREW_CONNECTOR_IDS,
-  BREW_SECTION_IDS,
-  BREW_TEAM_IDS,
-  DEFAULT_BREW_CONNECTORS,
-  DEFAULT_BREW_SECTIONS,
-  DEFAULT_BREW_TEAMS,
+  BREW_INCLUDE_IDS,
+  BREW_READING_SOURCES,
+  BREW_TOPIC_IDS,
+  DEFAULT_BREW_INCLUDES,
+  DEFAULT_BREW_TOPICS,
+  DEFAULT_READING_SOURCES,
 } from "./catalog";
 import type {
-  BrewConnectorId,
   BrewDeliveryTime,
   BrewDepthId,
+  BrewIncludeId,
+  BrewInboxDepthId,
+  BrewInsightDetailId,
   BrewPreferences,
-  BrewSectionId,
-  BrewTeamId,
+  BrewPulseDefault,
+  BrewTopicId,
   BrewToneId,
 } from "./types";
 
@@ -22,88 +24,133 @@ export interface BrewPreferenceStore {
   clear(scope: string): void;
 }
 
-const STORAGE_PREFIX = "audentra:morning-brew:v3";
-/** v1/v2 kept broad topics rather than named campus teams. */
-const LEGACY_PREFIXES = ["audentra:morning-brew:v2", "audentra:morning-brew:v1"];
+const STORAGE_PREFIX = "audentra:morning-brew:v4";
+/** Earlier shapes: v3 kept separate connector/section maps, v1–v2 broad topics. */
+const LEGACY_PREFIXES = [
+  "audentra:morning-brew:v3",
+  "audentra:morning-brew:v2",
+  "audentra:morning-brew:v1",
+];
 
-const TEAM_IDS = new Set<string>(BREW_TEAM_IDS);
+const TOPIC_IDS = new Set<string>(BREW_TOPIC_IDS);
+const SOURCE_IDS = new Set<string>(BREW_READING_SOURCES.map((source) => source.id));
 const DEPTHS = new Set<string>(["headlines", "balanced", "deep"]);
 const TONES = new Set<string>(["executive", "narrative"]);
 const TIMES = new Set<string>(["06:00", "06:30", "07:00", "07:30"]);
+const INBOX_DEPTHS = new Set<string>(["urgent", "handful", "everything"]);
+const INSIGHT_DETAILS = new Set<string>(["headline", "impact", "full"]);
+const PULSE_DEFAULTS = new Set<string>(["auto", "yesterday", "week", "month", "year"]);
 
 export const DEFAULT_BREW_PREFERENCES: Omit<BrewPreferences, "version" | "updatedAt"> = {
-  teams: DEFAULT_BREW_TEAMS,
-  connectors: DEFAULT_BREW_CONNECTORS,
+  topics: DEFAULT_BREW_TOPICS,
+  include: DEFAULT_BREW_INCLUDES,
   depth: "balanced",
   tone: "executive",
-  sections: DEFAULT_BREW_SECTIONS,
   deliveryTime: "07:00",
+  inboxDepth: "handful",
+  draftReplies: true,
+  calendarPrep: true,
+  pulseDefault: "auto",
+  insightDetail: "full",
+  readingSources: DEFAULT_READING_SOURCES,
   onboardingComplete: false,
 };
 
-function normalizeTeams(value: unknown): BrewTeamId[] {
-  if (!Array.isArray(value)) return [...DEFAULT_BREW_TEAMS];
-  const teams = value.filter((item): item is BrewTeamId => typeof item === "string" && TEAM_IDS.has(item));
-  return teams.length ? [...new Set(teams)] : [...DEFAULT_BREW_TEAMS];
+function normalizeTopics(value: unknown): BrewTopicId[] {
+  if (!Array.isArray(value)) return [...DEFAULT_BREW_TOPICS];
+  const topics = value.filter((item): item is BrewTopicId => typeof item === "string" && TOPIC_IDS.has(item));
+  return topics.length ? [...new Set(topics)] : [...DEFAULT_BREW_TOPICS];
 }
 
-function normalizeConnectors(value: unknown): Record<BrewConnectorId, boolean> {
+function normalizeInclude(value: unknown): Record<BrewIncludeId, boolean> {
   const record = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
   return Object.fromEntries(
-    BREW_CONNECTOR_IDS.map((id) => [
+    BREW_INCLUDE_IDS.map((id) => [
       id,
-      typeof record[id] === "boolean" ? record[id] : DEFAULT_BREW_CONNECTORS[id],
+      typeof record[id] === "boolean" ? record[id] : DEFAULT_BREW_INCLUDES[id],
     ]),
-  ) as Record<BrewConnectorId, boolean>;
+  ) as Record<BrewIncludeId, boolean>;
 }
 
-function normalizeSections(value: unknown): Record<BrewSectionId, boolean> {
-  const record = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
-  return Object.fromEntries(
-    BREW_SECTION_IDS.map((id) => [
-      id,
-      typeof record[id] === "boolean" ? record[id] : DEFAULT_BREW_SECTIONS[id],
-    ]),
-  ) as Record<BrewSectionId, boolean>;
+function normalizeSources(value: unknown): string[] {
+  if (!Array.isArray(value)) return [...DEFAULT_READING_SOURCES];
+  const sources = value.filter((item): item is string => typeof item === "string" && SOURCE_IDS.has(item));
+  return sources.length ? [...new Set(sources)] : [...DEFAULT_READING_SOURCES];
 }
 
 function normalize(value: Partial<BrewPreferences>): BrewPreferences {
   return {
-    version: 3,
-    teams: normalizeTeams(value.teams),
-    connectors: normalizeConnectors(value.connectors),
+    version: 4,
+    topics: normalizeTopics(value.topics),
+    include: normalizeInclude(value.include),
     depth: DEPTHS.has(String(value.depth)) ? (value.depth as BrewDepthId) : "balanced",
     tone: TONES.has(String(value.tone)) ? (value.tone as BrewToneId) : "executive",
-    sections: normalizeSections(value.sections),
     deliveryTime: TIMES.has(String(value.deliveryTime))
       ? (value.deliveryTime as BrewDeliveryTime)
       : "07:00",
+    inboxDepth: INBOX_DEPTHS.has(String(value.inboxDepth))
+      ? (value.inboxDepth as BrewInboxDepthId)
+      : "handful",
+    draftReplies: value.draftReplies !== false,
+    calendarPrep: value.calendarPrep !== false,
+    pulseDefault: PULSE_DEFAULTS.has(String(value.pulseDefault))
+      ? (value.pulseDefault as BrewPulseDefault)
+      : "auto",
+    insightDetail: INSIGHT_DETAILS.has(String(value.insightDetail))
+      ? (value.insightDetail as BrewInsightDetailId)
+      : "full",
+    readingSources: normalizeSources(value.readingSources),
     onboardingComplete: value.onboardingComplete === true,
     updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : new Date().toISOString(),
   };
 }
 
 /**
- * Earlier releases stored broad interest topics. Map what we can onto the named
- * campus teams so a returning reader keeps their shape, then send them back
- * through onboarding to pick up the newer preferences.
+ * Carry a returning reader's shape forward where we can, then send them back
+ * through setup so they can answer the questions this version adds.
  */
 function migrateLegacy(scope: string): BrewPreferences | null {
   for (const prefix of LEGACY_PREFIXES) {
     try {
       const raw = window.localStorage.getItem(`${prefix}:${scope}`);
       if (!raw) continue;
-      const legacy = JSON.parse(raw) as { topics?: string[]; interests?: string[] };
-      const previous = new Set([...(legacy.topics ?? []), ...(legacy.interests ?? [])]);
-      const teams: BrewTeamId[] = [];
-      if (previous.has("financial_aid") || previous.has("financial_health")) teams.push("financial_aid");
-      if (previous.has("enrollment_admissions") || previous.has("enrollment") || previous.has("admissions"))
-        teams.push("admissions");
-      if (previous.has("student_operations") || previous.has("student_success")) teams.push("student_success");
-      if (previous.has("housing")) teams.push("housing");
-      if (previous.has("academics") || previous.has("executive_performance")) teams.push("registrar");
-      if (!teams.length) continue;
-      return normalize({ ...DEFAULT_BREW_PREFERENCES, teams, onboardingComplete: false });
+      const legacy = JSON.parse(raw) as {
+        topics?: string[];
+        teams?: string[];
+        interests?: string[];
+        connectors?: Record<string, boolean>;
+        sections?: Record<string, boolean>;
+        depth?: string;
+        tone?: string;
+        deliveryTime?: string;
+      };
+      const previous = new Set([...(legacy.topics ?? []), ...(legacy.teams ?? []), ...(legacy.interests ?? [])]);
+      const topics: BrewTopicId[] = [];
+      if (previous.has("financial_aid") || previous.has("financial_health")) topics.push("financial_aid");
+      if (previous.has("admissions") || previous.has("enrollment_admissions") || previous.has("enrollment"))
+        topics.push("admissions");
+      if (previous.has("student_success") || previous.has("student_operations")) topics.push("student_success");
+      if (previous.has("housing")) topics.push("housing");
+      if (previous.has("registrar") || previous.has("academics") || previous.has("executive_performance"))
+        topics.push("registrar");
+      if (!topics.length) continue;
+
+      return normalize({
+        ...DEFAULT_BREW_PREFERENCES,
+        topics,
+        include: {
+          inbox: legacy.connectors?.outlook ?? true,
+          calendar: legacy.connectors?.calendar ?? true,
+          numbers: legacy.sections?.pulse ?? true,
+          signals: legacy.sections?.insights ?? true,
+          movements: legacy.sections?.changes ?? true,
+          headlines: legacy.sections?.news ?? true,
+        },
+        depth: legacy.depth as BrewDepthId | undefined,
+        tone: legacy.tone as BrewToneId | undefined,
+        deliveryTime: legacy.deliveryTime as BrewDeliveryTime | undefined,
+        onboardingComplete: false,
+      });
     } catch {
       // A malformed legacy entry should never block today's briefing.
     }
@@ -117,7 +164,7 @@ export const browserBrewPreferenceStore: BrewPreferenceStore = {
       const raw = window.localStorage.getItem(`${STORAGE_PREFIX}:${scope}`);
       if (!raw) return migrateLegacy(scope);
       const value = JSON.parse(raw) as Partial<BrewPreferences>;
-      if (value.version !== 3) return migrateLegacy(scope);
+      if (value.version !== 4) return migrateLegacy(scope);
       return normalize(value);
     } catch {
       return null;
@@ -138,7 +185,7 @@ export const browserBrewPreferenceStore: BrewPreferenceStore = {
     try {
       window.localStorage.removeItem(`${STORAGE_PREFIX}:${scope}`);
     } catch {
-      // Nothing to do — the reader simply sees onboarding again next visit.
+      // Nothing to do — the reader simply sees setup again next visit.
     }
   },
 };

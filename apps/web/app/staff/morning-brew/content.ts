@@ -22,7 +22,7 @@ import type {
 export const BREW_INSIGHTS: BrewInsight[] = [
   {
     id: "commuter-deposit-pace",
-    team: "admissions",
+    topic: "admissions",
     label: "Enrollment signal",
     title: "Commuter student deposit pace is slowing",
     severity: "high",
@@ -98,7 +98,7 @@ export const BREW_INSIGHTS: BrewInsight[] = [
   },
   {
     id: "verification-backlog",
-    team: "financial_aid",
+    topic: "financial_aid",
     label: "Financial aid",
     title: "Financial aid verification backlog increasing",
     severity: "medium",
@@ -113,7 +113,7 @@ export const BREW_INSIGHTS: BrewInsight[] = [
     destination: "tasks",
     detail: {
       narrative: [
-        "The queue holds 468 open verification cases against a team that clears roughly 95 per day at full staffing. Two reviewers are on leave through the end of the month, which puts real throughput closer to 72.",
+        "The queue holds 468 open verification cases against a topic that clears roughly 95 per day at full staffing. Two reviewers are on leave through the end of the month, which puts real throughput closer to 72.",
         "At current pace the backlog clears on June 14 — eleven days after the deposit deadline. Every day of drift moves students out of the high-conversion window.",
         "Adding two temporary reviewers restores throughput to 96/day and pulls the clear date back to May 29, ahead of the deadline. The cost is roughly $9,400 in temporary staffing against $1.8M of exposed net tuition.",
       ],
@@ -166,7 +166,7 @@ export const BREW_INSIGHTS: BrewInsight[] = [
   },
   {
     id: "transfer-volume",
-    team: "admissions",
+    topic: "admissions",
     label: "Positive signal",
     title: "Transfer application volume trending above target",
     severity: "positive",
@@ -237,7 +237,7 @@ export const BREW_INSIGHTS: BrewInsight[] = [
   },
   {
     id: "appeal-turnaround",
-    team: "financial_aid",
+    topic: "financial_aid",
     label: "Service standard",
     title: "Aid appeal turnaround is drifting past the five-day promise",
     severity: "high",
@@ -300,7 +300,7 @@ export const BREW_INSIGHTS: BrewInsight[] = [
   },
   {
     id: "melt-risk",
-    team: "student_success",
+    topic: "student_success",
     label: "Retention watch",
     title: "Summer melt risk is concentrating in first-generation admits",
     severity: "high",
@@ -365,7 +365,7 @@ export const BREW_INSIGHTS: BrewInsight[] = [
   },
   {
     id: "housing-blockers",
-    team: "housing",
+    topic: "housing",
     label: "Operations",
     title: "Deposit-paid students are stalling before room selection",
     severity: "medium",
@@ -424,7 +424,7 @@ export const BREW_INSIGHTS: BrewInsight[] = [
   },
   {
     id: "transcript-holds",
-    team: "registrar",
+    topic: "registrar",
     label: "Records",
     title: "Transcript evaluation queue is delaying transfer credit decisions",
     severity: "medium",
@@ -478,7 +478,7 @@ export const BREW_INSIGHTS: BrewInsight[] = [
 export const BREW_KPIS: BrewKpi[] = [
   {
     id: "applications",
-    team: "admissions",
+    topic: "admissions",
     label: "Applications",
     icon: "◫",
     format: "int",
@@ -563,7 +563,7 @@ export const BREW_KPIS: BrewKpi[] = [
   },
   {
     id: "admits",
-    team: "admissions",
+    topic: "admissions",
     label: "Admits",
     icon: "✓",
     format: "int",
@@ -648,7 +648,7 @@ export const BREW_KPIS: BrewKpi[] = [
   },
   {
     id: "deposits",
-    team: "admissions",
+    topic: "admissions",
     label: "Deposit Paid",
     icon: "$",
     format: "int",
@@ -733,7 +733,7 @@ export const BREW_KPIS: BrewKpi[] = [
   },
   {
     id: "deposit-rate",
-    team: "admissions",
+    topic: "admissions",
     label: "Deposit Rate",
     icon: "％",
     format: "percent",
@@ -817,7 +817,7 @@ export const BREW_KPIS: BrewKpi[] = [
   },
   {
     id: "net-tuition",
-    team: "financial_aid",
+    topic: "financial_aid",
     label: "Net Tuition (Proj.)",
     icon: "▣",
     format: "currencyM",
@@ -902,7 +902,7 @@ export const BREW_KPIS: BrewKpi[] = [
   },
   {
     id: "yield",
-    team: "admissions",
+    topic: "admissions",
     label: "Yield",
     icon: "◎",
     format: "percent",
@@ -984,7 +984,7 @@ export const BREW_KPIS: BrewKpi[] = [
   },
   {
     id: "aid-verified",
-    team: "financial_aid",
+    topic: "financial_aid",
     label: "Aid Files Cleared",
     icon: "▤",
     format: "int",
@@ -1066,7 +1066,7 @@ export const BREW_KPIS: BrewKpi[] = [
   },
   {
     id: "persistence",
-    team: "student_success",
+    topic: "student_success",
     label: "Deposit → Orientation",
     icon: "◇",
     format: "percent",
@@ -1148,7 +1148,7 @@ export const BREW_KPIS: BrewKpi[] = [
   },
   {
     id: "housing-contracts",
-    team: "housing",
+    topic: "housing",
     label: "Housing Contracts",
     icon: "⌂",
     format: "int",
@@ -1186,7 +1186,7 @@ export const BREW_KPIS: BrewKpi[] = [
   },
   {
     id: "registration-holds",
-    team: "registrar",
+    topic: "registrar",
     label: "Registration Holds",
     icon: "⊘",
     format: "int",
@@ -1228,9 +1228,9 @@ export const BREW_KPIS: BrewKpi[] = [
 export const BREW_CHANGES: BrewChange[] = [
   {
     id: "verification-overnight",
-    team: "financial_aid",
+    topic: "financial_aid",
     time: "6:10 AM",
-    title: "Verification team cleared 86 files overnight",
+    title: "Verification topic cleared 86 files overnight",
     detail: "Best single day since two reviewers went on leave. 468 cases remain open.",
     tone: "positive",
     source: "modeled",
@@ -1239,7 +1239,7 @@ export const BREW_CHANGES: BrewChange[] = [
   },
   {
     id: "commuter-deposits",
-    team: "admissions",
+    topic: "admissions",
     time: "7:02 AM",
     title: "Commuter deposits fell below the seven-day average",
     detail: "64 deposits posted yesterday against a 74/day pace. Commuter accounts for the whole gap.",
@@ -1250,7 +1250,7 @@ export const BREW_CHANGES: BrewChange[] = [
   },
   {
     id: "early-alerts",
-    team: "student_success",
+    topic: "student_success",
     time: "5:45 AM",
     title: "14 new early-alert flags on deposited students",
     detail: "Nine are first-generation students with no orientation registration.",
@@ -1261,7 +1261,7 @@ export const BREW_CHANGES: BrewChange[] = [
   },
   {
     id: "appeals",
-    team: "financial_aid",
+    topic: "financial_aid",
     time: "Yesterday · 4:40 PM",
     title: "Appeal committee approved 22 of 27 packages",
     detail: "Median award increase was $2,840. Five cases returned for documentation.",
@@ -1272,7 +1272,7 @@ export const BREW_CHANGES: BrewChange[] = [
   },
   {
     id: "transfer-milestone",
-    team: "admissions",
+    topic: "admissions",
     time: "Yesterday · 3:15 PM",
     title: "Transfer applications crossed 1,400 for the cycle",
     detail: "Business and Health Sciences account for two thirds of the year-over-year lift.",
@@ -1283,7 +1283,7 @@ export const BREW_CHANGES: BrewChange[] = [
   },
   {
     id: "room-selection",
-    team: "housing",
+    topic: "housing",
     time: "Yesterday · 9:00 AM",
     title: "Room selection opened to 1,190 deposited students",
     detail: "23 students are blocked by a prerequisite the housing portal cannot yet see.",
@@ -1294,7 +1294,7 @@ export const BREW_CHANGES: BrewChange[] = [
   },
   {
     id: "holds-cleared",
-    team: "registrar",
+    topic: "registrar",
     time: "Yesterday · 2:20 PM",
     title: "Spring transcript holds dropped by 41",
     detail: "Batch release cleared the largest group of registration blockers this month.",
@@ -1444,7 +1444,7 @@ export const BREW_EMAILS: BrewEmail[] = [
     subject: "Provost: Reallocation Request – Scholarship Initiative",
     summary: "Request to approve additional scholarship funds for commuter outreach.",
     priority: "high",
-    team: "financial_aid",
+    topic: "financial_aid",
     body: [
       "Priya — following our conversation on Friday, I would like to move $340,000 from the unallocated merit pool into a targeted commuter scholarship for the remainder of this cycle.",
       "The rationale is the conversion gap you flagged. If commuter deposits are lagging because of affordability rather than interest, a modest, well-targeted award should move the number more efficiently than another round of outreach.",
@@ -1488,7 +1488,7 @@ export const BREW_EMAILS: BrewEmail[] = [
     subject: "Board of Trustees: Upcoming Enrollment Update",
     summary: "Reminder: Enrollment update requested for June board meeting.",
     priority: "high",
-    team: "admissions",
+    topic: "admissions",
     body: [
       "The June board packet closes Friday. The enrollment section needs a yield-risk paragraph and an updated net tuition outlook.",
       "Trustees asked specifically about the commuter segment after the April meeting, so please address it directly rather than in aggregate.",
@@ -1527,10 +1527,10 @@ export const BREW_EMAILS: BrewEmail[] = [
     subject: "Regional High School Visit This Week",
     summary: "Schedule and talking points are ready for your visit to Northview High School.",
     priority: "medium",
-    team: "admissions",
+    topic: "admissions",
     body: [
       "Your Northview visit is Thursday at 10:00 AM. Counselor breakfast first, then two junior sessions and a financial aid Q&A for families at 6:00 PM.",
-      "Northview sent 218 applications this cycle, up 31%. Their counseling team has been asking for a plain-language aid timeline they can hand to families.",
+      "Northview sent 218 applications this cycle, up 31%. Their counseling topic has been asking for a plain-language aid timeline they can hand to families.",
       "Talking points and the one-page aid timeline are attached. Let me know if you want changes before we print.",
     ],
     asks: ["Review the talking points", "Approve the family aid timeline handout"],
@@ -1551,11 +1551,11 @@ export const BREW_EMAILS: BrewEmail[] = [
     id: "vendor-sla",
     time: "6:10 AM",
     sender: "Verification Services",
-    senderRole: "Account team, Meridian Verify",
+    senderRole: "Account topic, Meridian Verify",
     subject: "Service level change effective June 1",
     summary: "Vendor turnaround moves from 48 to 72 hours during peak season.",
     priority: "medium",
-    team: "financial_aid",
+    topic: "financial_aid",
     body: [
       "Effective June 1, standard document review turnaround moves from 48 to 72 hours through the peak season.",
       "Expedited review remains at 24 hours and is available for up to 15% of monthly volume at no additional cost.",
@@ -1582,7 +1582,7 @@ export const BREW_EMAILS: BrewEmail[] = [
     subject: "Thursday appeal committee agenda",
     summary: "27 appeals queued, 41 currently past the five-day service standard.",
     priority: "low",
-    team: "financial_aid",
+    topic: "financial_aid",
     body: [
       "Agenda for Thursday is attached. 27 appeals are queued and 41 are past our published five-day standard.",
       "If you want to add a Tuesday session through June 5, I can hold the room and poll the committee today.",
@@ -1608,7 +1608,7 @@ export const BREW_EMAILS: BrewEmail[] = [
 export const BREW_PRIORITIES: BrewPriority[] = [
   {
     id: "verification-surge",
-    team: "financial_aid",
+    topic: "financial_aid",
     title: "Financial Aid Verification Surge",
     level: "High",
     detail: "324 students need documents to complete files. Take action to protect yield.",
@@ -1631,7 +1631,7 @@ export const BREW_PRIORITIES: BrewPriority[] = [
   },
   {
     id: "campus-visits",
-    team: "admissions",
+    topic: "admissions",
     title: "Events & Campus Visits",
     level: "Medium",
     detail: "Weekend event attendance is down 12% vs last year. Review outreach plan.",
@@ -1654,7 +1654,7 @@ export const BREW_PRIORITIES: BrewPriority[] = [
   },
   {
     id: "scholarship-roi",
-    team: "financial_aid",
+    topic: "financial_aid",
     title: "Scholarship ROI Review",
     level: "Low",
     detail: "Early results show high ROI in GA and NC markets. Consider reallocating spend.",
@@ -1676,7 +1676,7 @@ export const BREW_PRIORITIES: BrewPriority[] = [
   },
   {
     id: "commuter-outreach",
-    team: "admissions",
+    topic: "admissions",
     title: "Commuter Deposit Outreach",
     level: "High",
     detail: "312 high-probability admits are one document away from depositing.",
@@ -1698,7 +1698,7 @@ export const BREW_PRIORITIES: BrewPriority[] = [
   },
   {
     id: "melt-coaches",
-    team: "student_success",
+    topic: "student_success",
     title: "First-Generation Coach Coverage",
     level: "Medium",
     detail: "46% of first-generation deposits still have no named success coach.",
@@ -1731,7 +1731,7 @@ export const BREW_NEWS: BrewNewsItem[] = [
     readTime: "2 min read",
     image: "/media/news/enrollment-trends.svg",
     imageAlt: "Illustration of a desk with an open notebook and enrollment charts",
-    teams: ["admissions", "student_success"],
+    topics: ["admissions", "student_success"],
     category: "Industry",
     summary:
       "National application volume is up for a third consecutive year while conversion continues to slip, widening the gap between interest and enrollment.",
@@ -1751,7 +1751,7 @@ export const BREW_NEWS: BrewNewsItem[] = [
     readTime: "3 min read",
     image: "/media/news/yield-strategies.svg",
     imageAlt: "Illustration of a phone showing a rising yield chart",
-    teams: ["admissions", "financial_aid"],
+    topics: ["admissions", "financial_aid"],
     category: "Research",
     summary:
       "A synthesis of yield interventions across 140 institutions, ranked by measured lift against cost.",
@@ -1771,7 +1771,7 @@ export const BREW_NEWS: BrewNewsItem[] = [
     readTime: "2 min read",
     image: "/media/news/fafsa-pressure.svg",
     imageAlt: "Illustration of a campus administration building",
-    teams: ["financial_aid"],
+    topics: ["financial_aid"],
     category: "Industry",
     summary:
       "Verification selection rates remain elevated, and aid offices report median turnaround times well past published service standards.",
@@ -1791,7 +1791,7 @@ export const BREW_NEWS: BrewNewsItem[] = [
     readTime: "3 min read",
     image: "/media/news/ai-enrollment.svg",
     imageAlt: "Illustration of a lecture hall with data overlays",
-    teams: ["admissions", "student_success", "financial_aid"],
+    topics: ["admissions", "student_success", "financial_aid"],
     category: "Technology",
     summary:
       "Institutions are moving predictive enrollment models out of pilot and into daily operations, with mixed governance maturity.",
@@ -1811,7 +1811,7 @@ export const BREW_NEWS: BrewNewsItem[] = [
     readTime: "4 min read",
     image: "/media/news/verification-guidance.svg",
     imageAlt: "Illustration of policy documents and a seal",
-    teams: ["financial_aid", "registrar"],
+    topics: ["financial_aid", "registrar"],
     category: "Policy",
     summary:
       "Draft guidance would narrow verification selection criteria beginning with the following award year.",
@@ -1831,7 +1831,7 @@ export const BREW_NEWS: BrewNewsItem[] = [
     readTime: "2 min read",
     image: "/media/news/direct-admission.svg",
     imageAlt: "Illustration of a pathway connecting two campuses",
-    teams: ["admissions", "registrar"],
+    topics: ["admissions", "registrar"],
     category: "Policy",
     summary:
       "Several state systems are pairing direct admission with guaranteed aid estimates delivered at the point of admission.",
@@ -1849,7 +1849,7 @@ export const BREW_NEWS: BrewNewsItem[] = [
 
 export const BREW_QUICK_LINKS: BrewQuickLink[] = [
   { id: "dashboard", label: "Enrollment Dashboard", destination: "overview" },
-  { id: "team", label: "Team Updates", destination: "messages" },
+  { id: "topic", label: "Team Updates", destination: "messages" },
   { id: "reports", label: "Reports Center", destination: "knowledge" },
   { id: "edward", label: "Ask Edward", destination: "edward" },
 ];

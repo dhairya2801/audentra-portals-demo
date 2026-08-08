@@ -67,8 +67,10 @@ const changeLimit = (preferences: BrewPreferences) =>
 const priorityLimit = (preferences: BrewPreferences) => (preferences.depth === "deep" ? 5 : 3);
 const newsLimit = (preferences: BrewPreferences) => (preferences.depth === "deep" ? 6 : 4);
 const meetingLimit = (preferences: BrewPreferences) => (preferences.depth === "headlines" ? 3 : 5);
+
+/** The reader's own answer about their inbox wins over the general length. */
 const emailLimit = (preferences: BrewPreferences) =>
-  preferences.depth === "headlines" ? 3 : preferences.depth === "deep" ? 5 : 4;
+  preferences.inboxDepth === "urgent" ? 2 : preferences.inboxDepth === "everything" ? 5 : 4;
 
 function deckFor(preferences: BrewPreferences, urgent: number): string {
   const time = preferences.deliveryTime === "06:00" ? "6:00" : preferences.deliveryTime.replace(/^0/, "");
@@ -92,7 +94,7 @@ export function buildBrewBriefing(
   workspace: StaffOperationsWorkspace,
   preferences: BrewPreferences,
 ): BrewBriefing {
-  const teams = new Set(preferences.teams);
+  const topics = new Set(preferences.topics);
   const cohort = workspace.cohort;
   const highRisk = cohort.filter((student) => student.risk.band === "high" || student.risk.band === "critical");
   const recommendedToday = cohort.filter((student) => student.recommendedAction.recommendedToday);
@@ -101,7 +103,7 @@ export function buildBrewBriefing(
 
   /* Live-workspace substitutions ------------------------------------------- */
 
-  const insights: BrewInsight[] = BREW_INSIGHTS.filter((insight) => teams.has(insight.team)).map(
+  const insights: BrewInsight[] = BREW_INSIGHTS.filter((insight) => topics.has(insight.topic)).map(
     (insight) => {
       if (insight.id !== "verification-backlog") return insight;
       const students = highRisk.slice(0, 3).map((student) => ({
@@ -119,7 +121,7 @@ export function buildBrewBriefing(
     },
   );
 
-  const changes: BrewChange[] = BREW_CHANGES.filter((change) => teams.has(change.team)).map((change) => {
+  const changes: BrewChange[] = BREW_CHANGES.filter((change) => topics.has(change.topic)).map((change) => {
     if (change.id !== "early-alerts") return change;
     return {
       ...change,
@@ -129,7 +131,7 @@ export function buildBrewBriefing(
     };
   });
 
-  const priorities: BrewPriority[] = BREW_PRIORITIES.filter((priority) => teams.has(priority.team)).map(
+  const priorities: BrewPriority[] = BREW_PRIORITIES.filter((priority) => topics.has(priority.topic)).map(
     (priority) => {
       if (priority.id !== "verification-surge") return priority;
       return {
@@ -145,13 +147,13 @@ export function buildBrewBriefing(
 
   /* Section assembly -------------------------------------------------------- */
 
-  // Give every followed team at least one tile before filling the board in
+  // Give every followed topic at least one tile before filling the board in
   // editorial order, so a reader who only follows Housing still gets a pulse.
-  const eligibleKpis = BREW_KPIS.filter((kpi) => teams.has(kpi.team));
+  const eligibleKpis = BREW_KPIS.filter((kpi) => topics.has(kpi.topic));
   const limit = kpiLimit(preferences);
   const chosen = new Set(
-    preferences.teams
-      .map((team) => eligibleKpis.find((kpi) => kpi.team === team))
+    preferences.topics
+      .map((topic) => eligibleKpis.find((kpi) => kpi.topic === topic))
       .filter((kpi) => kpi !== undefined)
       .slice(0, limit),
   );
@@ -161,8 +163,15 @@ export function buildBrewBriefing(
   }
   const kpis = eligibleKpis.filter((kpi) => chosen.has(kpi));
 
-  const news = BREW_NEWS.filter((item) => item.teams.some((team) => teams.has(team)));
-  const emails = BREW_EMAILS.filter((email) => teams.has(email.team) || email.priority === "high");
+  // Reading choices from the last setup screen narrow the headline feed.
+  const readingSources = new Set(preferences.readingSources);
+  const news = BREW_NEWS.filter(
+    (item) => item.topics.some((topic) => topics.has(topic)) && readingSources.has(item.sourceName),
+  );
+  const emails = BREW_EMAILS.filter((email) => topics.has(email.topic) || email.priority === "high");
+
+  const { inbox, calendar, numbers, signals, movements, headlines } = preferences.include;
+  const meetings = calendar ? BREW_MEETINGS.slice(0, meetingLimit(preferences)) : [];
 
   return {
     greetingName: workspace.currentStaff.name.split(" ")[0] || "there",
@@ -170,21 +179,19 @@ export function buildBrewBriefing(
     readTimeMinutes: readTimeFor(preferences),
     updatedAt: workspace.generatedAt,
     deliveryLabel: preferences.deliveryTime.replace(/^0/, ""),
-    insights: preferences.sections.insights ? insights.slice(0, depthOption(preferences).storyCount) : [],
-    kpis: preferences.sections.pulse ? kpis : [],
-    changes: preferences.sections.changes ? changes.slice(0, changeLimit(preferences)) : [],
-    meetings: preferences.connectors.calendar ? BREW_MEETINGS.slice(0, meetingLimit(preferences)) : [],
-    emails: preferences.connectors.outlook ? emails.slice(0, emailLimit(preferences)) : [],
-    priorities: preferences.sections.priorities ? priorities.slice(0, priorityLimit(preferences)) : [],
-    news: preferences.sections.news ? news.slice(0, newsLimit(preferences)) : [],
+    insights: signals ? insights.slice(0, depthOption(preferences).storyCount) : [],
+    kpis: numbers ? kpis : [],
+    changes: movements ? changes.slice(0, changeLimit(preferences)) : [],
+    meetings,
+    emails: inbox ? emails.slice(0, emailLimit(preferences)) : [],
+    priorities: signals ? priorities.slice(0, priorityLimit(preferences)) : [],
+    news: headlines ? news.slice(0, newsLimit(preferences)) : [],
     quickLinks: BREW_QUICK_LINKS,
     inbox: {
-      unread: preferences.connectors.outlook ? 23 : 0,
-      highPriority: preferences.connectors.outlook ? emails.filter((email) => email.priority === "high").length : 0,
-      meetings: preferences.connectors.calendar ? Math.min(BREW_MEETINGS.length, meetingLimit(preferences)) : 0,
-      meetingsHighPriority: preferences.connectors.calendar
-        ? BREW_MEETINGS.slice(0, meetingLimit(preferences)).filter((meeting) => meeting.priority === "high").length
-        : 0,
+      unread: inbox ? 23 : 0,
+      highPriority: inbox ? emails.filter((email) => email.priority === "high").length : 0,
+      meetings: meetings.length,
+      meetingsHighPriority: meetings.filter((meeting) => meeting.priority === "high").length,
     },
   };
 }
@@ -220,7 +227,7 @@ function insightsAnswer(briefing: BrewBriefing, context: string): EdwardAnswer {
     return {
       question: `What stands out in ${context.toLowerCase()}?`,
       answer: "Nothing in that section crosses the threshold I would bring to you today.",
-      followUp: "Turn on more teams in Customize if you want a wider read.",
+      followUp: "Turn on more topics in Customize if you want a wider read.",
     };
   }
   return {
@@ -290,7 +297,7 @@ export function answerEdward(request: EdwardRequest, briefing: BrewBriefing): Ed
       question,
       answer: "Tell me what you skipped this morning and I will stop sending it.",
       bullets: [
-        "Use Customize to change which teams, sections, and length you get.",
+        "Use Customize to change which topics, sections, and length you get.",
         "Ask me to summarize any panel and I will compress it into three lines.",
         "If a number looks wrong, open it — every KPI shows its definition and owner.",
       ],
@@ -326,7 +333,7 @@ export function answerEdward(request: EdwardRequest, briefing: BrewBriefing): Ed
       question,
       answer: briefing.changes.length
         ? "Three things moved overnight, and only one of them needs you."
-        : "Nothing material moved overnight in the teams you follow.",
+        : "Nothing material moved overnight in the topics you follow.",
       bullets: briefing.changes.slice(0, 3).map((change) => `${change.time} — ${change.title}`),
       followUp: "Verification throughput improving is real progress. The commuter deposit slide is the one to act on.",
     };

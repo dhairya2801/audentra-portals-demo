@@ -1,20 +1,21 @@
 /**
  * Morning Brew — a personalized executive briefing for university leadership.
  *
- * The reader picks the university teams they own, connects day-to-day context
- * (mail, calendar, systems of record), and tunes how the brief is written. The
- * briefing builder then assembles only the sections that reader asked for.
+ * The reader picks the topics they care about, chooses what gets pulled into
+ * the brief, then answers a few follow-ups about those choices. The briefing
+ * builder assembles only what they asked for.
  */
 
-/** University teams a leader can follow. These map to real campus org units. */
-export type BrewTeamId =
+/** Subjects a leader can follow each morning. */
+export type BrewTopicId =
   | "financial_aid"
   | "admissions"
   | "housing"
   | "registrar"
   | "student_success";
 
-export type BrewConnectorId = "outlook" | "calendar" | "sis" | "teams" | "analytics";
+/** What gets pulled into the morning read. */
+export type BrewIncludeId = "inbox" | "calendar" | "numbers" | "signals" | "movements" | "headlines";
 
 /** How much the reader wants in front of them each morning. */
 export type BrewDepthId = "headlines" | "balanced" | "deep";
@@ -22,13 +23,16 @@ export type BrewDepthId = "headlines" | "balanced" | "deep";
 /** Voice of the generated prose. */
 export type BrewToneId = "executive" | "narrative";
 
-/** Optional sections the reader can keep or drop. */
-export type BrewSectionId = "insights" | "pulse" | "changes" | "priorities" | "news";
-
 export type BrewDeliveryTime = "06:00" | "06:30" | "07:00" | "07:30";
 
 /** Comparison windows offered by the Enrollment Pulse carousel. */
 export type BrewTimeframeId = "yesterday" | "week" | "month" | "year";
+
+/** Which comparison the pulse opens on; "auto" cycles through all of them. */
+export type BrewPulseDefault = BrewTimeframeId | "auto";
+
+export type BrewInboxDepthId = "urgent" | "handful" | "everything";
+export type BrewInsightDetailId = "headline" | "impact" | "full";
 
 export type BrewSignalSource = "workspace" | "modeled" | "connected_demo";
 
@@ -45,27 +49,30 @@ export type MorningBrewDestination =
   | "knowledge"
   | "edward";
 
-export interface BrewTeam {
-  id: BrewTeamId;
+export type BrewAccent = "purple" | "blue" | "teal" | "navy" | "amber";
+
+export interface BrewTopic {
+  id: BrewTopicId;
   title: string;
-  lead: string;
-  description: string;
+  blurb: string;
+  /** A concrete taste of what lands in the brief when this is on. */
+  preview: string;
   icon: string;
-  accent: "purple" | "blue" | "teal" | "navy" | "amber";
+  accent: BrewAccent;
   /** Pre-selected for the demo reader (Executive Director of Financial Aid). */
   recommended: boolean;
   recommendation: string;
 }
 
-export interface BrewConnector {
-  id: BrewConnectorId;
+export interface BrewInclude {
+  id: BrewIncludeId;
   title: string;
-  vendor: string;
-  description: string;
-  unlocks: string;
+  blurb: string;
+  /** Where it comes from, named plainly rather than as a vendor list. */
+  source: string;
   icon: string;
-  /** Non-optional connectors ship with the workspace and cannot be turned off. */
-  optional: boolean;
+  accent: BrewAccent;
+  alwaysOn: boolean;
 }
 
 export interface BrewDepthOption {
@@ -83,21 +90,20 @@ export interface BrewToneOption {
   sample: string;
 }
 
-export interface BrewSectionOption {
-  id: BrewSectionId;
-  title: string;
-  description: string;
-  icon: string;
-}
-
 export interface BrewPreferences {
-  version: 3;
-  teams: BrewTeamId[];
-  connectors: Record<BrewConnectorId, boolean>;
+  version: 4;
+  topics: BrewTopicId[];
+  include: Record<BrewIncludeId, boolean>;
   depth: BrewDepthId;
   tone: BrewToneId;
-  sections: Record<BrewSectionId, boolean>;
   deliveryTime: BrewDeliveryTime;
+  /* Follow-ups, each asked only when the matching choice is switched on. */
+  inboxDepth: BrewInboxDepthId;
+  draftReplies: boolean;
+  calendarPrep: boolean;
+  pulseDefault: BrewPulseDefault;
+  insightDetail: BrewInsightDetailId;
+  readingSources: string[];
   onboardingComplete: boolean;
   updatedAt: string;
 }
@@ -125,7 +131,7 @@ export interface BrewInsightStudent {
 
 export interface BrewInsight {
   id: string;
-  team: BrewTeamId;
+  topic: BrewTopicId;
   label: string;
   title: string;
   severity: "high" | "medium" | "positive";
@@ -168,7 +174,7 @@ export interface BrewKpiFrame {
 
 export interface BrewKpi {
   id: string;
-  team: BrewTeamId;
+  topic: BrewTopicId;
   label: string;
   icon: string;
   format: BrewNumberFormat;
@@ -187,7 +193,7 @@ export interface BrewKpi {
 
 export interface BrewChange {
   id: string;
-  team: BrewTeamId;
+  topic: BrewTopicId;
   time: string;
   title: string;
   detail: string;
@@ -221,7 +227,7 @@ export interface BrewEmail {
   subject: string;
   summary: string;
   priority: "high" | "medium" | "low";
-  team: BrewTeamId;
+  topic: BrewTopicId;
   body: string[];
   asks: string[];
   thread: { sender: string; time: string; excerpt: string }[];
@@ -231,7 +237,7 @@ export interface BrewEmail {
 
 export interface BrewPriority {
   id: string;
-  team: BrewTeamId;
+  topic: BrewTopicId;
   title: string;
   level: "High" | "Medium" | "Low";
   detail: string;
@@ -252,7 +258,7 @@ export interface BrewNewsItem {
   readTime: string;
   image: string;
   imageAlt: string;
-  teams: BrewTeamId[];
+  topics: BrewTopicId[];
   summary: string;
   keyPoints: string[];
   relevance: string;
