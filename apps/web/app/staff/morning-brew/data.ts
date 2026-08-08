@@ -9,6 +9,7 @@ import {
   BREW_NEWS,
   BREW_PRIORITIES,
   BREW_QUICK_LINKS,
+  attendeeAvatar,
 } from "./content";
 import type {
   BrewBriefing,
@@ -30,6 +31,7 @@ export {
   BREW_NEWS,
   BREW_PRIORITIES,
   BREW_QUICK_LINKS,
+  attendeeAvatar,
 };
 
 /* ---------------------------------------------------------------- formatting */

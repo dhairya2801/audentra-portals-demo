@@ -9,6 +9,7 @@ import {
   BREW_MEETINGS,
   BREW_NEWS,
   BREW_PRIORITIES,
+  attendeeAvatar,
   formatBrewNumber,
 } from "./data";
 import type { BrewBriefing, BrewDetailRef, EdwardRequest, MorningBrewDestination } from "./types";
@@ -505,7 +506,7 @@ export function MorningBrewDetail({
           <h2>Attendees</h2>
           <span className="brew-avatars brew-avatars--large">
             {meeting.attendees.map((attendee) => (
-              <i key={attendee}>{attendee}</i>
+              <img src={attendeeAvatar(attendee)} alt={attendee} title={attendee} key={attendee} />
             ))}
             {meeting.extraAttendees ? <b>{meeting.extraAttendees}</b> : null}
           </span>

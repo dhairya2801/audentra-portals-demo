@@ -1416,6 +1416,23 @@ export const BREW_MEETINGS: BrewMeeting[] = [
   },
 ];
 
+/**
+ * A stable portrait per colleague, so the same attendee looks the same in the
+ * agenda and in the meeting detail. Falls back to a hash for unknown initials.
+ */
+const ATTENDEE_ROSTER = [...new Set(BREW_MEETINGS.flatMap((meeting) => meeting.attendees))];
+const AVATAR_COUNT = 8;
+
+export function attendeeAvatar(initials: string): string {
+  const known = ATTENDEE_ROSTER.indexOf(initials);
+  if (known >= 0) return `/media/avatars/attendee-${(known % AVATAR_COUNT) + 1}.svg`;
+  let hash = 0;
+  for (let index = 0; index < initials.length; index += 1) {
+    hash = (hash * 31 + initials.charCodeAt(index)) % 997;
+  }
+  return `/media/avatars/attendee-${(hash % AVATAR_COUNT) + 1}.svg`;
+}
+
 /* -------------------------------------------------------------------- email */
 
 export const BREW_EMAILS: BrewEmail[] = [

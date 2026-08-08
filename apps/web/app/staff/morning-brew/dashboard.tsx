@@ -2,6 +2,7 @@
 
 import { useTenant } from "../../components/tenant-provider";
 import { BREW_CONNECTORS } from "./catalog";
+import { attendeeAvatar } from "./data";
 import { EnrollmentPulse } from "./pulse";
 import type {
   BrewBriefing,
@@ -354,7 +355,7 @@ export function MorningBrewDashboard({
                       <p>{meeting.detail}</p>
                       <span className="brew-avatars">
                         {meeting.attendees.map((attendee) => (
-                          <i key={attendee}>{attendee}</i>
+                          <img src={attendeeAvatar(attendee)} alt={attendee} title={attendee} key={attendee} />
                         ))}
                         {meeting.extraAttendees ? <b>{meeting.extraAttendees}</b> : null}
                       </span>

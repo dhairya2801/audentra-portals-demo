@@ -15713,12 +15713,12 @@ a {
 .brew-change:hover h3 { color: var(--audentra-purple); }
 
 /* today's day panels --------------------------------------------------------- */
-.brew-day-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; align-items: start; }
+.brew-day-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; align-items: stretch; }
 .brew-panel { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; border: 1px solid var(--audentra-line); border-radius: 0.9rem; background: #fff; box-shadow: 0 6px 20px rgb(10 31 68 / 4%); }
 .brew-panel__head { display: flex; justify-content: space-between; gap: 0.6rem; align-items: center; padding: 0.8rem 0.9rem; border-bottom: 1px solid #eef0f5; }
 .brew-panel__foot { padding: 0.6rem 0.9rem 0.75rem; border-top: 1px solid #eef0f5; text-align: center; }
-.brew-list { display: grid; margin: 0; padding: 0 0.9rem; list-style: none; }
-.brew-list > li { position: relative; display: grid; gap: 0.55rem; align-items: start; padding: 0.75rem 0; }
+.brew-list { display: grid; align-content: start; grid-auto-rows: minmax(8rem, max-content); margin: 0; padding: 0 0.9rem; list-style: none; }
+.brew-list > li { position: relative; display: grid; gap: 0.55rem; align-content: center; align-items: start; padding: 0.75rem 0; }
 .brew-list > li + li { border-top: 1px solid #f2f4f8; }
 .brew-list h3 { margin: 0; color: #1d2b45; font-size: 0.66rem; font-weight: 800; line-height: 1.35; }
 .brew-list p { margin: 0.24rem 0 0; color: #78829a; font-size: 0.57rem; line-height: 1.45; }
@@ -15730,9 +15730,9 @@ a {
 .brew-list--meetings time { display: grid; color: var(--audentra-navy); font-size: 0.6rem; font-weight: 800; }
 .brew-list--meetings time small { margin-top: 0.1rem; color: #98a1b3; font-size: 0.5rem; font-weight: 500; }
 .brew-avatars { display: flex; margin-top: 0.45rem; }
-.brew-avatars i, .brew-avatars b { display: grid; width: 1.32rem; height: 1.32rem; place-items: center; margin-right: -0.28rem; border: 2px solid #fff; border-radius: 50%; background: #eef2fa; color: #4c5c78; font-size: 0.44rem; font-style: normal; font-weight: 800; }
+.brew-avatars img, .brew-avatars b { display: grid; width: 1.32rem; height: 1.32rem; place-items: center; margin-right: -0.28rem; border: 2px solid #fff; border-radius: 50%; background: #eef2fa; color: #4c5c78; font-size: 0.44rem; font-style: normal; font-weight: 800; object-fit: cover; }
 .brew-avatars b { background: var(--audentra-soft-purple); color: var(--audentra-purple); }
-.brew-avatars--large i, .brew-avatars--large b { width: 2rem; height: 2rem; font-size: 0.6rem; }
+.brew-avatars--large img, .brew-avatars--large b { width: 2rem; height: 2rem; font-size: 0.6rem; }
 .brew-list--emails > li, .brew-list--priorities > li { grid-template-columns: auto minmax(0, 1fr); }
 .brew-email__top { display: flex; justify-content: space-between; gap: 0.5rem; align-items: center; margin-bottom: 0.28rem; }
 .brew-email__top time { color: #98a1b3; font-size: 0.5rem; }
