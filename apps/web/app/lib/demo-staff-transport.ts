@@ -27,7 +27,7 @@ const staff = {
   id: "demo-staff-priya",
   name: "Priya Shah",
   email: STAFF_DEMO_EMAIL,
-  component: "Admissions",
+  component: "Financial Aid",
 };
 const colleague = {
   id: "demo-staff-jordan",

@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 260" role="img" aria-label="A bridge connecting a community college to a university campus">
+  <defs>
+    <linearGradient id="da-sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e7eefb"/>
+      <stop offset="1" stop-color="#f6f4ee"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="260" fill="url(#da-sky)"/>
+  <circle cx="72" cy="48" r="26" fill="#ffffff" opacity="0.75"/>
+
+  <!-- distant hills -->
+  <path d="M0 168 q70 -40 140 -6 q80 38 150 -14 q60 -44 110 -4 v116 H0 Z" fill="#cfd9ea" opacity="0.7"/>
+
+  <!-- left campus: community college -->
+  <g>
+    <rect x="26" y="126" width="96" height="76" fill="#e9e4d8"/>
+    <path d="M74 96 L132 128 L16 128 Z" fill="#f4f1e8"/>
+    <rect x="16" y="124" width="116" height="8" rx="2" fill="#f8f6f0"/>
+    <g fill="#0a1f44" opacity="0.3">
+      <rect x="40" y="146" width="16" height="20" rx="2"/>
+      <rect x="66" y="146" width="16" height="20" rx="2"/>
+      <rect x="92" y="146" width="16" height="20" rx="2"/>
+      <rect x="40" y="176" width="16" height="20" rx="2"/>
+      <rect x="92" y="176" width="16" height="20" rx="2"/>
+    </g>
+    <rect x="66" y="176" width="16" height="26" fill="#1e5bff" opacity="0.6"/>
+  </g>
+
+  <!-- right campus: university -->
+  <g>
+    <rect x="278" y="106" width="106" height="96" fill="#e9e4d8"/>
+    <path d="M331 66 L392 108 L270 108 Z" fill="#f4f1e8"/>
+    <rect x="270" y="104" width="122" height="8" rx="2" fill="#f8f6f0"/>
+    <g fill="#0a1f44" opacity="0.3">
+      <rect x="294" y="126" width="16" height="22" rx="2"/>
+      <rect x="322" y="126" width="16" height="22" rx="2"/>
+      <rect x="350" y="126" width="16" height="22" rx="2"/>
+      <rect x="294" y="160" width="16" height="22" rx="2"/>
+      <rect x="350" y="160" width="16" height="22" rx="2"/>
+    </g>
+    <rect x="322" y="160" width="16" height="42" fill="#6a38ff" opacity="0.65"/>
+    <!-- cupola -->
+    <path d="M331 40 a10 10 0 0 1 10 10 h-20 a10 10 0 0 1 10 -10 z" fill="#6a38ff"/>
+    <rect x="328" y="26" width="6" height="16" rx="3" fill="#0a1f44"/>
+  </g>
+
+  <!-- bridge -->
+  <path d="M112 196 h180" stroke="#0a1f44" stroke-width="9" stroke-linecap="round" opacity="0.85"/>
+  <path d="M118 194 q84 -56 168 -2" fill="none" stroke="#6a38ff" stroke-width="5" stroke-linecap="round"/>
+  <g stroke="#6a38ff" stroke-width="2.5" opacity="0.55" stroke-linecap="round">
+    <path d="M146 192 v-20"/>
+    <path d="M174 192 v-30"/>
+    <path d="M202 192 v-34"/>
+    <path d="M230 192 v-30"/>
+    <path d="M258 192 v-20"/>
+  </g>
+
+  <!-- travellers on the bridge -->
+  <g>
+    <circle cx="176" cy="184" r="7" fill="#00c49a"/>
+    <path d="M167 196 a9 9 0 0 1 18 0 z" fill="#00c49a" opacity="0.75"/>
+    <circle cx="212" cy="184" r="7" fill="#1e5bff"/>
+    <path d="M203 196 a9 9 0 0 1 18 0 z" fill="#1e5bff" opacity="0.75"/>
+  </g>
+  <path d="M236 176 h26" stroke="#00c49a" stroke-width="4" stroke-linecap="round"/>
+  <path d="M256 170 l8 6 l-8 6" fill="none" stroke="#00c49a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="0" y="202" width="400" height="58" fill="#ddd8c9"/>
+  <rect x="0" y="202" width="400" height="5" fill="#c9c3b2"/>
+</svg>

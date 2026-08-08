@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 260" role="img" aria-label="Stacked policy documents with an official seal and a ribbon">
+  <defs>
+    <linearGradient id="vg-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eef1f8"/>
+      <stop offset="1" stop-color="#dfe4f0"/>
+    </linearGradient>
+    <linearGradient id="vg-paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f1f3f9"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="260" fill="url(#vg-bg)"/>
+  <circle cx="60" cy="42" r="54" fill="#6a38ff" opacity="0.08"/>
+  <circle cx="356" cy="228" r="62" fill="#1e5bff" opacity="0.08"/>
+  <ellipse cx="200" cy="228" rx="132" ry="16" fill="#0a1f44" opacity="0.08"/>
+
+  <!-- back sheets -->
+  <g transform="rotate(-7 200 130)">
+    <rect x="86" y="44" width="196" height="164" rx="6" fill="#ffffff" opacity="0.75"/>
+  </g>
+  <g transform="rotate(4 200 130)">
+    <rect x="102" y="50" width="196" height="164" rx="6" fill="#ffffff" opacity="0.9"/>
+  </g>
+
+  <!-- front sheet -->
+  <rect x="96" y="40" width="200" height="172" rx="7" fill="url(#vg-paper)"/>
+  <rect x="96" y="40" width="200" height="16" rx="7" fill="#0a1f44"/>
+  <rect x="96" y="50" width="200" height="6" fill="#0a1f44"/>
+
+  <rect x="116" y="72" width="104" height="9" rx="4.5" fill="#0a1f44"/>
+  <rect x="116" y="90" width="72" height="6" rx="3" fill="#6a38ff" opacity="0.6"/>
+  <g fill="#ced5e3">
+    <rect x="116" y="112" width="160" height="5" rx="2.5"/>
+    <rect x="116" y="126" width="146" height="5" rx="2.5"/>
+    <rect x="116" y="140" width="160" height="5" rx="2.5"/>
+    <rect x="116" y="154" width="120" height="5" rx="2.5"/>
+  </g>
+  <!-- struck-through clause: criteria narrowing -->
+  <rect x="116" y="168" width="94" height="5" rx="2.5" fill="#ced5e3"/>
+  <path d="M112 170.5 h102" stroke="#ef6a6a" stroke-width="2.5" stroke-linecap="round"/>
+  <rect x="116" y="182" width="66" height="5" rx="2.5" fill="#00c49a" opacity="0.75"/>
+
+  <!-- seal -->
+  <g transform="translate(272 178)">
+    <circle r="30" fill="#6a38ff"/>
+    <circle r="30" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.4"/>
+    <circle r="21" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.6"/>
+    <path d="M-9 1 l6 7 l12 -14" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M-14 28 l-6 26 l14 -8 l10 10 l4 -30 z" fill="#1e5bff"/>
+  </g>
+</svg>
