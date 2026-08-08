@@ -15700,7 +15700,7 @@ a {
 .brew-pulse__foot i { color: var(--audentra-teal); font-style: normal; }
 
 /* since yesterday ------------------------------------------------------------ */
-.brew-change-rail { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(14.5rem, 1fr); overflow-x: auto; margin: 0; padding: 0 0 0.3rem; list-style: none; scrollbar-width: thin; }
+.brew-change-rail { display: grid; grid-template-columns: repeat(auto-fit, minmax(14.5rem, 1fr)); gap: 0.9rem 0; margin: 0; padding: 0; list-style: none; }
 .brew-change { position: relative; padding: 1.35rem 1rem 0.35rem 0; border-top: 2px solid var(--audentra-line); }
 .brew-change::before { position: absolute; top: -0.35rem; left: 0; width: 0.6rem; height: 0.6rem; border: 2px solid var(--audentra-purple); border-radius: 50%; background: #fff; content: ""; }
 .brew-change--positive::before { border-color: var(--audentra-teal); }
@@ -16036,7 +16036,7 @@ a {
 @media (width <= 46rem) {
   .brew-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .brew-pulse__controls { flex-direction: column; align-items: flex-start; }
-  .brew-timeframes { overflow-x: auto; max-width: 100%; }
+  .brew-timeframes { flex-wrap: wrap; max-width: 100%; }
   .brew-list--meetings > li { grid-template-columns: 0.45rem 2.8rem minmax(0, 1fr); }
   .brew-list--meetings > li > .brew-chip { grid-column: 2 / -1; }
   .brew-action-list li { grid-template-columns: 1fr; }
