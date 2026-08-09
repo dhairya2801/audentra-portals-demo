@@ -4,8 +4,8 @@ import { useCallback, useMemo, useState } from "react";
 import { PortalShell } from "../components/portal-shell";
 import { ErrorState, LoadingState } from "../components/portal-ui";
 import { useActivityTracking } from "../hooks/use-activity-tracking";
-import { useApiResource } from "../hooks/use-api-resource";
-import { getCampusLife } from "../lib/api-client";
+import { useApiAction, useApiResource } from "../hooks/use-api-resource";
+import { getCampusLife, registerCampusEvent } from "../lib/api-client";
 import { safePortalDestination } from "../lib/safe-destination";
 import { useTenant } from "../components/tenant-provider";
 import { TenantLink as Link } from "../components/tenant-link";
@@ -36,6 +36,8 @@ export default function CampusLifePage() {
   const [eventIndex, setEventIndex] = useState(0);
   const [clubQuery, setClubQuery] = useState("");
   const [clubCategory, setClubCategory] = useState("all");
+  const [registrationEventId, setRegistrationEventId] = useState<string | null>(null);
+  const registrationAction = useApiAction(registerCampusEvent);
 
   const clubCategories = useMemo(() => {
     if (!campus.data) return [];
@@ -113,6 +115,21 @@ export default function CampusLifePage() {
         event_id: event.id,
         surface: "featured_carousel",
       });
+    }
+  };
+
+  const registerForEvent = async () => {
+    if (!activeEvent || activeEvent.registrationStatus === "registered") return;
+    setRegistrationEventId(activeEvent.id);
+    try {
+      await registrationAction.run(
+        activeEvent.id,
+        { expectedVersion: activeEvent.version },
+        crypto.randomUUID(),
+      );
+      campus.refresh();
+    } catch {
+      // The action hook exposes the tenant-safe API message beside the button.
     }
   };
 
@@ -196,6 +213,34 @@ export default function CampusLifePage() {
                 </a>
               ) : hasActiveRegistration ? (
                 <Link href={activeRegistration.href}>Registration details →</Link>
+              ) : null}
+            </div>
+            <div className="campus-event-registration">
+              <button
+                className="button button--primary"
+                type="button"
+                disabled={
+                  activeEvent.registrationStatus === "registered" ||
+                  (registrationAction.status === "loading" &&
+                    registrationEventId === activeEvent.id)
+                }
+                onClick={() => void registerForEvent()}
+              >
+                {activeEvent.registrationStatus === "registered"
+                  ? "Registered"
+                  : registrationAction.status === "loading" &&
+                      registrationEventId === activeEvent.id
+                    ? "Registering..."
+                    : "Register for this event"}
+              </button>
+              <small>
+                {activeEvent.registrationStatus === "registered"
+                  ? "You will be notified if the date, location, or event details change."
+                  : "Registration is saved to your student record."}
+              </small>
+              {registrationAction.status === "error" &&
+              registrationEventId === activeEvent.id ? (
+                <span role="alert">{registrationAction.message}</span>
               ) : null}
             </div>
             {activeEvent.imageAttribution ? (

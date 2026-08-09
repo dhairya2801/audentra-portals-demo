@@ -3,6 +3,7 @@ import type {
   ActivityEventInput,
   AskEdwardInput,
   AskEdwardResponse,
+  CampusEventRegistration,
   CampusLifeFeed,
   CatalogCourse,
   ApiErrorResponse,
@@ -43,6 +44,7 @@ import type {
   StudentRequirementList,
   ReviewStaffDocumentInput,
   RecordStaffCommunicationInput,
+  RegisterCampusEventInput,
   RequestStaffAiRefreshInput,
   RetryStaffCallTranscriptionInput,
   StaffActionCenter,
@@ -628,6 +630,24 @@ export function getStaffActionCenter(signal?: AbortSignal) {
     headers: staffHeaders,
     signal,
   });
+}
+
+export function registerCampusEvent(
+  eventId: string,
+  input: RegisterCampusEventInput,
+  idempotencyKey: string,
+) {
+  return request<CampusEventRegistration>(
+    `/v1/student/campus-life/events/${encodeURIComponent(eventId)}/register`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export function getStaffWorkItemDetail(

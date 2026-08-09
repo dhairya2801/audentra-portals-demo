@@ -2105,6 +2105,14 @@ function CourseEditor({
         .split(",")
         .map((value) => value.trim().toUpperCase())
         .filter(Boolean);
+      const existingVideos = Array.isArray(record.related_videos)
+        ? (record.related_videos as Array<Record<string, unknown>>)
+        : [];
+      const videoUrl = String(form.get("videoUrl")).trim();
+      const videoTitle = String(form.get("videoTitle")).trim();
+      if (Boolean(videoUrl) !== Boolean(videoTitle)) {
+        throw new Error("Add both a YouTube title and URL, or leave both blank.");
+      }
       Object.assign(record, {
         code: String(form.get("code")).trim().toUpperCase(),
         title: String(form.get("title")),
@@ -2121,6 +2129,17 @@ function CourseEditor({
           .filter(Boolean),
         meeting_pattern: String(form.get("meetingPattern")).trim() || null,
         availability_label: String(form.get("availabilityLabel")).trim() || null,
+        related_videos: videoUrl
+          ? [
+              {
+                id: existingVideos[0]?.id ?? "featured-course-video",
+                title: videoTitle,
+                description: String(form.get("videoDescription")).trim() || null,
+                url: videoUrl,
+                source_label: String(form.get("videoSource")).trim() || null,
+              },
+            ]
+          : [],
       });
       await action.run("academics", {
         expectedVersion: configuration.version,
@@ -2220,6 +2239,49 @@ function CourseEditor({
             />
           </label>
         </div>
+        <section className="staff-type-configuration">
+          <div>
+            <strong>Featured course video</strong>
+            <p>
+              Optional. Use an HTTPS YouTube video or playlist; students see a
+              privacy-enhanced embedded player in course details.
+            </p>
+          </div>
+          <label>
+            Video title
+            <input
+              name="videoTitle"
+              defaultValue={course.relatedVideos?.[0]?.title ?? ""}
+              maxLength={180}
+            />
+          </label>
+          <label>
+            YouTube URL
+            <input
+              name="videoUrl"
+              type="url"
+              defaultValue={course.relatedVideos?.[0]?.url ?? ""}
+              placeholder="https://www.youtube.com/watch?v=..."
+            />
+          </label>
+          <label>
+            Description
+            <textarea
+              name="videoDescription"
+              defaultValue={course.relatedVideos?.[0]?.description ?? ""}
+              maxLength={500}
+            />
+          </label>
+          <label>
+            Source label
+            <input
+              name="videoSource"
+              defaultValue={course.relatedVideos?.[0]?.sourceLabel ?? ""}
+              placeholder="CS50 or MIT OpenCourseWare"
+              maxLength={180}
+            />
+          </label>
+        </section>
         <div className="staff-student-impact-note">
           Saving updates the course shown in student classrooms and Edward’s
           academic-planning context.

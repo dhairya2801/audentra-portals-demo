@@ -1883,6 +1883,82 @@
   white-space: nowrap;
 }
 
+.course-dialog__videos {
+  margin: 1.1rem 0;
+  padding: 1rem;
+  border: 1px solid #dfe3ec;
+  border-radius: 0.8rem;
+  background: linear-gradient(145deg, #f7f5ff, #f5f9ff);
+}
+
+.course-video-heading,
+.course-video-details,
+.course-video-controls {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.course-video-heading strong,
+.course-video-details h3 {
+  color: #20283a;
+}
+
+.course-video-heading p,
+.course-video-details p {
+  margin: 0.18rem 0 0;
+  color: #6d7480;
+  font-size: 0.62rem;
+  line-height: 1.45;
+}
+
+.course-video-heading > span,
+.course-video-details small {
+  color: #6c61bb;
+  font-size: 0.56rem;
+  font-weight: 800;
+}
+
+.course-video-frame {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  margin: 0.8rem 0;
+  border-radius: 0.7rem;
+  background: #101729;
+}
+
+.course-video-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.course-video-details h3 {
+  margin: 0;
+  font-family: inherit;
+  font-size: 0.76rem;
+}
+
+.course-video-details a,
+.course-video-controls button {
+  padding: 0.48rem 0.62rem;
+  border: 1px solid #d8d3f0;
+  border-radius: 0.45rem;
+  background: white;
+  color: #5147a2;
+  font-size: 0.58rem;
+  font-weight: 850;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.course-video-controls {
+  justify-content: flex-end;
+  margin-top: 0.7rem;
+}
+
 /* Campus life */
 .campus-overview {
   display: grid;
@@ -2169,6 +2245,43 @@
 
 .campus-carousel__meta a {
   color: inherit;
+}
+
+.campus-event-registration {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.8rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.campus-event-registration .button {
+  min-height: 2.15rem;
+  padding: 0.55rem 0.85rem;
+  border-color: #ffc329;
+  background: #ffc329;
+  color: #111a2d;
+  font-size: 0.62rem;
+}
+
+.campus-event-registration .button:disabled {
+  border-color: rgb(255 255 255 / 22%);
+  background: rgb(255 255 255 / 14%);
+  color: #e9edf5;
+  opacity: 1;
+}
+
+.campus-event-registration small {
+  max-width: 24rem;
+  color: #c6cbd5;
+  font-size: 0.56rem;
+  line-height: 1.4;
+}
+
+.campus-event-registration > span {
+  flex-basis: 100%;
+  color: #ffd0cb;
+  font-size: 0.58rem;
 }
 
 .campus-carousel__credit {

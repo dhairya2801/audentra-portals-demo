@@ -26,6 +26,28 @@ belong in the sibling `Audentra-platform` repository.
 - Student-facing content must be fetched from the platform on navigation or
   refresh. Content authoring stays deterministic and does not trigger LLM work.
 
+## Managed-content interaction rules
+
+- A staff publication writes canonical platform data. A student who already has
+  the page open keeps the rendered snapshot until navigation or refresh; realtime
+  notifications may announce material changes but must not silently replace the
+  page beneath them.
+- Send an idempotency key and the rendered event version when registering for a
+  Campus Life event. Treat already-registered responses as success, surface
+  stale/inactive/past-event conflicts, and disable duplicate submission while a
+  request is pending.
+- A cancelled or retired event disappears after the next canonical read. Keep
+  its student notification/history accessible even though the event card is no
+  longer rendered.
+- Classrooms are informational. Do not add browser-only enroll/add-course state.
+  Render optional approved YouTube media through privacy-enhanced
+  `youtube-nocookie.com` embeds with an accessible external-link fallback.
+- Keep staff Knowledge Base, Core Play, club, event, and course editors backed by
+  platform CRUD. Do not persist published content only in React state.
+- Enrollment and onboarding remain a distinct graph-aware form builder with a
+  controlled input palette. Do not fold journey steps into generic content CRUD
+  or mutate completed student work from the editor.
+
 ## Validation
 
 Run the relevant subset while developing and all gates before handoff:
