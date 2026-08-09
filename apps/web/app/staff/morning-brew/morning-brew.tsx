@@ -89,6 +89,20 @@ export function MorningBrewView({
 
   const briefing = useMemo(() => buildBrewBriefing(workspace, preferences), [workspace, preferences]);
 
+  /* Setup previews the draft, not the saved copy, so the miniature on screen
+     reacts to a choice before it has been committed. */
+  const draftBriefing = useMemo(
+    () =>
+      buildBrewBriefing(workspace, {
+        ...DEFAULT_BREW_PREFERENCES,
+        ...draft,
+        version: 4,
+        updatedAt: "",
+        onboardingComplete: false,
+      }),
+    [workspace, draft],
+  );
+
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
   const goToStep = (next: OnboardingStep) => {
@@ -144,6 +158,7 @@ export function MorningBrewView({
         direction={direction}
         firstName={workspace.currentStaff.name.split(" ")[0] || "there"}
         draft={draft}
+        preview={draftBriefing}
         customizing={Boolean(saved?.onboardingComplete)}
         onToggleTopic={(topic: BrewTopicId) =>
           setDraft((current) => ({

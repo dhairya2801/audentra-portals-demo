@@ -10,7 +10,9 @@ import {
   BREW_TOPICS,
   BREW_TONE_OPTIONS,
 } from "./catalog";
+import { formatBrewNumber } from "./data";
 import type {
+  BrewBriefing,
   BrewDeliveryTime,
   BrewDepthId,
   BrewIncludeId,
@@ -136,11 +138,181 @@ function SwitchRow({
 
 const iconFor = (id: BrewIncludeId) => BREW_INCLUDES.find((include) => include.id === id)?.icon ?? "•";
 
+const Bar = ({ width }: { width: string }) => <span className="bp-bar" style={{ width }} />;
+
+/**
+ * A miniature of tomorrow's edition, built from the same briefing the real page
+ * renders. Sections mount and unmount as choices change, so a toggle visibly
+ * adds or removes a band of the page rather than only a line of description.
+ */
+function BrewLivePreview({
+  briefing,
+  draft,
+  firstName,
+}: {
+  briefing: BrewBriefing;
+  draft: OnboardingDraft;
+  firstName: string;
+}) {
+  const { inbox, calendar, numbers, signals, movements, headlines } = draft.include;
+  const timeframe = draft.pulseDefault === "auto" ? "yesterday" : draft.pulseDefault;
+  const showImpact = draft.insightDetail !== "headline";
+  const columns = [calendar && "Calendar", inbox && "Email", briefing.priorities.length && "Priorities"].filter(
+    Boolean,
+  ) as string[];
+  const isEmpty =
+    !briefing.insights.length &&
+    !briefing.kpis.length &&
+    !briefing.changes.length &&
+    !briefing.news.length &&
+    !columns.length;
+
+  return (
+    <aside className="brew-preview" aria-label="Preview of tomorrow's Morning Brew">
+      <header className="brew-preview__head">
+        <span className="brew-preview__eyebrow">
+          <i className="brew-preview__pulse" aria-hidden="true" /> Live preview
+        </span>
+        <span className="brew-preview__meta">
+          ~{briefing.readTimeMinutes} min · {draft.deliveryTime.replace(/^0/, "")} AM
+        </span>
+      </header>
+
+      <div className="brew-preview__frame">
+        <div className="bp-chrome" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+          <span>Morning Brew</span>
+        </div>
+
+        <div className="bp-page">
+          {isEmpty ? (
+            <p className="bp-empty">Pick a topic and we&rsquo;ll show you what your morning looks like.</p>
+          ) : (
+            <>
+              <div className="bp-hero">
+                <p className="bp-greeting">Good Morning {firstName},</p>
+                <Bar width="82%" />
+                <Bar width="54%" />
+              </div>
+
+              {inbox || calendar ? (
+                <div className="bp-glance">
+                  {inbox ? (
+                    <span>
+                      <b>{briefing.inbox.unread}</b>
+                      <i>Unread</i>
+                    </span>
+                  ) : null}
+                  {calendar ? (
+                    <span>
+                      <b>{briefing.inbox.meetings}</b>
+                      <i>Meetings</i>
+                    </span>
+                  ) : null}
+                  <span className="bp-glance__links">
+                    <Bar width="70%" />
+                    <Bar width="86%" />
+                    <Bar width="60%" />
+                  </span>
+                </div>
+              ) : null}
+
+              {signals && briefing.insights.length ? (
+                <section className="bp-block">
+                  <p className="bp-eyebrow">✦ Emerging AI insights</p>
+                  <div className="bp-insights">
+                    {briefing.insights.map((insight, index) => (
+                      <article className={`bp-insight bp-insight--${insight.severity}`} key={insight.id}>
+                        <span className="bp-rank">{index + 1}</span>
+                        <p>{insight.title}</p>
+                        {showImpact && insight.impact[0] ? (
+                          <span className={`bp-impact bp-impact--${insight.impact[0].tone}`}>
+                            {insight.impact[0].label}
+                          </span>
+                        ) : null}
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {numbers && briefing.kpis.length ? (
+                <section className="bp-block">
+                  <p className="bp-eyebrow">⌁ Enrollment pulse</p>
+                  <div className="bp-kpis">
+                    {briefing.kpis.slice(0, 6).map((kpi) => (
+                      <span key={kpi.id}>
+                        <i>{kpi.label}</i>
+                        <b>{formatBrewNumber(kpi.frames[timeframe].numeric, kpi.format)}</b>
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {movements && briefing.changes.length ? (
+                <section className="bp-block">
+                  <p className="bp-eyebrow">↻ Since yesterday</p>
+                  <div className="bp-changes">
+                    {briefing.changes.slice(0, 4).map((change) => (
+                      <span key={change.id}>
+                        <i className={`bp-dot bp-dot--${change.tone}`} />
+                        <Bar width="88%" />
+                        <Bar width="62%" />
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {columns.length ? (
+                <div className="bp-columns">
+                  {columns.map((column) => (
+                    <div className="bp-column" key={column}>
+                      <p className="bp-eyebrow">{column}</p>
+                      {Array.from({ length: 4 }).map((_, row) => (
+                        <span className="bp-row" key={row}>
+                          <i />
+                          <Bar width={row % 2 ? "70%" : "88%"} />
+                        </span>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {headlines && briefing.news.length ? (
+                <section className="bp-block">
+                  <p className="bp-eyebrow">◎ Higher ed news</p>
+                  <div className="bp-news">
+                    {briefing.news.slice(0, 4).map((item) => (
+                      <span key={item.id}>
+                        <img src={item.image} alt="" loading="lazy" />
+                        <Bar width="90%" />
+                        <Bar width="64%" />
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+            </>
+          )}
+        </div>
+      </div>
+
+      <p className="brew-preview__foot">Changes as you choose. This is your real content, shrunk down.</p>
+    </aside>
+  );
+}
+
 export function MorningBrewOnboarding({
   step,
   direction,
   firstName,
   draft,
+  preview,
   customizing,
   onToggleTopic,
   onToggleInclude,
@@ -155,6 +327,8 @@ export function MorningBrewOnboarding({
   direction: 1 | -1;
   firstName: string;
   draft: OnboardingDraft;
+  /** Briefing built from the in-progress draft, for the live miniature. */
+  preview: BrewBriefing;
   customizing: boolean;
   onToggleTopic: (topic: BrewTopicId) => void;
   onToggleInclude: (include: BrewIncludeId) => void;
@@ -166,22 +340,8 @@ export function MorningBrewOnboarding({
 }) {
   const includedCount = BREW_INCLUDES.filter((include) => draft.include[include.id]).length;
   const depth = BREW_DEPTH_OPTIONS.find((option) => option.id === draft.depth) ?? BREW_DEPTH_OPTIONS[1];
-  const tone = BREW_TONE_OPTIONS.find((option) => option.id === draft.tone) ?? BREW_TONE_OPTIONS[0];
-  const { inbox, calendar, numbers, signals, movements, headlines } = draft.include;
+  const { inbox, calendar, numbers, signals, headlines } = draft.include;
   const hasFollowUps = inbox || calendar || numbers || signals || headlines;
-
-  const emailCount = draft.inboxDepth === "urgent" ? 2 : draft.inboxDepth === "everything" ? 5 : 4;
-  const meetingCount = draft.depth === "headlines" ? 3 : 5;
-  const comparison = BREW_PULSE_DEFAULTS.find((option) => option.id === draft.pulseDefault)?.label ?? "Cycle through";
-
-  /* What tomorrow's edition will actually contain, given the answers so far. */
-  const preview: string[] = [];
-  if (signals) preview.push(`${depth.storyCount} signals, ${draft.insightDetail === "headline" ? "headlines only" : draft.insightDetail === "impact" ? "with impact" : "with impact and next steps"}`);
-  if (numbers) preview.push(`Your numbers board, opening on ${comparison.toLowerCase()}`);
-  if (movements) preview.push("What moved since yesterday");
-  if (inbox) preview.push(`${emailCount} messages${draft.draftReplies ? ", each with a draft reply" : ""}`);
-  if (calendar) preview.push(`${meetingCount} meetings${draft.calendarPrep ? ", key ones with prep notes" : ""}`);
-  if (headlines) preview.push(`Stories from ${draft.readingSources.length} ${draft.readingSources.length === 1 ? "source" : "sources"}`);
 
   const heading =
     step === 1
@@ -221,7 +381,8 @@ export function MorningBrewOnboarding({
         </ol>
       </header>
 
-      <div className="brew-setup__stage" data-direction={direction} key={step}>
+      <div className="brew-setup__body">
+        <div className="brew-setup__stage" data-direction={direction} key={step}>
         {step === 1 ? (
           <>
             <p className="brew-setup__role">
@@ -316,7 +477,7 @@ export function MorningBrewOnboarding({
                     options={BREW_DEPTH_OPTIONS.map((option) => ({ id: option.id, label: option.title }))}
                   />
                 </Ask>
-                <Ask label="How should we write it?" hint={tone.description}>
+                <Ask label="How should we write it?" hint={BREW_TONE_OPTIONS.find((option) => option.id === draft.tone)?.description}>
                   <Segmented
                     label="Writing style"
                     value={draft.tone}
@@ -419,26 +580,11 @@ export function MorningBrewOnboarding({
                 </section>
               ) : null}
             </div>
-
-            <aside className="brew-preview" aria-label="What tomorrow's brief will contain">
-              <p className="brew-preview__eyebrow">Tomorrow morning</p>
-              <strong className="brew-preview__time">{depth.readTime}</strong>
-              <small className="brew-preview__when">Ready at {draft.deliveryTime.replace(/^0/, "")} AM</small>
-              {preview.length ? (
-                <ul>
-                  {preview.map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="brew-preview__empty">
-                  Nothing switched on yet. Step back and pick what you&rsquo;d like in it.
-                </p>
-              )}
-              <q>{tone.sample}</q>
-            </aside>
           </div>
         ) : null}
+        </div>
+
+        <BrewLivePreview briefing={preview} draft={draft} firstName={firstName} />
       </div>
 
       <footer className="brew-setup__footer">
