@@ -37,55 +37,104 @@ export interface OnboardingDraft {
   readingSources: string[];
 }
 
-function Choice({
-  selected,
-  onClick,
-  title,
-  caption,
+/** One question: a short label on the left, a compact control on the right. */
+function Ask({
+  label,
+  hint,
+  icon,
+  stack,
   children,
 }: {
-  selected: boolean;
-  onClick: () => void;
-  title: string;
-  caption?: string;
-  children?: React.ReactNode;
+  label: string;
+  hint?: string;
+  icon?: string;
+  stack?: boolean;
+  children: React.ReactNode;
 }) {
   return (
-    <button
-      className={selected ? "brew-choice is-selected" : "brew-choice"}
-      type="button"
-      aria-pressed={selected}
-      onClick={onClick}
-    >
-      <span className="brew-choice__tick" aria-hidden="true" />
-      <strong>{title}</strong>
-      {caption ? <small>{caption}</small> : null}
-      {children}
-    </button>
+    <div className={stack ? "brew-ask brew-ask--stack" : "brew-ask"}>
+      <span className="brew-ask__label">
+        {icon ? (
+          <i className="brew-ask__icon" aria-hidden="true">
+            {icon}
+          </i>
+        ) : null}
+        <span>
+          <strong>{label}</strong>
+          {hint ? <small>{hint}</small> : null}
+        </span>
+      </span>
+      <span className="brew-ask__control">{children}</span>
+    </div>
   );
 }
 
-function Switch({
+function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+  label,
+}: {
+  options: { id: T; label: string }[];
+  value: T;
+  onChange: (id: T) => void;
+  label: string;
+}) {
+  return (
+    <span className="brew-seg" role="group" aria-label={label}>
+      {options.map((option) => (
+        <button
+          className={value === option.id ? "is-selected" : ""}
+          type="button"
+          aria-pressed={value === option.id}
+          onClick={() => onChange(option.id)}
+          key={option.id}
+        >
+          {option.label}
+        </button>
+      ))}
+    </span>
+  );
+}
+
+function SwitchRow({
   on,
   onClick,
+  icon,
   title,
   caption,
+  sub,
 }: {
   on: boolean;
   onClick: () => void;
+  icon?: string;
   title: string;
   caption: string;
+  /** Renders indented, as a follow-on to the question directly above it. */
+  sub?: boolean;
 }) {
+  const className = ["brew-ask", "brew-ask--switch", sub ? "brew-ask--sub" : "", on ? "is-on" : ""]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <button className={on ? "brew-switch is-on" : "brew-switch"} type="button" role="switch" aria-checked={on} onClick={onClick}>
-      <span>
-        <strong>{title}</strong>
-        <small>{caption}</small>
+    <button className={className} type="button" role="switch" aria-checked={on} onClick={onClick}>
+      <span className="brew-ask__label">
+        {icon ? (
+          <i className="brew-ask__icon" aria-hidden="true">
+            {icon}
+          </i>
+        ) : null}
+        <span>
+          <strong>{title}</strong>
+          <small>{caption}</small>
+        </span>
       </span>
       <i className="brew-toggle__switch" aria-hidden="true" />
     </button>
   );
 }
+
+const iconFor = (id: BrewIncludeId) => BREW_INCLUDES.find((include) => include.id === id)?.icon ?? "•";
 
 export function MorningBrewOnboarding({
   step,
@@ -116,7 +165,23 @@ export function MorningBrewOnboarding({
   onCancel?: () => void;
 }) {
   const includedCount = BREW_INCLUDES.filter((include) => draft.include[include.id]).length;
-  const depth = BREW_DEPTH_OPTIONS.find((option) => option.id === draft.depth);
+  const depth = BREW_DEPTH_OPTIONS.find((option) => option.id === draft.depth) ?? BREW_DEPTH_OPTIONS[1];
+  const tone = BREW_TONE_OPTIONS.find((option) => option.id === draft.tone) ?? BREW_TONE_OPTIONS[0];
+  const { inbox, calendar, numbers, signals, movements, headlines } = draft.include;
+  const hasFollowUps = inbox || calendar || numbers || signals || headlines;
+
+  const emailCount = draft.inboxDepth === "urgent" ? 2 : draft.inboxDepth === "everything" ? 5 : 4;
+  const meetingCount = draft.depth === "headlines" ? 3 : 5;
+  const comparison = BREW_PULSE_DEFAULTS.find((option) => option.id === draft.pulseDefault)?.label ?? "Cycle through";
+
+  /* What tomorrow's edition will actually contain, given the answers so far. */
+  const preview: string[] = [];
+  if (signals) preview.push(`${depth.storyCount} signals, ${draft.insightDetail === "headline" ? "headlines only" : draft.insightDetail === "impact" ? "with impact" : "with impact and next steps"}`);
+  if (numbers) preview.push(`Your numbers board, opening on ${comparison.toLowerCase()}`);
+  if (movements) preview.push("What moved since yesterday");
+  if (inbox) preview.push(`${emailCount} messages${draft.draftReplies ? ", each with a draft reply" : ""}`);
+  if (calendar) preview.push(`${meetingCount} meetings${draft.calendarPrep ? ", key ones with prep notes" : ""}`);
+  if (headlines) preview.push(`Stories from ${draft.readingSources.length} ${draft.readingSources.length === 1 ? "source" : "sources"}`);
 
   const heading =
     step === 1
@@ -130,7 +195,7 @@ export function MorningBrewOnboarding({
       ? "We picked a few based on what you look after. Add anything else you keep half an eye on, and drop what you don't. Nothing here is permanent."
       : step === 2
         ? "Your morning read gets a lot better when it knows about the rest of your day. Everything below is a polished demo — no real account is touched, and nothing leaves this browser."
-        : "Just a few quick calls on what you picked. Sensible answers are already filled in, so you can hit go whenever you like.";
+        : "A few quick calls, then you're done. Everything is already answered sensibly.";
 
   return (
     <section className="brew-setup" aria-labelledby="brew-setup-title">
@@ -240,172 +305,138 @@ export function MorningBrewOnboarding({
 
         {step === 3 ? (
           <div className="brew-format">
-            <fieldset className="brew-format__group">
-              <legend>How long should it be?</legend>
-              <div className="brew-choice-row">
-                {BREW_DEPTH_OPTIONS.map((option) => (
-                  <Choice
-                    selected={draft.depth === option.id}
-                    onClick={() => onChange({ depth: option.id })}
-                    title={option.title}
-                    caption={option.readTime}
-                    key={option.id}
-                  >
-                    <p>{option.description}</p>
-                  </Choice>
-                ))}
-              </div>
-            </fieldset>
+            <div className="brew-format__main">
+              <section className="brew-ask-card">
+                <h2>Your read</h2>
+                <Ask label="How long should it be?" hint={depth.readTime}>
+                  <Segmented
+                    label="Briefing length"
+                    value={draft.depth}
+                    onChange={(id) => onChange({ depth: id })}
+                    options={BREW_DEPTH_OPTIONS.map((option) => ({ id: option.id, label: option.title }))}
+                  />
+                </Ask>
+                <Ask label="How should we write it?" hint={tone.description}>
+                  <Segmented
+                    label="Writing style"
+                    value={draft.tone}
+                    onChange={(id) => onChange({ tone: id })}
+                    options={BREW_TONE_OPTIONS.map((option) => ({ id: option.id, label: option.title }))}
+                  />
+                </Ask>
+                <Ask label="When do you want it?" hint="Every weekday">
+                  <Segmented
+                    label="Delivery time"
+                    value={draft.deliveryTime}
+                    onChange={(id) => onChange({ deliveryTime: id })}
+                    options={BREW_DELIVERY_TIMES.map((time) => ({ id: time.id, label: time.label }))}
+                  />
+                </Ask>
+              </section>
 
-            {draft.include.inbox ? (
-              <fieldset className="brew-format__group">
-                <legend>
-                  <span className="brew-format__tag">Your inbox</span>
-                  How much of it do you want?
-                </legend>
-                <div className="brew-choice-row">
-                  {BREW_INBOX_DEPTHS.map((option) => (
-                    <Choice
-                      selected={draft.inboxDepth === option.id}
-                      onClick={() => onChange({ inboxDepth: option.id })}
-                      title={option.title}
-                      caption={option.caption}
-                      key={option.id}
+              {hasFollowUps ? (
+                <section className="brew-ask-card">
+                  <h2>About the bits you picked</h2>
+
+                  {inbox ? (
+                    <>
+                      <Ask label="How much of your inbox?" icon={iconFor("inbox")}>
+                        <Segmented
+                          label="Inbox depth"
+                          value={draft.inboxDepth}
+                          onChange={(id) => onChange({ inboxDepth: id })}
+                          options={BREW_INBOX_DEPTHS.map((option) => ({ id: option.id, label: option.title }))}
+                        />
+                      </Ask>
+                      <SwitchRow
+                        sub
+                        on={draft.draftReplies}
+                        onClick={() => onChange({ draftReplies: !draft.draftReplies })}
+                        title="Edward drafts a reply for each"
+                        caption="Ready for you to edit or throw away"
+                      />
+                    </>
+                  ) : null}
+
+                  {calendar ? (
+                    <SwitchRow
+                      on={draft.calendarPrep}
+                      onClick={() => onChange({ calendarPrep: !draft.calendarPrep })}
+                      icon={iconFor("calendar")}
+                      title="Prep note on the meetings that matter"
+                      caption="One line on what to know before you walk in"
                     />
-                  ))}
-                </div>
-                <Switch
-                  on={draft.draftReplies}
-                  onClick={() => onChange({ draftReplies: !draft.draftReplies })}
-                  title="Let Edward write the first draft"
-                  caption="A reply waiting on each message, ready for you to edit or throw away."
-                />
-              </fieldset>
-            ) : null}
+                  ) : null}
 
-            {draft.include.calendar ? (
-              <fieldset className="brew-format__group">
-                <legend>
-                  <span className="brew-format__tag">Your calendar</span>
-                  Anything you want alongside it?
-                </legend>
-                <Switch
-                  on={draft.calendarPrep}
-                  onClick={() => onChange({ calendarPrep: !draft.calendarPrep })}
-                  title="Add a prep line to the meetings that matter"
-                  caption="One sentence on what you'd want to know before you walk in."
-                />
-              </fieldset>
-            ) : null}
+                  {numbers ? (
+                    <Ask label="Which comparison do you think in?" icon={iconFor("numbers")}>
+                      <Segmented
+                        label="Default comparison"
+                        value={draft.pulseDefault}
+                        onChange={(id) => onChange({ pulseDefault: id })}
+                        options={BREW_PULSE_DEFAULTS.map((option) => ({ id: option.id, label: option.label }))}
+                      />
+                    </Ask>
+                  ) : null}
 
-            {draft.include.numbers ? (
-              <fieldset className="brew-format__group">
-                <legend>
-                  <span className="brew-format__tag">Your numbers</span>
-                  Which comparison do you think in?
-                </legend>
-                <div className="brew-pill-row">
-                  {BREW_PULSE_DEFAULTS.map((option) => (
-                    <button
-                      className={draft.pulseDefault === option.id ? "brew-pill is-selected" : "brew-pill"}
-                      type="button"
-                      aria-pressed={draft.pulseDefault === option.id}
-                      onClick={() => onChange({ pulseDefault: option.id })}
-                      key={option.id}
+                  {signals ? (
+                    <Ask label="How much detail on what we spot?" icon={iconFor("signals")}>
+                      <Segmented
+                        label="Signal detail"
+                        value={draft.insightDetail}
+                        onChange={(id) => onChange({ insightDetail: id })}
+                        options={BREW_INSIGHT_DETAILS.map((option) => ({ id: option.id, label: option.title }))}
+                      />
+                    </Ask>
+                  ) : null}
+
+                  {headlines ? (
+                    <Ask
+                      label="Where should we read from?"
+                      icon={iconFor("headlines")}
+                      hint={`${draft.readingSources.length} of ${BREW_READING_SOURCES.length} selected`}
+                      stack
                     >
-                      <strong>{option.label}</strong>
-                      <small>{option.caption}</small>
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-            ) : null}
-
-            {draft.include.signals ? (
-              <fieldset className="brew-format__group">
-                <legend>
-                  <span className="brew-format__tag">What we spot</span>
-                  How much should we show?
-                </legend>
-                <div className="brew-choice-row">
-                  {BREW_INSIGHT_DETAILS.map((option) => (
-                    <Choice
-                      selected={draft.insightDetail === option.id}
-                      onClick={() => onChange({ insightDetail: option.id })}
-                      title={option.title}
-                      caption={option.caption}
-                      key={option.id}
-                    />
-                  ))}
-                </div>
-              </fieldset>
-            ) : null}
-
-            {draft.include.headlines ? (
-              <fieldset className="brew-format__group">
-                <legend>
-                  <span className="brew-format__tag">Your reading</span>
-                  Where should we read from?
-                </legend>
-                <div className="brew-source-row">
-                  {BREW_READING_SOURCES.map((source) => {
-                    const on = draft.readingSources.includes(source.id);
-                    return (
-                      <button
-                        className={on ? "brew-source-chip is-on" : "brew-source-chip"}
-                        type="button"
-                        aria-pressed={on}
-                        onClick={() => onToggleSource(source.id)}
-                        key={source.id}
-                      >
-                        <i aria-hidden="true">{on ? "✓" : "+"}</i>
-                        <span>
-                          <strong>{source.label}</strong>
-                          <small>{source.kind}</small>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </fieldset>
-            ) : null}
-
-            <div className="brew-format__split">
-              <fieldset className="brew-format__group">
-                <legend>When do you want it?</legend>
-                <div className="brew-pill-row">
-                  {BREW_DELIVERY_TIMES.map((time) => (
-                    <button
-                      className={draft.deliveryTime === time.id ? "brew-pill is-selected" : "brew-pill"}
-                      type="button"
-                      aria-pressed={draft.deliveryTime === time.id}
-                      onClick={() => onChange({ deliveryTime: time.id })}
-                      key={time.id}
-                    >
-                      <strong>{time.label}</strong>
-                      <small>{time.caption}</small>
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-
-              <fieldset className="brew-format__group">
-                <legend>How should we write it?</legend>
-                <div className="brew-choice-row brew-choice-row--tone">
-                  {BREW_TONE_OPTIONS.map((option) => (
-                    <Choice
-                      selected={draft.tone === option.id}
-                      onClick={() => onChange({ tone: option.id })}
-                      title={option.title}
-                      key={option.id}
-                    >
-                      <p>{option.description}</p>
-                      <q>{option.sample}</q>
-                    </Choice>
-                  ))}
-                </div>
-              </fieldset>
+                      <span className="brew-source-row">
+                        {BREW_READING_SOURCES.map((source) => {
+                          const on = draft.readingSources.includes(source.id);
+                          return (
+                            <button
+                              className={on ? "brew-source-chip is-on" : "brew-source-chip"}
+                              type="button"
+                              aria-pressed={on}
+                              onClick={() => onToggleSource(source.id)}
+                              key={source.id}
+                            >
+                              <i aria-hidden="true">{on ? "✓" : "+"}</i>
+                              {source.label}
+                            </button>
+                          );
+                        })}
+                      </span>
+                    </Ask>
+                  ) : null}
+                </section>
+              ) : null}
             </div>
+
+            <aside className="brew-preview" aria-label="What tomorrow's brief will contain">
+              <p className="brew-preview__eyebrow">Tomorrow morning</p>
+              <strong className="brew-preview__time">{depth.readTime}</strong>
+              <small className="brew-preview__when">Ready at {draft.deliveryTime.replace(/^0/, "")} AM</small>
+              {preview.length ? (
+                <ul>
+                  {preview.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="brew-preview__empty">
+                  Nothing switched on yet. Step back and pick what you&rsquo;d like in it.
+                </p>
+              )}
+              <q>{tone.sample}</q>
+            </aside>
           </div>
         ) : null}
       </div>
@@ -419,7 +450,7 @@ export function MorningBrewOnboarding({
                 : "Nothing picked yet"
               : step === 2
                 ? `${includedCount} of ${BREW_INCLUDES.length} switched on`
-                : `${depth?.title} · ${depth?.readTime}`}
+                : `${depth.title} · ${depth.readTime}`}
           </strong>
           <span>
             {step === 1
