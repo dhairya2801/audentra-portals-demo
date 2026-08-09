@@ -13,7 +13,6 @@ import type {
   BrewInboxDepthId,
   BrewInsightDetailId,
   BrewPreferences,
-  BrewPulseDefault,
   BrewTopicId,
   BrewToneId,
 } from "./types";
@@ -39,7 +38,6 @@ const TONES = new Set<string>(["executive", "narrative"]);
 const TIMES = new Set<string>(["06:00", "06:30", "07:00", "07:30"]);
 const INBOX_DEPTHS = new Set<string>(["urgent", "handful", "everything"]);
 const INSIGHT_DETAILS = new Set<string>(["headline", "impact", "full"]);
-const PULSE_DEFAULTS = new Set<string>(["auto", "yesterday", "week", "month", "year"]);
 
 export const DEFAULT_BREW_PREFERENCES: Omit<BrewPreferences, "version" | "updatedAt"> = {
   topics: DEFAULT_BREW_TOPICS,
@@ -50,7 +48,6 @@ export const DEFAULT_BREW_PREFERENCES: Omit<BrewPreferences, "version" | "update
   inboxDepth: "handful",
   draftReplies: true,
   calendarPrep: true,
-  pulseDefault: "auto",
   insightDetail: "full",
   readingSources: DEFAULT_READING_SOURCES,
   onboardingComplete: false,
@@ -93,9 +90,6 @@ function normalize(value: Partial<BrewPreferences>): BrewPreferences {
       : "handful",
     draftReplies: value.draftReplies !== false,
     calendarPrep: value.calendarPrep !== false,
-    pulseDefault: PULSE_DEFAULTS.has(String(value.pulseDefault))
-      ? (value.pulseDefault as BrewPulseDefault)
-      : "auto",
     insightDetail: INSIGHT_DETAILS.has(String(value.insightDetail))
       ? (value.insightDetail as BrewInsightDetailId)
       : "full",

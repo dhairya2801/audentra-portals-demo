@@ -278,7 +278,6 @@ export function MorningBrewDashboard({
 
       <EnrollmentPulse
         kpis={briefing.kpis}
-        initialMode={preferences.pulseDefault}
         refreshedAt={`${updatedClock} ET`}
         onOpenKpi={(id: string, timeframe: BrewTimeframeId) => onOpenDetail({ kind: "kpi", id, timeframe })}
         onAskEdward={() => onAskEdward({ mode: "insights", context: "the enrollment pulse" })}

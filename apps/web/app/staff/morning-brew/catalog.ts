@@ -5,7 +5,6 @@ import type {
   BrewIncludeId,
   BrewInsightDetailId,
   BrewInboxDepthId,
-  BrewPulseDefault,
   BrewTopic,
   BrewTopicId,
   BrewTimeframeId,
@@ -177,14 +176,6 @@ export const BREW_INBOX_DEPTHS: { id: BrewInboxDepthId; title: string; caption: 
   { id: "urgent", title: "Only what's urgent", caption: "The two or three that can't wait" },
   { id: "handful", title: "A short list", caption: "Roughly four, ranked" },
   { id: "everything", title: "Everything worth a look", caption: "All flagged messages" },
-];
-
-export const BREW_PULSE_DEFAULTS: { id: BrewPulseDefault; label: string; caption: string }[] = [
-  { id: "auto", label: "Cycle through", caption: "Rotates every few seconds" },
-  { id: "yesterday", label: "Yesterday", caption: "Day over day" },
-  { id: "week", label: "This week", caption: "Week over week" },
-  { id: "month", label: "This month", caption: "Month over month" },
-  { id: "year", label: "vs Last year", caption: "Same point last cycle" },
 ];
 
 export const BREW_INSIGHT_DETAILS: { id: BrewInsightDetailId; title: string; caption: string }[] = [

@@ -28,9 +28,6 @@ export type BrewDeliveryTime = "06:00" | "06:30" | "07:00" | "07:30";
 /** Comparison windows offered by the Enrollment Pulse carousel. */
 export type BrewTimeframeId = "yesterday" | "week" | "month" | "year";
 
-/** Which comparison the pulse opens on; "auto" cycles through all of them. */
-export type BrewPulseDefault = BrewTimeframeId | "auto";
-
 export type BrewInboxDepthId = "urgent" | "handful" | "everything";
 export type BrewInsightDetailId = "headline" | "impact" | "full";
 
@@ -101,7 +98,6 @@ export interface BrewPreferences {
   inboxDepth: BrewInboxDepthId;
   draftReplies: boolean;
   calendarPrep: boolean;
-  pulseDefault: BrewPulseDefault;
   insightDetail: BrewInsightDetailId;
   readingSources: string[];
   onboardingComplete: boolean;

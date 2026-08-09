@@ -4,7 +4,6 @@ import {
   BREW_INBOX_DEPTHS,
   BREW_INCLUDES,
   BREW_INSIGHT_DETAILS,
-  BREW_PULSE_DEFAULTS,
   BREW_READER_ROLE,
   BREW_READING_SOURCES,
   BREW_TOPICS,
@@ -18,7 +17,6 @@ import type {
   BrewIncludeId,
   BrewInboxDepthId,
   BrewInsightDetailId,
-  BrewPulseDefault,
   BrewTopicId,
   BrewToneId,
 } from "./types";
@@ -34,7 +32,6 @@ export interface OnboardingDraft {
   inboxDepth: BrewInboxDepthId;
   draftReplies: boolean;
   calendarPrep: boolean;
-  pulseDefault: BrewPulseDefault;
   insightDetail: BrewInsightDetailId;
   readingSources: string[];
 }
@@ -155,7 +152,6 @@ function BrewLivePreview({
   firstName: string;
 }) {
   const { inbox, calendar, numbers, signals, movements, headlines } = draft.include;
-  const timeframe = draft.pulseDefault === "auto" ? "yesterday" : draft.pulseDefault;
   const showImpact = draft.insightDetail !== "headline";
   const columns = [calendar && "Calendar", inbox && "Email", briefing.priorities.length && "Priorities"].filter(
     Boolean,
@@ -245,7 +241,7 @@ function BrewLivePreview({
                     {briefing.kpis.slice(0, 6).map((kpi) => (
                       <span key={kpi.id}>
                         <i>{kpi.label}</i>
-                        <b>{formatBrewNumber(kpi.frames[timeframe].numeric, kpi.format)}</b>
+                        <b>{formatBrewNumber(kpi.frames.yesterday.numeric, kpi.format)}</b>
                       </span>
                     ))}
                   </div>
@@ -340,8 +336,8 @@ export function MorningBrewOnboarding({
 }) {
   const includedCount = BREW_INCLUDES.filter((include) => draft.include[include.id]).length;
   const depth = BREW_DEPTH_OPTIONS.find((option) => option.id === draft.depth) ?? BREW_DEPTH_OPTIONS[1];
-  const { inbox, calendar, numbers, signals, headlines } = draft.include;
-  const hasFollowUps = inbox || calendar || numbers || signals || headlines;
+  const { inbox, calendar, signals, headlines } = draft.include;
+  const hasFollowUps = inbox || calendar || signals || headlines;
 
   const heading =
     step === 1
@@ -527,17 +523,6 @@ export function MorningBrewOnboarding({
                       title="Prep note on the meetings that matter"
                       caption="One line on what to know before you walk in"
                     />
-                  ) : null}
-
-                  {numbers ? (
-                    <Ask label="Which comparison do you think in?" icon={iconFor("numbers")}>
-                      <Segmented
-                        label="Default comparison"
-                        value={draft.pulseDefault}
-                        onChange={(id) => onChange({ pulseDefault: id })}
-                        options={BREW_PULSE_DEFAULTS.map((option) => ({ id: option.id, label: option.label }))}
-                      />
-                    </Ask>
                   ) : null}
 
                   {signals ? (

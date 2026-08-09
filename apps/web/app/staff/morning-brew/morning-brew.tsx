@@ -29,7 +29,6 @@ const draftFrom = (preferences: Omit<BrewPreferences, "version" | "updatedAt">):
   inboxDepth: preferences.inboxDepth,
   draftReplies: preferences.draftReplies,
   calendarPrep: preferences.calendarPrep,
-  pulseDefault: preferences.pulseDefault,
   insightDetail: preferences.insightDetail,
   readingSources: [...preferences.readingSources],
 });

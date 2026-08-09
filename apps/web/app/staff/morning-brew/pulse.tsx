@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BREW_TIMEFRAMES } from "./catalog";
 import { formatBrewNumber } from "./data";
-import type { BrewKpi, BrewNumberFormat, BrewPulseDefault, BrewTimeframeId } from "./types";
+import type { BrewKpi, BrewNumberFormat, BrewTimeframeId } from "./types";
 
 /** How long each timeframe holds the board before the carousel advances. */
 const ROTATE_MS = 4600;
@@ -118,21 +118,18 @@ function PulseCard({
 
 export function EnrollmentPulse({
   kpis,
-  initialMode,
   onOpenKpi,
   onAskEdward,
   onOpenDashboard,
   refreshedAt,
 }: {
   kpis: BrewKpi[];
-  /** The comparison the reader said they think in, chosen during setup. */
-  initialMode: BrewPulseDefault;
   onOpenKpi: (id: string, timeframe: BrewTimeframeId) => void;
   onAskEdward: () => void;
   onOpenDashboard: () => void;
   refreshedAt: string;
 }) {
-  const [mode, setMode] = useState<PulseMode>(initialMode);
+  const [mode, setMode] = useState<PulseMode>("auto");
   const [rotation, setRotation] = useState(0);
 
   useEffect(() => {
