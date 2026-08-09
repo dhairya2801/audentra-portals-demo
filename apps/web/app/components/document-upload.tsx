@@ -141,6 +141,17 @@ export function DocumentUpload({
   );
   const serverProcessing =
     reconciledActiveDocument?.extraction?.status === "processing";
+  const pendingDocuments = documents.filter(
+    (item) => item.status !== "uploaded",
+  );
+  const hasSubmittableFiles = pendingDocuments.some(
+    (item) =>
+      item.validationError === null &&
+      (item.status === "queued" || item.status === "error"),
+  );
+  const hasRetryableUpload = pendingDocuments.some(
+    (item) => item.status === "error" && !item.validationError,
+  );
   useEffect(() => {
     onUploadedRef.current = onUploaded;
   }, [onUploaded]);
@@ -579,24 +590,24 @@ export function DocumentUpload({
             : "Add every file that supports this requirement. The originals are stored securely in your student record and routed directly to staff review."}
       </p>
 
-      {documents.length ? (
+      {pendingDocuments.length ? (
         <div aria-live="polite" aria-atomic="false">
           <p>
-            <strong>Requirement bundle ({documents.length})</strong>
+            <strong>Files ready to submit ({pendingDocuments.length})</strong>
             {" · "}
-            {documents
+            {pendingDocuments
               .filter((item) => item.validationError === null)
               .reduce((total, item) => total + item.file.size, 0) <=
             maximumBundleBytes
               ? `${formatFileSize(
-                  documents
+                  pendingDocuments
                     .filter((item) => item.validationError === null)
                     .reduce((total, item) => total + item.file.size, 0),
                 )} selected`
               : "Review file limits"}
           </p>
           <ul>
-            {documents.map((item) => (
+            {pendingDocuments.map((item) => (
               <li key={item.id}>
                 <strong>{item.file.name}</strong>
                 {" · "}
@@ -620,11 +631,11 @@ export function DocumentUpload({
       {bundleMessage ? (
         <p
           className={
-            documents.some((item) => item.status === "error" && !item.validationError)
+            hasRetryableUpload
               ? "field-error"
               : "action-feedback"
           }
-          role={documents.some((item) => item.status === "error") ? "alert" : "status"}
+          role={hasRetryableUpload ? "alert" : "status"}
         >
           {bundleMessage}
         </p>
@@ -636,30 +647,20 @@ export function DocumentUpload({
         disabled={
           isUploading ||
           serverProcessing ||
-          !documents.some(
-            (item) =>
-              item.validationError === null &&
-              (item.status === "queued" || item.status === "error"),
-          )
+          !hasSubmittableFiles
         }
       >
         {serverProcessing
-          ? "Parsing current document…"
+          ? "Processing submitted files…"
           : isUploading
           ? classificationOnly
-            ? "Uploading and checking…"
+            ? "Submitting and checking…"
             : parsingEnabled
-              ? "Uploading and extracting…"
-            : "Uploading securely…"
-          : documents.length === 0
-            ? "Select a file above to upload"
-            : documents.some(
-                  (item) => item.status === "error" && !item.validationError,
-                )
-            ? "Retry files needing attention"
-            : categoryHint === "transcript"
-              ? "Upload transcript files"
-              : "Upload requirement bundle"}
+              ? "Submitting and extracting…"
+            : "Submitting securely…"
+          : hasRetryableUpload
+            ? "Retry file submission"
+            : "Submit files"}
       </button>
       <p className="document-privacy">
         <span aria-hidden="true">◆</span> Encrypted storage boundary ·{" "}

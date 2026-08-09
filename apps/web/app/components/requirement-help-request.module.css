@@ -1,0 +1,224 @@
+.card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.9rem;
+  margin: 0 1.65rem 1.65rem;
+  padding: 1rem;
+  border: 1px solid
+    color-mix(in srgb, var(--tenant-primary, #173f6f) 18%, #e2e7ed);
+  border-radius: 0.8rem;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--tenant-accent, #e8ad22) 7%, #fff),
+      #fff 68%
+    );
+}
+
+.requested {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  border-color: color-mix(
+    in srgb,
+    var(--tenant-primary, #173f6f) 32%,
+    #dce5ec
+  );
+  background: color-mix(
+    in srgb,
+    var(--tenant-primary, #173f6f) 5%,
+    #fff
+  );
+}
+
+.icon {
+  display: grid;
+  width: 2.15rem;
+  height: 2.15rem;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(
+    in srgb,
+    var(--tenant-accent, #e8ad22) 28%,
+    #fff
+  );
+  color: var(--tenant-primary, #173f6f);
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.copy {
+  min-width: 0;
+}
+
+.eyebrow,
+.copy h3,
+.copy p {
+  margin: 0;
+}
+
+.eyebrow {
+  color: color-mix(in srgb, var(--tenant-primary, #173f6f) 76%, #697586);
+  font-size: 0.61rem;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.copy h3 {
+  margin-top: 0.18rem;
+  color: #17243a;
+  font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.018em;
+}
+
+.copy > p:not(.eyebrow) {
+  max-width: 43rem;
+  margin-top: 0.35rem;
+  color: #657168;
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+
+.openButton {
+  margin-top: 0.75rem;
+}
+
+.form {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.9rem;
+}
+
+.form label {
+  color: #2d3d34;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.form textarea {
+  width: 100%;
+  min-height: 7rem;
+  resize: vertical;
+  padding: 0.8rem;
+  border: 1px solid #cbd5d0;
+  border-radius: 0.65rem;
+  background: #fff;
+  color: #17243a;
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.form textarea:focus-visible {
+  border-color: var(--tenant-primary, #173f6f);
+  outline: 3px solid
+    color-mix(in srgb, var(--tenant-accent, #e8ad22) 45%, transparent);
+}
+
+.formHint {
+  color: #718079;
+  font-size: 0.63rem;
+}
+
+.formActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.25rem;
+}
+
+.error {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.55rem;
+  background: #fff0ed;
+  color: #903d32;
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.lookupWarning {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.7rem;
+  margin-top: 0.65rem;
+  color: #76531b;
+  font-size: 0.68rem;
+}
+
+.lookupWarning button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tenant-primary, #173f6f);
+  font: inherit;
+  font-weight: 850;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.state {
+  display: inline-block;
+  margin-bottom: 0.15rem;
+  color: color-mix(in srgb, var(--tenant-primary, #173f6f) 80%, #315b4f);
+  font-size: 0.61rem;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.historyLink {
+  align-self: center;
+  color: var(--tenant-primary, #173f6f);
+  font-size: 0.7rem;
+  font-weight: 850;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.historyLink:hover,
+.historyLink:focus-visible {
+  text-decoration: underline;
+}
+
+.helpRequestedStatus {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 999px;
+  background: color-mix(
+    in srgb,
+    var(--tenant-accent, #e8ad22) 24%,
+    #fff
+  );
+  color: color-mix(in srgb, var(--tenant-primary, #173f6f) 82%, #76531b);
+  font-size: 0.59rem;
+  font-weight: 800;
+  letter-spacing: 0.025em;
+  white-space: nowrap;
+}
+
+.helpRequestedStatus > span {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 50%;
+  background: var(--tenant-accent, #e8ad22);
+}
+
+@media (max-width: 620px) {
+  .card,
+  .requested {
+    grid-template-columns: auto minmax(0, 1fr);
+    margin-inline: 1rem;
+  }
+
+  .historyLink {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

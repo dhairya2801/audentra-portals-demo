@@ -1976,3 +1976,149 @@ test("Edward separates the in-flow conversation workspace from the floating assi
     /\.edward-panel \{[\s\S]*?position: fixed;/,
   );
 });
+
+test("staff CRM distinguishes canonical students from preview cohort records", async () => {
+  const source = await readFile(
+    new URL("../app/staff/staff-portal.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /operation\.syntheticSeed \? "preview" : "success"/);
+  assert.match(source, /Canonical student record/);
+});
+
+test("the Action Center keeps evidence durable while AI and scheduled rules run asynchronously", async () => {
+  const [detail, rules, notifications, api, contracts] = await Promise.all([
+    readFile(new URL("../app/staff/action-center-detail.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/staff/action-rules-editor.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/staff/notification-center.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
+    readFile(new URL("../../../packages/contracts/src/index.ts", import.meta.url), "utf8"),
+  ]);
+
+  for (const tab of ["Overview", "Next Step", "Outcomes", "Comments", "History"]) {
+    assert.match(detail, new RegExp(`label: "${tab}"`));
+  }
+  for (const status of [
+    "todo",
+    "in_progress",
+    "follow_up_required",
+    "blocked",
+    "done",
+    "cancelled",
+  ]) {
+    assert.match(contracts, new RegExp(`\\| "${status}"`));
+  }
+
+  assert.match(detail, /participants consented to recording and external speech-to-text/);
+  assert.match(detail, /original recording is retained even if speech-to-text fails/i);
+  assert.match(detail, /Earlier transcript revisions/);
+  assert.match(detail, /Regenerate transcript/);
+  assert.match(detail, /AI enrichment is running in the background/);
+  assert.match(detail, /A message, outcome, or AI summary changed/);
+  assert.match(rules, /deterministic checks run independently from AI/);
+  assert.match(notifications, /unreadCount/);
+
+  for (const route of [
+    "/v1/staff/action-rules",
+    "/v1/staff/notifications",
+    "/recordings",
+    "/retry",
+    "/content",
+  ]) {
+    assert.match(api, new RegExp(route.replaceAll("/", "\\/")));
+  }
+});
+
+test("student requirement pages create durable, requirement-linked help requests", async () => {
+  const [page, helpWidget, helpStyles, client, contracts] = await Promise.all([
+    readFile(
+      new URL("../app/enrollment/requirements/[slug]/page.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/components/requirement-help-request.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../app/components/requirement-help-request.module.css",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../../../packages/contracts/src/index.ts", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(page, /<RequirementHelpRequest/);
+  assert.match(page, /<RequirementHelpRequestedStatus/);
+  assert.match(helpWidget, /requirementId: requirement\.id/);
+  assert.match(helpWidget, /request\.requirementId/);
+  assert.match(helpWidget, /request\.message\.includes\(requirementReference/);
+  assert.match(helpWidget, /Requirement code:/);
+  assert.match(helpWidget, /Requirement page:/);
+  assert.match(helpWidget, /Request help/);
+  assert.match(helpWidget, /Try again/);
+  assert.match(helpWidget, /role="alert"/);
+  assert.match(helpStyles, /var\(--tenant-primary/);
+  assert.match(helpStyles, /var\(--tenant-accent/);
+  assert.match(contracts, /requirementId\?: string/);
+  assert.match(contracts, /workItemId\?: string \| null/);
+  assert.match(client, /error\.code !== "VALIDATION_ERROR"/);
+  assert.match(client, /const legacyInput = \{ \.\.\.input \}/);
+  assert.match(client, /delete legacyInput\.requirementId/);
+});
+
+test("document submission only counts newly selected local files", async () => {
+  const uploader = await readFile(
+    new URL("../app/components/document-upload.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(uploader, /const pendingDocuments = documents\.filter/);
+  assert.match(uploader, /item\.status !== "uploaded"/);
+  assert.match(uploader, /const hasSubmittableFiles = pendingDocuments\.some/);
+  assert.match(uploader, /Files ready to submit \(\{pendingDocuments\.length\}\)/);
+  assert.match(uploader, /disabled=\{[\s\S]*?!hasSubmittableFiles/);
+  assert.match(uploader, /"Submit files"/);
+  assert.match(uploader, /"Retry file submission"/);
+  assert.doesNotMatch(uploader, /Select a file above to upload/);
+  assert.doesNotMatch(uploader, /Upload requirement bundle/);
+  assert.doesNotMatch(uploader, /Upload transcript files/);
+});
+
+test("student dashboard orders events before a height-balanced working area", async () => {
+  const [dashboard, styles] = await Promise.all([
+    readFile(new URL("../app/student-dashboard.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL(
+        "../app/components/student-dashboard-experience.module.css",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  const facts = dashboard.indexOf('className="aster-info-strip"');
+  const events = dashboard.indexOf("<DashboardCampusEvents");
+  const workingArea = dashboard.indexOf("dashboardStyles.workingArea");
+  const enrollment = dashboard.indexOf("Enrollment progress", workingArea);
+  const financials = dashboard.indexOf("<DashboardFinancialSnapshot", workingArea);
+  const classrooms = dashboard.indexOf("My Classrooms", workingArea);
+  const calendar = dashboard.indexOf("<StudentCalendar", workingArea);
+
+  assert.ok(facts >= 0 && facts < events, "profile facts must precede events");
+  assert.ok(events < workingArea, "events must precede the working area");
+  assert.ok(enrollment < financials, "enrollment must precede financials");
+  assert.ok(financials < classrooms, "financials must precede classrooms");
+  assert.ok(classrooms < calendar, "the left stack must precede the calendar");
+  assert.doesNotMatch(dashboard, /My Campus Life/);
+  assert.match(styles, /\.workingArea \{[\s\S]*?align-items: stretch/);
+  assert.match(styles, /\.workingStack \{[\s\S]*?height: 100%/);
+  assert.match(styles, /\.calendarColumn > \* \{[\s\S]*?height: 100%/);
+  assert.match(styles, /@media \(max-width: 900px\)/);
+});

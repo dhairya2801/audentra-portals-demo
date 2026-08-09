@@ -27,6 +27,10 @@ import {
 import { DocumentExtractionReview } from "../../../components/document-extraction-review";
 import { DocumentUpload } from "../../../components/document-upload";
 import { PortalShell } from "../../../components/portal-shell";
+import {
+  RequirementHelpRequest,
+  RequirementHelpRequestedStatus,
+} from "../../../components/requirement-help-request";
 import { RequirementResponseAction } from "../../../components/requirement-response-action";
 import {
   ActionFeedback,
@@ -1831,6 +1835,15 @@ function RequirementAction({
 export default function RequirementDetailPage() {
   const params = useParams<{ slug: string | string[] }>();
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
+  const [helpState, setHelpState] = useState({
+    slug,
+    requested: false,
+  });
+  const helpRequested = helpState.slug === slug && helpState.requested;
+  const setCurrentHelpRequested = useCallback(
+    (requested: boolean) => setHelpState({ slug, requested }),
+    [slug],
+  );
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [transcriptDocumentProjection, setTranscriptDocumentProjection] =
     useState<DocumentExtractionProjectionState | null>(null);
@@ -1942,7 +1955,11 @@ export default function RequirementDetailPage() {
                 <p className="eyebrow">Your action</p>
                 <h2>{requirement.data.title}</h2>
               </div>
-              <StatusPill value={requirement.data.status} />
+              {helpRequested ? (
+                <RequirementHelpRequestedStatus />
+              ) : (
+                <StatusPill value={requirement.data.status} />
+              )}
             </div>
             <p className="requirement-workspace__description">
               {requirement.data.description}
@@ -1956,6 +1973,11 @@ export default function RequirementDetailPage() {
               activeDocumentProjection={transcriptDocumentProjection}
               onHousingPreviewChange={setHousingSelection}
               prerequisite={firstPrerequisite}
+            />
+            <RequirementHelpRequest
+              key={requirement.data.id}
+              requirement={requirement.data}
+              onHelpStateChange={setCurrentHelpRequested}
             />
           </section>
           <aside className="requirement-workspace__context">

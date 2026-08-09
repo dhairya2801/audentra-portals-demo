@@ -26,14 +26,6 @@ import { safePortalDestination } from "./lib/safe-destination";
 import { TenantLink as Link } from "./components/tenant-link";
 import { useTenant } from "./components/tenant-provider";
 
-function shortDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(value));
-}
-
 function requirementState(item: StudentRequirementSummary) {
   if (["completed", "waived", "not_applicable"].includes(item.status)) {
     return "Complete";
@@ -172,7 +164,12 @@ export function StudentDashboardPage() {
         </div>
       </section>
 
-      <div className={`aster-dashboard-hero ${dashboardStyles.hero}`}>
+      <div className={dashboardStyles.overview}>
+        <DashboardCampusEvents events={campus.events} asOf={loadedAt} />
+      </div>
+
+      <div className={dashboardStyles.workingArea}>
+        <div className={dashboardStyles.workingStack}>
         <section
           className={`aster-card aster-progress-card ${dashboardStyles.progressCard}`}
         >
@@ -273,16 +270,11 @@ export function StudentDashboardPage() {
           )}
         </section>
 
-        <StudentCalendar entries={calendarEntries} />
-      </div>
-
-      <div className={dashboardStyles.overview}>
-        <DashboardCampusEvents events={campus.events} asOf={loadedAt} />
-      </div>
-
-      <section className="aster-domain-grid">
         <DashboardFinancialSnapshot financials={financials} />
-        <Link className="aster-domain-card" href="/classrooms">
+        <Link
+          className={`aster-domain-card ${dashboardStyles.classroomsCard}`}
+          href="/classrooms"
+        >
           <span>My Classrooms</span>
           <h2>{suggestedExemptions.length} credit matches</h2>
           <p>
@@ -293,20 +285,11 @@ export function StudentDashboardPage() {
             <strong>Review matches</strong>
           </div>
         </Link>
-        <Link className="aster-domain-card aster-domain-card--campus" href="/campus-life">
-          <span>My Campus Life</span>
-          <h2>{campus.events[0]?.title ?? "Discover campus"}</h2>
-          <p>
-            {campus.events[0]
-              ? `${shortDate(campus.events[0].startsAt)} · ${campus.events[0].location}`
-              : "Events and clubs will appear here."}
-          </p>
-          <div>
-            <small>{campus.clubs.length} active clubs</small>
-            <strong>Explore campus</strong>
-          </div>
-        </Link>
-      </section>
+        </div>
+        <div className={dashboardStyles.calendarColumn}>
+          <StudentCalendar entries={calendarEntries} />
+        </div>
+      </div>
     </PortalShell>
   );
 }

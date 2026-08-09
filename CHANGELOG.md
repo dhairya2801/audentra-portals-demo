@@ -4,6 +4,32 @@ This changelog summarizes user-visible releases. Detailed notes are separated
 by persona so students, staff, and implementation teams can review only the
 changes that affect them.
 
+## 2026-08-09 — Functional enrollment action center
+
+### Students
+
+- Added requirement-scoped help requests and a visible `Help requested` state.
+- Fixed document selection and submission so persisted failed files are not
+  mistaken for newly selected files.
+- Added clear transcript retry, parsing, and successful-review states without
+  losing access to the original upload.
+
+### Staff
+
+- Added Jira-style task creation, priority sorting, advanced filters, and modal
+  work-item details.
+- Redesigned the Enrollment Action Center around Overview, Next Step, Outcomes,
+  Comments, and History with tenant-aware visual theming.
+- Added realtime inquiry and action notifications with reconnect and fallback
+  refresh behavior.
+
+### Student home
+
+- Reordered Campus Life, Enrollment, Financials, Classrooms, and Calendar into
+  the agreed dashboard hierarchy and removed duplicate Campus Life content.
+
+See [Detailed Action Center changelog](docs/changelog/2026-08-09-action-center-functional.md).
+
 ## 2026-07-31 — Student experience and staff operations
 
 ### Student users
