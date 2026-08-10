@@ -4,6 +4,87 @@ This changelog summarizes user-visible releases. Detailed notes are separated
 by persona so students, staff, and implementation teams can review only the
 changes that affect them.
 
+## 2026-08-10 — Action Center handoff and recovery refinements
+
+### Staff experience
+
+- Replaced the ambiguous header overflow control with an accessible AI-refresh
+  icon and made **Mark complete** persist the canonical interaction or work-item
+  outcome.
+- Kept source communication, call recordings, transcript revisions, official
+  outcome controls, advisory AI summaries, conversation signals, related
+  uploaded files, and history in distinct Action Center sections.
+- Made portal-channel outreach create a real student inbox delivery and show
+  the canonical delivery state after the API responds.
+
+### Student experience
+
+- Requirement upload and help flows now preserve the original file, surface
+  parse/retry/review states clearly, and keep the linked task visible as staff
+  work progresses.
+- Enrollment and onboarding updates are grouped and deferred as one portal-visit
+  decision instead of interrupting route navigation with a chain of dialogs.
+
+See [Action Center handoff and recovery details](docs/changelog/2026-08-10-action-center-handoff-and-recovery.md).
+
+## 2026-08-10 — Calm, grouped student updates
+
+### Student portal
+
+- Enrollment and onboarding updates now appear together once per portal visit,
+  rather than reopening as the student moves between routes.
+- **Remind me later** saves the full displayed bundle; incoming realtime
+  changes refresh canonical portal state without creating a new blocking dialog
+  during an active visit.
+- Returning after five minutes away from the visible portal is treated as a
+  new visit and may present the current canonical bundle again.
+
+## 2026-08-10 — Graph-first enrollment and onboarding studio
+
+### Staff journey design
+
+- Replaced the dense journey editor with a draggable, zoomable workflow canvas
+  with connection ports, dependency arrows, deterministic layout
+  simplification, explicit layout saving, and focused enrollment/onboarding
+  views.
+- Added executable Yes/No, switch/default, multi-value case, and numeric
+  threshold paths with labeled conditional edges, all/any matching,
+  skipped-branch semantics, and safe path convergence.
+- Added a compact map/list switch and focused each map on the selected journey
+  plus only the external prerequisites needed to understand it.
+- Reorganized step editing into Details, Student experience, Dependencies, and
+  Publishing sections while preserving stable IDs and versioned publication.
+- Added nine append-only journey scaffolds, including decision-based and
+  readiness-score onboarding examples with switch/default and threshold paths,
+  plus international, transfer, support-first, enrollment-essential,
+  comprehensive multi-office, financial-aid, and document-recovery flows.
+  Staff can preview dependencies and attach entry nodes before publishing.
+
+### Student form design
+
+- Added multi-page form authoring with a page outline, visual field palette,
+  accessible ordering and duplication controls, stable page/field keys, and a
+  live student-portal preview.
+- Added bounded numeric fields with minimum, maximum, and step controls for
+  scoring, placement, eligibility, and other threshold-driven journeys.
+- Added five editable form scaffolds for profile/contact, support intake,
+  orientation preferences, emergency contacts, and simple confirmation.
+- Added native page-by-page validation and state preservation in the student
+  runtime, with one canonical submission after the final page.
+- Kept built-in onboarding screens protected while allowing staff to edit their
+  student-facing language, ownership, rewards, and configured fields.
+
+### Realtime staff updates
+
+- Replaced the generic "new inquiry" banner with event-specific notices for
+  inquiries, replies, parsing review, recovered documents, follow-ups, blocked
+  reviews, SLA escalation, new work, and background AI guidance refreshes.
+- Scheduled lifecycle changes now emit their realtime notice immediately; a
+  later AI enrichment is identified separately instead of looking like a replay
+  of the original student request.
+
+See [Detailed journey-builder changelog](docs/changelog/2026-08-10-journey-builder-ux.md).
+
 ## 2026-08-10 — Durable tenant content management
 
 ### Campus Life

@@ -22,6 +22,7 @@ import {
   completeStaffInteraction,
   createStaffWorkComment,
   getStaffCallRecordingContent,
+  getStaffDocumentContentUrl,
   getStaffWorkItemDetail,
   recordStaffCommunication,
   requestStaffAiRefresh,
@@ -105,7 +106,7 @@ function readable(value: string) {
   return value.replaceAll("_", " ");
 }
 
-function detailSignature(detail: StaffWorkItemDetail) {
+function projectionSignature(detail: StaffWorkItemDetail) {
   return JSON.stringify({
     work: [detail.workItem.version, detail.workItem.updatedAt],
     taskInsight: [detail.taskInsight.version, detail.taskInsight.state],
@@ -125,8 +126,51 @@ function detailSignature(detail: StaffWorkItemDetail) {
       ]),
     ]),
     comments: detail.comments.map((comment) => comment.id),
+    documents: detail.relatedDocuments.map((document) => [
+      document.id,
+      document.status,
+    ]),
     history: detail.workItem.history.map((event) => event.id),
   });
+}
+
+function meaningfulUpdateReason(
+  current: StaffWorkItemDetail,
+  next: StaffWorkItemDetail,
+) {
+  const currentCommunications = current.interactions.flatMap((interaction) =>
+    interaction.communications.map((communication) => communication.id),
+  );
+  const nextCommunications = next.interactions.flatMap((interaction) =>
+    interaction.communications.map((communication) => communication.id),
+  );
+  if (JSON.stringify(currentCommunications) !== JSON.stringify(nextCommunications)) {
+    return "New communication is available";
+  }
+  const workFields = (detail: StaffWorkItemDetail) => [
+    detail.workItem.status,
+    detail.workItem.assignee?.id ?? null,
+    detail.workItem.escalated,
+    detail.workItem.selectedChannel,
+    detail.workItem.followUpAt,
+    detail.workItem.outcomeCode,
+    detail.workItem.resolutionCode,
+  ];
+  if (JSON.stringify(workFields(current)) !== JSON.stringify(workFields(next))) {
+    return "The action record changed in another staff session";
+  }
+  if (
+    JSON.stringify(current.comments.map((comment) => comment.id)) !==
+    JSON.stringify(next.comments.map((comment) => comment.id))
+  ) {
+    return "A new team comment is available";
+  }
+  const documentFields = (detail: StaffWorkItemDetail) =>
+    detail.relatedDocuments.map((document) => [document.id, document.status]);
+  if (JSON.stringify(documentFields(current)) !== JSON.stringify(documentFields(next))) {
+    return "The student's uploaded files changed";
+  }
+  return null;
 }
 
 function aiLabel(state: StaffAiProcessingState) {
@@ -182,7 +226,10 @@ export function ActionCenterDetail({
 }) {
   const [detail, setDetail] = useState<StaffWorkItemDetail | null>(null);
   const detailRef = useRef<StaffWorkItemDetail | null>(null);
-  const [availableUpdate, setAvailableUpdate] = useState<StaffWorkItemDetail | null>(null);
+  const [availableUpdate, setAvailableUpdate] = useState<{
+    detail: StaffWorkItemDetail;
+    reason: string;
+  } | null>(null);
   const [tab, setTab] = useState<DetailTab>("overview");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -216,9 +263,19 @@ export function ActionCenterDetail({
       if (
         mode === "compare" &&
         current &&
-        detailSignature(current) !== detailSignature(next)
+        projectionSignature(current) !== projectionSignature(next)
       ) {
-        setAvailableUpdate(next);
+        const reason = meaningfulUpdateReason(current, next);
+        if (reason) {
+          setAvailableUpdate({ detail: next, reason });
+        } else {
+          // AI job transitions and generated projections are read-only. Reconcile
+          // them silently so queued/running/ready changes do not impersonate
+          // student activity or disturb any text the staff member is entering.
+          detailRef.current = next;
+          setDetail(next);
+          setFatalError(null);
+        }
       } else if (mode === "replace" || !current) {
         applyDetail(next);
       }
@@ -330,6 +387,42 @@ export function ActionCenterDetail({
     );
   };
 
+  const completeFromHeader = async () => {
+    if (isTerminal) return;
+    const outcomeCode =
+      activeInteraction?.outcome?.outcomeCode ??
+      item.outcomeCode ??
+      "staff_confirmed_complete";
+    const resolutionCode =
+      activeInteraction?.outcome?.resolutionCode ??
+      item.resolutionCode ??
+      "resolved_by_staff";
+    await runMutation(
+      "complete",
+      async () => {
+        if (activeInteraction) {
+          return completeStaffInteraction(activeInteraction.id, {
+            expectedInteractionVersion: activeInteraction.version,
+            expectedWorkItemVersion: item.version,
+            outcomeCode,
+            resolutionCode,
+            nextStep: activeInteraction.outcome?.nextStep ?? item.nextStep,
+            followUpAt: null,
+          });
+        }
+        await updateStaffWorkItem(item.id, {
+          expectedVersion: item.version,
+          status: "done",
+          outcomeCode,
+          resolutionCode,
+          nextStep: item.nextStep,
+          note: "Completed from the Enrollment Action Center.",
+        });
+      },
+      "Action completed. The student record and linked inquiry were updated.",
+    );
+  };
+
   return (
     <section
       className={"action-detail action-detail--" + presentation}
@@ -338,13 +431,13 @@ export function ActionCenterDetail({
       {availableUpdate ? (
         <div className="action-update-banner" role="status">
           <div>
-            <strong>New activity is available</strong>
+            <strong>{availableUpdate.reason}</strong>
             <span>
-              A message, outcome, or AI summary changed. Your current form values were not
-              replaced.
+              Load the canonical record when you are ready. Your current form values will not
+              be submitted automatically.
             </span>
           </div>
-          <button type="button" onClick={() => applyDetail(availableUpdate)}>
+          <button type="button" onClick={() => applyDetail(availableUpdate.detail)}>
             Load update
           </button>
         </div>
@@ -379,12 +472,26 @@ export function ActionCenterDetail({
           <button
             className="action-primary-button"
             type="button"
-            disabled={isTerminal}
-            onClick={() => setTab("outcomes")}
+            disabled={isTerminal || Boolean(busy)}
+            onClick={() => void completeFromHeader()}
           >
             {isTerminal ? readable(item.status) : "Mark complete"}
           </button>
-          <button type="button" onClick={() => setTab("overview")}>More</button>
+          <button
+            className="action-icon-button"
+            type="button"
+            disabled={Boolean(busy) || isAiBusy(detail.aiState)}
+            aria-label="Refresh AI summaries"
+            title="Refresh outcome and student summaries"
+            onClick={() =>
+              void retryAi(activeInteraction ? "both" : "student_summary")
+            }
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 7v5h-5M4 17v-5h5" />
+              <path d="M18.2 9A7 7 0 0 0 6.1 6.1L4 9M5.8 15A7 7 0 0 0 17.9 17.9L20 15" />
+            </svg>
+          </button>
         </div>
       </header>
 
@@ -434,7 +541,6 @@ export function ActionCenterDetail({
               itemTerminal={isTerminal}
               detail={detail}
               channel={channel}
-              activeInteraction={activeInteraction}
               busy={busy}
               onChannel={setChannel}
               onStart={() => void start()}
@@ -759,7 +865,6 @@ function NextStepTab({
   itemTerminal,
   detail,
   channel,
-  activeInteraction,
   busy,
   onChannel,
   onStart,
@@ -768,7 +873,6 @@ function NextStepTab({
   itemTerminal: boolean;
   detail: StaffWorkItemDetail;
   channel: StaffCommunicationChannel;
-  activeInteraction: StaffInteraction | null;
   busy: string | null;
   onChannel: (channel: StaffCommunicationChannel) => void;
   onStart: () => void;
@@ -834,37 +938,34 @@ function NextStepTab({
         </section>
       </div>
 
-      <form className="action-card action-communication-form" onSubmit={onRecord}>
-        <div className="action-card-heading">
-          <div>
-            <p className="eyebrow">3. Record the interaction</p>
-            <h2>{channel === "portal" ? "Send and record" : "Add the channel result"}</h2>
+      {channel === "portal" ? (
+        <form className="action-card action-portal-composer" onSubmit={onRecord}>
+          <input type="hidden" name="direction" value="outbound" />
+          <div className="action-card-heading">
+            <div>
+              <p className="eyebrow">Portal message</p>
+              <h2>Send guidance to {studentName}</h2>
+            </div>
+            <span>Delivered live</span>
           </div>
-          {activeInteraction ? <span>Interaction v{activeInteraction.version}</span> : null}
-        </div>
-        {channel !== "portal" ? (
-          <p className="action-honesty-note">
-            External {channel} delivery is not connected in this environment. This form records
-            communication that occurred in the approved channel; portal messages are delivered live.
-          </p>
-        ) : null}
-        <div className="action-form-grid">
-          <label>Direction
-            <select name="direction" defaultValue="outbound">
-              <option value="outbound">Staff to student</option>
-              <option value="inbound">Student to staff</option>
-            </select>
+          <label>
+            Subject <span>(optional)</span>
+            <input name="subject" maxLength={500} />
           </label>
-          <label>Subject<input name="subject" maxLength={500} /></label>
-          <label className="action-form-span">
-            {channel === "voice" ? "Call transcript or notes" : "Message or response"}
-            <textarea name="body" required maxLength={12_000} rows={7} />
+          <label>
+            Message
+            <textarea name="body" required maxLength={12_000} rows={4} />
           </label>
-        </div>
-        <button type="submit" disabled={itemTerminal || Boolean(busy)}>
-          {channel === "portal" ? "Deliver portal message" : `Record ${channel} result`}
-        </button>
-      </form>
+          <button type="submit" disabled={itemTerminal || Boolean(busy)}>
+            Send portal message
+          </button>
+        </form>
+      ) : (
+        <p className="action-channel-handoff">
+          Continue in the approved {readable(channel)} channel, then record the confirmed result
+          from the Outcomes tab. Source recordings for phone calls are attached there.
+        </p>
+      )}
     </div>
   );
 }
@@ -1083,6 +1184,91 @@ function CallRecordingPanel({
   );
 }
 
+function enrichmentTiming(interaction: StaffInteraction) {
+  if (interaction.aiState === "running") {
+    return "Generating from the latest communication evidence now.";
+  }
+  if (
+    (interaction.aiState === "pending" || interaction.aiState === "stale") &&
+    interaction.quietUntil
+  ) {
+    const quietUntil = new Date(interaction.quietUntil);
+    if (quietUntil.getTime() > Date.now()) {
+      return `Queued for ${dateTime(interaction.quietUntil)} after five minutes without another message.`;
+    }
+    return "The five-minute quiet window ended; the worker will claim this summary next.";
+  }
+  return null;
+}
+
+function ConversationSignalsCard({ interaction }: { interaction: StaffInteraction | null }) {
+  const signals = interaction?.outcome?.conversationSignals;
+  const confidence = interaction?.outcome?.confidence ?? null;
+  const metrics = [
+    {
+      label: "Sentiment",
+      value: signals?.sentiment.label ?? "Waiting for evidence",
+      score: signals?.sentiment.score ?? null,
+    },
+    {
+      label: "Engagement",
+      value: signals?.engagement.label ?? "Waiting for evidence",
+      score: signals?.engagement.score ?? null,
+    },
+    {
+      label: "Likelihood to progress",
+      value: signals?.likelihoodToProgress.label ?? "Waiting for evidence",
+      score: signals?.likelihoodToProgress.score ?? null,
+    },
+    {
+      label: "Confidence (AI quality)",
+      value:
+        confidence === null
+          ? "Waiting for evidence"
+          : confidence >= 0.75
+            ? "High"
+            : confidence >= 0.45
+              ? "Medium"
+              : "Low",
+      score: confidence,
+    },
+  ];
+  return (
+    <section className="action-card action-conversation-signals">
+      <p className="eyebrow">4. Conversation signals</p>
+      <h2>What the combined communication indicates</h2>
+      <dl>
+        {metrics.slice(0, 2).map((metric) => (
+          <div key={metric.label}>
+            <dt>{metric.label}</dt>
+            <dd>
+              <span className="action-signal-meter" aria-hidden="true">
+                <i style={{ width: `${Math.round((metric.score ?? 0) * 100)}%` }} />
+              </span>
+              <strong>{metric.value}</strong>
+            </dd>
+          </div>
+        ))}
+        <div>
+          <dt>Intent</dt>
+          <dd><strong>{signals?.intent ?? "Waiting for evidence"}</strong></dd>
+        </div>
+        {metrics.slice(2).map((metric) => (
+          <div key={metric.label}>
+            <dt>{metric.label}</dt>
+            <dd>
+              <span className="action-signal-meter" aria-hidden="true">
+                <i style={{ width: `${Math.round((metric.score ?? 0) * 100)}%` }} />
+              </span>
+              <strong>{metric.value}</strong>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
 function OutcomesTab({
   detail,
   interaction,
@@ -1171,26 +1357,13 @@ function OutcomesTab({
           {interaction?.outcome?.channelResults.length ? (
             <ul>{interaction.outcome.channelResults.map((result) => <li key={`${result.channel}:${result.result}`}>{result.channel}: {result.result}</li>)}</ul>
           ) : null}
-          {interaction ? (
-            <button
-              type="button"
-              disabled={Boolean(busy) || isAiBusy(interaction.aiState)}
-              onClick={() => onRetry("both")}
-            >
-              {isAiBusy(interaction.aiState)
-                ? "Outcome and student summary refresh queued"
-                : interaction.aiState === "failed_retryable" ||
-                    interaction.aiState === "dead_letter"
-                  ? "Retry outcome and student summaries"
-                  : "Refresh outcome and student summaries"}
-            </button>
+          {interaction && enrichmentTiming(interaction) ? (
+            <small className="action-enrichment-timing">
+              {enrichmentTiming(interaction)}
+            </small>
           ) : null}
         </section>
-        <section className="action-card">
-          <p className="eyebrow">4. Suggested follow-up</p>
-          <h2>{interaction?.outcome?.followUpRequired ? "Follow-up recommended" : "Review before closing"}</h2>
-          <p>{interaction?.outcome?.nextStep ?? detail.studentSummary.nextSteps[0] ?? "Confirm the final result and choose whether another contact is needed."}</p>
-        </section>
+        <ConversationSignalsCard interaction={interaction} />
       </div>
 
       {!terminalStatuses.has(detail.workItem.status) ? (
@@ -1380,12 +1553,37 @@ function RightRail({
       <section className="action-card">
         <h2>Related</h2>
         <ul className="action-related-list">
-          {detail.relatedItems.map((related) => (
-            <li key={related.id}>{related.key} - {related.title}</li>
-          ))}
-          {detail.relatedItems.length === 0 ? <li>No related open work</li> : null}
+          {detail.relatedDocuments.map((document) => {
+            const content = (
+              <>
+                <span className="action-related-document-icon" aria-hidden="true">▤</span>
+                <span>
+                  <strong>{document.fileName}</strong>
+                  <small>{readable(document.category)} · {readable(document.status)}</small>
+                </span>
+              </>
+            );
+            return (
+              <li key={document.id}>
+                {document.contentUrl ? (
+                  <a
+                    href={getStaffDocumentContentUrl(document.contentUrl)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {content}
+                  </a>
+                ) : (
+                  <span className="action-related-document">{content}</span>
+                )}
+              </li>
+            );
+          })}
+          {detail.relatedDocuments.length === 0 ? (
+            <li>No files have been uploaded by this student.</li>
+          ) : null}
         </ul>
-        <small>{center.items.filter((candidate) => candidate.student.id === item.student.id).length} actions for this student</small>
+        <small>{detail.relatedDocuments.length} uploaded file{detail.relatedDocuments.length === 1 ? "" : "s"}</small>
       </section>
     </aside>
   );

@@ -83,7 +83,15 @@ export function StudentNotificationCenter({
       if (document.visibilityState === "visible") refreshMessages();
     };
     const interval = window.setInterval(poll, 8_000);
-    return () => window.clearInterval(interval);
+    const refreshAfterRealtimeEvent = () => refreshMessages();
+    window.addEventListener("vv:student-realtime", refreshAfterRealtimeEvent);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener(
+        "vv:student-realtime",
+        refreshAfterRealtimeEvent,
+      );
+    };
   }, [refreshMessages]);
 
   useEffect(() => {

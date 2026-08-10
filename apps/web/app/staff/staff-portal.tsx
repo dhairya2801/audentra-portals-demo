@@ -83,6 +83,7 @@ type StaffView =
 interface StaffRealtimeNotice {
   eventId: number;
   title: string;
+  body: string;
   workItemId: string | null;
 }
 
@@ -94,6 +95,78 @@ function realtimeWorkItemId(event: StaffRealtimeEvent) {
   };
   const candidate = envelope.workItemId ?? envelope.data?.workItemId;
   return typeof candidate === "string" && candidate ? candidate : null;
+}
+
+function realtimeNoticeFor(event: StaffRealtimeEvent): StaffRealtimeNotice | null {
+  const envelope =
+    event.data && typeof event.data === "object"
+      ? (event.data as { data?: unknown })
+      : {};
+  const payload =
+    envelope.data && typeof envelope.data === "object"
+      ? (envelope.data as Record<string, unknown>)
+      : {};
+  const workItemId = realtimeWorkItemId(event);
+  const explicitTitle =
+    typeof payload.title === "string" && payload.title.trim()
+      ? payload.title.trim()
+      : null;
+  const explicitBody =
+    typeof payload.body === "string" && payload.body.trim()
+      ? payload.body.trim()
+      : null;
+  if (event.type === "staff.ai_update.available") {
+    return null;
+  }
+  const kind = typeof payload.kind === "string" ? payload.kind : "";
+  const notices = {
+    new_student_inquiry: {
+      title: "New student inquiry",
+      body: "A student requested help from the portal. The linked action is ready for triage.",
+    },
+    student_inquiry_reply: {
+      title: "Student replied",
+      body: "A new portal message is available on an existing student action.",
+    },
+    document_parse_review: {
+      title: "Document parsing needs human review",
+      body: "Automatic extraction failed. The original file is safe and the review action is ready.",
+    },
+    document_review_ready: {
+      title: "Student document ready for review",
+      body: "A newly uploaded student document is available for staff review.",
+    },
+    student_document_recovered: {
+      title: "Student document issue resolved",
+      body: "The student successfully uploaded a replacement and the linked help action was resolved.",
+    },
+    work_item_created: {
+      title: "New enrollment task",
+      body: "A new staff action was created and routed to its owner or team.",
+    },
+    follow_up_due: {
+      title: "Scheduled follow-up is due",
+      body: "The scheduler returned this action to To Do at its planned follow-up time.",
+    },
+    blocked_review_due: {
+      title: "Blocked action needs review",
+      body: "The blocker review time passed, so the scheduler escalated this action.",
+    },
+    sla_overdue: {
+      title: "Action SLA is overdue",
+      body: "The due time passed, so the scheduler escalated this action for team or leader attention.",
+    },
+  };
+  const fallback = notices[kind as keyof typeof notices];
+  return {
+    eventId: event.id,
+    title: explicitTitle ?? fallback?.title ?? "Staff workspace updated",
+    body:
+      explicitBody ??
+      fallback?.body ??
+      "Canonical staff data has refreshed. Open the related action when you are ready.",
+    workItemId,
+  };
 }
 
 const viewOrder: StaffView[] = [
@@ -2322,8 +2395,8 @@ function JourneysView({
         view="journeys"
         action={<StatusPill tone="success">Publishing live</StatusPill>}
       />
-      <div className="staff-journey-layout">
-        <section className="staff-panel">
+      <div className="staff-journey-studio">
+        <section className="staff-panel staff-journey-studio__workspace">
           <div className="staff-journey-tabs" role="tablist">
             <button
               className={kind === "onboarding" ? "is-active" : undefined}
@@ -2332,7 +2405,11 @@ function JourneysView({
               aria-selected={kind === "onboarding"}
               onClick={() => setKind("onboarding")}
             >
-              Offer onboarding
+              <span aria-hidden="true">01</span>
+              <span>
+                <strong>Offer onboarding</strong>
+                <small>Acceptance through student setup</small>
+              </span>
             </button>
             <button
               className={kind === "enrollment" ? "is-active" : undefined}
@@ -2341,7 +2418,11 @@ function JourneysView({
               aria-selected={kind === "enrollment"}
               onClick={() => setKind("enrollment")}
             >
-              Enrollment checklist
+              <span aria-hidden="true">02</span>
+              <span>
+                <strong>Enrollment checklist</strong>
+                <small>Post-acceptance requirements</small>
+              </span>
             </button>
           </div>
           <JourneyFlowBuilder
@@ -2356,13 +2437,23 @@ function JourneysView({
             onSaved={refresh}
           />
         </section>
-        <ConfigurationAssistant
-          key={`journeys-${workspace.configurations.journeys.version}`}
-          configuration={workspace.configurations.journeys}
-          kind="journeys"
-          promptPlaceholder={'Try: Add "Choose a meal plan" to onboarding as a single selection worth 20 points.'}
-          onSaved={refresh}
-        />
+        <details className="staff-journey-copilot">
+          <summary>
+            <span aria-hidden="true">✦</span>
+            <span>
+              <strong>Draft a workflow change with Edward</strong>
+              <small>Describe the change in plain language, then review the generated draft before publishing.</small>
+            </span>
+            <span>Open copilot</span>
+          </summary>
+          <ConfigurationAssistant
+            key={`journeys-${workspace.configurations.journeys.version}`}
+            configuration={workspace.configurations.journeys}
+            kind="journeys"
+            promptPlaceholder={'Try: Add "Choose a meal plan" to onboarding as a single selection worth 20 points.'}
+            onSaved={refresh}
+          />
+        </details>
       </div>
       <ActionRulesEditor kind={kind} />
       <section className="staff-roadmap-note">
@@ -4009,11 +4100,8 @@ function StaffWorkspaceShell({
           refresh();
           realtimeSubscribers.current.forEach((invalidate) => invalidate());
           if (event.type === "staff.stream.ready") return;
-          setRealtimeNotice({
-            eventId: event.id,
-            title: "New student inquiry/update available",
-            workItemId: realtimeWorkItemId(event),
-          });
+          const notice = realtimeNoticeFor(event);
+          if (notice) setRealtimeNotice(notice);
         },
       }),
     [refresh],
@@ -4125,10 +4213,7 @@ function StaffWorkspaceShell({
             <span className="staff-realtime-notice__signal" aria-hidden="true" />
             <div>
               <strong>{realtimeNotice.title}</strong>
-              <p>
-                Canonical staff data has refreshed. Open the action when you are
-                ready; an open record will not be replaced automatically.
-              </p>
+              <p>{realtimeNotice.body}</p>
             </div>
           </div>
           <div className="staff-realtime-notice__actions">

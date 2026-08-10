@@ -21,6 +21,8 @@ import type {
   CreateStudentInquiryMessageInput,
   CreateStudentAppointmentInput,
   CreateStudentDocumentInput,
+  DeferStudentExperienceUpdatesInput,
+  DeferStudentExperienceUpdatesResult,
   DecideStudentExperienceUpdateInput,
   StudentAppointment,
   StudentAppointmentList,
@@ -650,6 +652,19 @@ export function registerCampusEvent(
   );
 }
 
+export function deferStudentExperienceUpdates(
+  input: DeferStudentExperienceUpdatesInput,
+) {
+  return request<DeferStudentExperienceUpdatesResult>(
+    "/v1/student/experience-updates/defer",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
 export function getStaffWorkItemDetail(
   workItemId: string,
   signal?: AbortSignal,
@@ -1177,6 +1192,10 @@ export function reviewStaffDocument(
     },
     { notifyStudentRecordChanged: false },
   );
+}
+
+export function getStaffDocumentContentUrl(path: string) {
+  return tenantAwareDocumentUrl(path);
 }
 
 function tenantAwareDocumentUrl(path: string) {

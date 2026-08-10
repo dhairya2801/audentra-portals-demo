@@ -150,6 +150,21 @@ test("realtime client bootstraps without a replay cursor and suppresses ready ev
   );
 });
 
+test("realtime banners explain the event instead of labeling every update as an inquiry", async () => {
+  const portal = await readFile(
+    new URL("../app/staff/staff-portal.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(portal, /function realtimeNoticeFor/);
+  assert.match(portal, /event\.type === "staff\.ai_update\.available"/);
+  assert.match(portal, /return null;/);
+  assert.match(portal, /Action SLA is overdue/);
+  assert.match(portal, /The due time passed, so the scheduler escalated this action/);
+  assert.match(portal, /Document parsing needs human review/);
+  assert.doesNotMatch(portal, /title: "New student inquiry\/update available"/);
+  assert.match(portal, /<p>\{realtimeNotice\.body\}<\/p>/);
+});
+
 test("consumer requirement status supports the canonical help-requested state", async () => {
   const [contracts, styles] = await Promise.all([
     readFile(new URL("../../../packages/contracts/src/index.ts", import.meta.url), "utf8"),

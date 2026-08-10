@@ -373,6 +373,9 @@ test("typed client wires every resource route and mutation contract", async () =
       action: "handle_now",
       expectedVersion: 3,
     });
+    await client.deferStudentExperienceUpdates({
+      updates: [{ id: "update/2", expectedVersion: 4 }],
+    });
     await client.getStudentDashboard();
     await client.getStudentAcademics();
     await client.searchCatalogCourses("calculus");
@@ -635,6 +638,7 @@ test("typed client wires every resource route and mutation contract", async () =
   const expectedPaths = [
     "/v1/student/bootstrap",
     "/v1/student/experience-updates/update%2F1/decision",
+    "/v1/student/experience-updates/defer",
     "/v1/student/dashboard",
     "/v1/student/academics",
     "/v1/catalog/courses",
@@ -697,6 +701,14 @@ test("typed client wires every resource route and mutation contract", async () =
   assert.deepEqual(JSON.parse(experienceDecision.init.body), {
     action: "handle_now",
     expectedVersion: 3,
+  });
+  const experienceDeferral = requestByPath.get(
+    "/v1/student/experience-updates/defer",
+  );
+  assert.equal(experienceDeferral.init.method, "POST");
+  assert.equal(experienceDeferral.init.headers["Content-Type"], "application/json");
+  assert.deepEqual(JSON.parse(experienceDeferral.init.body), {
+    updates: [{ id: "update/2", expectedVersion: 4 }],
   });
 
   assert.equal(requests[3].init.method, "GET");
@@ -1509,6 +1521,8 @@ test("campus event visuals are data-driven, accessible, and backed by local asse
   assert.match(campusPage, /data-visual-theme=/);
   assert.match(campusPage, /activeEvent\.imageAlt/);
   assert.match(campusPage, /activeEvent\.imageAttribution/);
+  assert.match(campusPage, /Refresh current events/);
+  assert.match(campusPage, /campus\.refresh\(\)/);
   assert.match(styles, /\.campus-carousel--theme-festival/);
   assert.match(styles, /\.campus-carousel--theme-discovery/);
   assert.match(styles, /\.campus-carousel--theme-career/);
@@ -1523,8 +1537,8 @@ test("campus event visuals are data-driven, accessible, and backed by local asse
   }
 });
 
-test("experience updates open once with an accessible decision flow", async () => {
-  const [contracts, apiClient, shell, styles] = await Promise.all([
+test("experience updates aggregate once per portal visit with an accessible decision flow", async () => {
+  const [contracts, apiClient, shell, session, styles] = await Promise.all([
     readFile(
       new URL("../../../packages/contracts/src/index.ts", import.meta.url),
       "utf8",
@@ -1534,6 +1548,10 @@ test("experience updates open once with an accessible decision flow", async () =
       new URL("../app/components/portal-shell.tsx", import.meta.url),
       "utf8",
     ),
+    readFile(
+      new URL("../app/lib/experience-update-session.ts", import.meta.url),
+      "utf8",
+    ),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
 
@@ -1541,30 +1559,102 @@ test("experience updates open once with an accessible decision flow", async () =
   assert.match(contracts, /experienceUpdates: StudentExperienceUpdate\[\]/);
   assert.match(contracts, /status: "pending" \| "deferred"/);
   assert.match(contracts, /status: "acknowledged" \| "deferred"/);
+  assert.match(contracts, /interface DeferStudentExperienceUpdatesInput/);
   assert.match(apiClient, /experience-updates\/\$\{encodeURIComponent\(updateId\)\}\/decision/);
+  assert.match(apiClient, /experience-updates\/defer/);
   assert.match(apiClient, /request<StudentExperienceUpdateDecision>/);
+  assert.match(apiClient, /request<DeferStudentExperienceUpdatesResult>/);
 
   assert.match(shell, /role="dialog"/);
   assert.match(shell, /aria-modal="true"/);
   assert.match(shell, /aria-labelledby="experience-update-title"/);
-  assert.match(shell, /hasPresentedExperienceUpdate\.current = true/);
+  assert.match(shell, /experienceUpdates\.length > 0/);
+  assert.match(shell, /update\.kind === "enrollment" \|\| update\.kind === "onboarding"/);
+  assert.match(shell, /beginExperienceUpdateVisit\(experienceSessionKey\)/);
+  assert.match(shell, /document\.visibilityState === "visible"/);
+  assert.match(shell, /deferStudentExperienceUpdates/);
   assert.match(shell, /child\.setAttribute\("inert", ""\)/);
-  assert.match(shell, /onDecision\("handle_now"\)/);
-  assert.match(shell, /onDecision\("later"\)/);
+  assert.match(shell, /onHandleNow\(update\)/);
+  assert.match(shell, /onDefer\(\)/);
   assert.match(shell, /\/enrollment\/requirements\/\$\{encodeURIComponent/);
   assert.match(shell, /window\.location\.assign\(tenantRuntime\.href\(destination\)\)/);
+  assert.match(session, /EXPERIENCE_UPDATE_IDLE_MS = 5 \* 60_000/);
+  assert.match(session, /sessionStorage/);
   assert.match(styles, /\.experience-update-dialog/);
   assert.match(styles, /\.experience-update-dialog__actions/);
+  assert.match(styles, /\.experience-update-dialog__list/);
+});
+
+test("experience update session does not reopen on navigation but resumes after five minutes", async () => {
+  const source = await readFile(
+    new URL("../app/lib/experience-update-session.ts", import.meta.url),
+    "utf8",
+  );
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
+  const sessionValues = new Map();
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: {
+      sessionStorage: {
+        getItem: (key) => sessionValues.get(key) ?? null,
+        setItem: (key, value) => sessionValues.set(key, value),
+      },
+    },
+  });
+
+  try {
+    const session = await import(moduleUrl);
+    const key = session.studentExperienceUpdateSessionKey("tenant-1", "student-1");
+    const expiredKey = session.studentExperienceUpdateSessionKey("tenant-1", "student-2");
+    const startedAt = 1_000;
+
+    assert.equal(session.beginExperienceUpdateVisit(key, startedAt), true);
+    assert.equal(session.beginExperienceUpdateVisit(key, startedAt + 1_000), false);
+    session.touchExperienceUpdateVisit(key, startedAt + 2_000);
+    assert.equal(
+      session.beginExperienceUpdateVisit(
+        key,
+        startedAt + 2_000 + session.EXPERIENCE_UPDATE_IDLE_MS - 1,
+      ),
+      false,
+    );
+    assert.equal(session.beginExperienceUpdateVisit(expiredKey, startedAt), true);
+    session.touchExperienceUpdateVisit(expiredKey, startedAt + 2_000);
+    assert.equal(
+      session.beginExperienceUpdateVisit(
+        expiredKey,
+        startedAt + 2_000 + session.EXPERIENCE_UPDATE_IDLE_MS,
+      ),
+      true,
+    );
+  } finally {
+    if (previousWindow) {
+      Object.defineProperty(globalThis, "window", previousWindow);
+    } else {
+      delete globalThis.window;
+    }
+  }
 });
 
 test("staff journeys share a typed, accessible flow builder", async () => {
-  const [builder, formBuilder, onboarding, modelSource, staffPortal, contracts, styles] = await Promise.all([
+  const [builder, formBuilder, templateLibrary, onboarding, modelSource, staffPortal, contracts, styles] = await Promise.all([
     readFile(
       new URL("../app/staff/journey-flow-builder.tsx", import.meta.url),
       "utf8",
     ),
     readFile(
       new URL("../app/staff/onboarding-form-builder.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/staff/journey-template-library.ts", import.meta.url),
       "utf8",
     ),
     readFile(new URL("../app/onboarding/page.tsx", import.meta.url), "utf8"),
@@ -1583,6 +1673,8 @@ test("staff journeys share a typed, accessible flow builder", async () => {
   assert.match(staffPortal, /<JourneyFlowBuilder/);
   assert.match(staffPortal, /kind=\{kind\}/);
   assert.match(staffPortal, /Published changes stay versioned/);
+  assert.match(staffPortal, /className="staff-journey-studio"/);
+  assert.match(staffPortal, /<details className="staff-journey-copilot">/);
   assert.doesNotMatch(staffPortal, /New journeys use the new version/);
 
   assert.match(builder, /draggable=\{!busy && !item\.studentStep\}/);
@@ -1591,7 +1683,7 @@ test("staff journeys share a typed, accessible flow builder", async () => {
   assert.match(builder, /Move \$\{item\.title\} down/);
   assert.match(builder, /role="switch"/);
   assert.match(builder, /aria-checked=\{item\.active\}/);
-  assert.match(builder, />\s*Add step\s*</);
+  assert.match(builder, /\+ Add step/);
   assert.match(builder, /createJourneyTaskId\(kind, ids\)/);
   assert.match(builder, /createJourneyFlowId\(/);
   assert.match(builder, /noCompatMode: false/);
@@ -1622,12 +1714,41 @@ test("staff journeys share a typed, accessible flow builder", async () => {
   assert.match(builder, /Synced to the student checklist/);
   assert.match(builder, /Edit synced item/);
   assert.match(builder, /<JourneyDependencyMap/);
-  assert.match(builder, /How steps unlock/);
+  assert.match(builder, /Build the journey as a connected graph/);
+  assert.match(builder, /const \[viewMode, setViewMode\]/);
+  assert.match(builder, /Flow map/);
+  assert.match(builder, /Step list/);
+  assert.match(builder, /focusedGraphTasks/);
+  assert.match(builder, /currentKind=\{kind\}/);
+  assert.match(builder, /staff-journey-editor__section/);
   assert.match(builder, /journeySuccessorIds/);
-  assert.match(builder, /Priority \{task\.priority\}/);
+  assert.match(builder, /\{task\.points\} pts/);
   assert.match(builder, /name="priority"/);
   assert.match(builder, /name="dueOffsetDays"/);
   assert.match(builder, /className="staff-dependency-picker"/);
+  assert.match(builder, /Answer-driven path/);
+  assert.match(builder, /\+ Add answer condition/);
+  assert.match(builder, /A non-matching branch becomes Not applicable/);
+  assert.match(builder, /task\.activation =/);
+  assert.match(builder, /source_task: rule\.sourceTaskId/);
+  assert.match(builder, /journey-conditional-arrow/);
+  assert.match(builder, /Simplify layout/);
+  assert.match(builder, /⌖ Pointer/);
+  assert.match(builder, /✋ Hand/);
+  assert.match(builder, /zoomWithWheel/);
+  assert.match(builder, /onPointerDown=\{startPan\}/);
+  assert.match(builder, /const middleMouse = event\.button === 1/);
+  assert.match(builder, /middle mouse switches to Hand/);
+  assert.match(builder, /studentInputPreview/);
+  assert.match(builder, /02 Student input/);
+  assert.match(builder, /02 Student page/);
+  assert.match(builder, /03 System action/);
+  assert.match(builder, /System screen basics/);
+  assert.match(builder, /hidden=\{activeEditorSection !== "experience"\}/);
+  assert.match(builder, /operatorsForRouteField/);
+  assert.match(builder, /default \(none of\)/);
+  assert.match(builder, /greater_than_or_equal/);
+  assert.match(builder, /dedicated[\s\S]*express lane/);
   assert.match(builder, /selectedDependencies/);
   assert.match(builder, /validateJourneyDependencies\(candidateGraph\)/);
   assert.match(builder, /task\.due_days_after_acceptance = dueOffsetDays/);
@@ -1657,7 +1778,7 @@ test("staff journeys share a typed, accessible flow builder", async () => {
   assert.match(builder, /submission_type: submissionTypeForTask\(selectedType\)/);
   assert.match(builder, /name="options"/);
   assert.match(builder, /Selection steps need at least two options/);
-  assert.match(builder, /validateFormFields\(formFields\)/);
+  assert.match(builder, /validateFormDefinition\(formDefinition\)/);
   assert.match(builder, /name="maximumSelections"/);
   assert.match(builder, /name="acceptedFileTypes"/);
   assert.match(builder, /name="documentCategories"/);
@@ -1681,15 +1802,30 @@ test("staff journeys share a typed, accessible flow builder", async () => {
   assert.match(builder, /title: "Your response"/);
   assert.match(builder, /field_type: "text"/);
   assert.match(builder, /specializedForm = \["profile_verification", "housing_preference"\]/);
-  assert.match(builder, /selectedType !== "form"[\s\S]{0,80}delete existingInput\.fields/);
+  assert.match(builder, /delete existingInput\.form/);
+  assert.match(builder, /delete existingInput\.fields/);
   assert.match(builder, /remove its configured form/);
   assert.match(formBuilder, /aria-label="Student form builder"/);
   assert.match(formBuilder, /Live student preview/);
-  assert.match(formBuilder, /New field type/);
+  assert.match(formBuilder, /Browse templates/);
+  assert.match(formBuilder, /Form outline/);
+  assert.match(formBuilder, /formScaffoldTemplates/);
+  assert.match(styles, /staff-journey-graph__canvas-tools/);
+  assert.match(styles, /staff-journey-graph__viewport\.is-pan-ready/);
+  assert.match(styles, /staff-journey-editor__input-preview/);
+  assert.match(formBuilder, /Step \{activePageIndex \+ 1\} of \{form\.pages\.length\}/);
+  assert.match(formBuilder, /aria-label="Question field palette"/);
+  assert.match(formBuilder, /value: "number"/);
+  assert.match(formBuilder, /Minimum \(optional\)/);
+  assert.match(formBuilder, /Maximum \(optional\)/);
+  assert.match(formBuilder, /Step \(optional\)/);
+  assert.match(formBuilder, /duplicateField/);
+  assert.match(formBuilder, /staff-form-preview__device/);
   assert.match(formBuilder, /disabled: true/);
   assert.doesNotMatch(formBuilder, /required: field\.required/);
   assert.match(formBuilder, /dataTransfer\.setData\("text\/plain", field\.id\)/);
   assert.match(onboarding, /ConfiguredAboutYouFields/);
+  assert.match(onboarding, /configured-about-you-form__progress/);
   assert.match(onboarding, /custom__\$\{field\.id\}/);
   assert.match(onboarding, /label: configured\?\.label \|\| candidate\.label/);
   assert.match(staffPortal, /staff-event-image-dropzone/);
@@ -1708,6 +1844,14 @@ test("staff journeys share a typed, accessible flow builder", async () => {
     assert.ok(builder.includes(`"${alias}"`), `${alias} must be scrubbed from task.input`);
   }
   assert.match(contracts, /active\?: boolean/);
+  assert.match(contracts, /interface JourneyRouteActivation/);
+  assert.match(contracts, /operator: JourneyRouteOperator/);
+  assert.match(contracts, /\| "one_of"/);
+  assert.match(contracts, /\| "none_of"/);
+  assert.match(contracts, /\| "greater_than_or_equal"/);
+  assert.match(contracts, /value: string \| number \| boolean \| string\[\]/);
+  assert.match(contracts, /interface StudentRequirementFormDefinition/);
+  assert.match(contracts, /pages: StudentRequirementFormPage\[\]/);
   assert.match(
     contracts,
     /submissionType: "form" \| "document" \| "payment" \| "appointment" \| "none"/,
@@ -1715,7 +1859,32 @@ test("staff journeys share a typed, accessible flow builder", async () => {
   assert.match(styles, /\.staff-journey-list li\.is-inactive/);
   assert.match(styles, /\.staff-journey-list li\.is-drop-target/);
   assert.match(styles, /\.staff-form-builder__workspace/);
+  assert.match(styles, /\.staff-journey-commandbar/);
+  assert.match(styles, /\.staff-journey-map__viewport/);
+  assert.match(styles, /\.staff-journey-graph__node/);
+  assert.match(styles, /\.staff-route-builder/);
+  assert.match(styles, /\.staff-journey-templates/);
+  assert.match(styles, /\.staff-form-pages/);
+  assert.match(styles, /\.staff-journey-editor__section/);
+  assert.match(styles, /\.staff-form-builder__palette/);
+  assert.match(styles, /\.staff-journey-copilot/);
   assert.match(styles, /\.staff-event-image-dropzone\.is-dragging/);
+  assert.match(builder, /Use template/);
+  assert.match(builder, /onConnect=\{connectNodes\}/);
+  assert.match(builder, /editor_position/);
+  assert.match(templateLibrary, /Enrollment essentials/);
+  assert.match(templateLibrary, /Comprehensive enrollment readiness/);
+  assert.match(templateLibrary, /dependsOn: \["identity_verification", "financial_readiness", "financial_documents"\]/);
+  assert.match(templateLibrary, /dependsOn: \["academic_evaluation", "financial_clearance", "orientation_registration", "advisor_planning"\]/);
+  assert.match(templateLibrary, /International student launch/);
+  assert.match(templateLibrary, /Decision-based student onboarding/);
+  assert.match(templateLibrary, /sourceKey: "living_decision"/);
+  assert.match(templateLibrary, /operator: "one_of"/);
+  assert.match(templateLibrary, /operator: "none_of"/);
+  assert.match(templateLibrary, /Readiness score pathways/);
+  assert.match(templateLibrary, /field_type: "number"/);
+  assert.match(templateLibrary, /operator: "greater_than_or_equal"/);
+  assert.match(templateLibrary, /dependsOn: \["living_decision", "campus_housing_profile", "commuter_profile", "housing_guidance"\]/);
 
   const compiledModel = ts.transpileModule(modelSource, {
     compilerOptions: {
@@ -1755,6 +1924,24 @@ test("staff journeys share a typed, accessible flow builder", async () => {
     ["start"],
     ["profile", "housing"],
   ]);
+  const crossingGraph = [
+    { id: "start", dependsOn: [] },
+    { id: "upper", dependsOn: ["start"] },
+    { id: "lower", dependsOn: ["start"] },
+    { id: "cross_to_upper", dependsOn: ["lower"] },
+    { id: "cross_to_lower", dependsOn: ["upper"] },
+    { id: "finish", dependsOn: ["cross_to_upper", "cross_to_lower"] },
+  ];
+  const simplified = model.simplifyJourneyGraphLayout(crossingGraph);
+  assert.ok(simplified.lower.x < simplified.cross_to_upper.x);
+  assert.ok(simplified.upper.x < simplified.cross_to_lower.x);
+  assert.ok(simplified.cross_to_upper.y > simplified.cross_to_lower.y);
+  for (const level of model.journeyGraphLevels(crossingGraph)) {
+    const positions = level.map((id) => simplified[id]);
+    for (let index = 1; index < positions.length; index += 1) {
+      assert.ok(Math.abs(positions[index].y - positions[index - 1].y) >= 220);
+    }
+  }
   assert.equal(model.validateJourneyDependencies(dependencyGraph), null);
   assert.match(
     model.validateJourneyDependencies([{ id: "loop", dependsOn: ["loop"] }]),
@@ -1827,7 +2014,10 @@ test("generic requirement interactions submit typed, idempotent responses", asyn
   assert.match(action, /getStudentAppointments/);
   assert.doesNotMatch(action, /Paste.*appointment|appointment UUID/i);
   assert.match(action, /live\s+connection is not configured yet/);
-  assert.match(action, /visibleConfiguredFields\(fields, currentValues\)/);
+  assert.match(action, /configuredForm\(requirement\)/);
+  assert.match(action, /visibleConfiguredFields\(page\?\.fields \?\? \[\], currentValues\)/);
+  assert.match(action, /requirement-response__page-progress/);
+  assert.match(action, /pageIndex < form\.pages\.length - 1/);
   assert.match(action, /valuesFromForm\([\s\S]{0,100}visibleFields/);
   assert.match(action, /visibleFields\.map/);
   assert.match(requirementPage, /<RequirementResponseAction/);
@@ -1995,7 +2185,6 @@ test("the Action Center keeps evidence durable while AI and scheduled rules run 
     readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
     readFile(new URL("../../../packages/contracts/src/index.ts", import.meta.url), "utf8"),
   ]);
-
   for (const tab of ["Overview", "Next Step", "Outcomes", "Comments", "History"]) {
     assert.match(detail, new RegExp(`label: "${tab}"`));
   }
@@ -2015,7 +2204,13 @@ test("the Action Center keeps evidence durable while AI and scheduled rules run 
   assert.match(detail, /Earlier transcript revisions/);
   assert.match(detail, /Regenerate transcript/);
   assert.match(detail, /AI enrichment is running in the background/);
-  assert.match(detail, /A message, outcome, or AI summary changed/);
+  assert.match(detail, /function meaningfulUpdateReason/);
+  assert.match(detail, /AI job transitions and generated projections are read-only/);
+  assert.doesNotMatch(detail, /A message, outcome, or AI summary changed/);
+  assert.doesNotMatch(detail, /3\. Record the interaction/);
+  assert.match(detail, /4\. Conversation signals/);
+  assert.match(detail, /aria-label="Refresh AI summaries"/);
+  assert.match(detail, /completeFromHeader/);
   assert.match(rules, /deterministic checks run independently from AI/);
   assert.match(notifications, /unreadCount/);
 

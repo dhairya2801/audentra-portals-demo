@@ -176,3 +176,83 @@ export function journeyGraphLevels(tasks: readonly JourneyDependencyNode[]) {
 
   return levels;
 }
+
+export interface JourneyGraphPosition {
+  x: number;
+  y: number;
+}
+
+/**
+ * Produce a deterministic Sugiyama-style layered layout.
+ *
+ * Longest-path ranks keep prerequisites left of their dependants. Repeated
+ * forward/backward barycenter sweeps reorder each rank around the average row
+ * of its neighbours, reducing crossings without changing graph semantics.
+ * Fixed rank and row gaps then guarantee that node rectangles do not overlap.
+ */
+export function simplifyJourneyGraphLayout(
+  tasks: readonly JourneyDependencyNode[],
+): Record<string, JourneyGraphPosition> {
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const originalOrder = new Map(tasks.map((task, index) => [task.id, index]));
+  const levels = journeyGraphLevels(tasks).map((level) => [...level]);
+
+  const rowById = () =>
+    new Map(
+      levels.flatMap((level) =>
+        level.map((taskId, rowIndex) => [taskId, rowIndex] as const),
+      ),
+    );
+  const reorder = (
+    levelIndex: number,
+    neighbours: (taskId: string) => string[],
+  ) => {
+    const rows = rowById();
+    const previousRows = new Map(
+      levels[levelIndex].map((taskId, rowIndex) => [taskId, rowIndex]),
+    );
+    levels[levelIndex].sort((left, right) => {
+      const score = (taskId: string) => {
+        const neighbourRows = neighbours(taskId)
+          .map((neighbourId) => rows.get(neighbourId))
+          .filter((row): row is number => row !== undefined);
+        if (neighbourRows.length === 0) {
+          return previousRows.get(taskId) ?? originalOrder.get(taskId) ?? 0;
+        }
+        return (
+          neighbourRows.reduce((total, row) => total + row, 0) /
+          neighbourRows.length
+        );
+      };
+      return (
+        score(left) - score(right) ||
+        (previousRows.get(left) ?? 0) - (previousRows.get(right) ?? 0) ||
+        (originalOrder.get(left) ?? 0) - (originalOrder.get(right) ?? 0)
+      );
+    });
+  };
+
+  for (let sweep = 0; sweep < 6; sweep += 1) {
+    for (let levelIndex = 1; levelIndex < levels.length; levelIndex += 1) {
+      reorder(levelIndex, (taskId) => [...(taskById.get(taskId)?.dependsOn ?? [])]);
+    }
+    for (let levelIndex = levels.length - 2; levelIndex >= 0; levelIndex -= 1) {
+      reorder(levelIndex, (taskId) => journeySuccessorIds(tasks, taskId));
+    }
+  }
+
+  const widestLevel = Math.max(1, ...levels.map((level) => level.length));
+  const horizontalGap = 420;
+  const verticalGap = 220;
+  const positions: Record<string, JourneyGraphPosition> = {};
+  for (const [levelIndex, taskIds] of levels.entries()) {
+    const centeringOffset = ((widestLevel - taskIds.length) * verticalGap) / 2;
+    for (const [rowIndex, taskId] of taskIds.entries()) {
+      positions[taskId] = {
+        x: 80 + levelIndex * horizontalGap,
+        y: 170 + centeringOffset + rowIndex * verticalGap,
+      };
+    }
+  }
+  return positions;
+}

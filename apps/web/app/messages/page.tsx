@@ -1,7 +1,7 @@
 "use client";
 
 import type { StudentMessageList } from "@vv/contracts";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { PortalShell } from "../components/portal-shell";
 import {
   ActionFeedback,
@@ -111,6 +111,17 @@ export default function MessagesPage() {
     [],
   );
   const messages = useApiResource(loadMessages);
+  const refreshMessages = messages.refresh;
+
+  useEffect(() => {
+    const refreshAfterRealtimeEvent = () => refreshMessages();
+    window.addEventListener("vv:student-realtime", refreshAfterRealtimeEvent);
+    return () =>
+      window.removeEventListener(
+        "vv:student-realtime",
+        refreshAfterRealtimeEvent,
+      );
+  }, [refreshMessages]);
 
   return (
     <PortalShell

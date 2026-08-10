@@ -240,7 +240,18 @@ export default function CampusLifePage() {
               </small>
               {registrationAction.status === "error" &&
               registrationEventId === activeEvent.id ? (
-                <span role="alert">{registrationAction.message}</span>
+                <span className="campus-event-registration__stale" role="alert">
+                  <span>{registrationAction.message}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRegistrationEventId(null);
+                      campus.refresh();
+                    }}
+                  >
+                    Refresh current events
+                  </button>
+                </span>
               ) : null}
             </div>
             {activeEvent.imageAttribution ? (
