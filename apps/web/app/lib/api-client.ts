@@ -72,8 +72,6 @@ import type {
   UpdateStudentProfileInput,
 } from "@vv/contracts";
 import { currentTenantSlug } from "./tenant";
-import { demoStaffFetch } from "./demo-staff-transport";
-import { demoStudentFetch } from "./demo-student-transport";
 
 const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
 
@@ -96,17 +94,6 @@ export class ApiClientError extends Error {
     this.code = options.code;
     this.requestId = options.requestId;
   }
-}
-
-export interface DemoAuthSession {
-  authenticated: true;
-  mode: "demo";
-  actorType: "student";
-  student: {
-    id: string;
-    preferredName: string;
-  };
-  notice: string;
 }
 
 export interface CredentialAuthSession {
@@ -149,17 +136,15 @@ async function request<T>(
   init: RequestInit = {},
   options: { notifyStudentRecordChanged?: boolean } = {},
 ): Promise<T> {
-  const demoResponse = await demoStaffFetch(path, init);
-  const studentDemoResponse = demoResponse ?? await demoStudentFetch(path, init);
-  const response = studentDemoResponse ?? await fetch(`${API_BASE_URL}${path}`, {
-      ...init,
-      credentials: "include",
-      headers: {
-        Accept: "application/json",
-        "X-Tenant-Slug": currentTenantSlug(),
-        ...init.headers,
-      },
-    });
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+      "X-Tenant-Slug": currentTenantSlug(),
+      ...init.headers,
+    },
+  });
 
   if (!response.ok) {
     throw await parseError(response);
@@ -197,14 +182,6 @@ export function decideStudentExperienceUpdate(
   );
 }
 
-export function signInDemoStudent() {
-  return request<DemoAuthSession>("/v1/auth/demo/sign-in", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
-  });
-}
-
 export function signUpStudent(input: {
   email: string;
   phone: string;
@@ -231,28 +208,6 @@ export function signInStudent(input: {
 export function signOutStudent() {
   return request<{ authenticated: false; mode: "credentials" }>(
     "/v1/auth/sign-out",
-    { method: "POST" },
-  );
-}
-
-/**
- * Development-preview only: start a clean, first-use student journey.
- *
- * This is intentionally separate from `signInDemoStudent`, which preserves a
- * demo student's existing saved progress and lets the bootstrap response pick
- * the correct return route.
- */
-export function startGuidedOnboardingDemo() {
-  return request<DemoAuthSession>("/v1/auth/demo/start-guided-onboarding", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
-  });
-}
-
-export function signOutDemoStudent() {
-  return request<{ authenticated: false; mode: "demo" }>(
-    "/v1/auth/demo/sign-out",
     { method: "POST" },
   );
 }

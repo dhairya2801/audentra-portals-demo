@@ -351,19 +351,10 @@ test("typed client wires every resource route and mutation contract", async () =
     new URL("../app/lib/api-client.ts", import.meta.url),
     "utf8",
   );
-  const executableSource = source
-    .replace(
-      /import\s+\{\s*currentTenantSlug\s*\}\s+from\s+"\.\/tenant";/,
-      'const currentTenantSlug = () => "aster";',
-    )
-    .replace(
-      /import\s+\{\s*demoStaffFetch\s*\}\s+from\s+"\.\/demo-staff-transport";/,
-      "const demoStaffFetch = async () => null;",
-    )
-    .replace(
-      /import\s+\{\s*demoStudentFetch\s*\}\s+from\s+"\.\/demo-student-transport";/,
-      "const demoStudentFetch = async () => null;",
-    );
+  const executableSource = source.replace(
+    /import\s+\{\s*currentTenantSlug\s*\}\s+from\s+"\.\/tenant";/,
+    'const currentTenantSlug = () => "aster";',
+  );
   const compiled = ts.transpileModule(executableSource, {
     compilerOptions: {
       module: ts.ModuleKind.ESNext,
@@ -485,9 +476,6 @@ test("typed client wires every resource route and mutation contract", async () =
         properties: { projection_version: 1 },
       },
     ]);
-    await client.signInDemoStudent();
-    await client.startGuidedOnboardingDemo();
-    await client.signOutDemoStudent();
     await client.signInStaff({
       email: "priya.shah@aster.example.edu",
       password: "Individual-staff-password-2027",
@@ -674,9 +662,6 @@ test("typed client wires every resource route and mutation contract", async () =
     "/v1/demo/help-requests",
     "/v1/admission-offers/offer%2F1/accept",
     "/v1/activity-events/batch",
-    "/v1/auth/demo/sign-in",
-    "/v1/auth/demo/start-guided-onboarding",
-    "/v1/auth/demo/sign-out",
     "/v1/auth/staff/sign-in",
     "/v1/auth/staff/sign-up",
     "/v1/staff/action-center",
@@ -931,20 +916,21 @@ test("onboarding preserves the eight-step order and authoritative boundary actio
 });
 
 test("staff authentication never exposes or prefills credentials", async () => {
-  const [source, transport] = await Promise.all([
-    readFile(new URL("../app/staff/staff-action-center.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/lib/demo-staff-transport.ts", import.meta.url), "utf8"),
-  ]);
+  const source = await readFile(
+    new URL("../app/staff/staff-action-center.tsx", import.meta.url),
+    "utf8",
+  );
 
   assert.match(source, /Staff account access/);
   assert.match(source, /Institution access code/);
   assert.match(source, /signUpStaff/);
   assert.doesNotMatch(source, /AsterStaff2027|Local testing account|Password:/);
   assert.doesNotMatch(source, /defaultValue=.*password/i);
-  assert.match(source, /Explore the Audentra demo/);
-  assert.match(transport, /audentra:staff-demo-session:v1/);
-  assert.match(transport, /buildDemoStaffWorkspace/);
-  assert.match(transport, /if \(!staffDemoEnabled \|\| typeof window === "undefined"\) return null/);
+  // Every staff actor now authenticates against the platform. The browser-only
+  // demo transport and its one-click shortcut are deliberately gone, so no
+  // route into the workspace bypasses a real, revocable session.
+  assert.doesNotMatch(source, /Explore the Audentra demo/);
+  assert.doesNotMatch(source, /demo-staff-transport|staffDemoEnabled/);
 });
 
 test("staff authentication forms survive ambient focus refreshes", async () => {

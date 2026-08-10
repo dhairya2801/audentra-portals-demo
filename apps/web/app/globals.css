@@ -15546,12 +15546,6 @@ a {
 .staff-shell--workspace .button--primary { background: var(--audentra-blue); box-shadow: 0 8px 18px rgb(30 91 255 / 18%); }
 .staff-shell--workspace .button--primary:not(:disabled):hover { background: #164de2; }
 
-.staff-demo-login { display: grid; gap: 0.55rem; margin-top: 0.9rem; text-align: center; }
-.staff-demo-login > span { display: flex; gap: 0.7rem; align-items: center; color: #9299a7; font-size: 0.6rem; text-transform: uppercase; }
-.staff-demo-login > span::before, .staff-demo-login > span::after { height: 1px; flex: 1; background: var(--audentra-line, #e5e9f2); content: ""; }
-.staff-demo-login > button { display: grid; width: 100%; gap: 0.1rem; justify-items: center; border-color: #cfc6ff; background: var(--audentra-soft-purple, #f2efff); color: var(--audentra-purple, #6a38ff); }
-.staff-demo-login > button small { color: #756f88; font-size: 0.58rem; font-weight: 500; }
-.staff-demo-login > p { margin: 0; color: #7b8290; font-size: 0.58rem; line-height: 1.45; }
 
 /* Morning Brew — personalized executive briefing -------------------------------
    Reads as a morning newspaper for a university leader: a masthead, a serif
@@ -16313,53 +16307,6 @@ h1, h2, h3, h4,
 .auth-security-note {
   border-color: rgb(0 196 154 / 38%);
   background: #e9fbf6;
-}
-
-.student-demo-login {
-  display: grid;
-  gap: 0.55rem;
-  margin-top: 1rem;
-  text-align: center;
-}
-
-.student-demo-login > span {
-  display: flex;
-  gap: 0.7rem;
-  align-items: center;
-  color: #9299a7;
-  font-size: 0.6rem;
-  text-transform: uppercase;
-}
-
-.student-demo-login > span::before,
-.student-demo-login > span::after {
-  height: 1px;
-  flex: 1;
-  background: #e5e9f2;
-  content: "";
-}
-
-.student-demo-login > button {
-  display: grid;
-  width: 100%;
-  gap: 0.1rem;
-  justify-items: center;
-  border-color: #cfc6ff;
-  background: #f2efff;
-  color: var(--audentra-purple);
-}
-
-.student-demo-login > button small {
-  color: #756f88;
-  font-size: 0.62rem;
-  font-weight: 500;
-}
-
-.student-demo-login > p {
-  margin: 0;
-  color: #7b8290;
-  font-size: 0.62rem;
-  line-height: 1.45;
 }
 
 /* Portal selector */

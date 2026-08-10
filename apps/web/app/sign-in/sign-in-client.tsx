@@ -9,7 +9,6 @@ import { useApiAction } from "../hooks/use-api-resource";
 import {
   ApiClientError,
   getStudentBootstrap,
-  signInDemoStudent,
   signInStudent,
   signUpStudent,
 } from "../lib/api-client";
@@ -47,27 +46,14 @@ export function SignInClient() {
   );
   const signIn = useApiAction(signInAction, signInErrorMessage);
   const signUp = useApiAction(signUpAction);
-  const demoSignIn = useApiAction(signInDemoStudent, signInErrorMessage);
   const activeAction = mode === "sign_in" ? signIn : signUp;
-  const isBusy =
-    signIn.status === "loading" || signUp.status === "loading" || demoSignIn.status === "loading";
+  const isBusy = signIn.status === "loading" || signUp.status === "loading";
 
   const chooseMode = (nextMode: AuthMode) => {
     setMode(nextMode);
     setFieldErrors({});
     signIn.reset();
     signUp.reset();
-    demoSignIn.reset();
-  };
-
-  const enterDemo = async () => {
-    try {
-      await demoSignIn.run();
-      const bootstrap = await getStudentBootstrap();
-      window.location.assign(tenantRuntime.href(bootstrap.initialRoute));
-    } catch {
-      // The action feedback below exposes an accessible, retryable error.
-    }
   };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -321,25 +307,9 @@ export function SignInClient() {
           </button>
         </form>
 
-        {mode === "sign_in" ? (
-          <div className="student-demo-login">
-            <span>or</span>
-            <button
-              className="button button--secondary"
-              type="button"
-              disabled={isBusy}
-              onClick={() => void enterDemo()}
-            >
-              <strong>{demoSignIn.status === "loading" ? "Opening demo…" : "Explore the student demo"}</strong>
-              <small>No backend or account required</small>
-            </button>
-            <p>Opens the full student experience with synthetic demonstration data.</p>
-          </div>
-        ) : null}
-
         <ActionFeedback
-          status={demoSignIn.status === "error" ? demoSignIn.status : activeAction.status}
-          error={demoSignIn.message || activeAction.message}
+          status={activeAction.status}
+          error={activeAction.message}
           success={
             mode === "sign_up"
               ? "Account created. Opening onboarding…"
