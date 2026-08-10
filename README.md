@@ -134,21 +134,27 @@ npx vercel --prod
 ```
 
 `vercel.json` selects the Next.js framework, builds `apps/web`, and publishes
-`apps/web/.next`. For the self-contained staff demo, configure:
+`apps/web/.next`. Every student and staff actor authenticates against the
+platform; there is no browser-only demo mode and no way into either portal
+without a real, revocable session.
+
+Because the platform issues host-only `SameSite=lax` session cookies, the
+browser has to see a single origin. Which variable you set depends on whether
+that is already true:
 
 ```text
-NEXT_PUBLIC_STAFF_DEMO_MODE=true
-NEXT_PUBLIC_SITE_URL=https://portal.your-domain.example
+# Portal and API share one hostname (Caddy fronts both).
+NEXT_PUBLIC_API_BASE_URL=https://portal.your-domain.example
+
+# Portal is hosted apart from the API, e.g. on Vercel. next.config.ts then
+# proxies /v1/* and /health*, keeping the session cookie first-party.
+API_PROXY_ORIGIN=https://api.your-domain.example
 ```
 
-Do not set `NEXT_PUBLIC_API_BASE_URL` for that deployment. Demo Login creates a
-browser-only staff session and serves the complete staff workspace from an
-isolated synthetic adapter; it makes no `/v1/staff/*` network requests and
-needs no database.
+Set exactly one. They are mutually exclusive: `NEXT_PUBLIC_API_BASE_URL` makes
+`api-client.ts` build absolute cross-origin URLs, which bypasses the rewrites
+and puts the browser back into CORS with a cookie it will refuse to send.
 
-For a real integrated deployment, set `NEXT_PUBLIC_STAFF_DEMO_MODE=false` and
-`NEXT_PUBLIC_API_BASE_URL=https://api.your-domain.example`. The API must allow
-the exact portal origin with credentialed CORS and production cookies must be
-`Secure` with an appropriate `SameSite` policy. `NEXT_PUBLIC_SITE_URL` can be
-omitted for previews because Vercel supplies its generated hostname. Next App
-Router owns client/server routing, so no SPA rewrite is needed.
+`NEXT_PUBLIC_SITE_URL` can be omitted for previews because Vercel supplies its
+generated hostname. Next App Router owns client/server routing, so no SPA
+rewrite is needed.
