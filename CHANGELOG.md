@@ -4,6 +4,33 @@ This changelog summarizes user-visible releases. Detailed notes are separated
 by persona so students, staff, and implementation teams can review only the
 changes that affect them.
 
+## 2026-08-10 - Live support conversations and engineering documentation
+
+### Student and staff portals
+
+- Replaced the disconnected support handoff with one live Help/Messages thread.
+  Student replies and staff-delivered portal replies now refetch into both
+  portals from the canonical platform record.
+- Added explicit five-day active-conversation language and safe retry/error
+  behavior. Inactive threads leave active inboxes, while protected history
+  remains available to the platform for audit and recovery.
+
+### Engineering documentation
+
+- Kept the architecture explorer out of the staff product. The self-contained
+  employee-onboarding atlas lives in the platform repository at
+  `docs/architecture/audentra-system-flow-explorer.html` and documents help
+  conversations, transcript recovery, Action Center enrichment, scheduled
+  work, conditional journeys, and content publication.
+
+### Deployment
+
+- Added a portable Kubernetes web workload with standard Service, Ingress,
+  HPA, PDB, NetworkPolicy, and thin GKE/EKS image overlays. It documents the
+  required build-time portal/API origins for credentialed API and SSE traffic.
+
+See [live conversation and system-map details](docs/changelog/2026-08-10-live-conversations-and-system-map.md).
+
 ## 2026-08-10 — Action Center handoff and recovery refinements
 
 ### Staff experience

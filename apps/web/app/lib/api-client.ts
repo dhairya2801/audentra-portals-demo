@@ -59,6 +59,7 @@ import type {
   StaffEdwardConfigurationDraft,
   StaffEdwardConfigurationDraftInput,
   StaffInquiry,
+  StaffInquiryThread,
   StaffKnowledgeCard,
   StaffManagedConfiguration,
   StaffManagedConfigurationKind,
@@ -902,6 +903,17 @@ export function updateStaffWorkItem(
         "Content-Type": "application/json",
       },
       body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function getStaffInquiryThread(inquiryId: string, signal?: AbortSignal) {
+  return request<StaffInquiryThread>(
+    `/v1/staff/inquiries/${encodeURIComponent(inquiryId)}/thread`,
+    {
+      headers: staffHeaders,
+      signal,
     },
     { notifyStudentRecordChanged: false },
   );

@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+images:
+  - name: ghcr.io/audentra/audentra-portals
+    newName: us-central1-docker.pkg.dev/PROJECT_ID/audentra-portals/web
+    newTag: REPLACE_WITH_RELEASE_SHA

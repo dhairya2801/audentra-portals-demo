@@ -37,6 +37,7 @@ import {
   createStaffKnowledgeCard,
   createStaffWorkItem,
   draftStaffConfigurationWithEdward,
+  getStaffInquiryThread,
   getStaffOperationsWorkspace,
   previewStaffEdward,
   signOutStaff,
@@ -116,6 +117,9 @@ function realtimeNoticeFor(event: StaffRealtimeEvent): StaffRealtimeNotice | nul
       ? payload.body.trim()
       : null;
   if (event.type === "staff.ai_update.available") {
+    return null;
+  }
+  if (event.type === "staff.inquiry.archived") {
     return null;
   }
   const kind = typeof payload.kind === "string" ? payload.kind : "";
@@ -2908,12 +2912,23 @@ function MessageDetail({
   inquiry,
   workspace,
   onSaved,
+  subscribeToRealtimeInvalidation,
 }: {
   inquiry: StaffInquiry;
   workspace: StaffOperationsWorkspace;
   onSaved: () => void;
+  subscribeToRealtimeInvalidation: (invalidate: () => void) => () => void;
 }) {
   const action = useApiAction(updateStaffInquiry);
+  const loadThread = useCallback(
+    (signal: AbortSignal) => getStaffInquiryThread(inquiry.id, signal),
+    [inquiry.id],
+  );
+  const thread = useApiResource(loadThread);
+  useEffect(
+    () => subscribeToRealtimeInvalidation(thread.refresh),
+    [subscribeToRealtimeInvalidation, thread.refresh],
+  );
   const [reply, setReply] = useState("");
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -2927,6 +2942,7 @@ function MessageDetail({
         notifyStudent: form.get("notifyStudent") === "on",
       });
       setReply("");
+      thread.refresh();
       onSaved();
     } catch {
       onSaved();
@@ -2950,8 +2966,43 @@ function MessageDetail({
         </StatusPill>
       </header>
       <div className="staff-message-reader__body">
-        <time dateTime={inquiry.createdAt}>{formatTime(inquiry.createdAt)}</time>
-        <p>{inquiry.message}</p>
+        <div className="staff-conversation-heading">
+          <div>
+            <p className="eyebrow">Live conversation</p>
+            <h3>Message history</h3>
+          </div>
+          {thread.data?.expiresAt ? (
+            <small>
+              Active until {formatTime(thread.data.expiresAt)}
+            </small>
+          ) : null}
+        </div>
+        {thread.status === "loading" ? (
+          <p className="staff-conversation-state" role="status">Loading messages…</p>
+        ) : thread.status === "error" ? (
+          <div className="staff-conversation-state" role="alert">
+            <p>{thread.error}</p>
+            <button type="button" onClick={thread.reload}>Retry</button>
+          </div>
+        ) : (
+          <ol className="staff-conversation-thread" aria-live="polite">
+            {(thread.data?.messages ?? []).map((message) => (
+              <li
+                className={`staff-conversation-message staff-conversation-message--${message.direction}${message.privateToStaff ? " staff-conversation-message--private" : ""}`}
+                key={message.id}
+              >
+                <div>
+                  <strong>{message.authorName}</strong>
+                  <time dateTime={message.createdAt}>{formatTime(message.createdAt)}</time>
+                </div>
+                <p>{message.body}</p>
+                <small>
+                  {message.privateToStaff ? "Staff-only note" : message.deliveryStatus}
+                </small>
+              </li>
+            ))}
+          </ol>
+        )}
       </div>
       <form onSubmit={submit}>
         <div className="staff-form-grid">
@@ -2980,7 +3031,7 @@ function MessageDetail({
           </label>
         </div>
         <label>
-          Reply
+          Reply to student
           <textarea
             value={reply}
             maxLength={1000}
@@ -2990,7 +3041,7 @@ function MessageDetail({
         </label>
         <label className="staff-checkbox">
           <input name="notifyStudent" type="checkbox" defaultChecked />
-          Send the reply to the student inbox
+          Deliver this portal message and notify the student in real time
         </label>
         {action.message ? (
           <p className="field-error" role="alert">
@@ -2998,9 +3049,6 @@ function MessageDetail({
           </p>
         ) : null}
         <footer>
-          <button className="button button--secondary" type="button" disabled>
-            Edward drafting next
-          </button>
           <button
             className="button button--primary"
             type="submit"
@@ -3017,9 +3065,11 @@ function MessageDetail({
 function MessagesView({
   workspace,
   refresh,
+  subscribeToRealtimeInvalidation,
 }: {
   workspace: StaffOperationsWorkspace;
   refresh: () => void;
+  subscribeToRealtimeInvalidation: (invalidate: () => void) => () => void;
 }) {
   const [selectedId, setSelectedId] = useState(
     workspace.inquiries[0]?.id ?? null,
@@ -3097,6 +3147,7 @@ function MessagesView({
             inquiry={selected}
             workspace={workspace}
             onSaved={refresh}
+            subscribeToRealtimeInvalidation={subscribeToRealtimeInvalidation}
             key={`${selected.id}-${selected.version}`}
           />
         ) : (
@@ -4274,7 +4325,11 @@ function StaffWorkspaceShell({
         ) : view === "core_plays" ? (
           <CorePlaysView workspace={workspace} refresh={refresh} />
         ) : view === "messages" ? (
-          <MessagesView workspace={workspace} refresh={refresh} />
+          <MessagesView
+            workspace={workspace}
+            refresh={refresh}
+            subscribeToRealtimeInvalidation={subscribeToRealtimeInvalidation}
+          />
         ) : view === "campus_life" ? (
           <CampusLifeView workspace={workspace} refresh={refresh} />
         ) : view === "academics" ? (

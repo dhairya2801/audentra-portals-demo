@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - configmap.yaml
+  - web-service.yaml
+  - web-deployment.yaml
+  - web-hpa.yaml
+  - web-pdb.yaml
+  - web-network-policy.yaml
+  - web-ingress.yaml

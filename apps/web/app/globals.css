@@ -14544,6 +14544,85 @@ a {
   line-height: 1.7;
 }
 
+.staff-conversation-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.staff-conversation-heading h3 {
+  margin: 0.14rem 0 0;
+  color: #1d293d;
+  font-size: 0.9rem;
+}
+
+.staff-conversation-heading > small,
+.staff-conversation-message time,
+.staff-conversation-message > small {
+  color: #788392;
+  font-size: 0.6rem;
+}
+
+.staff-conversation-state {
+  margin: 0;
+  padding: 0.85rem;
+  border: 1px dashed #d6ddd7;
+  border-radius: 0.65rem;
+  background: #fff;
+}
+
+.staff-conversation-state > p {
+  margin-bottom: 0.55rem;
+}
+
+.staff-conversation-thread {
+  display: grid;
+  gap: 0.65rem;
+  max-height: 32rem;
+  margin: 0;
+  padding: 0.2rem;
+  overflow: auto;
+  list-style: none;
+}
+
+.staff-conversation-message {
+  width: min(88%, 38rem);
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #dce2dd;
+  border-radius: 0.72rem 0.72rem 0.72rem 0.18rem;
+  background: #fff;
+}
+
+.staff-conversation-message--staff {
+  justify-self: end;
+  border-color: #cbd9ed;
+  border-radius: 0.72rem 0.72rem 0.18rem;
+  background: #edf4ff;
+}
+
+.staff-conversation-message--private {
+  border-color: #f0dca7;
+  background: #fff9e9;
+}
+
+.staff-conversation-message > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.staff-conversation-message strong {
+  color: #20304b;
+  font-size: 0.69rem;
+}
+
+.staff-conversation-message p {
+  margin: 0.35rem 0;
+  white-space: pre-wrap;
+}
+
 .staff-club-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -17765,6 +17844,19 @@ a {
   display: grid;
   min-width: 0;
   gap: 1rem;
+}
+
+.student-support-live-status {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin: 0;
+  padding: 0.38rem 0.58rem;
+  border-radius: 999px;
+  background: #eaf6ef;
+  color: #176b46;
+  font-size: 0.66rem;
+  font-weight: 800;
 }
 
 .student-support-thread {

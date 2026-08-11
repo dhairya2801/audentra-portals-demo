@@ -109,6 +109,25 @@ belong in the sibling `Audentra-platform` repository.
 - Keep student previews derived from the same working configuration as the
   editor. Draft changes remain local until an explicit, version-checked publish.
 
+## Live support conversations and Kubernetes
+
+- The student Help page and staff Messages workspace render one canonical
+  inquiry thread. Realtime SSE events only invalidate/refetch that thread; do
+  not append an event payload directly into React state as if it were a
+  confirmed message.
+- A visible support conversation remains active for five days after its latest
+  participant message. After that it leaves active inboxes; show a clear
+  expired-state error rather than silently retrying a send or losing typed
+  content. Staff-only notes must never appear in student markup.
+- Engineering architecture explanations do not belong in the student or staff
+  product navigation. The canonical interactive employee-onboarding atlas lives
+  in `Audentra-platform/docs/architecture/audentra-system-flow-explorer.html`;
+  update that docs artifact when portal ownership or behavior changes.
+- The Kubernetes portal manifests are portable Kustomize resources. Public
+  `NEXT_PUBLIC_*` values are image-build configuration, not runtime Deployment
+  secrets; do not add cloud credentials or private platform settings to the
+  web workload.
+
 ## Validation
 
 Run the relevant subset while developing and all gates before handoff:
