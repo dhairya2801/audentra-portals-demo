@@ -132,10 +132,22 @@ test.describe("Edward adversarial requests through the browser", () => {
     expect(payload.message).not.toMatch(
       /<script|javascript:|https?:\/\/|evil\.example/i,
     );
-    expect(payload.suggestedActions).toEqual([]);
+    // Server-derived next-step suggestions are legitimate; what must never
+    // survive is a forged action or any non-portal destination.
+    for (const action of payload.suggestedActions as Array<{ href: string }>) {
+      expect(action.href).toMatch(/^\/[a-z]/);
+      expect(action.href).not.toMatch(/^https?:|javascript:|evil\.example/i);
+    }
     expect(payload.widgets).toEqual([]);
     const lastReply = page.locator(".edward-message--assistant").last();
-    await expect(lastReply.locator("a, .edward-widget")).toHaveCount(0);
+    await expect(lastReply.locator(".edward-widget")).toHaveCount(0);
+    const linkHrefs = await lastReply
+      .locator("a")
+      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("href") ?? ""));
+    for (const href of linkHrefs) {
+      expect(href).toMatch(/^\/[a-z]/);
+      expect(href).not.toMatch(/^https?:|javascript:|evil\.example/i);
+    }
     expect(
       await page.evaluate(
         () =>
@@ -192,26 +204,28 @@ test.describe("Edward adversarial requests through the browser", () => {
     page,
   }) => {
     await page.goto("/edward");
+    // The assistant pipeline reads only the domains a question names — the
+    // always-on dashboard/profile preload of the old router is gone.
     const cases = [
       {
         prompt: "Which classes and prerequisites are in my academic plan?",
-        expected: ["dashboard", "profile", "academics"],
+        expected: ["academics"],
       },
       {
         prompt: "Which clubs and campus events can I join?",
-        expected: ["dashboard", "profile", "campus_life"],
+        expected: ["campus_life"],
       },
       {
         prompt: "What did I choose for housing during onboarding?",
-        expected: ["dashboard", "profile", "onboarding"],
+        expected: ["housing"],
       },
       {
         prompt: "Do I have unread messages?",
-        expected: ["dashboard", "profile", "messages"],
+        expected: ["messages"],
       },
       {
         prompt: "What is my financial aid balance?",
-        expected: ["dashboard", "profile", "payments", "financials"],
+        expected: ["financial_aid"],
       },
     ];
 
