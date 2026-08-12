@@ -648,6 +648,13 @@ export function EdwardAssistant({
           page_context: window.location.pathname,
         });
       }
+      if (process.env.NODE_ENV !== "production" && response.requestId) {
+        // Development-only: the request id is the AssistantTurnTrace id.
+        // Inspect the full turn with
+        //   GET {API}/internal/assistant/traces/{requestId}
+        // (worker token; see Audentra-platform docs/25).
+        console.debug("[edward] trace", response.requestId);
+      }
       updateConversation(conversationId, (conversation) => ({
         ...conversation,
         messages: [
@@ -949,7 +956,7 @@ export function EdwardAssistant({
             ) : null}
             {message.role === "assistant" && message.provider ? (
               <small>
-                {message.provider === "openrouter"
+                {message.provider === "openrouter" || message.provider === "openai"
                   ? "AI-generated guidance · verify important decisions"
                   : "Built-in portal guidance"}
               </small>
