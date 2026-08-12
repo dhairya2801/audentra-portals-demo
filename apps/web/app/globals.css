@@ -5423,6 +5423,103 @@
   font-size: 0.5rem;
 }
 
+/* Structured assistant turns: one bubble, typed blocks inside. */
+.edward-message .assistant-blocks {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.72rem 0.8rem;
+  border-radius: 0.75rem 0.75rem 0.75rem 0.18rem;
+  background: white;
+  box-shadow: 0 4px 12px rgb(15 23 42 / 6%);
+  color: #334155;
+  font-size: 0.68rem;
+  line-height: 1.55;
+}
+
+.edward-message .assistant-blocks p {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.assistant-block {
+  margin: 0;
+}
+
+.assistant-block h4 {
+  margin: 0 0 0.3rem;
+  color: #0f172a;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.assistant-block--bullets ul,
+.assistant-block--steps ol {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.28rem;
+}
+
+.assistant-block--bullets a,
+.assistant-block--steps a {
+  color: var(--forest);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+.assistant-block__owner {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.08rem 0.35rem;
+  border-radius: 0.6rem;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* A wide table scrolls inside its own container, never the chat panel. */
+.assistant-block__table-scroll {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.45rem;
+}
+
+.assistant-block--table table {
+  width: 100%;
+  min-width: max-content;
+  border-collapse: collapse;
+  font-size: 0.62rem;
+}
+
+.assistant-block--table th,
+.assistant-block--table td {
+  padding: 0.4rem 0.55rem;
+  border-bottom: 1px solid #eef2f7;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.assistant-block--table thead th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.assistant-block--table tbody tr:last-child td {
+  border-bottom: none;
+}
+
 .edward-actions {
   display: flex;
   flex-wrap: wrap;

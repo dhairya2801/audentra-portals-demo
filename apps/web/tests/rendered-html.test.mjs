@@ -445,6 +445,12 @@ test("typed client wires every resource route and mutation contract", async () =
       pageContext: "/dashboard",
       history: [],
     });
+    await client.createAssistantConversation({
+      pageContext: { path: "/dashboard", label: "Aster student portal" },
+    });
+    await client.getAssistantConversationMessages(
+      "00000000-0000-7000-8000-000000000801",
+    );
     await client.getStudentAppointments();
     await client.createStudentAppointment(
       {
@@ -658,6 +664,8 @@ test("typed client wires every resource route and mutation contract", async () =
     "/v1/student/documents/document%2F1/confirm-extraction",
     "/v1/student/documents/document%2F1/retry-extraction",
     "/v1/student/assistant/messages",
+    "/v1/student/assistant/conversations",
+    "/v1/student/assistant/conversations/00000000-0000-7000-8000-000000000801/messages",
     "/v1/student/appointments",
     "/v1/student/payments",
     "/v1/student/payments/deposit",
@@ -989,21 +997,21 @@ test("Morning Brew is a personalized, persisted staff workspace briefing", async
 
   assert.match(portal, /id: "morning_brew", label: "Morning Brew"/);
   assert.match(portal, /<MorningBrewView workspace={workspace} navigate={navigate}/);
-  assert.match(onboarding, /What do you want to know every morning\?/);
-  assert.match(onboarding, /Connect your context/);
-  assert.match(onboarding, /Build my Morning Brew/);
-  assert.match(dashboard, /Customize Morning Brew/);
-  assert.match(dashboard, /What you need to know/);
+  assert.match(onboarding, /What do you want to catch up on each morning\?/);
+  assert.match(onboarding, /What should we bring you\?/);
+  assert.match(onboarding, /how do you like it\?/);
+  assert.match(dashboard, /Customize your Morning Brew/);
   assert.match(dashboard, /Since yesterday/);
-  assert.match(dashboard, /Needs your attention/);
-  assert.match(dashboard, /Manage Connections/);
-  assert.match(edward, /never reach the real Edward backend/);
-  assert.match(data, /buildMorningBrewBriefing/);
-  assert.match(data, /source: "workspace"/);
+  assert.match(dashboard, /Ask for insights/);
+  assert.match(dashboard, /Live workspace/);
+  assert.match(edward, /Briefing context attached/);
+  assert.match(data, /synthetic draft for the demo/);
+  assert.match(data, /buildBrewBriefing/);
+  assert.match(data, /Live-workspace substitutions/);
   assert.match(preferences, /audentra:morning-brew:v2/);
-  assert.match(preferences, /LEGACY_STORAGE_PREFIX/);
-  assert.match(preferences, /MorningBrewPreferenceStore/);
-  assert.match(styles, /\.brew-interest-card\.is-selected/);
+  assert.match(preferences, /LEGACY_PREFIXES/);
+  assert.match(preferences, /BrewPreferenceStore/);
+  assert.match(styles, /\.brew-setup/);
   assert.match(styles, /@media \(max-width: 520px\)/);
 });
 
@@ -2208,6 +2216,65 @@ test("Edward separates the in-flow conversation workspace from the floating assi
     globalStyles,
     /\.edward-panel \{[\s\S]*?position: fixed;/,
   );
+});
+
+test("Edward renders structured blocks safely and persists conversations when the platform can", async () => {
+  const [assistant, blocks, client, globalStyles, workspaceStyles] =
+    await Promise.all([
+      readFile(
+        new URL("../app/components/edward-assistant.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../app/components/assistant-blocks.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+      readFile(
+        new URL(
+          "../app/components/edward-assistant.module.css",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    ]);
+
+  // Blocks are typed data, never model-authored markup, and an unknown block
+  // type falls back to its own plain-text rendering.
+  assert.match(blocks, /case "text":/);
+  assert.match(blocks, /case "bullet_list":/);
+  assert.match(blocks, /case "numbered_list":/);
+  assert.match(blocks, /case "next_steps":/);
+  assert.match(blocks, /case "table":/);
+  assert.match(blocks, /fallbackText/);
+  assert.match(blocks, /assistant-block__table-scroll/);
+  assert.doesNotMatch(blocks, /dangerouslySetInnerHTML/);
+  assert.doesNotMatch(blocks, /from "(react-markdown|marked|showdown)/);
+
+  // A wide table scrolls inside its own container, never the page.
+  assert.match(
+    globalStyles,
+    /\.assistant-block__table-scroll \{[\s\S]*?overflow-x: auto;/,
+  );
+  assert.match(
+    workspaceStyles,
+    /\.embeddedAssistantMessage > :global\(\.assistant-blocks\)/,
+  );
+
+  // The assistant message routes through the block renderer only when the
+  // platform sent blocks; prose keeps the existing paragraph path.
+  assert.match(assistant, /message\.blocks\?\.length \? \(/);
+  assert.match(assistant, /<AssistantBlocks/);
+
+  // Conversations persist through the platform when it offers the endpoints,
+  // and the panel degrades to in-memory threads when it does not.
+  assert.match(assistant, /createAssistantConversation/);
+  assert.match(assistant, /getAssistantConversationMessages/);
+  assert.match(assistant, /clientMessageId/);
+  assert.match(assistant, /"unknown" \| "active" \| "unavailable"/);
+  assert.match(assistant, /sessionStorage/);
+  assert.match(client, /\/v1\/student\/assistant\/conversations/);
 });
 
 test("staff CRM distinguishes canonical students from preview cohort records", async () => {

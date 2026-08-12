@@ -2,6 +2,8 @@
 
 import type {
   AskEdwardResponse,
+  AssistantConversationMessage,
+  AssistantResponseBlock,
   EdwardActionWidget,
   EdwardChatMessage,
   EdwardContextReceipt,
@@ -18,9 +20,13 @@ import {
 } from "react";
 import { useActivityTracking } from "../hooks/use-activity-tracking";
 import {
+  ApiClientError,
   askEdward,
+  createAssistantConversation,
   createDepositPayment,
+  getAssistantConversationMessages,
 } from "../lib/api-client";
+import { AssistantBlocks } from "./assistant-blocks";
 import { useTenant } from "./tenant-provider";
 import styles from "./edward-assistant.module.css";
 
@@ -37,13 +43,73 @@ type DisplayMessage = EdwardChatMessage & {
   provider?: AskEdwardResponse["provider"];
   contextReceipts?: AskEdwardResponse["contextReceipts"];
   widgets?: EdwardActionWidget[];
+  blocks?: AssistantResponseBlock[];
 };
 
 type Conversation = {
   id: string;
   title: string;
   messages: DisplayMessage[];
+  /** Platform conversation backing this thread, once one exists. */
+  serverId?: string;
 };
+
+/**
+ * Whether the platform persists assistant conversations. "unknown" until the
+ * first round-trip settles it; an endpoint that answers 404 marks it
+ * "unavailable" and the panel keeps today's in-memory behaviour.
+ */
+type ConversationPersistence = "unknown" | "active" | "unavailable";
+
+function conversationStorageKey(tenantSlug: string, studentName: string) {
+  return `audentra.edward.active-conversation.v1:${tenantSlug}:${studentName}`;
+}
+
+function readStoredConversationId(key: string): string | null {
+  try {
+    const value = window.sessionStorage.getItem(key);
+    return value &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        value,
+      )
+      ? value
+      : null;
+  } catch {
+    // Private browsing may deny storage while the API remains usable.
+    return null;
+  }
+}
+
+function writeStoredConversationId(key: string, conversationId: string | null) {
+  try {
+    if (conversationId === null) {
+      window.sessionStorage.removeItem(key);
+    } else {
+      window.sessionStorage.setItem(key, conversationId);
+    }
+  } catch {
+    // The server still owns the conversation for this mounted session.
+  }
+}
+
+function persistedMessageToDisplay(
+  message: AssistantConversationMessage,
+): DisplayMessage {
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    ...(message.suggestedActions.length
+      ? { actions: message.suggestedActions }
+      : {}),
+    ...(message.provider ? { provider: message.provider } : {}),
+    ...(message.contextReceipts.length
+      ? { contextReceipts: message.contextReceipts }
+      : {}),
+    ...(message.widgets.length ? { widgets: message.widgets } : {}),
+    ...(message.blocks?.length ? { blocks: message.blocks } : {}),
+  };
+}
 
 function welcomeMessage(studentName: string): DisplayMessage {
   return {
@@ -117,6 +183,14 @@ const contextSourceLabels: Record<EdwardContextReceipt["source"], string> = {
   payments: "Payments",
   academics: "Academic plan",
   financials: "Financial plan",
+  financial_aid: "Financial aid",
+  housing: "Housing",
+  holds: "Holds",
+  registration: "Registration",
+  deadlines: "Deadlines",
+  appointments: "Appointments",
+  policies: "University policies",
+  account: "Account balance",
   messages: "Messages",
   campus_life: "Campus life",
 };
@@ -266,11 +340,54 @@ export function EdwardAssistant({
     () => activeConversation?.messages ?? [],
     [activeConversation],
   );
+  const [persistence, setPersistence] =
+    useState<ConversationPersistence>("unknown");
   const compactInput = useRef<HTMLInputElement>(null);
   const workspaceInput = useRef<HTMLTextAreaElement>(null);
   const transcript = useRef<HTMLDivElement>(null);
   const recognition = useRef<SpeechRecognitionInstance | null>(null);
+  const conversationCreation = useRef<Promise<string | null> | null>(null);
+  const storageKey = conversationStorageKey(tenant.slug, studentName);
   const { track } = useActivityTracking();
+
+  // Restore the platform-persisted conversation for this tab, when one exists.
+  // A backend without conversation persistence simply 404s here and the panel
+  // continues with its in-memory behaviour.
+  useEffect(() => {
+    const storedId = readStoredConversationId(storageKey);
+    if (!storedId) return;
+    const abort = new AbortController();
+    void getAssistantConversationMessages(storedId, abort.signal)
+      .then((result) => {
+        setPersistence("active");
+        setConversations((current) =>
+          current.map((conversation, index) =>
+            index === 0 && conversation.serverId === undefined
+              ? {
+                  ...conversation,
+                  serverId: result.conversationId,
+                  title:
+                    result.messages.find(({ role }) => role === "user")
+                      ?.content.slice(0, 42) ?? conversation.title,
+                  messages: [
+                    welcomeMessage(studentName),
+                    ...result.messages.map(persistedMessageToDisplay),
+                  ],
+                }
+              : conversation,
+          ),
+        );
+      })
+      .catch((caught) => {
+        if (abort.signal.aborted) return;
+        if (caught instanceof ApiClientError && caught.status === 404) {
+          // Gone on the server, or a backend without the endpoint; the next
+          // send finds out which by trying to create a conversation.
+          writeStoredConversationId(storageKey, null);
+        }
+      });
+    return () => abort.abort();
+  }, [storageKey, studentName]);
 
   useEffect(() => {
     return () => {
@@ -322,9 +439,55 @@ export function EdwardAssistant({
     }));
   };
 
+  /**
+   * The platform conversation backing a local thread, created lazily on the
+   * first send. Returns null when persistence is unavailable — the exchange
+   * then stays in memory exactly as before.
+   */
+  const ensureServerConversation = async (
+    localConversationId: string,
+  ): Promise<string | null> => {
+    if (persistence === "unavailable") return null;
+    const existing = conversations.find(
+      ({ id }) => id === localConversationId,
+    )?.serverId;
+    if (existing) return existing;
+    if (conversationCreation.current) return conversationCreation.current;
+    const creation = (async () => {
+      try {
+        const conversation = await createAssistantConversation({
+          pageContext: {
+            path: window.location.pathname,
+            label: `${tenant.shortName} student portal`,
+          },
+        });
+        setPersistence("active");
+        updateConversation(localConversationId, (current) => ({
+          ...current,
+          serverId: conversation.id,
+        }));
+        writeStoredConversationId(storageKey, conversation.id);
+        return conversation.id;
+      } catch (caught) {
+        if (caught instanceof ApiClientError && caught.status === 404) {
+          setPersistence("unavailable");
+          return null;
+        }
+        // A transient failure: keep this turn in memory and let a later
+        // send try to open a conversation again.
+        return null;
+      } finally {
+        conversationCreation.current = null;
+      }
+    })();
+    conversationCreation.current = creation;
+    return creation;
+  };
+
   const send = async (message: string, speakResponse = voiceReplies) => {
     const normalized = message.trim();
     if (!normalized || sending) return;
+    const clientMessageId = crypto.randomUUID();
     const userMessage: DisplayMessage = {
       id: crypto.randomUUID(),
       role: "user",
@@ -346,11 +509,20 @@ export function EdwardAssistant({
     setError(null);
     setSending(true);
     try {
+      const serverConversationId =
+        await ensureServerConversation(conversationId);
       const response = await askEdward({
+        ...(serverConversationId
+          ? { conversationId: serverConversationId, clientMessageId }
+          : {}),
         message: normalized,
+        inputMode: "text",
         pageContext: window.location.pathname,
         history,
       });
+      if (serverConversationId && response.conversationId) {
+        writeStoredConversationId(storageKey, response.conversationId);
+      }
       const contextReceipts = response.contextReceipts ?? [];
       if (contextReceipts.length > 0) {
         track("ui.edward_context_receipts_received.v1", {
@@ -363,13 +535,14 @@ export function EdwardAssistant({
         messages: [
           ...conversation.messages,
           {
-            id: crypto.randomUUID(),
+            id: response.assistantMessageId ?? crypto.randomUUID(),
             role: "assistant",
             content: response.message,
             actions: response.suggestedActions,
             provider: response.provider,
             contextReceipts,
             widgets: response.widgets ?? [],
+            ...(response.blocks?.length ? { blocks: response.blocks } : {}),
           },
         ],
       }));
@@ -576,7 +749,11 @@ export function EdwardAssistant({
             }`}
             key={message.id}
           >
-            <p>{message.content}</p>
+            {message.role === "assistant" && message.blocks?.length ? (
+              <AssistantBlocks blocks={message.blocks} idPrefix={message.id} />
+            ) : (
+              <p>{message.content}</p>
+            )}
             {message.contextReceipts?.length ? (
               <div
                 className="edward-context-receipts"
@@ -789,11 +966,19 @@ export function EdwardAssistant({
               </button>
             ))}
           </nav>
-          <p>
-            <span aria-hidden="true">●</span>
-            Conversations remain in memory for this tab and are not stored in
-            browser storage.
-          </p>
+          {persistence === "active" ? (
+            <p>
+              <span aria-hidden="true">●</span>
+              Your latest conversation is saved to your student record and
+              restored when you return in this tab.
+            </p>
+          ) : (
+            <p>
+              <span aria-hidden="true">●</span>
+              Conversations remain in memory for this tab and are not stored in
+              browser storage.
+            </p>
+          )}
         </aside>
         {historyOpen ? (
           <button

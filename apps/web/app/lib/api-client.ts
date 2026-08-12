@@ -3,6 +3,9 @@ import type {
   ActivityEventInput,
   AskEdwardInput,
   AskEdwardResponse,
+  AssistantConversation,
+  AssistantConversationMessagesResponse,
+  CreateAssistantConversationInput,
   CampusEventRegistration,
   CampusLifeFeed,
   CatalogCourse,
@@ -1173,6 +1176,34 @@ function tenantAwareDocumentUrl(path: string) {
   const url = new URL(path, `${API_BASE_URL}/`);
   url.searchParams.set("tenant", currentTenantSlug());
   return url.toString();
+}
+
+export function createAssistantConversation(
+  input: CreateAssistantConversationInput,
+) {
+  return request<AssistantConversation>(
+    "/v1/student/assistant/conversations",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+    {
+      // Opening a conversation reads nothing from the record and refreshing
+      // the shell would remount the panel that is mid-send.
+      notifyStudentRecordChanged: false,
+    },
+  );
+}
+
+export function getAssistantConversationMessages(
+  conversationId: string,
+  signal?: AbortSignal,
+) {
+  return request<AssistantConversationMessagesResponse>(
+    `/v1/student/assistant/conversations/${encodeURIComponent(conversationId)}/messages`,
+    { method: "GET", signal },
+  );
 }
 
 export function askEdward(input: AskEdwardInput, signal?: AbortSignal) {

@@ -126,6 +126,24 @@
   line-height: 1.55;
 }
 
+/* Structured turns lie flat in the workspace, like its plain paragraphs. */
+.embeddedTranscript .embeddedAssistantMessage > :global(.assistant-blocks) {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #273348;
+  font-size: 0.78rem;
+  line-height: 1.65;
+}
+
+.embeddedTranscript
+  .embeddedAssistantMessage
+  > :global(.assistant-blocks)
+  :global(.assistant-block--table) {
+  font-size: 0.72rem;
+}
+
 .embeddedTranscript .welcomeMessage {
   margin-top: auto;
   margin-bottom: auto;
