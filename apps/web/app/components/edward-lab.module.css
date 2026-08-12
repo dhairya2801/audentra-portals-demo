@@ -1,0 +1,704 @@
+/* Edward Lab — dense developer console layout.
+   Reuses global tokens (--ink, --line, --surface, …) and global primitives
+   (.card, .eyebrow, .resource-status); this module only owns layout and the
+   trace-console look. */
+
+.shell {
+  display: grid;
+  grid-template-columns: minmax(340px, 30rem) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+  padding: 1rem 1.25rem 2rem;
+  max-width: 110rem;
+  margin: 0 auto;
+}
+
+@media (max-width: 980px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+}
+
+.topBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+  padding: 0.7rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.topBar h1 {
+  font-size: 1.02rem;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.devBadge {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #7c2d12;
+  background: #ffedd5;
+  border: 1px solid #fdba74;
+  border-radius: 999px;
+  padding: 0.14rem 0.55rem;
+}
+
+.personaControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  font-size: 0.78rem;
+}
+
+.personaControls select {
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.42rem;
+  background: var(--surface);
+  color: var(--ink);
+  max-width: 20rem;
+}
+
+.personaMeta {
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+}
+
+.chatColumn {
+  position: sticky;
+  top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.chatCard {
+  padding: 0;
+  overflow: hidden;
+}
+
+.inspector {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* --- turn timeline ------------------------------------------------------ */
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 16rem;
+  overflow-y: auto;
+  padding: 0.65rem 0.8rem;
+}
+
+.timelineTitle {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0.55rem 0.8rem 0;
+}
+
+.turnRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: baseline;
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  background: none;
+  padding: 0.35rem 0.5rem;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+}
+
+.turnRow:hover {
+  background: var(--paper);
+}
+
+.turnRowActive {
+  border-color: var(--audentra-blue);
+  background: #eef3ff;
+}
+
+.turnIndex {
+  font-size: 0.66rem;
+  font-weight: 800;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.turnQuestion {
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.turnMeta {
+  font-size: 0.66rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- summary header ----------------------------------------------------- */
+
+.summaryCard {
+  position: sticky;
+  top: 0.75rem;
+  z-index: 5;
+  padding: 0.85rem 1rem;
+}
+
+.summaryHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.9rem;
+}
+
+.summaryHead h2 {
+  font-size: 0.92rem;
+  margin: 0;
+  font-weight: 800;
+}
+
+.statusBadge {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 0.18rem 0.6rem;
+  border: 1px solid transparent;
+}
+
+.statusGrounded {
+  color: #065f46;
+  background: #d1fae5;
+  border-color: #a7f3d0;
+}
+
+.statusDeterministic {
+  color: #1e40af;
+  background: #dbeafe;
+  border-color: #bfdbfe;
+}
+
+.statusFallback {
+  color: #92400e;
+  background: #fef3c7;
+  border-color: #fde68a;
+}
+
+.statusError {
+  color: #991b1b;
+  background: #fee2e2;
+  border-color: #fecaca;
+}
+
+.statusNeutral {
+  color: var(--ink-soft);
+  background: var(--paper);
+  border-color: var(--line);
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 0.45rem 1rem;
+  margin-top: 0.7rem;
+}
+
+.summaryStat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.summaryStat dt {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.summaryStat dd {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.mono {
+  font-family: "Cascadia Code", Consolas, ui-monospace, monospace;
+  font-size: 0.72rem;
+  word-break: break-all;
+}
+
+.copyButton {
+  font: inherit;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--audentra-blue);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  padding: 0.1rem 0.45rem;
+  cursor: pointer;
+}
+
+.copyButton:hover {
+  background: var(--paper);
+}
+
+/* --- sections ----------------------------------------------------------- */
+
+.section {
+  padding: 0.85rem 1rem;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.6rem;
+}
+
+.kvGrid {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.28rem 1rem;
+  font-size: 0.78rem;
+}
+
+.kvGrid dt {
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.kvGrid dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.toolChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.toolChip {
+  font-family: "Cascadia Code", Consolas, ui-monospace, monospace;
+  font-size: 0.66rem;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  padding: 0.08rem 0.4rem;
+  background: var(--paper);
+}
+
+.toolChipDependency {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+  color: #5b21b6;
+}
+
+/* --- latency waterfall -------------------------------------------------- */
+
+.waterfall {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+}
+
+.waterfallRow {
+  display: grid;
+  grid-template-columns: 11.5rem minmax(0, 1fr) 4.5rem;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.72rem;
+}
+
+.waterfallLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.waterfallLabelSub {
+  padding-left: 1.1rem;
+  color: var(--ink-soft);
+  font-family: "Cascadia Code", Consolas, ui-monospace, monospace;
+  font-size: 0.66rem;
+}
+
+.waterfallTrack {
+  position: relative;
+  height: 0.62rem;
+  border-radius: 0.31rem;
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.waterfallBar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 0.31rem;
+  background: var(--audentra-blue);
+  min-width: 2px;
+}
+
+.waterfallBarModel {
+  background: var(--audentra-purple);
+}
+
+.waterfallBarDependency {
+  background: #7c3aed;
+}
+
+.waterfallBarTool {
+  background: var(--audentra-teal);
+}
+
+.waterfallMs {
+  text-align: right;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* --- tool cards --------------------------------------------------------- */
+
+.toolCard {
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  overflow: hidden;
+}
+
+.toolCard + .toolCard {
+  margin-top: 0.45rem;
+}
+
+.toolCard summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  cursor: pointer;
+  list-style: none;
+  background: var(--surface);
+}
+
+.toolCard summary::-webkit-details-marker {
+  display: none;
+}
+
+.toolCard[open] summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.toolName {
+  font-family: "Cascadia Code", Consolas, ui-monospace, monospace;
+  font-size: 0.76rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolBody {
+  padding: 0.6rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  background: var(--paper);
+}
+
+.roundBadge {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 0.35rem;
+  padding: 0.1rem 0.4rem;
+  color: var(--ink-soft);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.roundBadgeDependency {
+  color: #5b21b6;
+  background: #f5f3ff;
+  border-color: #c4b5fd;
+}
+
+.okDot,
+.failDot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.okDot {
+  background: #10b981;
+}
+
+.failDot {
+  background: #ef4444;
+}
+
+/* --- JSON console block ------------------------------------------------- */
+
+.jsonBlock {
+  position: relative;
+  background: #101b30;
+  border-radius: 0.55rem;
+  border: 1px solid #1f2c47;
+}
+
+.jsonBlock pre {
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  max-height: 22rem;
+  overflow: auto;
+  color: #dce7f5;
+  font-family: "Cascadia Code", Consolas, ui-monospace, monospace;
+  font-size: 0.68rem;
+  line-height: 1.5;
+  tab-size: 2;
+}
+
+.jsonBlockTall pre {
+  max-height: 40rem;
+}
+
+.jsonCopy {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #9db6dd;
+  background: #182741;
+  border: 1px solid #27395c;
+  border-radius: 0.35rem;
+  padding: 0.12rem 0.45rem;
+  cursor: pointer;
+}
+
+.jsonCopy:hover {
+  color: #dce7f5;
+}
+
+/* --- model calls -------------------------------------------------------- */
+
+.modelCall {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.2rem 0.8rem;
+  align-items: baseline;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.7rem;
+}
+
+.modelCall + .modelCall {
+  margin-top: 0.45rem;
+}
+
+.modelCallMeta {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1rem;
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- evidence ----------------------------------------------------------- */
+
+.evidenceList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.evidenceList li {
+  display: grid;
+  grid-template-columns: 1rem minmax(0, 1fr);
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  padding: 0.14rem 0.2rem;
+  border-radius: 0.3rem;
+}
+
+.evidenceWarn {
+  background: #fffbeb;
+}
+
+.evidenceDone {
+  color: var(--ink-soft);
+}
+
+.evidenceIcon {
+  font-size: 0.7rem;
+  line-height: 1.6;
+}
+
+/* --- guard / failures --------------------------------------------------- */
+
+.checkList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checkList li {
+  font-size: 0.66rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.08rem 0.5rem;
+  color: var(--ink-soft);
+}
+
+.checkFailed {
+  color: #991b1b;
+  background: #fee2e2;
+  border-color: #fecaca;
+  font-weight: 700;
+}
+
+.failureBanner {
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+  border-radius: 0.6rem;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.76rem;
+}
+
+.failureBannerError {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.failureCode {
+  font-family: "Cascadia Code", Consolas, ui-monospace, monospace;
+  font-size: 0.68rem;
+}
+
+/* --- recent traces ------------------------------------------------------ */
+
+.recentList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.recentRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.15rem 0.6rem;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 0.45rem;
+  background: none;
+  padding: 0.35rem 0.5rem;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+}
+
+.recentRow:hover {
+  background: var(--paper);
+}
+
+.recentRowActive {
+  border-color: var(--audentra-blue);
+  background: #eef3ff;
+}
+
+.recentQuestion {
+  font-size: 0.74rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recentMeta {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 0.7rem;
+  font-size: 0.64rem;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.emptyState {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  padding: 0.5rem 0;
+}
+
+.tabRow {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.tabButton {
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  background: var(--surface);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.tabButtonActive {
+  color: #fff;
+  background: var(--ink);
+  border-color: var(--ink);
+}

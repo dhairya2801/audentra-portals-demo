@@ -314,12 +314,27 @@ function ActionWidget({
   );
 }
 
+/** Developer observability hook: one call per completed text turn. */
+export interface EdwardTurnEvent {
+  question: string;
+  response: AskEdwardResponse | null;
+  error: string | null;
+  latencyMs: number;
+}
+
 export function EdwardAssistant({
   studentName,
   variant = "floating",
+  onTurn,
 }: {
   studentName: string;
   variant?: "floating" | "embedded";
+  /**
+   * Development-only observer (Edward Lab). Called after every send with the
+   * raw response (including requestId) or the error. Never used on student
+   * surfaces; adds no behavior when absent.
+   */
+  onTurn?: (turn: EdwardTurnEvent) => void;
 }) {
   const { tenant } = useTenant();
   const [open, setOpen] = useState(variant === "embedded");
@@ -626,6 +641,7 @@ export function EdwardAssistant({
     setDraft("");
     setError(null);
     setSending(true);
+    const sendStartedAt = performance.now();
     try {
       const serverConversationId =
         await ensureServerConversation(conversationId);
@@ -655,6 +671,12 @@ export function EdwardAssistant({
         // (worker token; see Audentra-platform docs/25).
         console.debug("[edward] trace", response.requestId);
       }
+      onTurn?.({
+        question: normalized,
+        response,
+        error: null,
+        latencyMs: performance.now() - sendStartedAt,
+      });
       updateConversation(conversationId, (conversation) => ({
         ...conversation,
         messages: [
@@ -679,11 +701,17 @@ export function EdwardAssistant({
         window.speechSynthesis.speak(utterance);
       }
     } catch (caught) {
-      setError(
+      const message =
         caught instanceof Error
           ? caught.message
-          : "Edward could not answer just now. Please try again.",
-      );
+          : "Edward could not answer just now. Please try again.";
+      setError(message);
+      onTurn?.({
+        question: normalized,
+        response: null,
+        error: message,
+        latencyMs: performance.now() - sendStartedAt,
+      });
     } finally {
       setSending(false);
     }
