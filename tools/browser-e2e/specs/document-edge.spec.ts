@@ -165,7 +165,7 @@ test.describe("document misuse through the enrollment UI", () => {
       "The file contents do not match the selected PDF, JPEG, or PNG type",
     );
     await expect(
-      page.getByRole("button", { name: "Retry files needing attention" }),
+      page.getByRole("button", { name: "Retry file submission" }),
     ).toBeEnabled();
   });
 

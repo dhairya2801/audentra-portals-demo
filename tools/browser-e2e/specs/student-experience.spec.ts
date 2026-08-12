@@ -15,9 +15,11 @@ test.describe("student experience overview", () => {
       name: "Your student calendar",
     }).locator("xpath=ancestor::section[1]");
     await expect(calendar).toBeVisible();
-    const dashboardHero = page.locator(".aster-dashboard-hero");
-    await expect(dashboardHero).toContainText("Enrollment progress");
-    await expect(dashboardHero).toContainText("Your student calendar");
+    // The action-center rework replaced the hero container with a progress
+    // card and a calendar section that live side by side in the main column.
+    const progressCard = page.locator(".aster-progress-card");
+    await expect(progressCard).toContainText("Enrollment progress");
+    await expect(calendar).toContainText("Your student calendar");
     await expect(page.getByText("Edward’s brief", { exact: true })).toHaveCount(0);
     await expect(
       page
