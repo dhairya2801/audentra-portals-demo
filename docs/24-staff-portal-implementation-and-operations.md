@@ -167,11 +167,17 @@ Default URLs:
 
 ## CI/CD behavior
 
-`.github/workflows/ci.yml` has two relevant triggers:
+`.github/workflows/ci.yml` validates pull requests and pushes to `main`. The
+former deployment job was removed because it targeted a personal GCP project
+and VM rather than the Vekend-owned `audentra` project.
 
-- Pull requests run the complete `validate` job.
-- Pushes to `main` run `validate`, then deploy the hardened VM preview after
-  validation succeeds.
+Portal deployment is currently fail-closed. The Vekend platform API is private,
+while this preview still permits demo browser authentication and a demo staff
+actor header. A public portal-side proxy would therefore become an anonymous
+gateway to synthetic staff and student mutations. Before re-enabling automatic
+deployment, choose and implement one reviewed boundary: authorized users behind
+IAP, credential-required browser authentication, or an explicitly disposable
+public demo.
 
 A direct push to a feature branch publishes the branch to GitHub but does not
 run this workflow until a pull request is opened or the branch is merged to
