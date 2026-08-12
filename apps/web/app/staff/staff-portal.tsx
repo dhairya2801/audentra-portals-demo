@@ -27,6 +27,7 @@ import {
   useState,
 } from "react";
 import { TenantLink as Link } from "../components/tenant-link";
+import { StaffEdwardAssistant } from "../components/staff-edward-assistant";
 import { PortalMark } from "../components/portal-ui";
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
 import {
@@ -4412,9 +4413,12 @@ export default function StaffPortal() {
     );
   }
   return (
-    <StaffWorkspaceShell
-      workspace={workspace.data}
-      refresh={workspace.refresh}
-    />
+    <>
+      <StaffWorkspaceShell
+        workspace={workspace.data}
+        refresh={workspace.refresh}
+      />
+      <StaffEdwardAssistant staffName={workspace.data.currentStaff.name} />
+    </>
   );
 }
