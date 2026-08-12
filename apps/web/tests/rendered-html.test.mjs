@@ -451,6 +451,13 @@ test("typed client wires every resource route and mutation contract", async () =
     await client.getAssistantConversationMessages(
       "00000000-0000-7000-8000-000000000801",
     );
+    await client.createAssistantVoiceSession({
+      conversationId: "00000000-0000-7000-8000-000000000801",
+      pageContext: { path: "/dashboard", label: "Aster student portal" },
+    });
+    await client.refreshAssistantVoiceSessionToken(
+      "00000000-0000-7000-8000-000000000821",
+    );
     await client.getStudentAppointments();
     await client.createStudentAppointment(
       {
@@ -666,6 +673,8 @@ test("typed client wires every resource route and mutation contract", async () =
     "/v1/student/assistant/messages",
     "/v1/student/assistant/conversations",
     "/v1/student/assistant/conversations/00000000-0000-7000-8000-000000000801/messages",
+    "/v1/student/assistant/voice-sessions",
+    "/v1/student/assistant/voice-sessions/00000000-0000-7000-8000-000000000821/token",
     "/v1/student/appointments",
     "/v1/student/payments",
     "/v1/student/payments/deposit",
@@ -2275,6 +2284,54 @@ test("Edward renders structured blocks safely and persists conversations when th
   assert.match(assistant, /"unknown" \| "active" \| "unavailable"/);
   assert.match(assistant, /sessionStorage/);
   assert.match(client, /\/v1\/student\/assistant\/conversations/);
+});
+
+test("Edward talks over LiveKit when the platform offers voice and falls back to browser speech", async () => {
+  const [assistant, hook, voiceLib, client, globalStyles] = await Promise.all([
+    readFile(
+      new URL("../app/components/edward-assistant.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/hooks/use-edward-voice.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/lib/edward-voice.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  // The typed client exposes both voice-session endpoints.
+  assert.match(client, /\/v1\/student\/assistant\/voice-sessions/);
+  assert.match(client, /voice-sessions\/\$\{encodeURIComponent\(voiceSessionId\)\}\/token/);
+
+  // The assistant runs LiveKit voice through the shared hook, bound to the
+  // persisted conversation, and appends canonical room responses to the
+  // thread instead of trusting local transcripts.
+  assert.match(assistant, /useEdwardVoice/);
+  assert.match(assistant, /onCanonicalResponse/);
+  assert.match(assistant, /voice\.startVoice\(serverConversationId\)/);
+  assert.match(assistant, /EDWARD_VOICE_STATE_LABELS/);
+  assert.match(assistant, /edward-live-caption/);
+  assert.match(assistant, /Voice message/);
+
+  // A backend without the endpoint (404) degrades to browser speech, the
+  // same pattern conversation persistence uses.
+  assert.match(hook, /error\.status === 404/);
+  assert.match(hook, /onUnavailable/);
+  assert.match(assistant, /liveVoiceUnavailable/);
+  assert.match(assistant, /toggleVoiceInput\(\)/);
+
+  // Voice room events are validated before they touch the thread: typed
+  // topics only, and the canonical response must carry its message ids.
+  assert.match(voiceLib, /student-assistant\.voice\.response\.v1/);
+  assert.match(voiceLib, /parseVoiceJsonEvent/);
+  assert.match(voiceLib, /typeof value\.voiceSessionId !== "string"/);
+
+  // Live voice UI has real styles in both states.
+  assert.match(globalStyles, /\.edward-live-voice \{/);
+  assert.match(globalStyles, /\.edward-live-caption \{/);
+  assert.match(globalStyles, /\.edward-message__mode/);
 });
 
 test("staff CRM distinguishes canonical students from preview cohort records", async () => {

@@ -5,7 +5,9 @@ import type {
   AskEdwardResponse,
   AssistantConversation,
   AssistantConversationMessagesResponse,
+  AssistantVoiceSessionCredentials,
   CreateAssistantConversationInput,
+  CreateAssistantVoiceSessionInput,
   CampusEventRegistration,
   CampusLifeFeed,
   CatalogCourse,
@@ -1203,6 +1205,32 @@ export function getAssistantConversationMessages(
   return request<AssistantConversationMessagesResponse>(
     `/v1/student/assistant/conversations/${encodeURIComponent(conversationId)}/messages`,
     { method: "GET", signal },
+  );
+}
+
+export function createAssistantVoiceSession(
+  input: CreateAssistantVoiceSessionInput,
+) {
+  return request<AssistantVoiceSessionCredentials>(
+    "/v1/student/assistant/voice-sessions",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+    {
+      // Starting voice reads nothing from the record; refreshing the shell
+      // would remount the panel while the room is connecting.
+      notifyStudentRecordChanged: false,
+    },
+  );
+}
+
+export function refreshAssistantVoiceSessionToken(voiceSessionId: string) {
+  return request<AssistantVoiceSessionCredentials>(
+    `/v1/student/assistant/voice-sessions/${encodeURIComponent(voiceSessionId)}/token`,
+    { method: "POST" },
+    { notifyStudentRecordChanged: false },
   );
 }
 

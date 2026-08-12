@@ -5703,6 +5703,133 @@
   line-height: 1.4;
 }
 
+/* Live voice session (LiveKit) ------------------------------------------- */
+
+.edward-message .edward-message__mode {
+  display: inline-flex;
+  margin-top: 0.3rem;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #3352c9;
+  font-size: 0.46rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.edward-live-caption {
+  margin: 0.35rem 0 0;
+  padding: 0.5rem 0.65rem;
+  border: 1px dashed #c9d4ea;
+  border-radius: 0.6rem;
+  background: #f7faff;
+}
+
+.edward-live-caption span {
+  display: block;
+  color: #5b6b8c;
+  font-size: 0.46rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.edward-live-caption p {
+  margin: 0.2rem 0 0;
+  color: #17243b;
+  font-size: 0.58rem;
+  line-height: 1.45;
+}
+
+.edward-live-voice {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.55rem 0.85rem;
+  border-top: 1px solid #e4e9f2;
+  background: #f8fafd;
+}
+
+.edward-live-voice__summary {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.edward-live-voice__summary > span {
+  color: #94a3b8;
+  font-size: 0.7rem;
+}
+
+.edward-live-voice[data-state="listening"] .edward-live-voice__summary > span,
+.edward-live-voice[data-state="user_speaking"] .edward-live-voice__summary > span {
+  color: #d92d20;
+}
+
+.edward-live-voice[data-state="assistant_speaking"] .edward-live-voice__summary > span {
+  color: #1e5bff;
+}
+
+.edward-live-voice__summary strong {
+  display: block;
+  color: #17243b;
+  font-size: 0.56rem;
+  font-weight: 800;
+}
+
+.edward-live-voice__summary small {
+  color: #5b6b8c;
+  font-size: 0.48rem;
+}
+
+.edward-live-voice__problem {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid #f2c5c0;
+  border-radius: 0.5rem;
+  background: #fff0ef;
+}
+
+.edward-live-voice__problem strong {
+  display: block;
+  color: #8f241b;
+  font-size: 0.54rem;
+}
+
+.edward-live-voice__problem p {
+  margin: 0.2rem 0 0;
+  color: #8f241b;
+  font-size: 0.5rem;
+  line-height: 1.4;
+}
+
+.edward-live-voice__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.edward-live-voice__controls button {
+  padding: 0.3rem 0.65rem;
+  border: 1px solid #c9d4ea;
+  border-radius: 999px;
+  background: #fff;
+  color: #17243b;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.5rem;
+  font-weight: 800;
+}
+
+.edward-live-voice__controls button:focus-visible {
+  outline: 2px solid #1e5bff;
+  outline-offset: 2px;
+}
+
+.edward-live-voice__controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 @keyframes edward-in {
   from {
     opacity: 0;
