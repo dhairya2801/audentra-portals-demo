@@ -2,6 +2,9 @@
 
 import type {
   AboutYouConfigurableField,
+  JourneyRouteActivation,
+  JourneyRouteOperator,
+  JourneyRouteRule,
   StaffJourneyBlueprintItem,
   StaffManagedConfiguration,
 } from "@vv/contracts";
@@ -9,6 +12,8 @@ import { dump, load } from "js-yaml";
 import {
   type DragEvent as ReactDragEvent,
   type FormEvent,
+  type PointerEvent as ReactPointerEvent,
+  type WheelEvent as ReactWheelEvent,
   useEffect,
   useMemo,
   useRef,
@@ -24,24 +29,34 @@ import {
   journeyGraphLevels,
   journeySuccessorIds,
   type JourneyFlowKind,
+  type JourneyGraphPosition,
   type JourneyTaskType,
   moveJourneyTask,
+  simplifyJourneyGraphLayout,
   submissionTypeForTask,
   validateJourneyDependencies,
 } from "./journey-flow-model";
 import {
-  aboutYouDefaultFields,
+  aboutYouDefaultForm,
+  flattenFormDefinition,
+  type FormBuilderDefinition,
   type FormBuilderField,
   FormCanvasBuilder,
+  onePageForm,
   onboardingScreenDefaults,
   responsibleOfficeOptions,
 } from "./onboarding-form-builder";
+import {
+  journeyScaffoldTemplates,
+  type JourneyScaffoldTemplate,
+} from "./journey-template-library";
 
 type ManagedDocument = Record<string, unknown>;
 type ManagedRecord = Record<string, unknown>;
 type SignatureProvider = "built_in" | "docusign";
 
 interface JourneyBuilderTask extends StaffJourneyBlueprintItem {
+  activation: JourneyRouteActivation;
   active: boolean;
   selectionOptions: string[];
   maximumSelections: number | null;
@@ -51,12 +66,13 @@ interface JourneyBuilderTask extends StaffJourneyBlueprintItem {
   documentCategories: string[];
   aboutYouRequiredFields: AboutYouConfigurableField[];
   identityQuickUpload: boolean;
-  formFields: FormBuilderField[];
+  formDefinition: FormBuilderDefinition;
   screenLabel: string | null;
   screenTitle: string | null;
   screenDescription: string | null;
   priority: number;
   dueOffsetDays: number | null;
+  canvasPosition: { x: number; y: number } | null;
 }
 
 const aboutYouFieldBindings: Partial<
@@ -103,17 +119,22 @@ const defaultAboutYouRequiredFields: AboutYouConfigurableField[] = [
   "citizenshipStatus",
 ];
 
-const taskTypeOptions: Array<{ value: JourneyTaskType; label: string }> = [
-  { value: "approval", label: "Approval" },
-  { value: "form", label: "Form" },
-  { value: "single_select", label: "Single select" },
-  { value: "multiple_select", label: "Multiple select" },
-  { value: "upload_file", label: "File upload" },
-  { value: "signature", label: "E-signature" },
-  { value: "payment", label: "Payment" },
-  { value: "information", label: "Information" },
-  { value: "selection_flow", label: "Structured selection flow" },
-  { value: "scheduling", label: "Scheduling" },
+const taskTypeOptions: Array<{
+  value: JourneyTaskType;
+  label: string;
+  symbol: string;
+  description: string;
+}> = [
+  { value: "approval", label: "Approval", symbol: "OK", description: "Confirm a decision or acknowledgement" },
+  { value: "form", label: "Form", symbol: "FRM", description: "Collect structured student information" },
+  { value: "single_select", label: "Single select", symbol: "1", description: "Choose one option" },
+  { value: "multiple_select", label: "Multiple select", symbol: "N", description: "Choose several options" },
+  { value: "upload_file", label: "File upload", symbol: "UP", description: "Request one or more documents" },
+  { value: "signature", label: "E-signature", symbol: "SIG", description: "Review and sign a document" },
+  { value: "payment", label: "Payment", symbol: "$", description: "Complete the enrollment deposit" },
+  { value: "information", label: "Information", symbol: "i", description: "Show guidance with no submission" },
+  { value: "selection_flow", label: "Guided choices", symbol: "FLOW", description: "Collect choices over several prompts" },
+  { value: "scheduling", label: "Scheduling", symbol: "CAL", description: "Book an available appointment" },
 ];
 
 function editableDocument(configuration: StaffManagedConfiguration) {
@@ -176,6 +197,7 @@ function configuredFormFields(value: unknown): FormBuilderField[] {
         "email",
         "phone",
         "date",
+        "number",
         "checkbox",
         "single_select",
         "multiple_select",
@@ -183,6 +205,7 @@ function configuredFormFields(value: unknown): FormBuilderField[] {
     ) {
       return [];
     }
+    const when = managedRecord(field?.when);
     return [
       {
         id,
@@ -195,8 +218,235 @@ function configuredFormFields(value: unknown): FormBuilderField[] {
         ...(Number.isInteger(Number(field?.maximum_selections))
           ? { maximum_selections: Number(field?.maximum_selections) }
           : {}),
+        ...(Number.isFinite(Number(field?.minimum))
+          ? { minimum: Number(field?.minimum) }
+          : {}),
+        ...(Number.isFinite(Number(field?.maximum))
+          ? { maximum: Number(field?.maximum) }
+          : {}),
+        ...(Number.isFinite(Number(field?.step)) && Number(field?.step) > 0
+          ? { step: Number(field?.step) }
+          : {}),
+        ...(typeof when?.field === "string" && typeof when.equals === "string"
+          ? { when: { field: when.field, equals: when.equals } }
+          : {}),
       },
     ];
+  });
+}
+
+function routeActivation(value: unknown): JourneyRouteActivation {
+  const activation = managedRecord(value);
+  const rules = Array.isArray(activation?.rules)
+    ? activation.rules.flatMap((candidate) => {
+        const rule = managedRecord(candidate);
+        const sourceTaskId = String(
+          rule?.sourceTaskId ?? rule?.source_task ?? "",
+        ).trim();
+        const fieldId = String(rule?.fieldId ?? rule?.field ?? "").trim();
+        const operator = String(rule?.operator ?? "equals");
+        const value = rule?.value;
+        if (
+          !sourceTaskId ||
+          !fieldId ||
+          ![
+            "equals",
+            "not_equals",
+            "one_of",
+            "none_of",
+            "contains",
+            "not_contains",
+            "greater_than",
+            "greater_than_or_equal",
+            "less_than",
+            "less_than_or_equal",
+          ].includes(operator) ||
+          !(
+            typeof value === "string" ||
+            typeof value === "boolean" ||
+            (typeof value === "number" && Number.isFinite(value)) ||
+            (Array.isArray(value) && value.every((item) => typeof item === "string"))
+          )
+        ) {
+          return [];
+        }
+        return [
+          {
+            sourceTaskId,
+            fieldId,
+            operator: operator as JourneyRouteOperator,
+            value,
+          },
+        ];
+      })
+    : [];
+  return {
+    match: activation?.match === "any" ? "any" : "all",
+    rules,
+  };
+}
+
+interface JourneyRouteAnswerField {
+  id: string;
+  label: string;
+  fieldType: "checkbox" | "single_select" | "multiple_select" | "number";
+  options: Array<string | boolean>;
+  minimum?: number;
+  maximum?: number;
+}
+
+function routeFieldsForTask(task: JourneyBuilderTask): JourneyRouteAnswerField[] {
+  if (task.taskType === "single_select" || task.taskType === "multiple_select") {
+    return [
+      {
+        id: "$answer",
+        label: "Selected answer",
+        fieldType: task.taskType,
+        options: task.selectionOptions,
+      },
+    ];
+  }
+  if (task.taskType !== "form" && task.taskType !== "selection_flow") {
+    return [];
+  }
+  return flattenFormDefinition(task.formDefinition).flatMap((field) => {
+    if (
+      field.field_type !== "checkbox" &&
+      field.field_type !== "single_select" &&
+      field.field_type !== "multiple_select" &&
+      field.field_type !== "number"
+    ) {
+      return [];
+    }
+    if (field.field_type !== "checkbox" && !field.required) return [];
+    return [
+      {
+        id: field.id,
+        label: field.title,
+        fieldType: field.field_type,
+        options:
+          field.field_type === "checkbox"
+            ? [true, false]
+            : field.field_type === "number"
+              ? []
+              : [...(field.options ?? [])],
+        ...(field.minimum !== undefined ? { minimum: field.minimum } : {}),
+        ...(field.maximum !== undefined ? { maximum: field.maximum } : {}),
+      },
+    ];
+  });
+}
+
+function operatorForRouteField(
+  field: JourneyRouteAnswerField,
+): JourneyRouteOperator {
+  if (field.fieldType === "multiple_select") return "contains";
+  if (field.fieldType === "number") return "greater_than_or_equal";
+  return "equals";
+}
+
+function operatorsForRouteField(field: JourneyRouteAnswerField) {
+  if (field.fieldType === "multiple_select") {
+    return [
+      { value: "contains", label: "includes" },
+      { value: "not_contains", label: "does not include" },
+    ] satisfies Array<{ value: JourneyRouteOperator; label: string }>;
+  }
+  if (field.fieldType === "single_select") {
+    return [
+      { value: "equals", label: "case is" },
+      { value: "one_of", label: "case is one of" },
+      { value: "none_of", label: "default (none of)" },
+      { value: "not_equals", label: "is not" },
+    ] satisfies Array<{ value: JourneyRouteOperator; label: string }>;
+  }
+  if (field.fieldType === "number") {
+    return [
+      { value: "greater_than_or_equal", label: "is at least" },
+      { value: "greater_than", label: "is greater than" },
+      { value: "less_than_or_equal", label: "is at most" },
+      { value: "less_than", label: "is less than" },
+      { value: "equals", label: "equals" },
+      { value: "not_equals", label: "does not equal" },
+    ] satisfies Array<{ value: JourneyRouteOperator; label: string }>;
+  }
+  return [
+    { value: "equals", label: "is" },
+    { value: "not_equals", label: "is not" },
+  ] satisfies Array<{ value: JourneyRouteOperator; label: string }>;
+}
+
+function defaultRouteValue(
+  field: JourneyRouteAnswerField,
+  operator: JourneyRouteOperator = operatorForRouteField(field),
+): JourneyRouteRule["value"] {
+  if (field.fieldType === "number") return field.minimum ?? 0;
+  const first = field.options[0] ?? "";
+  return operator === "one_of" || operator === "none_of" ? [String(first)] : first;
+}
+
+function routeRuleLabel(
+  source: JourneyBuilderTask | undefined,
+  rule: JourneyRouteRule,
+) {
+  const field = source
+    ? routeFieldsForTask(source).find((candidate) => candidate.id === rule.fieldId)
+    : undefined;
+  const rawLabel = field?.label ?? rule.fieldId;
+  const fieldLabel = rawLabel.length > 24 ? `${rawLabel.slice(0, 22)}…` : rawLabel;
+  if (rule.operator === "none_of") {
+    return "Default: other answers";
+  }
+  const operator = {
+    not_equals: "is not",
+    one_of: "is one of",
+    contains: "includes",
+    not_contains: "excludes",
+    greater_than: ">",
+    greater_than_or_equal: "≥",
+    less_than: "<",
+    less_than_or_equal: "≤",
+    equals: "is",
+  }[rule.operator];
+  const value =
+    typeof rule.value === "boolean"
+      ? rule.value
+        ? "Yes"
+        : "No"
+      : Array.isArray(rule.value)
+        ? rule.value.join(" / ")
+        : rule.value;
+  return rule.operator === "one_of"
+    ? `Cases: ${value}`
+    : `${fieldLabel} ${operator} ${value}`;
+}
+
+function configuredFormDefinition(
+  value: unknown,
+  fallbackFields: FormBuilderField[],
+  fallbackTitle: string,
+): FormBuilderDefinition {
+  const record = managedRecord(value);
+  const rawPages = Array.isArray(record?.pages) ? record.pages : [];
+  const pages = rawPages.flatMap((candidate) => {
+    const page = managedRecord(candidate);
+    const id = String(page?.id ?? "").trim();
+    const title = String(page?.title ?? "").trim();
+    if (!id || !title) return [];
+    return [{
+      id,
+      title,
+      ...(typeof page?.description === "string"
+        ? { description: page.description }
+        : {}),
+      fields: configuredFormFields(page?.fields),
+    }];
+  });
+  if (pages.length > 0) return { version: 1, pages };
+  return onePageForm(fallbackFields, {
+    id: "student_details",
+    title: fallbackTitle || "Student details",
+    description: "Complete the questions below.",
   });
 }
 
@@ -218,6 +468,30 @@ function validateFormFields(fields: readonly FormBuilderField[]) {
       if (options.length < 2 || new Set(options).size !== options.length) {
         throw new Error(`${field.title} needs at least two unique choices.`);
       }
+    }
+  }
+}
+
+function validateFormDefinition(form: FormBuilderDefinition) {
+  if (form.pages.length === 0 || form.pages.length > 20) {
+    throw new Error("A form must contain between 1 and 20 pages.");
+  }
+  const pageIds = new Set<string>();
+  const fieldIds = new Set<string>();
+  for (const page of form.pages) {
+    if (!/^[a-z][a-z0-9_]{1,79}$/.test(page.id) || pageIds.has(page.id)) {
+      throw new Error("Every form page needs a unique stable page key.");
+    }
+    pageIds.add(page.id);
+    if (!page.title.trim()) {
+      throw new Error("Every form page needs a student-facing title.");
+    }
+    validateFormFields(page.fields);
+    for (const field of page.fields) {
+      if (fieldIds.has(field.id)) {
+        throw new Error(`Question key ${field.id} is duplicated across form pages.`);
+      }
+      fieldIds.add(field.id);
     }
   }
 }
@@ -261,6 +535,56 @@ function taskType(value: unknown): JourneyTaskType {
 
 function taskTypeLabel(value: JourneyTaskType) {
   return taskTypeOptions.find((option) => option.value === value)?.label ?? value;
+}
+
+function taskTypeVisual(value: JourneyTaskType) {
+  return (
+    taskTypeOptions.find((option) => option.value === value) ??
+    taskTypeOptions.find((option) => option.value === "information")!
+  );
+}
+
+function studentInputPreview(task: JourneyBuilderTask) {
+  if (task.taskType === "single_select" || task.taskType === "multiple_select") {
+    const choices = task.selectionOptions.slice(0, 3);
+    return {
+      label: task.taskType === "single_select" ? "Choices" : "Multi-select choices",
+      value: choices.length ? choices.join(" · ") : "No choices configured",
+      remaining: Math.max(0, task.selectionOptions.length - choices.length),
+    };
+  }
+  if (task.taskType === "form" || task.taskType === "selection_flow") {
+    const fields = flattenFormDefinition(task.formDefinition);
+    const labels = fields.slice(0, 2).map((field) => field.title);
+    return {
+      label: task.taskType === "form" ? "Student form" : "Guided questions",
+      value: labels.length ? labels.join(" · ") : "No questions configured",
+      remaining: Math.max(0, fields.length - labels.length),
+    };
+  }
+  if (task.taskType === "upload_file") {
+    return {
+      label: "Files accepted",
+      value: task.documentCategories.length
+        ? task.documentCategories.slice(0, 3).join(" · ")
+        : "Configure document categories",
+      remaining: Math.max(0, task.documentCategories.length - 3),
+    };
+  }
+  if (task.taskType === "signature") {
+    return { label: "Student action", value: "Review and sign", remaining: 0 };
+  }
+  if (task.taskType === "payment") {
+    return { label: "Student action", value: "Review payment details", remaining: 0 };
+  }
+  if (task.taskType === "scheduling") {
+    return { label: "Student action", value: "Choose an available time", remaining: 0 };
+  }
+  return {
+    label: "Student action",
+    value: task.taskType === "approval" ? "Review and confirm" : "Read guidance",
+    remaining: 0,
+  };
 }
 
 function parsedTasks(
@@ -347,10 +671,14 @@ function parsedTasks(
         })(),
         identityQuickUpload:
           (input.identity_quick_upload ?? input.identityQuickUpload) !== false,
-        formFields: configuredFormFields(
-          configuredType === "selection_flow"
-            ? task.flow ?? input.flow
-            : input.fields,
+        formDefinition: configuredFormDefinition(
+          input.form,
+          configuredFormFields(
+            configuredType === "selection_flow"
+              ? task.flow ?? input.flow
+              : input.fields,
+          ),
+          String(task.title ?? "Student details"),
         ),
         screenLabel:
           typeof input.screen_label === "string" ? input.screen_label : null,
@@ -367,9 +695,18 @@ function parsedTasks(
         dueOffsetDays: Number.isInteger(Number(task.due_days_after_acceptance))
           ? Number(task.due_days_after_acceptance)
           : null,
+        canvasPosition: (() => {
+          const position = managedRecord(task.editor_position);
+          const x = Number(position?.x);
+          const y = Number(position?.y);
+          return Number.isFinite(x) && Number.isFinite(y)
+            ? { x: Math.max(0, x), y: Math.max(0, y) }
+            : null;
+        })(),
         studentStep:
           typeof task.student_step === "string" ? task.student_step : null,
         dependsOn: stringList(task.depends_on),
+        activation: routeActivation(task.activation),
         flow: Array.isArray(task.flow ?? input.flow)
           ? (structuredClone(task.flow ?? input.flow) as JourneyBuilderTask["flow"])
           : [],
@@ -397,74 +734,526 @@ function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
-function JourneyDependencyMap({
+function JourneyTemplateGallery({
+  kind,
   tasks,
+  busy,
+  onApply,
+  onClose,
+}: {
+  kind: JourneyFlowKind;
+  tasks: JourneyBuilderTask[];
+  busy: boolean;
+  onApply: (template: JourneyScaffoldTemplate, startAfterId: string | null) => void;
+  onClose: () => void;
+}) {
+  const templates = journeyScaffoldTemplates.filter((template) => template.kind === kind);
+  const [selectedId, setSelectedId] = useState(templates[0]?.id ?? "");
+  const [startAfterId, setStartAfterId] = useState("");
+  const selectedTemplate = templates.find((template) => template.id === selectedId) ?? templates[0];
+  const attachableTasks = tasks.filter((task) => task.active && !task.studentStep);
+
+  return (
+    <div className="staff-template-backdrop">
+      <section className="staff-journey-templates" role="dialog" aria-modal="true" aria-labelledby="journey-template-title">
+        <header>
+          <div><p className="eyebrow">Journey template library</p><h2 id="journey-template-title">Start from a proven scaffold</h2><p>Templates add editable steps to the current journey in one published version. Existing steps and completed student work stay untouched.</p></div>
+          <button type="button" aria-label="Close journey templates" onClick={onClose}>Close</button>
+        </header>
+        <div className="staff-journey-templates__body">
+          <nav aria-label="Journey templates">
+            {templates.map((template) => (
+              <button className={template.id === selectedTemplate?.id ? "is-active" : undefined} type="button" key={template.id} onClick={() => setSelectedId(template.id)}>
+                <span>{String(template.tasks.length).padStart(2, "0")}</span>
+                <span><small>{template.bestFor}</small><strong>{template.name}</strong><p>{template.description}</p></span>
+              </button>
+            ))}
+          </nav>
+          {selectedTemplate ? (
+            <article className="staff-journey-template-preview">
+              <header><div><span>Template preview</span><h3>{selectedTemplate.name}</h3><p>{selectedTemplate.outcome}</p></div><span>{selectedTemplate.tasks.length} steps</span></header>
+              <ol>
+                {selectedTemplate.tasks.map((task, index) => {
+                  const routeLabels = task.activation?.rules.map((rule) => {
+                    const source = selectedTemplate.tasks.find(
+                      (candidate) => candidate.key === rule.sourceKey,
+                    );
+                    const valueLabel =
+                      typeof rule.value === "boolean"
+                        ? rule.value
+                          ? "Yes"
+                          : "No"
+                        : Array.isArray(rule.value)
+                          ? rule.value.join(" / ")
+                          : rule.value;
+                    if (rule.operator === "none_of") {
+                      return `${source?.title ?? rule.sourceKey}: default (any other answer)`;
+                    }
+                    const operatorLabel = {
+                      equals: "is",
+                      not_equals: "is not",
+                      one_of: "is one of",
+                      contains: "includes",
+                      not_contains: "does not include",
+                      greater_than: ">",
+                      greater_than_or_equal: "≥",
+                      less_than: "<",
+                      less_than_or_equal: "≤",
+                    }[rule.operator];
+                    return `${source?.title ?? rule.sourceKey} ${operatorLabel} ${valueLabel}`;
+                  });
+                  return (
+                    <li key={task.key}>
+                      <span>{taskTypeVisual(task.taskType).symbol}</span>
+                      <div><small>{index + 1}. {taskTypeLabel(task.taskType)} - {task.owner}</small><strong>{task.title}</strong><p>{task.description}</p><span>{task.dependsOn.length === 0 ? "Entry step" : `After ${task.dependsOn.join(", ")}`}</span>{routeLabels?.length ? <span className="staff-journey-template-preview__route">Only when {routeLabels.join(task.activation?.match === "any" ? " or " : " and ")}</span> : null}</div>
+                    </li>
+                  );
+                })}
+              </ol>
+              <label>
+                Connect template entry steps after
+                <select value={startAfterId} onChange={(event) => setStartAfterId(event.target.value)}>
+                  <option value="">Start as an independent branch</option>
+                  {attachableTasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}
+                </select>
+                <small>Internal template dependencies are connected automatically and validated for cycles.</small>
+              </label>
+              <footer><button className="button button--secondary" type="button" onClick={onClose}>Cancel</button><button className="button button--primary" type="button" disabled={busy} onClick={() => onApply(selectedTemplate, startAfterId || null)}>{busy ? "Publishing scaffold..." : "Add template to journey"}</button></footer>
+            </article>
+          ) : null}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function JourneyStageMap({
+  tasks,
+  currentKind,
   onSelect,
+  onAdd,
+  busy,
 }: {
   tasks: JourneyBuilderTask[];
+  currentKind: JourneyFlowKind;
   onSelect: (item: JourneyBuilderTask) => void;
+  onAdd: () => void;
+  busy: boolean;
 }) {
   const taskById = new Map(tasks.map((task) => [task.id, task]));
   const levels = journeyGraphLevels(tasks);
   const graphError = validateJourneyDependencies(tasks);
+  const activeCount = tasks.filter((task) => task.active).length;
+  const branchCount = tasks.filter(
+    (task) => journeySuccessorIds(tasks, task.id).length > 1,
+  ).length;
 
   return (
-    <section className="staff-journey-map" aria-labelledby="journey-map-title">
+    <section className="staff-journey-map staff-journey-canvas" aria-labelledby="journey-map-title">
       <header className="staff-journey-map__heading">
         <div>
-          <p className="eyebrow">Dependency map</p>
-          <h3 id="journey-map-title">How steps unlock</h3>
+          <p className="eyebrow">Visual workflow</p>
+          <h3 id="journey-map-title">How the student journey unfolds</h3>
           <p>
-            Columns group steps by their earliest unlock stage. Each card lists
-            its actual prerequisites and the steps it unlocks.
+            Read left to right. Each lane is an unlock stage; select any card to
+            edit its student experience, rules, or prerequisites.
           </p>
         </div>
-        <span>{tasks.length} nodes</span>
+        <div className="staff-journey-map__summary" aria-label="Workflow summary">
+          <span><strong>{tasks.length}</strong> steps</span>
+          <span><strong>{activeCount}</strong> live</span>
+          <span><strong>{branchCount}</strong> branches</span>
+        </div>
       </header>
       {graphError ? (
         <p className="field-error staff-journey-map__error" role="alert">
           {graphError}
         </p>
       ) : null}
-      <div className="staff-journey-map__levels">
-        {levels.map((taskIds, levelIndex) => (
-          <div className="staff-journey-map__level" key={taskIds.join(":")}>
-            <span className="staff-journey-map__stage">Stage {levelIndex + 1}</span>
-            <div>
-              {taskIds.map((taskId) => {
-                const task = taskById.get(taskId);
+      <div className="staff-journey-map__legend" aria-label="Workflow legend">
+        <span><i className="is-live" /> Live step</span>
+        <span><i className="is-system" /> Protected system screen</span>
+        <span><i className="is-external" /> Cross-journey prerequisite</span>
+        <span><i className="is-inactive" /> Inactive</span>
+      </div>
+      <div className="staff-journey-map__viewport">
+        <div className="staff-journey-map__levels">
+          {levels.map((taskIds, levelIndex) => (
+            <section className="staff-journey-map__level" key={taskIds.join(":")}>
+              <header className="staff-journey-map__stage">
+                <span>{String(levelIndex + 1).padStart(2, "0")}</span>
+                <div>
+                  <strong>{levelIndex === 0 ? "Entry" : `Stage ${levelIndex + 1}`}</strong>
+                  <small>{taskIds.length} {taskIds.length === 1 ? "step" : "parallel steps"}</small>
+                </div>
+              </header>
+              <div className="staff-journey-map__nodes">
+                {taskIds.map((taskId) => {
+                  const task = taskById.get(taskId);
+                  if (!task) return null;
+                  const successorIds = journeySuccessorIds(tasks, task.id);
+                  const visual = taskTypeVisual(task.taskType);
+                  const external = task.kind !== currentKind;
+                  return (
+                    <button
+                      className={[
+                        "staff-journey-map__node",
+                        task.active ? "" : "is-inactive",
+                        task.studentStep ? "is-system" : "",
+                        external ? "is-external" : "",
+                      ].filter(Boolean).join(" ")}
+                      type="button"
+                      onClick={() => onSelect(task)}
+                      key={task.id}
+                    >
+                      <span className="staff-journey-map__node-topline">
+                        <span className="staff-journey-map__type" aria-hidden="true">{visual.symbol}</span>
+                        <span>{visual.label}</span>
+                        <i aria-label={task.active ? "Live" : "Inactive"} />
+                      </span>
+                      <strong>{task.title}</strong>
+                      <span className="staff-journey-map__owner">{task.owner}</span>
+                      <span className="staff-journey-map__node-meta">
+                        <small>{task.required ? "Required" : "Optional"}</small>
+                        <small>{task.points} pts</small>
+                        {external ? <small>{task.kind}</small> : null}
+                      </span>
+                      <span className="staff-journey-map__relationship">
+                        {task.dependsOn.length === 0
+                          ? "Starts independently"
+                          : `Waits for ${task.dependsOn.length}`}
+                        <span aria-hidden="true">→</span>
+                        {successorIds.length === 0
+                          ? "Journey end"
+                          : `Unlocks ${successorIds.length}`}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+          <section className="staff-journey-map__level staff-journey-map__level--add">
+            <header className="staff-journey-map__stage">
+              <span>+</span>
+              <div><strong>Extend flow</strong><small>Add another student step</small></div>
+            </header>
+            <button type="button" className="staff-journey-map__add-node" onClick={onAdd} disabled={busy}>
+              <span aria-hidden="true">+</span>
+              <strong>Add a step</strong>
+              <small>Choose an action, build its form, then connect it to the flow.</small>
+            </button>
+          </section>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+interface JourneyGraphEdgeRoute {
+  key: string;
+  sourceId: string;
+  targetId: string;
+  path: string;
+  labelX: number;
+  labelY: number;
+}
+
+const graphNodeWidth = 282;
+const graphNodePortY = 78;
+
+function centeredAttachment(index: number, count: number) {
+  return (index - (count - 1) / 2) * 14;
+}
+
+/** Route every connector through an empty inter-rank channel or a dedicated
+ * express lane below the graph. Fan-in/fan-out offsets keep arrow segments
+ * distinct all the way to node boundaries. */
+function journeyGraphEdgeRoutes(
+  tasks: JourneyBuilderTask[],
+  positions: Record<string, JourneyGraphPosition>,
+  nodeBottom: number,
+): JourneyGraphEdgeRoute[] {
+  const edges = tasks.flatMap((target) =>
+    target.dependsOn.map((sourceId) => ({
+      key: `${sourceId}:${target.id}`,
+      sourceId,
+      targetId: target.id,
+    })),
+  );
+  const outgoing = new Map<string, typeof edges>();
+  const incoming = new Map<string, typeof edges>();
+  for (const edge of edges) {
+    outgoing.set(edge.sourceId, [...(outgoing.get(edge.sourceId) ?? []), edge]);
+    incoming.set(edge.targetId, [...(incoming.get(edge.targetId) ?? []), edge]);
+  }
+  for (const group of outgoing.values()) {
+    group.sort(
+      (left, right) =>
+        (positions[left.targetId]?.y ?? 0) - (positions[right.targetId]?.y ?? 0),
+    );
+  }
+  for (const group of incoming.values()) {
+    group.sort(
+      (left, right) =>
+        (positions[left.sourceId]?.y ?? 0) - (positions[right.sourceId]?.y ?? 0),
+    );
+  }
+  const longEdges = edges.filter((edge) => {
+    const source = positions[edge.sourceId];
+    const target = positions[edge.targetId];
+    return source && target && target.x - (source.x + graphNodeWidth) > 300;
+  });
+  const adjacentGroups = new Map<string, typeof edges>();
+  for (const edge of edges) {
+    const source = positions[edge.sourceId];
+    const target = positions[edge.targetId];
+    if (!source || !target) continue;
+    const key = `${source.x}:${target.x}`;
+    adjacentGroups.set(key, [...(adjacentGroups.get(key) ?? []), edge]);
+  }
+
+  return edges.flatMap((edge) => {
+    const source = positions[edge.sourceId];
+    const target = positions[edge.targetId];
+    if (!source || !target) return [];
+    const outgoingGroup = outgoing.get(edge.sourceId) ?? [edge];
+    const incomingGroup = incoming.get(edge.targetId) ?? [edge];
+    const startX = source.x + graphNodeWidth;
+    const startY =
+      source.y +
+      graphNodePortY +
+      centeredAttachment(outgoingGroup.findIndex((item) => item.key === edge.key), outgoingGroup.length);
+    const endX = target.x;
+    const endY =
+      target.y +
+      graphNodePortY +
+      centeredAttachment(incomingGroup.findIndex((item) => item.key === edge.key), incomingGroup.length);
+    const longIndex = longEdges.findIndex((item) => item.key === edge.key);
+    if (longIndex >= 0 || endX <= startX + 50) {
+      const laneIndex = longIndex >= 0 ? longIndex : longEdges.length + edges.indexOf(edge);
+      const laneY = nodeBottom + 46 + laneIndex * 24;
+      const sourceChannel = startX + 34;
+      const targetChannel = endX - 34;
+      return [{
+        ...edge,
+        path: `M ${startX} ${startY} H ${sourceChannel} V ${laneY} H ${targetChannel} V ${endY} H ${endX}`,
+        labelX: (sourceChannel + targetChannel) / 2,
+        labelY: laneY - 7,
+      }];
+    }
+    const gapKey = `${source.x}:${target.x}`;
+    const gapGroup = adjacentGroups.get(gapKey) ?? [edge];
+    const gapIndex = gapGroup.findIndex((item) => item.key === edge.key);
+    const channelX =
+      (startX + endX) / 2 + centeredAttachment(gapIndex, gapGroup.length) * 0.75;
+    return [{
+      ...edge,
+      path: `M ${startX} ${startY} H ${channelX} V ${endY} H ${endX}`,
+      labelX: channelX,
+      labelY: (startY + endY) / 2 - 8,
+    }];
+  });
+}
+
+function JourneyDependencyMap({
+  tasks,
+  currentKind,
+  onSelect,
+  onAdd,
+  onConnect,
+  onSaveLayout,
+  busy,
+}: {
+  tasks: JourneyBuilderTask[];
+  currentKind: JourneyFlowKind;
+  onSelect: (item: JourneyBuilderTask) => void;
+  onAdd: () => void;
+  onConnect: (sourceId: string, targetId: string) => Promise<void>;
+  onSaveLayout: (positions: Record<string, { x: number; y: number }>) => Promise<void>;
+  busy: boolean;
+}) {
+  const automatic = useMemo(() => simplifyJourneyGraphLayout(tasks), [tasks]);
+  const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>(
+    () => Object.fromEntries(tasks.map((task) => [task.id, task.canvasPosition ?? automatic[task.id]])),
+  );
+  const [zoom, setZoom] = useState(1);
+  const [layoutDirty, setLayoutDirty] = useState(false);
+  const [connectionSource, setConnectionSource] = useState<string | null>(null);
+  const [canvasMode, setCanvasMode] = useState<"select" | "pan">("select");
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [panning, setPanning] = useState<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    scrollLeft: number;
+    scrollTop: number;
+  } | null>(null);
+  const [dragging, setDragging] = useState<{
+    id: string;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+  } | null>(null);
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const graphError = validateJourneyDependencies(tasks);
+  const activeCount = tasks.filter((task) => task.active).length;
+  const branchCount = tasks.filter((task) => journeySuccessorIds(tasks, task.id).length > 1).length;
+  const conditionalPathCount = tasks.reduce(
+    (count, task) => count + routeActivation(task.activation).rules.length,
+    0,
+  );
+
+  const canvasWidth = Math.max(1000, ...Object.values(positions).map((position) => position.x + 380));
+  const nodeBottom = Math.max(360, ...Object.values(positions).map((position) => position.y + 208));
+  const routedEdges = journeyGraphEdgeRoutes(tasks, positions, nodeBottom);
+  const canvasHeight = Math.max(
+    620,
+    nodeBottom + 100,
+    ...routedEdges.map((edge) => edge.labelY + 80),
+  );
+  const resetLayout = () => {
+    setPositions(automatic);
+    setLayoutDirty(true);
+  };
+  const startPan = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const middleMouse = event.button === 1;
+    if (canvasMode !== "pan" && !middleMouse) return;
+    const target = event.target as HTMLElement;
+    if (target.closest("button, input, select, textarea, a, [data-journey-node]")) return;
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    event.preventDefault();
+    if (middleMouse) setCanvasMode("pan");
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setPanning({
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      scrollLeft: viewport.scrollLeft,
+      scrollTop: viewport.scrollTop,
+    });
+  };
+  const movePan = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!panning || panning.pointerId !== event.pointerId) return;
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    event.preventDefault();
+    viewport.scrollLeft = panning.scrollLeft - (event.clientX - panning.startX);
+    viewport.scrollTop = panning.scrollTop - (event.clientY - panning.startY);
+  };
+  const stopPan = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!panning || panning.pointerId !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setPanning(null);
+  };
+  const zoomWithWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
+    if (canvasMode !== "pan") return;
+    event.preventDefault();
+    const adjustment = event.deltaY < 0 ? 0.1 : -0.1;
+    setZoom((current) => Math.max(0.6, Math.min(1.6, Math.round((current + adjustment) * 100) / 100)));
+  };
+
+  return (
+    <section className="staff-journey-map staff-journey-canvas staff-journey-graph" aria-labelledby="journey-map-title">
+      <header className="staff-journey-map__heading">
+        <div><p className="eyebrow">Visual workflow editor</p><h3 id="journey-map-title">Build the journey as a connected graph</h3><p>Connect prerequisites, then open a target step to turn an edge into an answer-driven path such as Yes or No.</p></div>
+        <div className="staff-journey-map__summary" aria-label="Workflow summary"><span><strong>{tasks.length}</strong> steps</span><span><strong>{activeCount}</strong> live</span><span><strong>{branchCount}</strong> branches</span><span><strong>{conditionalPathCount}</strong> conditional</span></div>
+      </header>
+      {graphError ? <p className="field-error staff-journey-map__error" role="alert">{graphError}</p> : null}
+      <div className="staff-journey-graph__toolbar">
+        <div className="staff-journey-map__legend" aria-label="Workflow legend"><span><i className="is-live" /> Live</span><span><i className="is-conditional" /> Answer path</span><span><i className="is-system" /> Protected</span><span><i className="is-external" /> Other journey</span><span><i className="is-inactive" /> Inactive</span></div>
+        <div className="staff-journey-graph__canvas-tools" role="group" aria-label="Canvas controls">
+          <span className="staff-journey-graph__tool-label">Canvas</span>
+          <button type="button" className={canvasMode === "select" ? "is-active" : undefined} aria-pressed={canvasMode === "select"} onClick={() => setCanvasMode("select")} title="Pointer: click a step to edit it; use its Drag control to reposition it">⌖ Pointer</button>
+          <button type="button" className={canvasMode === "pan" ? "is-active" : undefined} aria-pressed={canvasMode === "pan"} onClick={() => setCanvasMode("pan")} title="Hand: drag empty space to move around the graph, then use your mouse wheel to zoom">✋ Hand</button>
+          <span className="staff-journey-graph__tool-help">{canvasMode === "pan" ? "Drag empty space · wheel zooms" : "Click a step to configure it · middle mouse switches to Hand"}</span>
+        </div>
+        <div><button type="button" onClick={() => setZoom((current) => Math.max(.6, current - .1))} aria-label="Zoom out">-</button><span>{Math.round(zoom * 100)}%</span><button type="button" onClick={() => setZoom((current) => Math.min(1.6, current + .1))} aria-label="Zoom in">+</button><button type="button" onClick={resetLayout} title="Re-rank steps, reduce crossings, and route connectors through clear lanes">Simplify layout</button><button type="button" disabled={!layoutDirty || busy} onClick={() => void onSaveLayout(positions).then(() => setLayoutDirty(false)).catch(() => undefined)}>{busy ? "Saving..." : "Save layout"}</button></div>
+      </div>
+      {connectionSource ? <div className="staff-journey-graph__connection-mode" role="status"><span>Connecting from <strong>{taskById.get(connectionSource)?.title}</strong>. Choose an input port.</span><button type="button" onClick={() => setConnectionSource(null)}>Cancel connection</button></div> : null}
+      <div
+        className={`staff-journey-map__viewport staff-journey-graph__viewport ${canvasMode === "pan" ? "is-pan-ready" : ""} ${panning ? "is-panning" : ""}`}
+        ref={viewportRef}
+        onPointerDown={startPan}
+        onPointerMove={movePan}
+        onPointerUp={stopPan}
+        onPointerCancel={stopPan}
+        onWheel={zoomWithWheel}
+        aria-label="Journey graph canvas"
+      >
+        <div className="staff-journey-graph__scaled" style={{ width: canvasWidth * zoom, height: canvasHeight * zoom }}>
+          <div className="staff-journey-graph__surface" style={{ width: canvasWidth, height: canvasHeight, transform: `scale(${zoom})` }}>
+            <svg className="staff-journey-graph__edges" width={canvasWidth} height={canvasHeight} aria-hidden="true">
+              <defs>
+                <marker id={`journey-arrow-${currentKind}`} markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" /></marker>
+                <marker className="is-conditional" id={`journey-conditional-arrow-${currentKind}`} markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" /></marker>
+              </defs>
+              {routedEdges.map((edge) => {
+                const task = taskById.get(edge.targetId);
                 if (!task) return null;
-                const successorIds = journeySuccessorIds(tasks, task.id);
+                const dependency = edge.sourceId;
+                const activation = routeActivation(task.activation);
+                const routeRules = activation.rules.filter(
+                  (rule) => rule.sourceTaskId === dependency,
+                );
+                const edgeLabel = routeRules
+                  .map((rule) => routeRuleLabel(taskById.get(dependency), rule))
+                  .join(activation.match === "any" ? " OR " : " AND ");
                 return (
-                  <button
-                    className={`staff-journey-map__node${task.active ? "" : " is-inactive"}`}
-                    type="button"
-                    onClick={() => onSelect(task)}
-                    key={task.id}
+                  <g
+                    className={routeRules.length > 0 ? "is-conditional" : undefined}
+                    key={edge.key}
                   >
-                    <span>
-                      {task.dependsOn.length === 0
-                        ? "Start"
-                        : `After ${task.dependsOn.length}`}
-                      {task.active ? "" : " · Inactive"}
-                    </span>
-                    <strong>{task.title}</strong>
-                    <small>{task.kind === "onboarding" ? "Onboarding" : "Enrollment"}</small>
-                    <small>
-                      Priority {task.priority} · {task.points} points
-                    </small>
-                    <small>
-                      {successorIds.length > 0
-                        ? `Unlocks ${successorIds.map((id) => taskById.get(id)?.title ?? id).join(", ")}`
-                        : "End of this branch"}
-                    </small>
-                  </button>
+                    <path
+                      d={edge.path}
+                      markerEnd={`url(#${routeRules.length > 0 ? "journey-conditional-arrow" : "journey-arrow"}-${currentKind})`}
+                    />
+                    {edgeLabel ? (
+                      <text
+                        x={edge.labelX}
+                        y={edge.labelY}
+                        textAnchor="middle"
+                      >
+                        {edgeLabel}
+                      </text>
+                    ) : null}
+                  </g>
                 );
               })}
-            </div>
+            </svg>
+            {tasks.map((task) => {
+              const position = positions[task.id] ?? automatic[task.id];
+              const successorIds = journeySuccessorIds(tasks, task.id);
+              const visual = taskTypeVisual(task.taskType);
+              const external = task.kind !== currentKind;
+              const decisionOutputs = tasks.reduce(
+                (count, target) =>
+                  count + routeActivation(target.activation).rules.filter(
+                    (rule) => rule.sourceTaskId === task.id,
+                  ).length,
+                0,
+              );
+              const targetConnectable = !external && !task.studentStep && connectionSource !== task.id;
+              const inputPreview = studentInputPreview(task);
+              return (
+                <article data-journey-node className={["staff-journey-graph__node", task.active ? "" : "is-inactive", task.studentStep ? "is-system" : "", external ? "is-external" : "", connectionSource === task.id ? "is-connecting" : ""].filter(Boolean).join(" ")} style={{ transform: `translate(${position.x}px, ${position.y}px)` }} key={task.id}>
+                  <button className="staff-journey-graph__port staff-journey-graph__port--input" type="button" aria-label={`Connect prerequisite into ${task.title}`} disabled={!connectionSource || !targetConnectable || busy} onClick={() => { if (!connectionSource) return; const source = connectionSource; setConnectionSource(null); void onConnect(source, task.id).catch(() => undefined); }} />
+                  <button className="staff-journey-graph__drag" type="button" aria-label={`Drag ${task.title}`} onPointerDown={(event) => { event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId); setDragging({ id: task.id, startX: event.clientX, startY: event.clientY, originX: position.x, originY: position.y }); }} onPointerMove={(event) => { event.stopPropagation(); if (dragging?.id !== task.id) return; setPositions((current) => ({ ...current, [task.id]: { x: Math.max(20, dragging.originX + (event.clientX - dragging.startX) / zoom), y: Math.max(20, dragging.originY + (event.clientY - dragging.startY) / zoom) } })); }} onPointerUp={(event) => { event.stopPropagation(); if (dragging?.id !== task.id) return; event.currentTarget.releasePointerCapture(event.pointerId); setDragging(null); setLayoutDirty(true); }}>Drag</button>
+                  <button className="staff-journey-graph__node-body" type="button" onClick={() => onSelect(task)}><span className="staff-journey-map__node-topline"><span className="staff-journey-map__type" aria-hidden="true">{visual.symbol}</span><span>{visual.label}</span><i aria-label={task.active ? "Live" : "Inactive"} /></span><strong>{task.title}</strong><span className="staff-journey-map__owner">{task.owner}</span><span className="staff-journey-graph__node-input"><small>{inputPreview.label}</small><span>{inputPreview.value}{inputPreview.remaining > 0 ? ` +${inputPreview.remaining}` : ""}</span></span><span className="staff-journey-map__node-meta"><small>{task.required ? "Required" : "Optional"}</small><small>{task.points} pts</small>{decisionOutputs > 0 ? <small className="is-decision">Decision</small> : null}{external ? <small>{task.kind}</small> : null}</span><span className="staff-journey-map__relationship">{task.dependsOn.length === 0 ? "Entry" : `${task.dependsOn.length} inputs`}<span aria-hidden="true">-&gt;</span>{successorIds.length === 0 ? "End" : `${successorIds.length} outputs`}</span></button>
+                  <button className="staff-journey-graph__port staff-journey-graph__port--output" type="button" aria-label={`Start a connection from ${task.title}`} disabled={!task.active || busy} onClick={() => setConnectionSource((current) => current === task.id ? null : task.id)} />
+                </article>
+              );
+            })}
+            <button type="button" className="staff-journey-graph__add" style={{ transform: `translate(${canvasWidth - 260}px, ${canvasHeight - 130}px)` }} onClick={onAdd} disabled={busy}><span>+</span><strong>Add step</strong><small>Configure a new node</small></button>
           </div>
-        ))}
+        </div>
       </div>
+      <p className="staff-journey-graph__hint">Canvas positions publish only when you choose Save layout. Connections publish immediately as versioned journey changes.</p>
+      <details className="staff-journey-graph__stage-summary"><summary>View stage-by-stage summary</summary><JourneyStageMap tasks={tasks} currentKind={currentKind} onSelect={onSelect} onAdd={onAdd} busy={busy} /></details>
     </section>
   );
 }
@@ -484,10 +1273,22 @@ function JourneyTaskEditor({
   onConfigurationSaved: (configuration: StaffManagedConfiguration) => void;
   onClose: () => void;
 }) {
+  type EditorSection = "details" | "experience" | "dependencies" | "publishing";
   const { tenant } = useTenant();
   const action = useApiAction(updateStaffManagedConfiguration);
   const [editorError, setEditorError] = useState<string | null>(null);
   const [configuredTaskType, setConfiguredTaskType] = useState(item.taskType);
+  const [activeEditorSection, setActiveEditorSection] = useState<EditorSection>(() => {
+    // System onboarding screens use the same compact editing rhythm as a
+    // newly-added step. Their protected behavior remains obvious, without
+    // dropping staff into a long, unrelated form.
+    if (isNew || (item.kind === "onboarding" && item.studentStep)) {
+      return "details";
+    }
+    return ["form", "selection_flow", "single_select", "multiple_select", "upload_file", "signature"].includes(item.taskType)
+      ? "experience"
+      : "details";
+  });
   const [signatureProvider, setSignatureProvider] =
     useState<SignatureProvider>(item.signatureProvider);
   const screenDefaults = item.studentStep
@@ -506,21 +1307,35 @@ function JourneyTaskEditor({
       screenDefaults?.description.replaceAll("Aster", tenant.shortName) ??
       item.description,
   );
-  const [formFields, setFormFields] = useState<FormBuilderField[]>(() => {
-    if (item.formFields.length > 0) return structuredClone(item.formFields);
+  const [formDefinition, setFormDefinition] = useState<FormBuilderDefinition>(() => {
+    if (flattenFormDefinition(item.formDefinition).length > 0) {
+      return structuredClone(item.formDefinition);
+    }
     if (item.studentStep === "about_you") {
       const required = new Set(item.aboutYouRequiredFields);
-      return structuredClone(aboutYouDefaultFields).map((field) => ({
-        ...field,
-        required: aboutYouFieldBindings[field.id]
-          ? required.has(aboutYouFieldBindings[field.id]!)
-          : field.required,
-      }));
+      return {
+        ...structuredClone(aboutYouDefaultForm),
+        pages: structuredClone(aboutYouDefaultForm.pages).map((page) => ({
+          ...page,
+          fields: page.fields.map((field) => ({
+            ...field,
+            required: aboutYouFieldBindings[field.id]
+              ? required.has(aboutYouFieldBindings[field.id]!)
+              : field.required,
+          })),
+        })),
+      };
     }
-    return [];
+    return onePageForm([]);
   });
   const [selectedDependencies, setSelectedDependencies] = useState(
     () => new Set(item.dependsOn),
+  );
+  const [routeMatch, setRouteMatch] = useState<"all" | "any">(
+    routeActivation(item.activation).match,
+  );
+  const [routeRules, setRouteRules] = useState<JourneyRouteRule[]>(() =>
+    structuredClone(routeActivation(item.activation).rules),
   );
   const panelRef = useRef<HTMLElement>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -534,6 +1349,38 @@ function JourneyTaskEditor({
   const successorTasks = dependencyTasks.filter((candidate) =>
     candidate.dependsOn.includes(item.id),
   );
+  const routeSourceTasks = dependencyTasks.filter(
+    (candidate) =>
+      selectedDependencies.has(candidate.id) &&
+      routeFieldsForTask(candidate).length > 0,
+  );
+  const inputPreview = studentInputPreview({ ...item, taskType: configuredTaskType });
+
+  const updateRouteRule = (
+    index: number,
+    update: (current: JourneyRouteRule) => JourneyRouteRule,
+  ) => {
+    setRouteRules((current) =>
+      current.map((rule, ruleIndex) =>
+        ruleIndex === index ? update(rule) : rule,
+      ),
+    );
+  };
+
+  const addRouteRule = () => {
+    const source = routeSourceTasks[0];
+    const field = source ? routeFieldsForTask(source)[0] : undefined;
+    if (!source || !field) return;
+    setRouteRules((current) => [
+      ...current,
+      {
+        sourceTaskId: source.id,
+        fieldId: field.id,
+        operator: operatorForRouteField(field),
+        value: defaultRouteValue(field),
+      },
+    ]);
+  };
 
   useEffect(() => {
     const panel = panelRef.current;
@@ -651,6 +1498,59 @@ function JourneyTaskEditor({
           );
         }
       }
+      for (const rule of routeRules) {
+        if (!dependencies.includes(rule.sourceTaskId)) {
+          throw new Error(
+            "Every answer condition must use a selected prerequisite.",
+          );
+        }
+        const source = dependencyById.get(rule.sourceTaskId);
+        const field = source
+          ? routeFieldsForTask(source).find(
+              (candidate) => candidate.id === rule.fieldId,
+            )
+          : undefined;
+        if (!source || !field) {
+          throw new Error(
+            "An answer condition references a question that is no longer available.",
+          );
+        }
+        const operators = operatorsForRouteField(field).map(
+          (operator) => operator.value,
+        );
+        if (!operators.includes(rule.operator)) {
+          throw new Error(
+            `Choose a valid comparison for ${source.title}: ${field.label}.`,
+          );
+        }
+        if (field.fieldType === "number") {
+          if (typeof rule.value !== "number" || !Number.isFinite(rule.value)) {
+            throw new Error(
+              `Enter a numeric threshold for ${source.title}: ${field.label}.`,
+            );
+          }
+          if (
+            (field.minimum !== undefined && rule.value < field.minimum) ||
+            (field.maximum !== undefined && rule.value > field.maximum)
+          ) {
+            throw new Error(
+              `Keep the threshold inside the published range for ${source.title}: ${field.label}.`,
+            );
+          }
+        }
+        const caseValues = Array.isArray(rule.value) ? rule.value : [rule.value];
+        if (
+          field.fieldType !== "number" &&
+          (caseValues.length === 0 ||
+            !caseValues.every((value) =>
+              field.options.some((option) => option === value),
+            ))
+        ) {
+          throw new Error(
+            `Choose a published answer for ${source.title}: ${field.label}.`,
+          );
+        }
+      }
       const candidateGraph = dependencyTasks
         .filter((candidate) => candidate.id !== item.id)
         .map((candidate) => ({
@@ -679,6 +1579,19 @@ function JourneyTaskEditor({
         active: form.get("active") === "on",
         depends_on: dependencies,
       });
+      if (routeRules.length > 0) {
+        task.activation = {
+          match: routeMatch,
+          rules: routeRules.map((rule) => ({
+            source_task: rule.sourceTaskId,
+            field: rule.fieldId,
+            operator: rule.operator,
+            value: rule.value,
+          })),
+        };
+      } else {
+        delete task.activation;
+      }
       if (dueOffsetDays === null) {
         delete task.due_days_after_acceptance;
       } else {
@@ -745,8 +1658,8 @@ function JourneyTaskEditor({
       }
 
       if (selectedType === "selection_flow") {
-        validateFormFields(formFields);
-        task.flow = structuredClone(formFields);
+        validateFormDefinition(formDefinition);
+        task.flow = structuredClone(flattenFormDefinition(formDefinition));
       } else {
         delete task.flow;
       }
@@ -758,9 +1671,13 @@ function JourneyTaskEditor({
         selectedType === "form" &&
         !specializedForm
       ) {
-        validateFormFields(formFields);
-        existingInput.fields = structuredClone(formFields);
+        validateFormDefinition(formDefinition);
+        existingInput.form = structuredClone(formDefinition);
+        existingInput.fields = structuredClone(flattenFormDefinition(formDefinition));
+      } else if (selectedType === "selection_flow") {
+        existingInput.form = structuredClone(formDefinition);
       } else if (selectedType !== "form") {
+        delete existingInput.form;
         delete existingInput.fields;
       }
 
@@ -832,7 +1749,9 @@ function JourneyTaskEditor({
       input.screen_title = screenTitle.trim();
       input.screen_description = screenDescription.trim();
       if (item.studentStep === "about_you") {
-        validateFormFields(formFields);
+        validateFormDefinition(formDefinition);
+        const formFields = flattenFormDefinition(formDefinition);
+        input.form = structuredClone(formDefinition);
         input.fields = structuredClone(formFields);
         input.required_fields = formFields.flatMap((field) => {
           const binding = aboutYouFieldBindings[field.id];
@@ -873,6 +1792,19 @@ function JourneyTaskEditor({
               (dependency) => dependency !== item.id,
             );
           }
+          const activation = managedRecord(candidate.activation);
+          const activationRules = activation?.rules;
+          if (activation && Array.isArray(activationRules)) {
+            const remainingRules = activationRules.filter((rawRule) => {
+              const rule = managedRecord(rawRule);
+              return (
+                String(rule?.source_task ?? rule?.sourceTaskId ?? "") !==
+                item.id
+              );
+            });
+            if (remainingRules.length === 0) delete candidate.activation;
+            else activation.rules = remainingRules;
+          }
         }
       }
       const updatedConfiguration = await action.run("journeys", {
@@ -890,7 +1822,7 @@ function JourneyTaskEditor({
   if (builtInOnboardingScreen) {
     return (
       <aside
-        className="staff-editor-panel"
+        className="staff-editor-panel staff-journey-editor staff-journey-editor--built-in"
         ref={panelRef}
         role="dialog"
         aria-modal="true"
@@ -905,8 +1837,42 @@ function JourneyTaskEditor({
           <button type="button" aria-label="Close editor" onClick={onClose}>
             ×
           </button>
-        </header>
-        <form onSubmit={saveBuiltInScreen}>
+      </header>
+      <form noValidate onSubmit={saveBuiltInScreen}>
+          <div className="staff-journey-editor__hero">
+            <span aria-hidden="true">{taskTypeVisual(item.taskType).symbol}</span>
+            <div>
+              <small>Protected onboarding screen</small>
+              <strong>{item.title}</strong>
+              <p>Edit the student-facing content without breaking its stable route contract.</p>
+            </div>
+            <button
+              className="staff-journey-editor__input-preview"
+              type="button"
+              onClick={() =>
+                setActiveEditorSection(
+                  item.studentStep === "about_you" ? "dependencies" : "experience",
+                )
+              }
+              title="Open the student-facing configuration"
+            >
+              <small>{item.studentStep === "about_you" ? "Student form" : "Student action"}</small>
+              <strong>{inputPreview.value}{inputPreview.remaining > 0 ? ` +${inputPreview.remaining}` : ""}</strong>
+              <span>{item.studentStep === "about_you" ? "Configure form →" : "View student page →"}</span>
+            </button>
+            <span className="is-system">System</span>
+          </div>
+          <nav className="staff-journey-editor__nav" aria-label="System step editor sections">
+            <button type="button" className={activeEditorSection === "details" ? "is-active" : undefined} aria-pressed={activeEditorSection === "details"} onClick={() => setActiveEditorSection("details")}>01 Basics</button>
+            <button type="button" className={activeEditorSection === "experience" ? "is-active" : undefined} aria-pressed={activeEditorSection === "experience"} onClick={() => setActiveEditorSection("experience")}>02 Student page</button>
+            <button type="button" className={activeEditorSection === "dependencies" ? "is-active" : undefined} aria-pressed={activeEditorSection === "dependencies"} onClick={() => setActiveEditorSection("dependencies")}>{item.studentStep === "about_you" ? "03 Student form" : "03 System action"}</button>
+            <button type="button" className={activeEditorSection === "publishing" ? "is-active" : undefined} aria-pressed={activeEditorSection === "publishing"} onClick={() => setActiveEditorSection("publishing")}>04 Publish</button>
+          </nav>
+          <section className="staff-journey-editor__section" hidden={activeEditorSection !== "details"}>
+            <header>
+              <span>01</span>
+              <div><h3>System screen basics</h3><p>Keep the protected route stable while setting its staff label, owner, and reward.</p></div>
+            </header>
           <div className="staff-journey-task-id">
             <span>Stable screen key</span>
             <code>{item.studentStep}</code>
@@ -916,51 +1882,58 @@ function JourneyTaskEditor({
             <input name="title" defaultValue={item.title} required maxLength={180} />
             <small>Used by staff and in the student&apos;s progress navigation.</small>
           </label>
-          <label>
-            Student page section label
-            <input
-              value={screenLabel}
-              onChange={(event) => setScreenLabel(event.target.value)}
-              required
-              maxLength={80}
-            />
-          </label>
-          <label>
-            Student page heading
-            <input
-              value={screenTitle}
-              onChange={(event) => setScreenTitle(event.target.value)}
-              required
-              maxLength={180}
-            />
-          </label>
-          <label>
-            Student page introduction
-            <textarea
-              className="staff-editor-panel__body"
-              value={screenDescription}
-              onChange={(event) => setScreenDescription(event.target.value)}
-              required
-              maxLength={1200}
-            />
-          </label>
           <div className="staff-form-grid">
             <ResponsibleOfficeSelect defaultValue={item.owner} />
             <label>
               Points
               <input name="points" type="number" min="0" max="10000" defaultValue={item.points} required />
             </label>
-            <div className="staff-locked-setting" role="note">
-              <span>Student action</span>
-              <strong>{taskTypeLabel(item.taskType)}</strong>
-              <small>This system screen uses the fields configured below.</small>
-            </div>
           </div>
-          {item.studentStep === "about_you" ? (
-            <>
+          </section>
+          <section className="staff-journey-editor__section" hidden={activeEditorSection !== "experience"}>
+            <header>
+              <span>02</span>
+              <div><h3>Student page</h3><p>Shape the exact heading and guidance the student sees on this stable screen.</p></div>
+            </header>
+            <label>
+              Student page section label
+              <input
+                value={screenLabel}
+                onChange={(event) => setScreenLabel(event.target.value)}
+                required
+                maxLength={80}
+              />
+            </label>
+            <label>
+              Student page heading
+              <input
+                value={screenTitle}
+                onChange={(event) => setScreenTitle(event.target.value)}
+                required
+                maxLength={180}
+              />
+            </label>
+            <label>
+              Student page introduction
+              <textarea
+                className="staff-editor-panel__body"
+                value={screenDescription}
+                onChange={(event) => setScreenDescription(event.target.value)}
+                required
+                maxLength={1200}
+              />
+            </label>
+          </section>
+          <section className="staff-journey-editor__section" hidden={activeEditorSection !== "dependencies"}>
+            {item.studentStep === "about_you" ? (
+              <>
+              <header>
+                <span>03</span>
+                <div><h3>Student form</h3><p>Arrange profile questions and preview the published page.</p></div>
+              </header>
               <FormCanvasBuilder
-                fields={formFields}
-                onChange={setFormFields}
+                form={formDefinition}
+                onChange={setFormDefinition}
                 screen={{
                   label: screenLabel,
                   title: screenTitle,
@@ -975,14 +1948,33 @@ function JourneyTaskEditor({
                   defaultChecked={item.identityQuickUpload}
                 />
                 Let students upload an ID to prefill available identity details
-              </label>
+                  </label>
               </section>
-            </>
-          ) : null}
-          <div className="staff-student-impact-note">
-            This preview and the student page read the same published configuration.
-            The stable screen key and its route contract remain protected.
-          </div>
+              </>
+            ) : (
+              <>
+                <header>
+                  <span>03</span>
+                  <div><h3>System action</h3><p>Make the student outcome clear without exposing the protected route implementation.</p></div>
+                </header>
+                <div className="staff-locked-setting" role="note">
+                  <span>Student action</span>
+                  <strong>{taskTypeLabel(item.taskType)}</strong>
+                  <small>This route is system-managed. The student-facing page above is editable; payment, signing, and verification behavior remains protected.</small>
+                </div>
+              </>
+            )}
+          </section>
+          <section className="staff-journey-editor__section" hidden={activeEditorSection !== "publishing"}>
+            <header>
+              <span>04</span>
+              <div><h3>Ready to publish</h3><p>Review the scope of this change before it becomes available to students.</p></div>
+            </header>
+            <div className="staff-student-impact-note">
+              This preview and the student page read the same published configuration.
+              The stable screen key and its route contract remain protected.
+            </div>
+          </section>
           {editorError || action.message ? (
             <p className="field-error" role="alert">{editorError ?? action.message}</p>
           ) : null}
@@ -999,7 +1991,7 @@ function JourneyTaskEditor({
 
   return (
     <aside
-      className="staff-editor-panel"
+      className="staff-editor-panel staff-journey-editor"
       ref={panelRef}
       role="dialog"
       aria-modal="true"
@@ -1015,7 +2007,41 @@ function JourneyTaskEditor({
           ×
         </button>
       </header>
-      <form onSubmit={save}>
+      <form noValidate onSubmit={save}>
+        <div className="staff-journey-editor__hero">
+          <span aria-hidden="true">{taskTypeVisual(configuredTaskType).symbol}</span>
+          <div>
+            <small>{item.kind === "onboarding" ? "Offer onboarding" : "Enrollment checklist"}</small>
+            <strong>{item.title || "New journey step"}</strong>
+            <p>{taskTypeVisual(configuredTaskType).description}</p>
+          </div>
+          <button
+            className="staff-journey-editor__input-preview"
+            type="button"
+            onClick={() => setActiveEditorSection("experience")}
+            title="Open the student input configuration"
+          >
+            <small>{inputPreview.label}</small>
+            <strong>{inputPreview.value}{inputPreview.remaining > 0 ? ` +${inputPreview.remaining}` : ""}</strong>
+            <span>Configure input →</span>
+          </button>
+          <span className={item.active ? "is-live" : "is-inactive"}>{item.active ? "Live" : "Inactive"}</span>
+        </div>
+        <nav className="staff-journey-editor__nav" aria-label="Step editor sections">
+          <button type="button" className={activeEditorSection === "details" ? "is-active" : undefined} aria-pressed={activeEditorSection === "details"} onClick={() => setActiveEditorSection("details")}>01 Basics</button>
+          <button type="button" className={activeEditorSection === "experience" ? "is-active" : undefined} aria-pressed={activeEditorSection === "experience"} onClick={() => setActiveEditorSection("experience")}>02 Student input</button>
+          <button type="button" className={activeEditorSection === "dependencies" ? "is-active" : undefined} aria-pressed={activeEditorSection === "dependencies"} onClick={() => setActiveEditorSection("dependencies")}>03 Journey logic</button>
+          <button type="button" className={activeEditorSection === "publishing" ? "is-active" : undefined} aria-pressed={activeEditorSection === "publishing"} onClick={() => setActiveEditorSection("publishing")}>04 Publish</button>
+        </nav>
+        <section
+          className="staff-journey-editor__section"
+          hidden={activeEditorSection !== "details"}
+          id="journey-step-details"
+        >
+          <header>
+            <span>01</span>
+            <div><h3>Step details</h3><p>Name the step and define how it should be prioritized and owned.</p></div>
+          </header>
         <div className="staff-journey-task-id">
           <span>Stable step ID</span>
           <code>{item.id}</code>
@@ -1096,6 +2122,17 @@ function JourneyTaskEditor({
             />
           </label>
         </div>
+        </section>
+
+        <section
+          className="staff-journey-editor__section"
+          hidden={activeEditorSection !== "experience"}
+          id="journey-step-experience"
+        >
+          <header>
+            <span>02</span>
+            <div><h3>Student experience</h3><p>Choose the action and configure exactly what the student will see and submit.</p></div>
+          </header>
 
         {configuredTaskType === "single_select" ||
         configuredTaskType === "multiple_select" ? (
@@ -1184,8 +2221,8 @@ function JourneyTaskEditor({
           !["profile_verification", "housing_preference"].includes(item.id)) ||
         configuredTaskType === "selection_flow" ? (
           <FormCanvasBuilder
-            fields={formFields}
-            onChange={setFormFields}
+            form={formDefinition}
+            onChange={setFormDefinition}
             screen={{
               label: item.kind === "onboarding" ? "Onboarding" : "Enrollment task",
               title: item.title || "New student step",
@@ -1194,13 +2231,24 @@ function JourneyTaskEditor({
           />
         ) : null}
 
-        {formFields.length > 0 &&
+        {flattenFormDefinition(formDefinition).length > 0 &&
         !["form", "selection_flow"].includes(configuredTaskType) ? (
           <div className="staff-student-impact-note" role="alert">
             Changing this step to this action type will remove its configured form
             fields when you publish.
           </div>
         ) : null}
+        </section>
+
+        <section
+          className="staff-journey-editor__section"
+          hidden={activeEditorSection !== "dependencies"}
+          id="journey-step-dependencies"
+        >
+          <header>
+            <span>03</span>
+            <div><h3>Dependencies and branching</h3><p>Control when this step unlocks and see what it unlocks next.</p></div>
+          </header>
         <fieldset className="staff-dependency-picker">
           <legend>Prerequisites</legend>
           <p>
@@ -1222,6 +2270,11 @@ function JourneyTaskEditor({
                         next.delete(dependency);
                         return next;
                       });
+                      setRouteRules((current) =>
+                        current.filter(
+                          (rule) => rule.sourceTaskId !== dependency,
+                        ),
+                      );
                     }}
                   />
                   <span>
@@ -1244,6 +2297,13 @@ function JourneyTaskEditor({
                         else next.delete(candidate.id);
                         return next;
                       });
+                      if (!event.target.checked) {
+                        setRouteRules((current) =>
+                          current.filter(
+                            (rule) => rule.sourceTaskId !== candidate.id,
+                          ),
+                        );
+                      }
                     }}
                   />
                   <span>
@@ -1262,14 +2322,231 @@ function JourneyTaskEditor({
             </p>
           )}
         </fieldset>
+        <section className="staff-route-builder" aria-labelledby="route-builder-title">
+          <header>
+            <div>
+              <span>IF / ELSE</span>
+              <div>
+                <strong id="route-builder-title">Answer-driven path</strong>
+                <p>
+                  Make this step part of the journey only when a prerequisite
+                  answer matches. A non-matching branch becomes Not applicable.
+                </p>
+              </div>
+            </div>
+            <button
+              className="button button--secondary"
+              type="button"
+              disabled={routeSourceTasks.length === 0}
+              onClick={addRouteRule}
+            >
+              + Add answer condition
+            </button>
+          </header>
+          {routeRules.length > 1 ? (
+            <label className="staff-route-builder__match">
+              Apply this path when
+              <select
+                value={routeMatch}
+                onChange={(event) =>
+                  setRouteMatch(event.target.value === "any" ? "any" : "all")
+                }
+              >
+                <option value="all">All conditions match</option>
+                <option value="any">Any condition matches</option>
+              </select>
+            </label>
+          ) : null}
+          {routeRules.length > 0 ? (
+            <div className="staff-route-builder__rules">
+              {routeRules.map((rule, index) => {
+                const source = dependencyTasks.find(
+                  (candidate) => candidate.id === rule.sourceTaskId,
+                );
+                const fields = source ? routeFieldsForTask(source) : [];
+                const field =
+                  fields.find((candidate) => candidate.id === rule.fieldId) ??
+                  fields[0];
+                const operators = field ? operatorsForRouteField(field) : [];
+                return (
+                  <article key={`${rule.sourceTaskId}:${rule.fieldId}:${index}`}>
+                    <span aria-hidden="true">{index + 1}</span>
+                    <label>
+                      Prerequisite
+                      <select
+                        value={rule.sourceTaskId}
+                        onChange={(event) => {
+                          const nextSource = dependencyTasks.find(
+                            (candidate) => candidate.id === event.target.value,
+                          );
+                          const nextField = nextSource
+                            ? routeFieldsForTask(nextSource)[0]
+                            : undefined;
+                          if (!nextSource || !nextField) return;
+                          updateRouteRule(index, () => ({
+                            sourceTaskId: nextSource.id,
+                            fieldId: nextField.id,
+                            operator: operatorForRouteField(nextField),
+                            value: defaultRouteValue(nextField),
+                          }));
+                        }}
+                      >
+                        {routeSourceTasks.map((candidate) => (
+                          <option key={candidate.id} value={candidate.id}>
+                            {candidate.title}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Answer field
+                      <select
+                        value={rule.fieldId}
+                        onChange={(event) => {
+                          const nextField = fields.find(
+                            (candidate) => candidate.id === event.target.value,
+                          );
+                          if (!nextField) return;
+                          updateRouteRule(index, (current) => ({
+                            ...current,
+                            fieldId: nextField.id,
+                            operator: operatorForRouteField(nextField),
+                            value: defaultRouteValue(nextField),
+                          }));
+                        }}
+                      >
+                        {fields.map((candidate) => (
+                          <option key={candidate.id} value={candidate.id}>
+                            {candidate.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Comparison
+                      <select
+                        value={rule.operator}
+                        onChange={(event) => {
+                          const operator = event.target.value as JourneyRouteOperator;
+                          updateRouteRule(index, (current) => ({
+                            ...current,
+                            operator,
+                            value: field
+                              ? defaultRouteValue(field, operator)
+                              : current.value,
+                          }));
+                        }}
+                      >
+                        {operators.map((operator) => (
+                          <option key={operator.value} value={operator.value}>
+                            {operator.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      {rule.operator === "none_of" ? "Handled cases" : field?.fieldType === "number" ? "Threshold" : "Expected answer"}
+                      {field?.fieldType === "number" ? (
+                        <input
+                          type="number"
+                          min={field.minimum}
+                          max={field.maximum}
+                          value={typeof rule.value === "number" ? rule.value : ""}
+                          onChange={(event) =>
+                            updateRouteRule(index, (current) => ({
+                              ...current,
+                              value: Number(event.target.value),
+                            }))
+                          }
+                        />
+                      ) : rule.operator === "one_of" || rule.operator === "none_of" ? (
+                        <select
+                          multiple
+                          value={Array.isArray(rule.value) ? rule.value : [String(rule.value)]}
+                          onChange={(event) =>
+                            updateRouteRule(index, (current) => ({
+                              ...current,
+                              value: Array.from(event.target.selectedOptions, (option) => option.value),
+                            }))
+                          }
+                        >
+                          {(field?.options ?? []).map((option) => (
+                            <option key={String(option)} value={String(option)}>{String(option)}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <select
+                          value={String(rule.value)}
+                          onChange={(event) =>
+                            updateRouteRule(index, (current) => ({
+                              ...current,
+                              value:
+                                field?.fieldType === "checkbox"
+                                  ? event.target.value === "true"
+                                  : event.target.value,
+                            }))
+                          }
+                        >
+                          {(field?.options ?? []).map((option) => (
+                            <option key={`${typeof option}:${String(option)}`} value={String(option)}>
+                              {typeof option === "boolean" ? (option ? "Yes" : "No") : option}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {rule.operator === "none_of" ? <small>Students whose answer is not in this list take this default path.</small> : null}
+                    </label>
+                    <button
+                      type="button"
+                      aria-label={`Remove condition ${index + 1}`}
+                      onClick={() =>
+                        setRouteRules((current) =>
+                          current.filter((_, ruleIndex) => ruleIndex !== index),
+                        )
+                      }
+                    >
+                      Remove
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="staff-route-builder__empty">
+              <strong>This path currently follows prerequisites for everyone.</strong>
+              <p>
+                Select a prerequisite with a Yes/No, single-choice, or
+                multiple-choice answer to create a conditional branch.
+              </p>
+            </div>
+          )}
+          <footer>
+            <strong>Safe convergence</strong>
+            <span>
+              Unselected paths are skipped, while a later step can depend on all
+              branch ends and continue after the selected path is complete.
+            </span>
+          </footer>
+        </section>
         <div className="staff-dependency-successors" role="note">
           <strong>Steps currently unlocked by this one</strong>
           <p>
             {successorTasks.length > 0
               ? successorTasks.map((candidate) => candidate.title).join(", ")
-              : "No existing step currently uses this as a prerequisite."}
+            : "No existing step currently uses this as a prerequisite."}
           </p>
         </div>
+        </section>
+
+        <section
+          className="staff-journey-editor__section"
+          hidden={activeEditorSection !== "publishing"}
+          id="journey-step-publishing"
+        >
+          <header>
+            <span>04</span>
+            <div><h3>Availability and publishing</h3><p>Set the student visibility and review the version impact before publishing.</p></div>
+          </header>
         <div className="staff-form-grid">
           <label className="staff-checkbox">
             <input name="required" type="checkbox" defaultChecked={item.required} />
@@ -1323,6 +2600,7 @@ function JourneyTaskEditor({
             )}
           </section>
         ) : null}
+        </section>
 
         {editorError || action.message ? (
           <p className="field-error" role="alert">
@@ -1392,10 +2670,29 @@ export function JourneyFlowBuilder({
     }
   }, [parsed.tasks, workingConfiguration]);
   const [tasks, setTasks] = useState(parsed.tasks);
+  const [viewMode, setViewMode] = useState<"map" | "list">("map");
+  const focusedGraphTasks = useMemo(() => {
+    const taskById = new Map(
+      dependencyTasks.map((task) => [task.id, task]),
+    );
+    for (const task of tasks) taskById.set(task.id, task);
+    const visible = new Set(tasks.map((task) => task.id));
+    const addPrerequisites = (taskId: string) => {
+      const task = taskById.get(taskId);
+      for (const dependency of task?.dependsOn ?? []) {
+        if (visible.has(dependency)) continue;
+        visible.add(dependency);
+        addPrerequisites(dependency);
+      }
+    };
+    for (const task of tasks) addPrerequisites(task.id);
+    return [...taskById.values()].filter((task) => visible.has(task.id));
+  }, [dependencyTasks, tasks]);
   const [selected, setSelected] = useState<{
     item: JourneyBuilderTask;
     isNew: boolean;
   } | null>(null);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
@@ -1439,6 +2736,179 @@ export function JourneyFlowBuilder({
       changeSummary,
     });
     acceptPublishedConfiguration(updatedConfiguration);
+  };
+
+  const applyTemplate = async (
+    template: JourneyScaffoldTemplate,
+    startAfterId: string | null,
+  ) => {
+    setOperationError(null);
+    try {
+      const document = editableDocument(workingConfigurationRef.current);
+      const flows = flowRecords(document);
+      let flow = flows.find(
+        (candidate) => candidate.kind === kind && candidate.status === "published",
+      );
+      if (!flow) {
+        flow = {
+          id: createJourneyFlowId(
+            kind,
+            new Set(flows.map((candidate) => String(candidate.id))),
+          ),
+          title: kind === "onboarding" ? "Offer onboarding" : "Enrollment checklist",
+          kind,
+          status: "published",
+          tasks: [],
+        };
+        flows.push(flow);
+      }
+      const existingIds = new Set(
+        flows.flatMap((candidate) => taskRecords(candidate).map((task) => String(task.id))),
+      );
+      if (startAfterId && !existingIds.has(startAfterId)) {
+        throw new Error("The selected starting step changed. Reopen the template and try again.");
+      }
+      const idByKey = new Map<string, string>();
+      for (const templateTask of template.tasks) {
+        const base = `tpl_${template.id}_${templateTask.key}`
+          .toLowerCase()
+          .replace(/[^a-z0-9_]+/g, "_")
+          .replace(/^_+|_+$/g, "")
+          .slice(0, 88);
+        let candidate = base;
+        let suffix = 2;
+        while (existingIds.has(candidate)) {
+          candidate = `${base.slice(0, 84)}_${suffix}`;
+          suffix += 1;
+        }
+        existingIds.add(candidate);
+        idByKey.set(templateTask.key, candidate);
+      }
+      for (const templateTask of template.tasks) {
+        const internalDependencies = templateTask.dependsOn.map((dependency) => {
+          const mapped = idByKey.get(dependency);
+          if (!mapped) throw new Error(`Template dependency ${dependency} is invalid.`);
+          return mapped;
+        });
+        const dependencies =
+          internalDependencies.length === 0 && startAfterId
+            ? [startAfterId]
+            : internalDependencies;
+        const record: ManagedRecord = {
+          id: idByKey.get(templateTask.key),
+          title: templateTask.title,
+          description: templateTask.description,
+          owner: templateTask.owner,
+          task_type: templateTask.taskType,
+          submission_type: submissionTypeForTask(templateTask.taskType),
+          required: templateTask.required,
+          active: true,
+          points: templateTask.points,
+          priority: templateTask.priority,
+          depends_on: dependencies,
+        };
+        if (templateTask.activation) {
+          record.activation = {
+            match: templateTask.activation.match,
+            rules: templateTask.activation.rules.map((rule) => {
+              const sourceTaskId = idByKey.get(rule.sourceKey);
+              if (!sourceTaskId) {
+                throw new Error(
+                  `Template route source ${rule.sourceKey} is invalid.`,
+                );
+              }
+              return {
+                source_task: sourceTaskId,
+                field: rule.fieldId,
+                operator: rule.operator,
+                value: rule.value,
+              };
+            }),
+          };
+        }
+        if (templateTask.dueOffsetDays !== null) {
+          record.due_days_after_acceptance = templateTask.dueOffsetDays;
+        }
+        if (templateTask.form) {
+          record.input = {
+            form: structuredClone(templateTask.form),
+            fields: structuredClone(flattenFormDefinition(templateTask.form)),
+          };
+        }
+        if (templateTask.options) {
+          record.options = structuredClone(templateTask.options);
+        }
+        if (templateTask.maximumSelections) {
+          record.maximum_selections = templateTask.maximumSelections;
+        }
+        if (templateTask.acceptedMimeTypes) {
+          record.accepted_mime_types = structuredClone(templateTask.acceptedMimeTypes);
+        }
+        if (templateTask.documentCategories) {
+          record.document_categories = structuredClone(templateTask.documentCategories);
+        }
+        if (templateTask.taskType === "signature") {
+          record.signature_provider = "built_in";
+        }
+        taskRecords(flow).push(record);
+      }
+      await publish(document, `Added ${template.name} journey template.`);
+      setShowTemplates(false);
+      setViewMode("map");
+    } catch (error) {
+      setOperationError(errorMessage(error, "The journey template could not be published."));
+    }
+  };
+
+  const connectNodes = async (sourceId: string, targetId: string) => {
+    setOperationError(null);
+    try {
+      const source = dependencyTasks.find((task) => task.id === sourceId);
+      const target = dependencyTasks.find((task) => task.id === targetId);
+      if (!source || !target || target.kind !== kind || target.studentStep) {
+        throw new Error("Those nodes can no longer be connected.");
+      }
+      if (!source.active && target.active) {
+        throw new Error("Activate the source step before connecting it to a live step.");
+      }
+      if (target.dependsOn.includes(sourceId)) return;
+      const candidate = dependencyTasks.map((task) => ({
+        id: task.id,
+        dependsOn: task.id === targetId ? [...task.dependsOn, sourceId] : task.dependsOn,
+      }));
+      const dependencyError = validateJourneyDependencies(candidate);
+      if (dependencyError) throw new Error(dependencyError);
+      const document = editableDocument(workingConfigurationRef.current);
+      const { task } = findTask(document, target);
+      if (!task) throw new Error("The target step is no longer available.");
+      task.depends_on = [...new Set([...stringList(task.depends_on), sourceId])];
+      await publish(document, `Connected ${source.title} to ${target.title}.`);
+    } catch (error) {
+      setOperationError(errorMessage(error, "The journey nodes could not be connected."));
+      throw error;
+    }
+  };
+
+  const saveCanvasLayout = async (
+    positions: Record<string, { x: number; y: number }>,
+  ) => {
+    setOperationError(null);
+    try {
+      const document = editableDocument(workingConfigurationRef.current);
+      for (const item of tasks) {
+        const { task } = findTask(document, item);
+        const position = positions[item.id];
+        if (!task || !position) continue;
+        task.editor_position = {
+          x: Math.max(0, Math.round(position.x)),
+          y: Math.max(0, Math.round(position.y)),
+        };
+      }
+      await publish(document, `Updated ${kind} journey canvas layout.`);
+    } catch (error) {
+      setOperationError(errorMessage(error, "The canvas layout could not be saved."));
+      throw error;
+    }
   };
 
   const persistOrder = async (nextTasks: JourneyBuilderTask[]) => {
@@ -1580,22 +3050,24 @@ export function JourneyFlowBuilder({
           documentCategories: [],
           aboutYouRequiredFields: defaultAboutYouRequiredFields,
           identityQuickUpload: true,
-          formFields: [
+          formDefinition: onePageForm([
             {
               id: "response",
               title: "Your response",
               field_type: "text",
               required: true,
             },
-          ],
+          ]),
           screenLabel: null,
           screenTitle: null,
           screenDescription: null,
           points: 0,
           priority: 0,
           dueOffsetDays: null,
+          canvasPosition: null,
           studentStep: null,
           dependsOn: [],
+          activation: { match: "all", rules: [] },
           flow: [],
           configurationVersion: workingConfigurationRef.current.version,
         },
@@ -1610,20 +3082,50 @@ export function JourneyFlowBuilder({
 
   return (
     <>
-      <header className="staff-panel__heading staff-panel__heading--padded staff-flow-builder__heading">
-        <div>
-          <p className="eyebrow">Published flow</p>
-          <h2>{title}</h2>
+      <header className="staff-journey-commandbar">
+        <div className="staff-journey-commandbar__title">
+          <span className="staff-journey-commandbar__mark" aria-hidden="true">FLOW</span>
+          <div>
+            <p className="eyebrow">Published student journey</p>
+            <h2>{title}</h2>
+            <p>Design the sequence, branch logic, and student experience from one workspace.</p>
+          </div>
         </div>
-        <div>
-          <span className="staff-status-pill staff-status-pill--success">Live</span>
+        <div className="staff-journey-commandbar__actions">
+          <div className="staff-journey-view-switch" role="group" aria-label="Journey view">
+            <button
+              className={viewMode === "map" ? "is-active" : undefined}
+              type="button"
+              aria-pressed={viewMode === "map"}
+              onClick={() => setViewMode("map")}
+            >
+              <span aria-hidden="true">◇</span> Flow map
+            </button>
+            <button
+              className={viewMode === "list" ? "is-active" : undefined}
+              type="button"
+              aria-pressed={viewMode === "list"}
+              onClick={() => setViewMode("list")}
+            >
+              <span aria-hidden="true">≡</span> Step list
+            </button>
+          </div>
+          <span className="staff-journey-version">Live · v{workingConfiguration.version}</span>
+          <button
+            className="button button--secondary"
+            type="button"
+            disabled={busy || Boolean(parsed.error)}
+            onClick={() => setShowTemplates(true)}
+          >
+            Use template
+          </button>
           <button
             className="button button--primary"
             type="button"
             disabled={busy || Boolean(parsed.error)}
             onClick={addStep}
           >
-            Add step
+            + Add step
           </button>
         </div>
       </header>
@@ -1666,12 +3168,19 @@ export function JourneyFlowBuilder({
           </ul>
         </section>
       ) : null}
-      {dependencyTasks.length > 0 ? (
+      {viewMode === "map" && focusedGraphTasks.length > 0 ? (
         <JourneyDependencyMap
-          tasks={dependencyTasks}
+          key={`${kind}:${workingConfiguration.version}`}
+          tasks={focusedGraphTasks}
+          currentKind={kind}
           onSelect={(item) => openEditor(item, false)}
+          onAdd={addStep}
+          onConnect={connectNodes}
+          onSaveLayout={saveCanvasLayout}
+          busy={busy}
         />
       ) : null}
+      {viewMode === "list" ? (
       <ol className="staff-journey-list" aria-describedby={instructionId}>
         {tasks.map((item, index) => {
           const previous = tasks[index - 1];
@@ -1821,6 +3330,7 @@ export function JourneyFlowBuilder({
           );
         })}
       </ol>
+      ) : null}
       {tasks.length === 0 && !parsed.error ? (
         <div className="staff-flow-builder__empty">
           <strong>No steps yet</strong>
@@ -1839,6 +3349,15 @@ export function JourneyFlowBuilder({
             onClose={closeEditor}
           />
         </div>
+      ) : null}
+      {showTemplates ? (
+        <JourneyTemplateGallery
+          kind={kind}
+          tasks={tasks}
+          busy={busy}
+          onApply={(template, startAfterId) => void applyTemplate(template, startAfterId)}
+          onClose={() => setShowTemplates(false)}
+        />
       ) : null}
     </>
   );

@@ -2,6 +2,7 @@
 
 import type {
   StudentAppointment,
+  StudentRequirementFormDefinition,
   StudentRequirementDetail,
   StudentRequirementInputField,
   StudentRequirementResponsePayload,
@@ -30,11 +31,33 @@ function configuredFields(requirement: StudentRequirementDetail) {
   return fields ?? [];
 }
 
-function ConfiguredField({ field }: { field: StudentRequirementInputField }) {
+function configuredForm(requirement: StudentRequirementDetail): StudentRequirementFormDefinition {
+  const publishedForm = requirement.inputConfig.form;
+  if (publishedForm?.version === 1 && publishedForm.pages.length > 0) {
+    return publishedForm;
+  }
+  return {
+    version: 1,
+    pages: [{
+      id: "student_details",
+      title: "Your response",
+      description: "Complete the questions below.",
+      fields: configuredFields(requirement),
+    }],
+  };
+}
+
+function ConfiguredField({
+  field,
+  currentValue,
+}: {
+  field: StudentRequirementInputField;
+  currentValue?: StudentRequirementResponseValue;
+}) {
   if (field.field_type === "checkbox") {
     return (
       <label className="requirement-response__checkbox">
-        <input name={field.id} type="checkbox" required={field.required} />
+        <input name={field.id} type="checkbox" required={field.required} defaultChecked={currentValue === true} />
         {field.title}
       </label>
     );
@@ -43,7 +66,7 @@ function ConfiguredField({ field }: { field: StudentRequirementInputField }) {
     return (
       <label>
         {field.title}
-        <select name={field.id} required={field.required} defaultValue="">
+        <select name={field.id} required={field.required} defaultValue={typeof currentValue === "string" ? currentValue : ""}>
           <option value="" disabled>
             Select an option
           </option>
@@ -60,7 +83,7 @@ function ConfiguredField({ field }: { field: StudentRequirementInputField }) {
     return (
       <label>
         {field.title}
-        <select name={field.id} required={field.required} multiple>
+        <select name={field.id} required={field.required} multiple defaultValue={Array.isArray(currentValue) ? currentValue.map(String) : []}>
           {(field.options ?? []).map((option) => (
             <option key={option} value={option}>
               {option}
@@ -80,6 +103,14 @@ function ConfiguredField({ field }: { field: StudentRequirementInputField }) {
         name={field.id}
         type={field.field_type === "phone" ? "tel" : field.field_type}
         required={field.required}
+        min={field.minimum}
+        max={field.maximum}
+        step={field.step}
+        defaultValue={
+          typeof currentValue === "string" || typeof currentValue === "number"
+            ? currentValue
+            : ""
+        }
       />
     </label>
   );
@@ -106,6 +137,13 @@ function valuesFromForm(
         );
       }
       values[field.id] = selected;
+    } else if (field.field_type === "number") {
+      const rawValue = String(form.get(field.id) ?? "").trim();
+      const parsedValue = Number(rawValue);
+      if (rawValue && !Number.isFinite(parsedValue)) {
+        throw new Error(`${field.title} must be a valid number.`);
+      }
+      values[field.id] = rawValue ? parsedValue : null;
     } else {
       values[field.id] = String(form.get(field.id) ?? "");
     }
@@ -124,11 +162,14 @@ function GenericValuesForm({
   loading: boolean;
   onValidationError: (message: string | null) => void;
 }) {
-  const fields = configuredFields(requirement);
+  const form = configuredForm(requirement);
+  const fields = form.pages.flatMap((page) => page.fields);
+  const [pageIndex, setPageIndex] = useState(0);
   const [currentValues, setCurrentValues] = useState<
     Record<string, StudentRequirementResponseValue>
   >({});
-  const visibleFields = visibleConfiguredFields(fields, currentValues);
+  const page = form.pages[Math.min(pageIndex, form.pages.length - 1)];
+  const visibleFields = visibleConfiguredFields(page?.fields ?? [], currentValues);
   if (fields.length === 0) {
     return (
       <div>
@@ -144,14 +185,24 @@ function GenericValuesForm({
       </div>
     );
   }
+  const valuesForPage = (formData: FormData, validateSelections: boolean) => {
+    const next = { ...currentValues };
+    for (const field of page?.fields ?? []) delete next[field.id];
+    return {
+      ...next,
+      ...valuesFromForm(formData, visibleFields, validateSelections),
+    };
+  };
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
-      const values = valuesFromForm(
-        new FormData(event.currentTarget),
-        visibleFields,
-      );
+      const values = valuesForPage(new FormData(event.currentTarget), true);
       onValidationError(null);
+      if (pageIndex < form.pages.length - 1) {
+        setCurrentValues(values);
+        setPageIndex((current) => current + 1);
+        return;
+      }
       await submit({ values });
     } catch (error) {
       onValidationError(
@@ -161,19 +212,31 @@ function GenericValuesForm({
   };
   return (
     <form
+      className="requirement-response__multipage-form"
       onChange={(event) =>
-        setCurrentValues(
-          valuesFromForm(new FormData(event.currentTarget), fields, false),
-        )
+        setCurrentValues(valuesForPage(new FormData(event.currentTarget), false))
       }
       onSubmit={(event) => void onSubmit(event)}
     >
+      {form.pages.length > 1 ? (
+        <div className="requirement-response__page-progress" aria-label={`Step ${pageIndex + 1} of ${form.pages.length}`}>
+          <span>Step {pageIndex + 1} of {form.pages.length}</span>
+          <div>{form.pages.map((candidate, index) => <i className={index <= pageIndex ? "is-complete" : undefined} key={candidate.id} />)}</div>
+        </div>
+      ) : null}
+      <header className="requirement-response__page-heading">
+        <h3>{page?.title}</h3>
+        {page?.description ? <p>{page.description}</p> : null}
+      </header>
       {visibleFields.map((field) => (
-        <ConfiguredField key={field.id} field={field} />
+        <ConfiguredField key={field.id} field={field} currentValue={currentValues[field.id]} />
       ))}
-      <button className="button button--primary" type="submit" disabled={loading}>
-        {loading ? "Submitting..." : "Submit response"}
-      </button>
+      <div className="requirement-response__page-actions">
+        {pageIndex > 0 ? <button className="button button--secondary" type="button" disabled={loading} onClick={() => setPageIndex((current) => current - 1)}>Back</button> : null}
+        <button className="button button--primary" type="submit" disabled={loading}>
+          {loading ? "Submitting..." : pageIndex === form.pages.length - 1 ? "Submit response" : "Continue"}
+        </button>
+      </div>
     </form>
   );
 }

@@ -66,7 +66,7 @@ test.describe("document misuse through the enrollment UI", () => {
       ]),
     });
     await page
-      .getByRole("button", { name: "Upload requirement bundle" })
+      .getByRole("button", { name: "Submit files" })
       .click();
 
     await expect(
@@ -92,7 +92,7 @@ test.describe("document misuse through the enrollment UI", () => {
       ]),
     });
     await page
-      .getByRole("button", { name: "Upload requirement bundle" })
+      .getByRole("button", { name: "Submit files" })
       .click();
 
     await expect(
@@ -128,7 +128,7 @@ test.describe("document misuse through the enrollment UI", () => {
       page.getByRole("listitem").filter({ hasText: "notes.txt" }),
     ).toContainText("Use PDF, JPEG, or PNG.");
     await expect(
-      page.getByRole("button", { name: "Upload requirement bundle" }),
+      page.getByRole("button", { name: "Submit files" }),
     ).toBeDisabled();
 
     await fileInput.setInputFiles({
@@ -140,7 +140,7 @@ test.describe("document misuse through the enrollment UI", () => {
       page.getByRole("listitem").filter({ hasText: "empty.pdf" }),
     ).toContainText("This file is empty.");
     await expect(
-      page.getByRole("button", { name: "Upload requirement bundle" }),
+      page.getByRole("button", { name: "Submit files" }),
     ).toBeDisabled();
   });
 
@@ -156,7 +156,7 @@ test.describe("document misuse through the enrollment UI", () => {
       buffer: Buffer.from("Restaurant menu pretending to be a PDF"),
     });
     await page
-      .getByRole("button", { name: "Upload requirement bundle" })
+      .getByRole("button", { name: "Submit files" })
       .click();
 
     await expect(
@@ -201,7 +201,7 @@ test.describe("document misuse through the enrollment UI", () => {
       page.getByRole("listitem").filter({ hasText: "aid-photo-second.jpeg" }),
     ).not.toContainText("Use PDF, JPEG, or PNG.");
     await expect(
-      page.getByRole("button", { name: "Upload requirement bundle" }),
+      page.getByRole("button", { name: "Submit files" }),
     ).toBeEnabled();
 
     await page
@@ -219,7 +219,7 @@ test.describe("document misuse through the enrollment UI", () => {
       page.getByRole("listitem").filter({ hasText: "oversized.jpg" }),
     ).toContainText("This file is larger than 10 MB.");
     await expect(
-      page.getByRole("button", { name: "Upload requirement bundle" }),
+      page.getByRole("button", { name: "Submit files" }),
     ).toBeDisabled();
 
     await fileInput.setInputFiles(

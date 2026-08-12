@@ -3,18 +3,26 @@ import type {
   ActivityEventInput,
   AskEdwardInput,
   AskEdwardResponse,
+  CampusEventRegistration,
   CampusLifeFeed,
   CatalogCourse,
   ApiErrorResponse,
   CompleteStudentOnboardingInput,
+  CompleteStaffInteractionInput,
   ConfirmStudentDocumentExtractionInput,
+  CreateStaffActionRuleInput,
   CreateDepositPaymentInput,
+  CreateStaffWorkItemInput,
+  CreateStaffWorkCommentInput,
   CreateStaffClubInput,
   CreateStaffCorePlayInput,
   CreateStaffKnowledgeCardInput,
   CreateStudentHelpRequestInput,
+  CreateStudentInquiryMessageInput,
   CreateStudentAppointmentInput,
   CreateStudentDocumentInput,
+  DeferStudentExperienceUpdatesInput,
+  DeferStudentExperienceUpdatesResult,
   DecideStudentExperienceUpdateInput,
   StudentAppointment,
   StudentAppointmentList,
@@ -37,7 +45,13 @@ import type {
   StudentRequirementDetail,
   StudentRequirementList,
   ReviewStaffDocumentInput,
+  RecordStaffCommunicationInput,
+  RegisterCampusEventInput,
+  RequestStaffAiRefreshInput,
+  RetryStaffCallTranscriptionInput,
   StaffActionCenter,
+  StaffActionRule,
+  StaffActionRuleList,
   StaffCorePlay,
   StaffDocumentDecisionResult,
   StaffEdwardPreview,
@@ -45,9 +59,12 @@ import type {
   StaffEdwardConfigurationDraft,
   StaffEdwardConfigurationDraftInput,
   StaffInquiry,
+  StaffInquiryThread,
   StaffKnowledgeCard,
   StaffManagedConfiguration,
   StaffManagedConfigurationKind,
+  StaffNotificationList,
+  StaffNotificationReadResult,
   StaffOperationsWorkspace,
   StaffOutreachRun,
   StaffPortalMediaUpload,
@@ -56,11 +73,14 @@ import type {
   StaffSignUpInput,
   StaffStudentRecord,
   StaffWorkItem,
+  StaffWorkItemDetail,
+  StartStaffInteractionInput,
   SubmitStudentRequirementResponseInput,
   SubmitStudentRequirementResponseResult,
   StudentClub,
   SimulateStaffOutreachInput,
   UpdateStaffClubInput,
+  UpdateStaffActionRuleInput,
   UpdateStaffCorePlayInput,
   UpdateStaffInquiryInput,
   UpdateStaffKnowledgeCardInput,
@@ -574,6 +594,51 @@ export function getStaffActionCenter(signal?: AbortSignal) {
   });
 }
 
+export function registerCampusEvent(
+  eventId: string,
+  input: RegisterCampusEventInput,
+  idempotencyKey: string,
+) {
+  return request<CampusEventRegistration>(
+    `/v1/student/campus-life/events/${encodeURIComponent(eventId)}/register`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function deferStudentExperienceUpdates(
+  input: DeferStudentExperienceUpdatesInput,
+) {
+  return request<DeferStudentExperienceUpdatesResult>(
+    "/v1/student/experience-updates/defer",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function getStaffWorkItemDetail(
+  workItemId: string,
+  signal?: AbortSignal,
+) {
+  return request<StaffWorkItemDetail>(
+    `/v1/staff/work-items/${encodeURIComponent(workItemId)}`,
+    {
+      method: "GET",
+      headers: staffHeaders,
+      signal,
+    },
+  );
+}
+
 export function getStaffOperationsWorkspace(signal?: AbortSignal) {
   return request<StaffOperationsWorkspace>("/v1/staff/workspace", {
     method: "GET",
@@ -802,6 +867,254 @@ export function updateStaffWorkItem(
   );
 }
 
+export function getStaffInquiryThread(inquiryId: string, signal?: AbortSignal) {
+  return request<StaffInquiryThread>(
+    `/v1/staff/inquiries/${encodeURIComponent(inquiryId)}/thread`,
+    {
+      headers: staffHeaders,
+      signal,
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function createStaffWorkItem(
+  input: CreateStaffWorkItemInput,
+  idempotencyKey: string,
+) {
+  return request<StaffWorkItem>(
+    "/v1/staff/work-items",
+    {
+      method: "POST",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function createStaffWorkComment(
+  workItemId: string,
+  input: CreateStaffWorkCommentInput,
+  idempotencyKey: string,
+) {
+  return request<StaffWorkItemDetail>(
+    `/v1/staff/work-items/${encodeURIComponent(workItemId)}/comments`,
+    {
+      method: "POST",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function startStaffInteraction(
+  workItemId: string,
+  input: StartStaffInteractionInput,
+  idempotencyKey: string,
+) {
+  return request<StaffWorkItemDetail>(
+    `/v1/staff/work-items/${encodeURIComponent(workItemId)}/interactions`,
+    {
+      method: "POST",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function recordStaffCommunication(
+  interactionId: string,
+  input: RecordStaffCommunicationInput,
+  idempotencyKey: string,
+) {
+  return request<StaffWorkItemDetail>(
+    `/v1/staff/interactions/${encodeURIComponent(interactionId)}/communications`,
+    {
+      method: "POST",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function completeStaffInteraction(
+  interactionId: string,
+  input: CompleteStaffInteractionInput,
+) {
+  return request<StaffWorkItemDetail>(
+    `/v1/staff/interactions/${encodeURIComponent(interactionId)}/complete`,
+    {
+      method: "POST",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function requestStaffAiRefresh(
+  workItemId: string,
+  input: RequestStaffAiRefreshInput,
+) {
+  return request<StaffWorkItemDetail>(
+    `/v1/staff/work-items/${encodeURIComponent(workItemId)}/ai-refresh`,
+    {
+      method: "POST",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function uploadStaffCallRecording(
+  interactionId: string,
+  file: File,
+  consentConfirmed: boolean,
+  idempotencyKey: string,
+) {
+  const body = new FormData();
+  body.set("file", file);
+  body.set("consentConfirmed", String(consentConfirmed));
+  return request<StaffWorkItemDetail>(
+    `/v1/staff/interactions/${encodeURIComponent(interactionId)}/recordings`,
+    {
+      method: "POST",
+      headers: {
+        ...staffHeaders,
+        "Idempotency-Key": idempotencyKey,
+      },
+      body,
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function retryStaffCallTranscription(
+  recordingId: string,
+  input: RetryStaffCallTranscriptionInput,
+) {
+  return request<StaffWorkItemDetail>(
+    `/v1/staff/call-recordings/${encodeURIComponent(recordingId)}/retry`,
+    {
+      method: "POST",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export async function getStaffCallRecordingContent(
+  recordingId: string,
+  signal?: AbortSignal,
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/v1/staff/call-recordings/${encodeURIComponent(recordingId)}/content`,
+    {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        Accept: "audio/*,video/*",
+        ...staffHeaders,
+        "X-Tenant-Slug": currentTenantSlug(),
+      },
+      signal,
+    },
+  );
+  if (!response.ok) throw await parseError(response);
+  return response.blob();
+}
+
+export function getStaffActionRules(signal?: AbortSignal) {
+  return request<StaffActionRuleList>("/v1/staff/action-rules", {
+    method: "GET",
+    headers: staffHeaders,
+    signal,
+  });
+}
+
+export function getStaffNotifications(signal?: AbortSignal) {
+  return request<StaffNotificationList>("/v1/staff/notifications", {
+    method: "GET",
+    headers: staffHeaders,
+    signal,
+  });
+}
+
+export function markStaffNotificationRead(notificationId: string) {
+  return request<StaffNotificationReadResult>(
+    `/v1/staff/notifications/${encodeURIComponent(notificationId)}/read`,
+    {
+      method: "POST",
+      headers: staffHeaders,
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function createStaffActionRule(input: CreateStaffActionRuleInput) {
+  return request<StaffActionRule>(
+    "/v1/staff/action-rules",
+    {
+      method: "POST",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function updateStaffActionRule(
+  ruleId: string,
+  input: UpdateStaffActionRuleInput,
+) {
+  return request<StaffActionRule>(
+    `/v1/staff/action-rules/${encodeURIComponent(ruleId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
 export function getStaffStudentRecord(
   studentId: string,
   signal?: AbortSignal,
@@ -850,6 +1163,10 @@ export function reviewStaffDocument(
     },
     { notifyStudentRecordChanged: false },
   );
+}
+
+export function getStaffDocumentContentUrl(path: string) {
+  return tenantAwareDocumentUrl(path);
 }
 
 function tenantAwareDocumentUrl(path: string) {
@@ -940,7 +1257,7 @@ export function getStudentHelp(signal?: AbortSignal) {
   });
 }
 
-export function createStudentHelpRequest(
+function postStudentHelpRequest(
   input: CreateStudentHelpRequestInput,
   idempotencyKey: string,
 ) {
@@ -952,6 +1269,49 @@ export function createStudentHelpRequest(
     },
     body: JSON.stringify(input),
   });
+}
+
+export async function createStudentHelpRequest(
+  input: CreateStudentHelpRequestInput,
+  idempotencyKey: string,
+) {
+  try {
+    return await postStudentHelpRequest(input, idempotencyKey);
+  } catch (error) {
+    if (
+      !input.requirementId ||
+      !(error instanceof ApiClientError) ||
+      error.status !== 400 ||
+      error.code !== "VALIDATION_ERROR"
+    ) {
+      throw error;
+    }
+
+    // Compatibility during the backend rollout: older strict schemas reject
+    // requirementId. The durable message still carries the exact requirement
+    // reference, so retry once without the new field instead of losing the note.
+    const legacyInput = { ...input };
+    delete legacyInput.requirementId;
+    return postStudentHelpRequest(legacyInput, idempotencyKey);
+  }
+}
+
+export function createStudentInquiryMessage(
+  inquiryId: string,
+  input: CreateStudentInquiryMessageInput,
+  idempotencyKey: string,
+) {
+  return request<StudentHelpRequest>(
+    `/v1/student/help/requests/${encodeURIComponent(inquiryId)}/messages`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export function acceptAdmissionOffer(

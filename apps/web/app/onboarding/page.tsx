@@ -1637,17 +1637,23 @@ function optionValue(field: StudentRequirementInputField, option: string) {
   return configuredChoiceValues[field.id]?.[option] ?? option;
 }
 
-function ConfiguredAboutYouFields({
+function ConfiguredAboutYouPageFields({
   fields,
   data,
+  title = "Your information",
+  description = "Review the fields configured by your university before continuing.",
+  active = true,
 }: {
   fields: StudentRequirementInputField[];
   data: StudentOnboardingData;
+  title?: string;
+  description?: string;
+  active?: boolean;
 }) {
   return (
     <fieldset className="form-section">
-      <legend>Your information</legend>
-      <p>Review the fields configured by your university before continuing.</p>
+      <legend>{title}</legend>
+      <p>{description}</p>
       <div className="form-grid">
         {fields.map((field) => {
           const name = configuredFieldName(field);
@@ -1660,7 +1666,7 @@ function ConfiguredAboutYouFields({
                   type="checkbox"
                   value="yes"
                   defaultChecked={current === true}
-                  required={field.required}
+                  required={active && field.required}
                 />
                 <span><strong>{field.title}</strong></span>
               </label>
@@ -1680,7 +1686,7 @@ function ConfiguredAboutYouFields({
                         type="checkbox"
                         value={value}
                         defaultChecked={selected.includes(value)}
-                        required={field.required && index === 0 && selected.length === 0}
+                        required={active && field.required && index === 0 && selected.length === 0}
                       />
                       {option}
                     </label>
@@ -1696,7 +1702,7 @@ function ConfiguredAboutYouFields({
                 <select
                   name={name}
                   defaultValue={typeof current === "string" ? current : ""}
-                  required={field.required}
+                  required={active && field.required}
                 >
                   <option value="" disabled>Choose one</option>
                   {(field.options ?? []).map((option) => (
@@ -1713,7 +1719,7 @@ function ConfiguredAboutYouFields({
                 name={name}
                 type={field.field_type === "phone" ? "tel" : field.field_type}
                 defaultValue={typeof current === "string" ? current : ""}
-                required={field.required}
+                required={active && field.required}
                 maxLength={field.field_type === "email" ? 254 : 180}
               />
             </label>
@@ -1721,6 +1727,65 @@ function ConfiguredAboutYouFields({
         })}
       </div>
     </fieldset>
+  );
+}
+
+function ConfiguredAboutYouFields({
+  fields,
+  form,
+  data,
+}: {
+  fields: StudentRequirementInputField[];
+  form?: StudentOnboardingScreenConfiguration["form"];
+  data: StudentOnboardingData;
+}) {
+  const pages = form?.version === 1 && form.pages.length > 0
+    ? form.pages
+    : [{ id: "student_details", title: "Your information", description: "Review the fields configured by your university before continuing.", fields }];
+  const [pageIndex, setPageIndex] = useState(0);
+  const pageRoot = useRef<HTMLDivElement>(null);
+  const finalPage = pageIndex === pages.length - 1;
+  const continueToNextPage = () => {
+    const controls = Array.from(
+      pageRoot.current?.querySelectorAll<HTMLInputElement | HTMLSelectElement>(
+        "input, select, textarea",
+      ) ?? [],
+    );
+    const invalid = controls.find((control) => !control.checkValidity());
+    if (invalid) {
+      invalid.reportValidity();
+      invalid.focus();
+      return;
+    }
+    setPageIndex((current) => Math.min(pages.length - 1, current + 1));
+  };
+
+  return (
+    <div className={`configured-about-you-form${pages.length > 1 ? " is-multipage" : ""}${finalPage ? " is-final" : ""}`}>
+      {pages.length > 1 ? (
+        <div className="configured-about-you-form__progress" aria-label={`Form step ${pageIndex + 1} of ${pages.length}`}>
+          <span>Part {pageIndex + 1} of {pages.length}</span>
+          <div>{pages.map((page, index) => <i className={index <= pageIndex ? "is-complete" : undefined} key={page.id} />)}</div>
+        </div>
+      ) : null}
+      {pages.map((page, index) => (
+        <div ref={index === pageIndex ? pageRoot : undefined} hidden={index !== pageIndex} key={page.id}>
+          <ConfiguredAboutYouPageFields
+            fields={page.fields}
+            data={data}
+            title={page.title}
+            description={page.description}
+            active={index === pageIndex}
+          />
+        </div>
+      ))}
+      {pages.length > 1 ? (
+        <div className="configured-about-you-form__actions">
+          {pageIndex > 0 ? <button className="button button--secondary" type="button" onClick={() => setPageIndex((current) => Math.max(0, current - 1))}>Back</button> : <span />}
+          {!finalPage ? <button className="button button--primary" type="button" onClick={continueToNextPage}>Continue</button> : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -1971,6 +2036,7 @@ function StepFields({
           {screenConfiguration?.fields?.length ? (
             <ConfiguredAboutYouFields
               fields={screenConfiguration.fields}
+              form={screenConfiguration.form}
               data={prefilledData}
             />
           ) : (

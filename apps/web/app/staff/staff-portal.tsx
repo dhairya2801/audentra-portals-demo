@@ -3,13 +3,17 @@
 import type {
   CampusEvent,
   CatalogCourse,
+  CreateStaffWorkItemInput,
+  StaffActionType,
   StaffCorePlay,
   StaffInquiry,
   StaffKnowledgeCard,
   StaffManagedConfiguration,
   StaffManagedConfigurationKind,
   StaffOperationsWorkspace,
+  StaffWorkItemPriority,
   StaffWorkItemStatus,
+  StaffWorkItemType,
   StudentClub,
 } from "@vv/contracts";
 import { dump, load } from "js-yaml";
@@ -26,10 +30,13 @@ import { TenantLink as Link } from "../components/tenant-link";
 import { PortalMark } from "../components/portal-ui";
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
 import {
+  ApiClientError,
   createStaffClub,
   createStaffCorePlay,
   createStaffKnowledgeCard,
+  createStaffWorkItem,
   draftStaffConfigurationWithEdward,
+  getStaffInquiryThread,
   getStaffOperationsWorkspace,
   previewStaffEdward,
   signOutStaff,
@@ -47,8 +54,19 @@ import {
   StudentInspector,
   WorkItemCard,
 } from "./staff-action-center";
+import { ActionCenterDetail } from "./action-center-detail";
+import { ActionRulesEditor } from "./action-rules-editor";
 import { JourneyFlowBuilder } from "./journey-flow-builder";
 import { MorningBrewView } from "./morning-brew/morning-brew";
+import { NotificationCenter } from "./notification-center";
+import { connectStaffRealtime, type StaffRealtimeEvent } from "./staff-realtime";
+import {
+  emptyTaskBoardFilters,
+  filterAndSortStaffWorkItems,
+  hasActiveTaskBoardFilters,
+  type TaskBoardFilters,
+  type TaskDueWindow,
+} from "./task-board-utils";
 
 type StaffView =
   | "morning_brew"
@@ -63,6 +81,98 @@ type StaffView =
   | "campus_life"
   | "academics"
   | "edward";
+
+interface StaffRealtimeNotice {
+  eventId: number;
+  title: string;
+  body: string;
+  workItemId: string | null;
+}
+
+function realtimeWorkItemId(event: StaffRealtimeEvent) {
+  if (!event.data || typeof event.data !== "object") return null;
+  const envelope = event.data as {
+    workItemId?: unknown;
+    data?: { workItemId?: unknown };
+  };
+  const candidate = envelope.workItemId ?? envelope.data?.workItemId;
+  return typeof candidate === "string" && candidate ? candidate : null;
+}
+
+function realtimeNoticeFor(event: StaffRealtimeEvent): StaffRealtimeNotice | null {
+  const envelope =
+    event.data && typeof event.data === "object"
+      ? (event.data as { data?: unknown })
+      : {};
+  const payload =
+    envelope.data && typeof envelope.data === "object"
+      ? (envelope.data as Record<string, unknown>)
+      : {};
+  const workItemId = realtimeWorkItemId(event);
+  const explicitTitle =
+    typeof payload.title === "string" && payload.title.trim()
+      ? payload.title.trim()
+      : null;
+  const explicitBody =
+    typeof payload.body === "string" && payload.body.trim()
+      ? payload.body.trim()
+      : null;
+  if (event.type === "staff.ai_update.available") {
+    return null;
+  }
+  if (event.type === "staff.inquiry.archived") {
+    return null;
+  }
+  const kind = typeof payload.kind === "string" ? payload.kind : "";
+  const notices = {
+    new_student_inquiry: {
+      title: "New student inquiry",
+      body: "A student requested help from the portal. The linked action is ready for triage.",
+    },
+    student_inquiry_reply: {
+      title: "Student replied",
+      body: "A new portal message is available on an existing student action.",
+    },
+    document_parse_review: {
+      title: "Document parsing needs human review",
+      body: "Automatic extraction failed. The original file is safe and the review action is ready.",
+    },
+    document_review_ready: {
+      title: "Student document ready for review",
+      body: "A newly uploaded student document is available for staff review.",
+    },
+    student_document_recovered: {
+      title: "Student document issue resolved",
+      body: "The student successfully uploaded a replacement and the linked help action was resolved.",
+    },
+    work_item_created: {
+      title: "New enrollment task",
+      body: "A new staff action was created and routed to its owner or team.",
+    },
+    follow_up_due: {
+      title: "Scheduled follow-up is due",
+      body: "The scheduler returned this action to To Do at its planned follow-up time.",
+    },
+    blocked_review_due: {
+      title: "Blocked action needs review",
+      body: "The blocker review time passed, so the scheduler escalated this action.",
+    },
+    sla_overdue: {
+      title: "Action SLA is overdue",
+      body: "The due time passed, so the scheduler escalated this action for team or leader attention.",
+    },
+  };
+  const fallback = notices[kind as keyof typeof notices];
+  return {
+    eventId: event.id,
+    title: explicitTitle ?? fallback?.title ?? "Staff workspace updated",
+    body:
+      explicitBody ??
+      fallback?.body ??
+      "Canonical staff data has refreshed. Open the related action when you are ready.",
+    workItemId,
+  };
+}
 
 const viewOrder: StaffView[] = [
   "morning_brew",
@@ -128,7 +238,29 @@ const workColumns: Array<{
     title: "In progress",
     description: "Actively being worked",
   },
+  {
+    status: "follow_up_required",
+    title: "Follow-up",
+    description: "Waiting on a dated next action",
+  },
+  { status: "blocked", title: "Blocked", description: "Needs a dependency or decision" },
   { status: "done", title: "Done", description: "Resolved work" },
+  { status: "cancelled", title: "Cancelled", description: "Closed without completion" },
+];
+
+const createTaskActionTypes: Array<{
+  value: StaffActionType;
+  label: string;
+}> = [
+  { value: "enrollment_follow_up", label: "Enrollment follow-up" },
+  { value: "onboarding_assistance", label: "Onboarding assistance" },
+  { value: "document_review", label: "Document review" },
+  { value: "missing_information", label: "Missing information" },
+  { value: "external_verification", label: "External verification" },
+  { value: "deadline_risk", label: "Deadline risk" },
+  { value: "staff_decision", label: "Staff decision" },
+  { value: "communication_response", label: "Communication response" },
+  { value: "blocked_dependency", label: "Blocked dependency" },
 ];
 
 const viewCopy: Record<
@@ -522,41 +654,61 @@ function OverviewView({
 function TaskBoardView({
   workspace,
   refresh,
+  initialWorkItemId = null,
+  onDetailClosed,
 }: {
   workspace: StaffOperationsWorkspace;
   refresh: () => void;
+  initialWorkItemId?: string | null;
+  onDetailClosed?: () => void;
 }) {
   const center = workspace.actionCenter;
-  const [selectedId, setSelectedId] = useState(center.items[0]?.id ?? null);
-  const [query, setQuery] = useState("");
-  const [component, setComponent] = useState("all");
-  const [scope, setScope] = useState<"all" | "mine" | "unassigned">("all");
+  const [openDetailId, setOpenDetailId] = useState<string | null>(initialWorkItemId);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [filters, setFilters] = useState<TaskBoardFilters>({
+    ...emptyTaskBoardFilters,
+  });
   const draggedId = useRef<string | null>(null);
   const [dropTarget, setDropTarget] =
     useState<StaffWorkItemStatus | null>(null);
   const [boardMessage, setBoardMessage] = useState<string | null>(null);
   const components = useMemo(
-    () => Array.from(new Set(center.items.map((item) => item.component))).sort(),
-    [center.items],
+    () =>
+      Array.from(
+        new Set([
+          workspace.currentStaff.component,
+          ...center.staff.map((staff) => staff.component),
+          ...center.items.map((item) => item.component),
+        ]),
+      ).sort((left, right) => left.localeCompare(right)),
+    [center.items, center.staff, workspace.currentStaff.component],
   );
-  const filtered = center.items.filter((item) => {
-    const search = query.trim().toLowerCase();
-    return (
-      (component === "all" || item.component === component) &&
-      (scope === "all" ||
-        (scope === "mine" &&
-          item.assignee?.id === workspace.currentStaff.id) ||
-        (scope === "unassigned" && item.assignee === null)) &&
-      (!search ||
-        `${item.key} ${item.title} ${item.student.name} ${item.component}`
-          .toLowerCase()
-          .includes(search))
+  const assignees = useMemo(() => {
+    const byId = new Map(
+      [workspace.currentStaff, ...center.staff].map((staff) => [staff.id, staff]),
     );
-  });
-  const selected =
-    center.items.find((item) => item.id === selectedId) ??
-    center.items[0] ??
-    null;
+    const current = byId.get(workspace.currentStaff.id);
+    byId.delete(workspace.currentStaff.id);
+    return [
+      ...(current ? [current] : []),
+      ...Array.from(byId.values()).sort((left, right) =>
+        left.name.localeCompare(right.name),
+      ),
+    ];
+  }, [center.staff, workspace.currentStaff]);
+  const filtered = useMemo(
+    () =>
+      filterAndSortStaffWorkItems(
+        center.items,
+        filters,
+        workspace.currentStaff.id,
+      ),
+    [center.items, filters, workspace.currentStaff.id],
+  );
+  const updateFilter = <Key extends keyof TaskBoardFilters>(
+    key: Key,
+    value: TaskBoardFilters[Key],
+  ) => setFilters((current) => ({ ...current, [key]: value }));
 
   const moveItem = async (
     itemId: string,
@@ -564,6 +716,13 @@ function TaskBoardView({
   ) => {
     const item = center.items.find((candidate) => candidate.id === itemId);
     if (!item || item.status === status) return;
+    if (!["todo", "in_progress"].includes(status)) {
+      setOpenDetailId(item.id);
+      setBoardMessage(
+        `${columnTitle(status)} needs outcome, blocker, follow-up, or cancellation details.`,
+      );
+      return;
+    }
     setBoardMessage(`Moving ${item.key}...`);
     try {
       await updateStaffWorkItem(item.id, {
@@ -592,53 +751,168 @@ function TaskBoardView({
     <>
       <PageHeading
         view="tasks"
-        action={<StatusPill tone="success">Live shared queue</StatusPill>}
+        action={
+          <div className="staff-heading-actions">
+            <StatusPill tone="success">Live shared queue</StatusPill>
+            <button
+              className="staff-create-task-button"
+              type="button"
+              onClick={() => setCreateOpen(true)}
+            >
+              <span aria-hidden="true">+</span>
+              Create task
+            </button>
+          </div>
+        }
       />
       <section className="staff-task-toolbar" aria-label="Task filters">
-        <label className="staff-search-field">
-          <span aria-hidden="true">⌕</span>
-          <span className="sr-only">Search work items</span>
-          <input
-            type="search"
-            value={query}
-            placeholder="Search student, task, or key"
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
-        <select
-          aria-label="Filter by component"
-          value={component}
-          onChange={(event) => setComponent(event.target.value)}
-        >
-          <option value="all">All components</option>
-          {components.map((value) => (
-            <option value={value} key={value}>
-              {value}
-            </option>
-          ))}
-        </select>
-        <div className="staff-segmented-control" aria-label="Task ownership">
-          {(["all", "mine", "unassigned"] as const).map((value) => (
-            <button
-              className={scope === value ? "is-active" : undefined}
-              type="button"
-              aria-pressed={scope === value}
-              onClick={() => setScope(value)}
-              key={value}
-            >
-              {value === "all"
-                ? "All work"
-                : value === "mine"
-                  ? "My work"
-                  : "Unassigned"}
-            </button>
-          ))}
+        <div className="staff-task-toolbar__primary">
+          <label className="staff-search-field">
+            <span aria-hidden="true">⌕</span>
+            <span className="sr-only">Search work items</span>
+            <input
+              type="search"
+              value={filters.query}
+              placeholder="Search task, key, student, owner, or team"
+              onChange={(event) => updateFilter("query", event.target.value)}
+            />
+          </label>
+          <div className="staff-segmented-control" aria-label="Quick ownership filters">
+            {(["all", "mine", "unassigned"] as const).map((value) => (
+              <button
+                className={filters.ownership === value ? "is-active" : undefined}
+                type="button"
+                aria-pressed={filters.ownership === value}
+                onClick={() => {
+                  updateFilter("ownership", value);
+                  updateFilter("assigneeId", "all");
+                }}
+                key={value}
+              >
+                {value === "all" ? "All" : value === "mine" ? "@me" : "Unassigned"}
+              </button>
+            ))}
+          </div>
+          <strong aria-live="polite">
+            {filtered.length} of {center.items.length} tasks
+          </strong>
         </div>
-        <span>{filtered.length} tasks</span>
+        <div className="staff-task-filter-grid">
+          <label>
+            <span>Assignee</span>
+            <select
+              value={filters.assigneeId}
+              onChange={(event) => {
+                updateFilter("ownership", "all");
+                updateFilter("assigneeId", event.target.value);
+              }}
+            >
+              <option value="all">Anyone</option>
+              {assignees.map((staff) => (
+                <option value={staff.id} key={staff.id}>
+                  {staff.id === workspace.currentStaff.id
+                    ? `@me · ${staff.name}`
+                    : staff.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Task type</span>
+            <select
+              value={filters.workType}
+              onChange={(event) =>
+                updateFilter(
+                  "workType",
+                  event.target.value as "all" | StaffWorkItemType,
+                )
+              }
+            >
+              <option value="all">All types</option>
+              <option value="enrollment">Enrollment</option>
+              <option value="document_review">Document review</option>
+              <option value="communication">Communication</option>
+            </select>
+          </label>
+          <label>
+            <span>Priority</span>
+            <select
+              value={filters.priority}
+              onChange={(event) =>
+                updateFilter(
+                  "priority",
+                  event.target.value as "all" | StaffWorkItemPriority,
+                )
+              }
+            >
+              <option value="all">All priorities</option>
+              <option value="urgent">Urgent</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </label>
+          <label>
+            <span>Status</span>
+            <select
+              value={filters.status}
+              onChange={(event) =>
+                updateFilter(
+                  "status",
+                  event.target.value as "all" | StaffWorkItemStatus,
+                )
+              }
+            >
+              <option value="all">All statuses</option>
+              {workColumns.map((column) => (
+                <option value={column.status} key={column.status}>
+                  {column.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Team / component</span>
+            <select
+              value={filters.component}
+              onChange={(event) => updateFilter("component", event.target.value)}
+            >
+              <option value="all">All teams</option>
+              {components.map((value) => (
+                <option value={value} key={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Due</span>
+            <select
+              value={filters.dueWindow}
+              onChange={(event) =>
+                updateFilter("dueWindow", event.target.value as TaskDueWindow)
+              }
+            >
+              <option value="all">Any due date</option>
+              <option value="overdue">Overdue</option>
+              <option value="today">Due today</option>
+              <option value="seven_days">Next 7 days</option>
+              <option value="no_due">No due date</option>
+            </select>
+          </label>
+          <button
+            className="staff-clear-task-filters"
+            type="button"
+            disabled={!hasActiveTaskBoardFilters(filters)}
+            onClick={() => setFilters({ ...emptyTaskBoardFilters })}
+          >
+            Clear filters
+          </button>
+        </div>
       </section>
       <p className="staff-board-announcement" aria-live="polite">
         {boardMessage ??
-          "Drag a task between columns, or use its inspector to change status."}
+          "Select a task for full details. Drag between columns to update simple statuses."}
       </p>
 
       <div className="staff-workspace staff-task-workspace">
@@ -691,8 +965,8 @@ function TaskBoardView({
                   {items.map((item) => (
                     <WorkItemCard
                       item={item}
-                      selected={selected?.id === item.id}
-                      onSelect={() => setSelectedId(item.id)}
+                      selected={openDetailId === item.id}
+                      onSelect={() => setOpenDetailId(item.id)}
                       draggable
                       onDragStart={(event) => {
                         event.dataTransfer.effectAllowed = "move";
@@ -721,17 +995,451 @@ function TaskBoardView({
             );
           })}
         </div>
-        {selected ? (
-          <StudentInspector
-            item={selected}
-            center={center}
-            onBoardChanged={refresh}
-            key={selected.id}
-          />
-        ) : null}
       </div>
+      {createOpen ? (
+        <CreateTaskDialog
+          workspace={workspace}
+          components={components}
+          assignees={assignees}
+          onClose={() => setCreateOpen(false)}
+          onCreated={(workItemId) => {
+            setCreateOpen(false);
+            setOpenDetailId(workItemId);
+            setBoardMessage("Task created and opened.");
+            refresh();
+          }}
+        />
+      ) : null}
+      {openDetailId ? (
+        <TaskDetailDialog
+          workItemId={openDetailId}
+          workspace={workspace}
+          onClose={() => {
+            setOpenDetailId(null);
+            onDetailClosed?.();
+          }}
+          onChanged={refresh}
+        />
+      ) : null}
     </>
   );
+}
+
+function StaffDialog({
+  ariaLabel,
+  className,
+  onClose,
+  children,
+}: {
+  ariaLabel: string;
+  className: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute("hidden"));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="staff-dialog-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        className={"staff-dialog " + className}
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel}
+        ref={dialogRef}
+      >
+        <button
+          className="staff-dialog__close"
+          type="button"
+          aria-label={"Close " + ariaLabel.toLowerCase()}
+          onClick={onClose}
+          ref={closeRef}
+        >
+          ×
+        </button>
+        {children}
+      </section>
+    </div>
+  );
+}
+
+function CreateTaskDialog({
+  workspace,
+  components,
+  assignees,
+  onClose,
+  onCreated,
+}: {
+  workspace: StaffOperationsWorkspace;
+  components: string[];
+  assignees: StaffOperationsWorkspace["actionCenter"]["staff"];
+  onClose: () => void;
+  onCreated: (workItemId: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [studentQuery, setStudentQuery] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState(
+    workspace.cohort[0]?.id ?? workspace.student.student.id,
+  );
+  const [selectedComponent, setSelectedComponent] = useState(
+    workspace.currentStaff.component,
+  );
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState(
+    workspace.currentStaff.id,
+  );
+  const studentOptions = useMemo(() => {
+    const students = new Map(
+      workspace.cohort.map((student) => [student.id, student]),
+    );
+    const canonicalStudent = workspace.student.student;
+    if (!students.has(canonicalStudent.id)) {
+      students.set(canonicalStudent.id, {
+        ...workspace.cohort[0],
+        ...canonicalStudent,
+        assignedStaffId: workspace.currentStaff.id,
+        syntheticSeed: false,
+        journey: workspace.cohort[0]?.journey ?? {
+          stage: "Enrollment",
+          completedTasks: 0,
+          totalTasks: 0,
+          lastActivityAt: new Date(0).toISOString(),
+        },
+        risk: workspace.cohort[0]?.risk ?? {
+          score: 0,
+          band: "low",
+          category: "administrative",
+          meltLikelihoodPercent: 0,
+          recoveryLikelihoodPercent: 100,
+          reason: "No current risk assessment.",
+          signals: [],
+          modelVersion: "not_assessed",
+          evaluatedAt: new Date(0).toISOString(),
+        },
+        recommendedAction: workspace.cohort[0]?.recommendedAction ?? {
+          title: "No recommendation",
+          rationale: "No recommendation is available.",
+          channel: "portal",
+          expectedImpact: "Not assessed",
+          taskId: null,
+          recommendedToday: false,
+        },
+        communicationHistory: workspace.cohort[0]?.communicationHistory ?? [],
+      });
+    }
+    return Array.from(students.values()).sort((left, right) =>
+      left.name.localeCompare(right.name),
+    );
+  }, [workspace]);
+  const visibleStudentOptions = useMemo(() => {
+    const search = studentQuery.trim().toLocaleLowerCase();
+    const matches = search
+      ? studentOptions.filter((student) =>
+          [
+            student.name,
+            student.preferredName,
+            student.programName,
+            String(student.classYear),
+          ]
+            .join(" ")
+            .toLocaleLowerCase()
+            .includes(search),
+        )
+      : studentOptions;
+    const visible = matches.slice(0, search ? 50 : 25);
+    const selected = studentOptions.find(
+      (student) => student.id === selectedStudentId,
+    );
+    return selected && !visible.some((student) => student.id === selected.id)
+      ? [selected, ...visible]
+      : visible;
+  }, [selectedStudentId, studentOptions, studentQuery]);
+  const componentAssignees = useMemo(
+    () =>
+      assignees.filter(
+        (staff) =>
+          staff.component.toLocaleLowerCase() ===
+          selectedComponent.toLocaleLowerCase(),
+      ),
+    [assignees, selectedComponent],
+  );
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const dueAtValue = String(form.get("dueAt") ?? "").trim();
+    const dueAt = dueAtValue ? new Date(dueAtValue) : null;
+    if (dueAt && Number.isNaN(dueAt.getTime())) {
+      setError("Enter a valid due date and time.");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      const actionType = String(form.get("actionType") ?? "").trim();
+      const created = await createStaffWorkItem(
+        {
+          studentId: String(form.get("studentId") ?? ""),
+          flowKind: String(form.get("flowKind")) as "enrollment" | "onboarding",
+          title: String(form.get("title") ?? "").trim(),
+          description: String(form.get("description") ?? "").trim(),
+          component: String(form.get("component") ?? ""),
+          assigneeId: String(form.get("assigneeId") ?? "") || null,
+          priority: String(form.get("priority")) as StaffWorkItemPriority,
+          status: String(form.get("status")) as CreateStaffWorkItemInput["status"],
+          dueAt: dueAt?.toISOString() ?? null,
+          ...(actionType ? { actionType: actionType as StaffActionType } : {}),
+        },
+        crypto.randomUUID(),
+      );
+      onCreated(created.id);
+    } catch (cause) {
+      if (cause instanceof ApiClientError && cause.status === 404) {
+        setError(
+          "Task creation is not available from the platform yet. Your form is still here; retry after the backend endpoint is deployed.",
+        );
+      } else {
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "The task could not be created. Review the fields and try again.",
+        );
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <StaffDialog
+      ariaLabel="Create task"
+      className="staff-create-task-dialog"
+      onClose={onClose}
+    >
+      <header className="staff-dialog__heading">
+        <p className="eyebrow">Enrollment task management</p>
+        <h2>Create task</h2>
+        <p>Add a shared student work item. Required fields are marked.</p>
+      </header>
+      <form className="staff-create-task-form" onSubmit={submit}>
+        <label className="staff-create-task-form__wide">
+          <span>Summary / title</span>
+          <input name="title" required maxLength={240} autoFocus />
+        </label>
+        <label className="staff-create-task-form__wide">
+          <span>Description</span>
+          <textarea name="description" required maxLength={2_000} rows={4} />
+        </label>
+        <div className="staff-create-task-student">
+          <label htmlFor="create-task-student-search">
+            <span>Find student</span>
+            <input
+              id="create-task-student-search"
+              type="search"
+              value={studentQuery}
+              placeholder="Search name, program, or class year"
+              aria-controls="create-task-student-options"
+              aria-describedby="create-task-student-search-help"
+              onChange={(event) => setStudentQuery(event.target.value)}
+            />
+          </label>
+          <label htmlFor="create-task-student-options">
+            <span>Student</span>
+            <select
+              id="create-task-student-options"
+              name="studentId"
+              required
+              value={selectedStudentId}
+              onChange={(event) => setSelectedStudentId(event.target.value)}
+            >
+            {visibleStudentOptions.map((student) => (
+              <option value={student.id} key={student.id}>
+                {student.name} · {student.programName}
+              </option>
+            ))}
+            </select>
+            <small id="create-task-student-search-help">
+              {studentQuery.trim()
+                ? visibleStudentOptions.length + " matching students shown"
+                : "Showing 25 students. Type above to search the full cohort."}
+            </small>
+          </label>
+        </div>
+        <label>
+          <span>Flow category</span>
+          <select name="flowKind" defaultValue="enrollment">
+            <option value="enrollment">Enrollment</option>
+            <option value="onboarding">Onboarding</option>
+          </select>
+        </label>
+        <label>
+          <span>Task category</span>
+          <select name="actionType" defaultValue="">
+            <option value="">Use the flow default</option>
+            {createTaskActionTypes.map((option) => (
+              <option value={option.value} key={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Team / component</span>
+          <select
+            name="component"
+            value={selectedComponent}
+            onChange={(event) => {
+              const nextComponent = event.target.value;
+              setSelectedComponent(nextComponent);
+              const assigneeStillMatches = assignees.some(
+                (staff) =>
+                  staff.id === selectedAssigneeId &&
+                  staff.component.toLocaleLowerCase() ===
+                    nextComponent.toLocaleLowerCase(),
+              );
+              if (!assigneeStillMatches) setSelectedAssigneeId("");
+            }}
+          >
+            {components.map((component) => (
+              <option value={component} key={component}>
+                {component}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Assignee</span>
+          <select
+            name="assigneeId"
+            value={selectedAssigneeId}
+            onChange={(event) => setSelectedAssigneeId(event.target.value)}
+          >
+            <option value="">Unassigned</option>
+            {componentAssignees.map((staff) => (
+              <option value={staff.id} key={staff.id}>
+                {staff.id === workspace.currentStaff.id
+                  ? "@me · " + staff.name
+                  : staff.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Priority</span>
+          <select name="priority" defaultValue="medium">
+            <option value="urgent">Urgent</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </label>
+        <label>
+          <span>Status</span>
+          <select name="status" defaultValue="todo">
+            <option value="todo">To do</option>
+            <option value="in_progress">In progress</option>
+            <option value="follow_up_required">Follow-up required</option>
+            <option value="blocked">Blocked</option>
+          </select>
+        </label>
+        <label className="staff-create-task-form__wide">
+          <span>Due date and time</span>
+          <input name="dueAt" type="datetime-local" />
+        </label>
+        {error ? (
+          <p className="field-error staff-create-task-form__wide" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <footer className="staff-create-task-form__actions">
+          <button type="button" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button className="staff-create-task-form__submit" type="submit" disabled={busy}>
+            {busy ? "Creating task…" : "Create task"}
+          </button>
+        </footer>
+      </form>
+    </StaffDialog>
+  );
+}
+
+function TaskDetailDialog({
+  workItemId,
+  workspace,
+  onClose,
+  onChanged,
+}: {
+  workItemId: string;
+  workspace: StaffOperationsWorkspace;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  return (
+    <StaffDialog
+      ariaLabel="Enrollment action details"
+      className="staff-task-detail-dialog"
+      onClose={onClose}
+    >
+      <ActionCenterDetail
+        key={workItemId}
+        workItemId={workItemId}
+        center={workspace.actionCenter}
+        currentStaffId={workspace.currentStaff.id}
+        presentation="dialog"
+        onBack={onClose}
+        onChanged={onChanged}
+      />
+    </StaffDialog>
+  );
+}
+
+function columnTitle(status: StaffWorkItemStatus) {
+  return workColumns.find((column) => column.status === status)?.title ?? status;
 }
 
 function StudentsView({
@@ -860,7 +1568,9 @@ function StudentsView({
                 {operation.classYear}
               </p>
             </div>
-            <StatusPill tone="preview">Synthetic test student</StatusPill>
+            <StatusPill tone={operation.syntheticSeed ? "preview" : "success"}>
+              {operation.syntheticSeed ? "Synthetic test student" : "Canonical student record"}
+            </StatusPill>
           </header>
           <div className="staff-student-facts">
             <article>
@@ -1481,6 +2191,14 @@ function CourseEditor({
         .split(",")
         .map((value) => value.trim().toUpperCase())
         .filter(Boolean);
+      const existingVideos = Array.isArray(record.related_videos)
+        ? (record.related_videos as Array<Record<string, unknown>>)
+        : [];
+      const videoUrl = String(form.get("videoUrl")).trim();
+      const videoTitle = String(form.get("videoTitle")).trim();
+      if (Boolean(videoUrl) !== Boolean(videoTitle)) {
+        throw new Error("Add both a YouTube title and URL, or leave both blank.");
+      }
       Object.assign(record, {
         code: String(form.get("code")).trim().toUpperCase(),
         title: String(form.get("title")),
@@ -1497,6 +2215,17 @@ function CourseEditor({
           .filter(Boolean),
         meeting_pattern: String(form.get("meetingPattern")).trim() || null,
         availability_label: String(form.get("availabilityLabel")).trim() || null,
+        related_videos: videoUrl
+          ? [
+              {
+                id: existingVideos[0]?.id ?? "featured-course-video",
+                title: videoTitle,
+                description: String(form.get("videoDescription")).trim() || null,
+                url: videoUrl,
+                source_label: String(form.get("videoSource")).trim() || null,
+              },
+            ]
+          : [],
       });
       await action.run("academics", {
         expectedVersion: configuration.version,
@@ -1596,6 +2325,49 @@ function CourseEditor({
             />
           </label>
         </div>
+        <section className="staff-type-configuration">
+          <div>
+            <strong>Featured course video</strong>
+            <p>
+              Optional. Use an HTTPS YouTube video or playlist; students see a
+              privacy-enhanced embedded player in course details.
+            </p>
+          </div>
+          <label>
+            Video title
+            <input
+              name="videoTitle"
+              defaultValue={course.relatedVideos?.[0]?.title ?? ""}
+              maxLength={180}
+            />
+          </label>
+          <label>
+            YouTube URL
+            <input
+              name="videoUrl"
+              type="url"
+              defaultValue={course.relatedVideos?.[0]?.url ?? ""}
+              placeholder="https://www.youtube.com/watch?v=..."
+            />
+          </label>
+          <label>
+            Description
+            <textarea
+              name="videoDescription"
+              defaultValue={course.relatedVideos?.[0]?.description ?? ""}
+              maxLength={500}
+            />
+          </label>
+          <label>
+            Source label
+            <input
+              name="videoSource"
+              defaultValue={course.relatedVideos?.[0]?.sourceLabel ?? ""}
+              placeholder="CS50 or MIT OpenCourseWare"
+              maxLength={180}
+            />
+          </label>
+        </section>
         <div className="staff-student-impact-note">
           Saving updates the course shown in student classrooms and Edward’s
           academic-planning context.
@@ -1636,8 +2408,8 @@ function JourneysView({
         view="journeys"
         action={<StatusPill tone="success">Publishing live</StatusPill>}
       />
-      <div className="staff-journey-layout">
-        <section className="staff-panel">
+      <div className="staff-journey-studio">
+        <section className="staff-panel staff-journey-studio__workspace">
           <div className="staff-journey-tabs" role="tablist">
             <button
               className={kind === "onboarding" ? "is-active" : undefined}
@@ -1646,7 +2418,11 @@ function JourneysView({
               aria-selected={kind === "onboarding"}
               onClick={() => setKind("onboarding")}
             >
-              Offer onboarding
+              <span aria-hidden="true">01</span>
+              <span>
+                <strong>Offer onboarding</strong>
+                <small>Acceptance through student setup</small>
+              </span>
             </button>
             <button
               className={kind === "enrollment" ? "is-active" : undefined}
@@ -1655,7 +2431,11 @@ function JourneysView({
               aria-selected={kind === "enrollment"}
               onClick={() => setKind("enrollment")}
             >
-              Enrollment checklist
+              <span aria-hidden="true">02</span>
+              <span>
+                <strong>Enrollment checklist</strong>
+                <small>Post-acceptance requirements</small>
+              </span>
             </button>
           </div>
           <JourneyFlowBuilder
@@ -1670,14 +2450,25 @@ function JourneysView({
             onSaved={refresh}
           />
         </section>
-        <ConfigurationAssistant
-          key={`journeys-${workspace.configurations.journeys.version}`}
-          configuration={workspace.configurations.journeys}
-          kind="journeys"
-          promptPlaceholder={'Try: Add "Choose a meal plan" to onboarding as a single selection worth 20 points.'}
-          onSaved={refresh}
-        />
+        <details className="staff-journey-copilot">
+          <summary>
+            <span aria-hidden="true">✦</span>
+            <span>
+              <strong>Draft a workflow change with Edward</strong>
+              <small>Describe the change in plain language, then review the generated draft before publishing.</small>
+            </span>
+            <span>Open copilot</span>
+          </summary>
+          <ConfigurationAssistant
+            key={`journeys-${workspace.configurations.journeys.version}`}
+            configuration={workspace.configurations.journeys}
+            kind="journeys"
+            promptPlaceholder={'Try: Add "Choose a meal plan" to onboarding as a single selection worth 20 points.'}
+            onSaved={refresh}
+          />
+        </details>
       </div>
+      <ActionRulesEditor kind={kind} />
       <section className="staff-roadmap-note">
         <div>
           <p className="eyebrow">Version boundary</p>
@@ -2130,12 +2921,23 @@ function MessageDetail({
   inquiry,
   workspace,
   onSaved,
+  subscribeToRealtimeInvalidation,
 }: {
   inquiry: StaffInquiry;
   workspace: StaffOperationsWorkspace;
   onSaved: () => void;
+  subscribeToRealtimeInvalidation: (invalidate: () => void) => () => void;
 }) {
   const action = useApiAction(updateStaffInquiry);
+  const loadThread = useCallback(
+    (signal: AbortSignal) => getStaffInquiryThread(inquiry.id, signal),
+    [inquiry.id],
+  );
+  const thread = useApiResource(loadThread);
+  useEffect(
+    () => subscribeToRealtimeInvalidation(thread.refresh),
+    [subscribeToRealtimeInvalidation, thread.refresh],
+  );
   const [reply, setReply] = useState("");
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -2149,6 +2951,7 @@ function MessageDetail({
         notifyStudent: form.get("notifyStudent") === "on",
       });
       setReply("");
+      thread.refresh();
       onSaved();
     } catch {
       onSaved();
@@ -2172,8 +2975,43 @@ function MessageDetail({
         </StatusPill>
       </header>
       <div className="staff-message-reader__body">
-        <time dateTime={inquiry.createdAt}>{formatTime(inquiry.createdAt)}</time>
-        <p>{inquiry.message}</p>
+        <div className="staff-conversation-heading">
+          <div>
+            <p className="eyebrow">Live conversation</p>
+            <h3>Message history</h3>
+          </div>
+          {thread.data?.expiresAt ? (
+            <small>
+              Active until {formatTime(thread.data.expiresAt)}
+            </small>
+          ) : null}
+        </div>
+        {thread.status === "loading" ? (
+          <p className="staff-conversation-state" role="status">Loading messages…</p>
+        ) : thread.status === "error" ? (
+          <div className="staff-conversation-state" role="alert">
+            <p>{thread.error}</p>
+            <button type="button" onClick={thread.reload}>Retry</button>
+          </div>
+        ) : (
+          <ol className="staff-conversation-thread" aria-live="polite">
+            {(thread.data?.messages ?? []).map((message) => (
+              <li
+                className={`staff-conversation-message staff-conversation-message--${message.direction}${message.privateToStaff ? " staff-conversation-message--private" : ""}`}
+                key={message.id}
+              >
+                <div>
+                  <strong>{message.authorName}</strong>
+                  <time dateTime={message.createdAt}>{formatTime(message.createdAt)}</time>
+                </div>
+                <p>{message.body}</p>
+                <small>
+                  {message.privateToStaff ? "Staff-only note" : message.deliveryStatus}
+                </small>
+              </li>
+            ))}
+          </ol>
+        )}
       </div>
       <form onSubmit={submit}>
         <div className="staff-form-grid">
@@ -2202,7 +3040,7 @@ function MessageDetail({
           </label>
         </div>
         <label>
-          Reply
+          Reply to student
           <textarea
             value={reply}
             maxLength={1000}
@@ -2212,7 +3050,7 @@ function MessageDetail({
         </label>
         <label className="staff-checkbox">
           <input name="notifyStudent" type="checkbox" defaultChecked />
-          Send the reply to the student inbox
+          Deliver this portal message and notify the student in real time
         </label>
         {action.message ? (
           <p className="field-error" role="alert">
@@ -2220,9 +3058,6 @@ function MessageDetail({
           </p>
         ) : null}
         <footer>
-          <button className="button button--secondary" type="button" disabled>
-            Edward drafting next
-          </button>
           <button
             className="button button--primary"
             type="submit"
@@ -2239,9 +3074,11 @@ function MessageDetail({
 function MessagesView({
   workspace,
   refresh,
+  subscribeToRealtimeInvalidation,
 }: {
   workspace: StaffOperationsWorkspace;
   refresh: () => void;
+  subscribeToRealtimeInvalidation: (invalidate: () => void) => () => void;
 }) {
   const [selectedId, setSelectedId] = useState(
     workspace.inquiries[0]?.id ?? null,
@@ -2319,6 +3156,7 @@ function MessagesView({
             inquiry={selected}
             workspace={workspace}
             onSaved={refresh}
+            subscribeToRealtimeInvalidation={subscribeToRealtimeInvalidation}
             key={`${selected.id}-${selected.version}`}
           />
         ) : (
@@ -3304,6 +4142,28 @@ function StaffWorkspaceShell({
 }) {
   const [view, setView] = useState<StaffView>("overview");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [requestedWorkItemId, setRequestedWorkItemId] = useState<string | null>(null);
+  const [realtimeNotice, setRealtimeNotice] =
+    useState<StaffRealtimeNotice | null>(null);
+  const realtimeSubscribers = useRef(new Set<() => void>());
+  const subscribeToRealtimeInvalidation = useCallback((invalidate: () => void) => {
+    realtimeSubscribers.current.add(invalidate);
+    return () => realtimeSubscribers.current.delete(invalidate);
+  }, []);
+
+  useEffect(
+    () =>
+      connectStaffRealtime({
+        onEvent: (event) => {
+          refresh();
+          realtimeSubscribers.current.forEach((invalidate) => invalidate());
+          if (event.type === "staff.stream.ready") return;
+          const notice = realtimeNoticeFor(event);
+          if (notice) setRealtimeNotice(notice);
+        },
+      }),
+    [refresh],
+  );
 
   const readHash = useCallback(() => {
     const candidate = window.location.hash.replace(/^#/, "");
@@ -3324,6 +4184,7 @@ function StaffWorkspaceShell({
   }, [readHash]);
 
   const navigate = (next: StaffView) => {
+    setRequestedWorkItemId(null);
     setView(next);
     setMobileNavOpen(false);
     window.history.replaceState(null, "", `#${next}`);
@@ -3333,6 +4194,14 @@ function StaffWorkspaceShell({
   const signOut = async () => {
     await signOutStaff();
     window.location.reload();
+  };
+
+  const openWorkItem = (workItemId: string) => {
+    setRequestedWorkItemId(workItemId);
+    setView("tasks");
+    setMobileNavOpen(false);
+    window.history.replaceState(null, "", "#tasks");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
@@ -3363,6 +4232,10 @@ function StaffWorkspaceShell({
           <kbd>⌘ K</kbd>
         </label>
         <div className="staff-topbar__actions">
+          <NotificationCenter
+            onOpenWorkItem={openWorkItem}
+            subscribeToRealtimeInvalidation={subscribeToRealtimeInvalidation}
+          />
           <StatusPill tone="success">Authenticated</StatusPill>
           <button type="button" onClick={refresh}>
             Refresh
@@ -3387,6 +4260,54 @@ function StaffWorkspaceShell({
           </button>
         </div>
       </header>
+      {realtimeNotice ? (
+        <section
+          className="staff-realtime-notice"
+          role="status"
+          aria-live="polite"
+          key={realtimeNotice.eventId}
+        >
+          <div>
+            <span className="staff-realtime-notice__signal" aria-hidden="true" />
+            <div>
+              <strong>{realtimeNotice.title}</strong>
+              <p>{realtimeNotice.body}</p>
+            </div>
+          </div>
+          <div className="staff-realtime-notice__actions">
+            <button
+              type="button"
+              onClick={() => {
+                refresh();
+                realtimeSubscribers.current.forEach((invalidate) => invalidate());
+                setRealtimeNotice(null);
+              }}
+            >
+              Refresh
+            </button>
+            {realtimeNotice.workItemId ? (
+              <button
+                className="staff-realtime-notice__open"
+                type="button"
+                onClick={() => {
+                  openWorkItem(realtimeNotice.workItemId!);
+                  setRealtimeNotice(null);
+                }}
+              >
+                Open
+              </button>
+            ) : null}
+            <button
+              className="staff-realtime-notice__dismiss"
+              type="button"
+              aria-label="Dismiss realtime update"
+              onClick={() => setRealtimeNotice(null)}
+            >
+              ×
+            </button>
+          </div>
+        </section>
+      ) : null}
       <div className={mobileNavOpen ? "staff-mobile-nav is-open" : "staff-mobile-nav"}>
         <StaffSidebar view={view} workspace={workspace} navigate={navigate} />
       </div>
@@ -3397,7 +4318,13 @@ function StaffWorkspaceShell({
         ) : view === "overview" ? (
           <OverviewView workspace={workspace} navigate={navigate} />
         ) : view === "tasks" ? (
-          <TaskBoardView workspace={workspace} refresh={refresh} />
+          <TaskBoardView
+            key={requestedWorkItemId ?? "task-board"}
+            workspace={workspace}
+            refresh={refresh}
+            initialWorkItemId={requestedWorkItemId}
+            onDetailClosed={() => setRequestedWorkItemId(null)}
+          />
         ) : view === "students" ? (
           <StudentsView workspace={workspace} refresh={refresh} />
         ) : view === "journeys" ? (
@@ -3407,7 +4334,11 @@ function StaffWorkspaceShell({
         ) : view === "core_plays" ? (
           <CorePlaysView workspace={workspace} refresh={refresh} />
         ) : view === "messages" ? (
-          <MessagesView workspace={workspace} refresh={refresh} />
+          <MessagesView
+            workspace={workspace}
+            refresh={refresh}
+            subscribeToRealtimeInvalidation={subscribeToRealtimeInvalidation}
+          />
         ) : view === "campus_life" ? (
           <CampusLifeView workspace={workspace} refresh={refresh} />
         ) : view === "academics" ? (
@@ -3434,7 +4365,7 @@ export default function StaffPortal() {
 
   useEffect(() => {
     if (workspace.status !== "ready") return;
-    const interval = window.setInterval(refresh, 5_000);
+    const interval = window.setInterval(refresh, 10_000);
     const onFocus = () => refresh();
     window.addEventListener("focus", onFocus);
     return () => {

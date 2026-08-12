@@ -6,12 +6,19 @@ import { useActivityTracking } from "../hooks/use-activity-tracking";
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
 import {
   decideStudentExperienceUpdate,
+  deferStudentExperienceUpdates,
   getStudentBootstrap,
 } from "../lib/api-client";
+import {
+  beginExperienceUpdateVisit,
+  studentExperienceUpdateSessionKey,
+  touchExperienceUpdateVisit,
+} from "../lib/experience-update-session";
 import { EdwardAssistant } from "./edward-assistant";
 import { ErrorState, LoadingState, PortalMark } from "./portal-ui";
 import { RewardCelebration } from "./reward-celebration";
 import { StudentNotificationCenter } from "./student-notification-center";
+import { connectStudentRealtime } from "./student-realtime";
 import { TenantLink as Link } from "./tenant-link";
 import { useTenant } from "./tenant-provider";
 
@@ -72,6 +79,13 @@ const navigation: {
     symbol: "◉",
   },
   {
+    key: "messages",
+    label: "Messages",
+    shortLabel: "Messages",
+    href: "/messages",
+    symbol: "\u2709",
+  },
+  {
     key: "edward",
     label: "Edward AI",
     shortLabel: "Edward",
@@ -118,19 +132,24 @@ const experienceKindLabels: Record<StudentExperienceUpdate["kind"], string> = {
 };
 
 function ExperienceUpdateDialog({
-  update,
+  updates,
   institutionName,
   busy,
   error,
-  onDecision,
+  onDefer,
+  onHandleNow,
 }: {
-  update: StudentExperienceUpdate;
+  updates: StudentExperienceUpdate[];
   institutionName: string;
   busy: boolean;
   error: string | null;
-  onDecision: (action: "handle_now" | "later") => Promise<void>;
+  onDefer: () => Promise<void>;
+  onHandleNow: (update: StudentExperienceUpdate) => Promise<void>;
 }) {
   const dialog = useRef<HTMLElement>(null);
+  const primaryUpdate = updates[0]!;
+  const isBundle = updates.length > 1;
+  const updateIds = updates.map((update) => update.id).join(":");
 
   useEffect(() => {
     const element = dialog.current;
@@ -162,7 +181,7 @@ function ExperienceUpdateDialog({
       document.body.style.overflow = previousOverflow;
       previousFocus?.focus();
     };
-  }, [update.id]);
+  }, [updateIds]);
 
   const trapFocus = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key !== "Tab") return;
@@ -170,7 +189,7 @@ function ExperienceUpdateDialog({
       dialog.current?.querySelectorAll<HTMLElement>(
         'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
       ) ?? [],
-    );
+    ).filter((control) => !control.hidden && control.offsetParent !== null);
     if (controls.length === 0) {
       event.preventDefault();
       dialog.current?.focus();
@@ -204,17 +223,55 @@ function ExperienceUpdateDialog({
           !
         </span>
         <div className="experience-update-dialog__meta">
-          <span>{experienceKindLabels[update.kind]}</span>
+          <span>
+            {isBundle
+              ? "Enrollment & onboarding"
+              : experienceKindLabels[primaryUpdate.kind]}
+          </span>
           <small>
-            {update.status === "deferred" ? "Saved reminder" : "New update"}
+            {isBundle
+              ? `${updates.length} updates together`
+              : primaryUpdate.status === "deferred"
+                ? "Saved reminder"
+                : "New update"}
           </small>
         </div>
         <p className="eyebrow">An update from {institutionName}</p>
-        <h2 id="experience-update-title">{update.title}</h2>
-        <p id="experience-update-description">{update.description}</p>
+        <h2 id="experience-update-title">
+          {isBundle
+            ? "Your enrollment and onboarding have updates"
+            : primaryUpdate.title}
+        </h2>
+        <p id="experience-update-description">
+          {isBundle
+            ? "We grouped the latest changes so you can review them without repeated interruptions."
+            : primaryUpdate.description}
+        </p>
+        {isBundle ? (
+          <ul className="experience-update-dialog__list">
+            {updates.map((update) => (
+              <li key={update.id}>
+                <div>
+                  <small>{experienceKindLabels[update.kind]}</small>
+                  <h3>{update.title}</h3>
+                  <p>{update.description}</p>
+                </div>
+                <button
+                  className="experience-update-dialog__handle"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void onHandleNow(update)}
+                >
+                  Handle now
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         <p className="experience-update-dialog__guidance">
-          You can take care of this now or save it for the next time you open
-          your portal.
+          {isBundle
+            ? "Open any update now, or save this set for your next portal visit."
+            : "You can take care of this now or save it for your next portal visit."}
         </p>
         {error ? (
           <p className="inline-error" role="alert">
@@ -226,15 +283,16 @@ function ExperienceUpdateDialog({
             className="button button--secondary"
             type="button"
             disabled={busy}
-            onClick={() => void onDecision("later")}
+            onClick={() => void onDefer()}
           >
             {busy ? "Saving…" : "Remind me later"}
           </button>
           <button
             className="button"
             type="button"
+            hidden={isBundle}
             disabled={busy}
-            onClick={() => void onDecision("handle_now")}
+            onClick={() => void onHandleNow(primaryUpdate)}
           >
             {busy ? "Opening…" : "Handle now"}
           </button>
@@ -262,12 +320,16 @@ export function PortalShell({
   const tenantRuntime = useTenant();
   const { tenant } = tenantRuntime;
   const [menuOpen, setMenuOpen] = useState(false);
-  const [experienceUpdate, setExperienceUpdate] =
-    useState<StudentExperienceUpdate | null>(null);
-  const hasPresentedExperienceUpdate = useRef(false);
+  const [experienceUpdates, setExperienceUpdates] = useState<
+    StudentExperienceUpdate[]
+  >([]);
+  const [experienceVisit, setExperienceVisit] = useState(0);
+  const presentedExperienceVisit = useRef<string | null>(null);
   const { track } = useActivityTracking();
   const experienceDecision = useApiAction(decideStudentExperienceUpdate);
+  const experienceDeferral = useApiAction(deferStudentExperienceUpdates);
   const runExperienceDecision = experienceDecision.run;
+  const runExperienceDeferral = experienceDeferral.run;
   const loadBootstrap = useCallback(
     (signal: AbortSignal) => getStudentBootstrap(signal),
     [],
@@ -280,6 +342,10 @@ export function PortalShell({
   const needsSignIn =
     identity.status === "error" &&
     (identity.errorStatus === 401 || identity.errorStatus === 403);
+  const experienceSessionKey =
+    identity.status === "ready"
+      ? studentExperienceUpdateSessionKey(tenant.id, identity.data.student.id)
+      : null;
 
   useEffect(() => {
     if (needsSignIn) {
@@ -294,45 +360,128 @@ export function PortalShell({
       identity.status !== "ready" ||
       needsOnboarding ||
       needsSignIn ||
-      hasPresentedExperienceUpdate.current
+      !experienceSessionKey
     ) {
       return;
     }
-    const nextUpdate = (identity.data.experienceUpdates ?? []).find(
-      (update) => update.status === "pending" || update.status === "deferred",
+    if (beginExperienceUpdateVisit(experienceSessionKey)) {
+      const frame = window.requestAnimationFrame(() => {
+        setExperienceVisit((current) => current + 1);
+      });
+      return () => window.cancelAnimationFrame(frame);
+    }
+  }, [
+    experienceSessionKey,
+    identity.status,
+    needsOnboarding,
+    needsSignIn,
+  ]);
+
+  useEffect(() => {
+    if (
+      identity.status !== "ready" ||
+      needsOnboarding ||
+      needsSignIn ||
+      !experienceSessionKey ||
+      experienceVisit === 0
+    ) {
+      return;
+    }
+    const presentationKey = `${experienceSessionKey}:${experienceVisit}`;
+    if (presentedExperienceVisit.current === presentationKey) return;
+    presentedExperienceVisit.current = presentationKey;
+    const updates = (identity.data.experienceUpdates ?? []).filter(
+      (update) =>
+        (update.status === "pending" || update.status === "deferred") &&
+        (update.kind === "enrollment" || update.kind === "onboarding"),
     );
+    if (updates.length === 0) return;
     const frame = window.requestAnimationFrame(() => {
-      if (hasPresentedExperienceUpdate.current || !nextUpdate) return;
-      hasPresentedExperienceUpdate.current = true;
-      setExperienceUpdate(nextUpdate);
+      setExperienceUpdates(updates);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [identity.data, identity.status, needsOnboarding, needsSignIn]);
+  }, [
+    experienceSessionKey,
+    experienceVisit,
+    identity.data,
+    identity.status,
+    needsOnboarding,
+    needsSignIn,
+  ]);
 
-  const handleExperienceDecision = useCallback(
-    async (action: "handle_now" | "later") => {
-      if (!experienceUpdate) return;
-      const current = experienceUpdate;
+  const handleExperienceUpdate = useCallback(
+    async (update: StudentExperienceUpdate) => {
       let decision;
       try {
-        decision = await runExperienceDecision(current.id, {
-          action,
-          expectedVersion: current.version,
+        decision = await runExperienceDecision(update.id, {
+          action: "handle_now",
+          expectedVersion: update.version,
         });
       } catch {
         return;
       }
 
-      setExperienceUpdate(null);
-      if (action === "handle_now") {
-        const destination = decision.requirementSlug
-          ? `/enrollment/requirements/${encodeURIComponent(decision.requirementSlug)}`
-          : "/enrollment";
-        window.location.assign(tenantRuntime.href(destination));
-      }
+      if (experienceSessionKey) touchExperienceUpdateVisit(experienceSessionKey);
+      setExperienceUpdates([]);
+      const destination = decision.requirementSlug
+        ? `/enrollment/requirements/${encodeURIComponent(decision.requirementSlug)}`
+        : "/enrollment";
+      window.location.assign(tenantRuntime.href(destination));
     },
-    [experienceUpdate, runExperienceDecision, tenantRuntime],
+    [experienceSessionKey, runExperienceDecision, tenantRuntime],
   );
+
+  const deferExperienceUpdates = useCallback(async () => {
+    if (experienceUpdates.length === 0) return;
+    try {
+      await runExperienceDeferral({
+        updates: experienceUpdates.map((update) => ({
+          id: update.id,
+          expectedVersion: update.version,
+        })),
+      });
+    } catch {
+      return;
+    }
+    if (experienceSessionKey) touchExperienceUpdateVisit(experienceSessionKey);
+    setExperienceUpdates([]);
+  }, [experienceSessionKey, experienceUpdates, runExperienceDeferral]);
+
+  useEffect(() => {
+    if (!experienceSessionKey) return;
+    const touch = () => touchExperienceUpdateVisit(experienceSessionKey);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        touch();
+        return;
+      }
+      if (document.visibilityState === "visible") {
+        if (beginExperienceUpdateVisit(experienceSessionKey)) {
+          setExperienceVisit((current) => current + 1);
+          refreshIdentity();
+        }
+      }
+    };
+    window.addEventListener("pointerdown", touch, { passive: true });
+    window.addEventListener("keydown", touch);
+    window.addEventListener("focus", touch);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("pointerdown", touch);
+      window.removeEventListener("keydown", touch);
+      window.removeEventListener("focus", touch);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [experienceSessionKey, refreshIdentity]);
+
+  const experienceBusy =
+    experienceDecision.status === "loading" || experienceDeferral.status === "loading";
+  const experienceError =
+    experienceDecision.status === "error"
+      ? experienceDecision.message
+      : experienceDeferral.status === "error"
+        ? experienceDeferral.message
+        : null;
 
   useEffect(() => {
     track("ui.portal_section_viewed.v1", {
@@ -356,6 +505,16 @@ export function PortalShell({
       );
     };
   }, [refreshIdentity]);
+
+  useEffect(() => {
+    if (identity.status !== "ready" || needsOnboarding || needsSignIn) return;
+    return connectStudentRealtime((event) => {
+      refreshIdentity();
+      window.dispatchEvent(
+        new CustomEvent("vv:student-realtime", { detail: event }),
+      );
+    });
+  }, [identity.status, needsOnboarding, needsSignIn, refreshIdentity]);
 
   if (identity.status === "loading" || needsSignIn || needsOnboarding) {
     return (
@@ -421,7 +580,7 @@ export function PortalShell({
           </Link>
           <StudentNotificationCenter
             fallbackUnreadCount={identity.data.unreadMessageCount}
-            suppressTransient={Boolean(experienceUpdate)}
+            suppressTransient={experienceUpdates.length > 0}
           />
           <Link
             className="aster-student"
@@ -543,17 +702,18 @@ export function PortalShell({
         />
       ) : null}
 
-      {experienceUpdate ? (
+      {experienceUpdates.length > 0 ? (
         <ExperienceUpdateDialog
-          update={experienceUpdate}
+          updates={experienceUpdates}
           institutionName={tenant.shortName}
-          busy={experienceDecision.status === "loading"}
-          error={experienceDecision.message}
-          onDecision={handleExperienceDecision}
+          busy={experienceBusy}
+          error={experienceError}
+          onDefer={deferExperienceUpdates}
+          onHandleNow={handleExperienceUpdate}
         />
       ) : null}
 
-      {!experienceUpdate && identity.data.rewards ? (
+      {experienceUpdates.length === 0 && identity.data.rewards ? (
         <RewardCelebration
           tenantSlug={tenant.slug}
           studentId={identity.data.student.id}

@@ -27,6 +27,34 @@ const statusLabels: Record<StudentAcademicPlanItem["status"], string> = {
   exempted: "Exempted",
 };
 
+function youtubeEmbedUrl(value: string) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    if (url.protocol !== "https:") return null;
+    if (host === "youtu.be") {
+      const id = url.pathname.split("/").filter(Boolean)[0];
+      return id ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}` : null;
+    }
+    if (!["youtube.com", "www.youtube.com", "m.youtube.com"].includes(host)) {
+      return null;
+    }
+    const playlist = url.searchParams.get("list");
+    if (url.pathname === "/playlist" && playlist) {
+      return `https://www.youtube-nocookie.com/embed/videoseries?list=${encodeURIComponent(playlist)}`;
+    }
+    const id =
+      url.pathname === "/watch"
+        ? url.searchParams.get("v")
+        : url.pathname.startsWith("/embed/")
+          ? url.pathname.slice("/embed/".length).split("/")[0]
+          : null;
+    return id ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}` : null;
+  } catch {
+    return null;
+  }
+}
+
 function CourseDetail({
   course,
   onClose,
@@ -34,6 +62,11 @@ function CourseDetail({
   course: CatalogCourse;
   onClose: () => void;
 }) {
+  const videos = course.relatedVideos ?? [];
+  const [videoIndex, setVideoIndex] = useState(0);
+  const video = videos[videoIndex] ?? videos[0];
+  const embedUrl = video ? youtubeEmbedUrl(video.url) : null;
+
   return (
     <div className="course-dialog-backdrop" role="presentation" onMouseDown={onClose}>
       <section
@@ -84,6 +117,56 @@ function CourseDetail({
             <p>No course prerequisites.</p>
           )}
         </div>
+        {video && embedUrl ? (
+          <section className="course-dialog__videos" aria-labelledby="course-video-title">
+            <div className="course-video-heading">
+              <div>
+                <strong id="course-video-title">Related course video</strong>
+                <p>Optional learning media selected by academic staff.</p>
+              </div>
+              {videos.length > 1 ? (
+                <span>{videoIndex + 1} / {videos.length}</span>
+              ) : null}
+            </div>
+            <div className="course-video-frame">
+              <iframe
+                src={embedUrl}
+                title={video.title}
+                loading="lazy"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            </div>
+            <div className="course-video-details">
+              <div>
+                <h3>{video.title}</h3>
+                {video.description ? <p>{video.description}</p> : null}
+                <small>{video.sourceLabel ?? video.provider}</small>
+              </div>
+              <a href={video.url} target="_blank" rel="noreferrer">
+                Open on YouTube <span aria-hidden="true">↗</span>
+              </a>
+            </div>
+            {videos.length > 1 ? (
+              <div className="course-video-controls">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setVideoIndex((current) => (current - 1 + videos.length) % videos.length)
+                  }
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVideoIndex((current) => (current + 1) % videos.length)}
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
         {course.resources?.length ? (
           <section
             className="course-dialog__resources"

@@ -18,13 +18,13 @@
     "build": "node scripts/build.mjs",
     "vercel-build": "next build --webpack",
     "start": "node scripts/build.mjs start",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@vv/contracts": "file:../../packages/contracts",
-    "js-yaml": "4.3.0",
+    "js-yaml": "4.3.1",
     "next": "16.3.0",
     "react": "19.2.6",
     "react-dom": "19.2.6"

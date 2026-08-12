@@ -1,6 +1,8 @@
 "use client";
 
-import { type FormEvent, useCallback, useMemo, useState } from "react";
+import type { StudentHelpRequest } from "@vv/contracts";
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PortalShell } from "../components/portal-shell";
 import {
   EmptyState,
@@ -9,7 +11,11 @@ import {
   PageCard,
 } from "../components/portal-ui";
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
-import { createStudentHelpRequest, getStudentHelp } from "../lib/api-client";
+import {
+  createStudentHelpRequest,
+  createStudentInquiryMessage,
+  getStudentHelp,
+} from "../lib/api-client";
 
 const categoryLabels = {
   all: "All topics",
@@ -21,7 +27,7 @@ const categoryLabels = {
 
 type HelpCategory = keyof typeof categoryLabels;
 
-function StudentInquiryForm() {
+function StudentInquiryForm({ onSent }: { onSent: () => void }) {
   const action = useApiAction(createStudentHelpRequest);
   const [sent, setSent] = useState(false);
 
@@ -40,6 +46,7 @@ function StudentInquiryForm() {
       );
       form.reset();
       setSent(true);
+      onSent();
     } catch {
       // The action state provides the student-safe error.
     }
@@ -89,13 +96,109 @@ function StudentInquiryForm() {
   );
 }
 
+function InquiryThread({
+  request,
+  onUpdated,
+  openByDefault,
+}: {
+  request: StudentHelpRequest;
+  onUpdated: () => void;
+  openByDefault: boolean;
+}) {
+  const reply = useApiAction(createStudentInquiryMessage);
+  const [sent, setSent] = useState(false);
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSent(false);
+    const form = event.currentTarget;
+    const body = String(new FormData(form).get("body") ?? "").trim();
+    if (!body) return;
+    try {
+      await reply.run(
+        request.id,
+        { expectedVersion: request.version, body },
+        crypto.randomUUID(),
+      );
+      form.reset();
+      setSent(true);
+      onUpdated();
+    } catch {
+      // Keep the student's text in the form. The action exposes a safe error.
+    }
+  };
+  return (
+    <details
+      className="student-support-thread"
+      open={openByDefault || request.status === "waiting_on_student"}
+    >
+      <summary>
+        <span>
+          <strong>{request.subject}</strong>
+          <small>
+            Updated {new Date(request.updatedAt).toLocaleString()}
+            {request.expiresAt
+              ? ` · active until ${new Date(request.expiresAt).toLocaleString()}`
+              : ""}
+          </small>
+        </span>
+        <span className={`student-support-status student-support-status--${request.status}`}>
+          {request.status.replaceAll("_", " ")}
+        </span>
+      </summary>
+      <ol className="student-support-messages">
+        {request.messages.map((message) => (
+          <li
+            className={
+              message.direction === "student"
+                ? "student-support-message student-support-message--student"
+                : "student-support-message student-support-message--staff"
+            }
+            key={message.id}
+          >
+            <div><strong>{message.authorName}</strong><time>{new Date(message.createdAt).toLocaleString()}</time></div>
+            <p>{message.body}</p>
+            <small>{message.deliveryStatus}</small>
+          </li>
+        ))}
+      </ol>
+      <form className="student-support-reply" onSubmit={submit}>
+        <label>
+          Reply to the enrollment team
+          <textarea name="body" required minLength={1} maxLength={2_000} />
+        </label>
+        <p>
+          Replies are saved immediately. This live conversation remains active for five days
+          after the latest message; after that it leaves active inboxes while its history stays
+          safely protected.
+        </p>
+        {reply.message ? <p className="field-error" role="alert">{reply.message}</p> : null}
+        {sent ? <p className="student-inquiry-form__success" role="status">Reply sent.</p> : null}
+        <button className="button button--primary" type="submit" disabled={reply.status === "loading"}>
+          {reply.status === "loading" ? "Sending..." : "Send reply"}
+        </button>
+      </form>
+    </details>
+  );
+}
+
 export default function HelpPage() {
   const [category, setCategory] = useState<HelpCategory>("all");
+  const searchParams = useSearchParams();
+  const selectedConversationId = searchParams.get("conversation");
   const loadHelp = useCallback(
     (signal: AbortSignal) => getStudentHelp(signal),
     [],
   );
   const help = useApiResource(loadHelp);
+  const refreshHelp = help.refresh;
+  useEffect(() => {
+    // The stream only invalidates local state; the REST projection remains
+    // canonical. Refreshing this lightweight view for every student event
+    // avoids missing a support reply when a provider evolves its event shape.
+    const refreshAfterStudentEvent = () => refreshHelp();
+    window.addEventListener("vv:student-realtime", refreshAfterStudentEvent);
+    return () => window.removeEventListener("vv:student-realtime", refreshAfterStudentEvent);
+  }, [refreshHelp]);
   const articles = useMemo(
     () =>
       help.data?.articles.filter(
@@ -117,7 +220,8 @@ export default function HelpPage() {
         <ErrorState message={help.error} onRetry={help.reload} />
       ) : (
         <div className="resource-layout">
-          <PageCard eyebrow="Knowledge center" title="Frequently asked questions">
+          <div className="resource-main student-support-main">
+            <PageCard eyebrow="Knowledge center" title="Frequently asked questions">
             <div className="filter-chips" aria-label="Filter help topics">
               {(Object.keys(categoryLabels) as HelpCategory[]).map((key) => (
                 <button
@@ -146,9 +250,27 @@ export default function HelpPage() {
                 ))}
               </div>
             )}
-          </PageCard>
+            </PageCard>
+            {help.data.requests.length > 0 ? (
+              <PageCard eyebrow="Your support history" title="Enrollment conversations">
+                <p className="student-support-live-status" role="status">
+                  Live updates are on. New team replies appear here without refreshing the page.
+                </p>
+                <div className="student-support-threads">
+                  {help.data.requests.map((request) => (
+                    <InquiryThread
+                      request={request}
+                      onUpdated={help.refresh}
+                      openByDefault={request.id === selectedConversationId}
+                      key={request.id}
+                    />
+                  ))}
+                </div>
+              </PageCard>
+            ) : null}
+          </div>
           <aside className="resource-aside">
-            <StudentInquiryForm />
+            <StudentInquiryForm onSent={help.refresh} />
             <div className="support-card">
               <span className="support-card__mark" aria-hidden="true">A</span>
               <p className="eyebrow">Talk with a person</p>

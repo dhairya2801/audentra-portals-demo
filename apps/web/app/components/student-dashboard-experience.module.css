@@ -1,17 +1,45 @@
-.hero {
+.workingArea {
+  display: grid;
   grid-template-columns: minmax(15rem, 0.72fr) minmax(0, 1.6fr);
   align-items: stretch;
+  gap: clamp(20px, 2.5vw, 28px);
+  margin-bottom: clamp(28px, 4vw, 46px);
 }
 
-.hero > * {
+.workingArea > * {
   min-width: 0;
+}
+
+.workingStack {
+  display: grid;
+  grid-template-rows: auto auto minmax(11rem, 1fr);
+  gap: clamp(16px, 2vw, 22px);
+  min-width: 0;
+  height: 100%;
 }
 
 .progressCard {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  align-self: start;
+  align-self: stretch;
+}
+
+.classroomsCard {
+  min-height: 11rem;
+  height: 100%;
+}
+
+.calendarColumn {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+}
+
+.calendarColumn > * {
+  min-width: 0;
+  height: 100%;
+  flex: 1 1 auto;
 }
 
 .progressCard > p {
@@ -169,8 +197,16 @@
 }
 
 @media (max-width: 900px) {
-  .hero {
+  .workingArea {
     grid-template-columns: 1fr;
+  }
+
+  .workingStack {
+    grid-template-rows: auto;
+  }
+
+  .calendarColumn > * {
+    height: auto;
   }
 }
 
