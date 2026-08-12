@@ -3,6 +3,9 @@ import type {
   ActivityEventInput,
   AskEdwardInput,
   AskEdwardResponse,
+  AskStaffEdwardInput,
+  AskStaffEdwardResponse,
+  StaffAssistantConversation,
   AssistantConversation,
   AssistantConversationMessagesResponse,
   AssistantVoiceSessionCredentials,
@@ -1247,6 +1250,39 @@ export function askEdward(input: AskEdwardInput, signal?: AbortSignal) {
       // Asking Edward reads the student record but does not mutate it.
       // Refreshing the portal shell here would remount the conversation
       // before the assistant response can render.
+      notifyStudentRecordChanged: false,
+    },
+  );
+}
+
+export function createStaffAssistantConversation() {
+  return request<StaffAssistantConversation>(
+    "/v1/staff/assistant/conversations",
+    {
+      method: "POST",
+      headers: staffHeaders,
+    },
+    {
+      // Opening a conversation reads nothing from any record.
+      notifyStudentRecordChanged: false,
+    },
+  );
+}
+
+export function askStaffEdward(input: AskStaffEdwardInput, signal?: AbortSignal) {
+  return request<AskStaffEdwardResponse>(
+    "/v1/staff/assistant/messages",
+    {
+      method: "POST",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+      signal,
+    },
+    {
+      // Staff Edward is read-only; nothing on the student record changes.
       notifyStudentRecordChanged: false,
     },
   );

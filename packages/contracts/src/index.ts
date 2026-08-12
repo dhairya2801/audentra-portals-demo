@@ -1977,6 +1977,64 @@ export interface AssistantConversationMessagesResponse {
   messages: AssistantConversationMessage[];
 }
 
+/* ---------------------------------------------------------------------------
+ * Staff Edward — the read-only staff assistant.
+ *
+ * Staff turns reuse the student block family and add the `draft` block: a
+ * proposed outbound message (email/SMS) that Edward writes but never sends.
+ * The disclaimer travels with the block so no client can render a draft
+ * without it.
+ * ------------------------------------------------------------------------- */
+
+export interface StaffAssistantDraftBlock {
+  type: "draft";
+  fallbackText: string;
+  channel: string;
+  subject?: string;
+  body: string;
+  disclaimer: string;
+}
+
+export type StaffAssistantResponseBlock =
+  | AssistantResponseBlock
+  | StaffAssistantDraftBlock;
+
+export interface AskStaffEdwardInput {
+  message: string;
+  /** Omitted for a stateless turn; created via the conversations endpoint. */
+  conversationId?: string;
+  /** Client-generated id so a retried send never duplicates a message. */
+  clientMessageId?: string;
+}
+
+export interface StaffAssistantResolvedStudent {
+  id: string;
+  name: string;
+}
+
+export interface AskStaffEdwardResponse {
+  message: string;
+  blocks?: StaffAssistantResponseBlock[];
+  provider: string;
+  model: string | null;
+  usage: AskEdwardResponse["usage"];
+  contextReceipts: { source: string }[];
+  /** The student this turn was grounded in, when Edward resolved one. */
+  resolvedStudent: StaffAssistantResolvedStudent | null;
+  requestId: string;
+  /** Present when the platform persisted this exchange to a conversation. */
+  conversationId?: string;
+  userMessageId?: string;
+  assistantMessageId?: string;
+}
+
+export interface StaffAssistantConversation {
+  id: string;
+  status: AssistantConversationStatus;
+  messages: unknown[];
+  createdAt: string;
+}
+
 export interface CreateAssistantVoiceSessionInput {
   conversationId: string;
   pageContext: AssistantPageContext;

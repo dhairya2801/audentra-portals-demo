@@ -11,11 +11,16 @@
 export interface TraceToolCall {
   tool: string;
   status: string;
-  round: "initial" | "dependency";
+  /** Staff turns add a "referent" round: resolving which student is meant. */
+  round: "initial" | "dependency" | "referent";
   durationMs?: number;
   recordCount?: number | null;
   reason?: string | null;
   result?: unknown;
+  /** Staff tools take validated arguments; recorded sanitized when present. */
+  arguments?: unknown;
+  /** Validation outcome for the recorded arguments (staff turns). */
+  validation?: string | null;
 }
 
 export interface TraceModelCall {
@@ -38,6 +43,11 @@ export interface TraceStage {
 /** The AssistantTurnTrace payload exactly as the platform serializes it. */
 export interface EdwardTurnTrace {
   traceId: string;
+  /** "student" (or absent on older traces) vs "staff". */
+  assistantKind?: string;
+  /** Staff turns record who asked. */
+  actorType?: string | null;
+  staffMemberId?: string | null;
   tenantId?: string | null;
   studentId?: string | null;
   conversationId?: string | null;
@@ -54,6 +64,8 @@ export interface EdwardTurnTrace {
     source?: string;
     additionalRequestTypes?: string[];
     requirementReference?: string | null;
+    /** Staff classification: the referenced student/topic, when one exists. */
+    reference?: string | null;
   } | null;
   toolSelectionSource?: string | null;
   selectedTools?: string[];
@@ -78,6 +90,8 @@ export interface EdwardTurnTrace {
 
 export interface TraceListEntry {
   traceId: string;
+  /** "student" (or absent on older traces) vs "staff". */
+  assistantKind?: string;
   startedAt?: string;
   path?: string;
   inputMode?: string;

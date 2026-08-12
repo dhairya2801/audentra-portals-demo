@@ -63,13 +63,17 @@ function statusBadgeClass(status: string): string {
 
 function SummaryHeader({ trace }: { trace: EdwardTurnTrace }) {
   const summary = summarizeTrace(trace);
+  const staff = trace.assistantKind === "staff";
   return (
     <section className={`card ${styles.summaryCard}`}>
       <div className={styles.summaryHead}>
-        <h2>Edward turn</h2>
+        <h2>{staff ? "Staff Edward turn" : "Edward turn"}</h2>
         <span className={`${styles.statusBadge} ${statusBadgeClass(summary.status)}`}>
           {summary.statusLabel}
         </span>
+        {staff ? (
+          <span className={`${styles.statusBadge} ${styles.statusNeutral}`}>Staff</span>
+        ) : null}
         {trace.inputMode === "voice" ? (
           <span className={`${styles.statusBadge} ${styles.statusNeutral}`}>Voice</span>
         ) : null}
@@ -111,10 +115,28 @@ function SummaryHeader({ trace }: { trace: EdwardTurnTrace }) {
           <dt>Response source</dt>
           <dd className={styles.mono}>{trace.responseSource ?? trace.path ?? "—"}</dd>
         </div>
-        <div className={styles.summaryStat}>
-          <dt>Student</dt>
-          <dd className={styles.mono}>{trace.studentId?.slice(0, 8) ?? "—"}…</dd>
-        </div>
+        {staff ? (
+          <>
+            <div className={styles.summaryStat}>
+              <dt>Actor</dt>
+              <dd className={styles.mono}>
+                {trace.actorType ?? "staff"}
+                {trace.staffMemberId ? ` · ${trace.staffMemberId.slice(0, 8)}…` : ""}
+              </dd>
+            </div>
+            <div className={styles.summaryStat}>
+              <dt>Resolved student</dt>
+              <dd className={styles.mono}>
+                {trace.studentId ? `${trace.studentId.slice(0, 8)}…` : "none"}
+              </dd>
+            </div>
+          </>
+        ) : (
+          <div className={styles.summaryStat}>
+            <dt>Student</dt>
+            <dd className={styles.mono}>{trace.studentId?.slice(0, 8) ?? "—"}…</dd>
+          </div>
+        )}
         <div className={styles.summaryStat}>
           <dt>Conversation</dt>
           <dd className={styles.mono}>
@@ -222,7 +244,7 @@ function LatencySection({ trace }: { trace: EdwardTurnTrace }) {
           <div key={`${call.tool}-${index}`} className={styles.waterfallRow}>
             <span className={`${styles.waterfallLabel} ${styles.waterfallLabelSub}`}>
               {call.tool}
-              {call.round === "dependency" ? " (dep)" : ""}
+              {call.round === "dependency" ? " (dep)" : call.round === "referent" ? " (ref)" : ""}
             </span>
             <span className={styles.waterfallTrack}>
               <span
@@ -250,7 +272,10 @@ function ClassificationSection({ trace }: { trace: EdwardTurnTrace }) {
   const classification = trace.classification;
   const selected = trace.selectedTools ?? [];
   const toolCalls = trace.toolCalls ?? [];
-  const initial = toolCalls.filter((call) => call.round !== "dependency");
+  const referent = toolCalls.filter((call) => call.round === "referent");
+  const initial = toolCalls.filter(
+    (call) => call.round !== "dependency" && call.round !== "referent",
+  );
   const dependency = toolCalls.filter((call) => call.round === "dependency");
   const triggers = trace.secondRead?.triggeredBy ?? [];
   return (
@@ -265,6 +290,12 @@ function ClassificationSection({ trace }: { trace: EdwardTurnTrace }) {
           <>
             <dt>Additional intents</dt>
             <dd className={styles.mono}>{classification.additionalRequestTypes.join(", ")}</dd>
+          </>
+        ) : null}
+        {classification?.reference ? (
+          <>
+            <dt>Reference</dt>
+            <dd className={styles.mono}>{classification.reference}</dd>
           </>
         ) : null}
         <dt>Confidence</dt>
@@ -284,6 +315,23 @@ function ClassificationSection({ trace }: { trace: EdwardTurnTrace }) {
             ))}
           </span>
         </dd>
+        {referent.length > 0 ? (
+          <>
+            <dt>Referent reads</dt>
+            <dd>
+              <span className={styles.toolChips}>
+                {referent.map((call) => (
+                  <span
+                    key={call.tool}
+                    className={`${styles.toolChip} ${styles.toolChipReferent}`}
+                  >
+                    {call.status === "available" ? "✓" : "✗"} {call.tool}
+                  </span>
+                ))}
+              </span>
+            </dd>
+          </>
+        ) : null}
         <dt>Initial reads</dt>
         <dd>
           <span className={styles.toolChips}>
@@ -330,10 +378,18 @@ function ToolCard({ call, trace }: { call: TraceToolCall; trace: EdwardTurnTrace
         <span className={styles.toolName}>{call.tool}</span>
         <span
           className={`${styles.roundBadge} ${
-            call.round === "dependency" ? styles.roundBadgeDependency : ""
+            call.round === "dependency"
+              ? styles.roundBadgeDependency
+              : call.round === "referent"
+                ? styles.roundBadgeReferent
+                : ""
           }`}
         >
-          {call.round === "dependency" ? "dependency" : "initial"}
+          {call.round === "dependency"
+            ? "dependency"
+            : call.round === "referent"
+              ? "referent"
+              : "initial"}
         </span>
         <span className={styles.turnMeta}>{formatMs(call.durationMs ?? 0)}</span>
       </summary>
@@ -353,13 +409,30 @@ function ToolCard({ call, trace }: { call: TraceToolCall; trace: EdwardTurnTrace
               <dd className={styles.mono}>{trigger}</dd>
             </>
           ) : null}
+          {call.validation ? (
+            <>
+              <dt>Validation</dt>
+              <dd className={styles.mono}>{call.validation}</dd>
+            </>
+          ) : null}
           <dt>Records</dt>
           <dd>{call.recordCount ?? "—"}</dd>
-          <dt>Arguments</dt>
-          <dd className={styles.personaMeta}>
-            none — identity is bound server-side; tools receive no model-supplied arguments
-          </dd>
+          {call.arguments === undefined ? (
+            <>
+              <dt>Arguments</dt>
+              <dd className={styles.personaMeta}>
+                none — identity is bound server-side; tools receive no model-supplied
+                arguments
+              </dd>
+            </>
+          ) : null}
         </dl>
+        {call.arguments !== undefined ? (
+          <>
+            <span className="eyebrow">Arguments</span>
+            <JsonBlock value={call.arguments} />
+          </>
+        ) : null}
         {call.result !== undefined ? (
           <JsonBlock value={call.result} />
         ) : (
