@@ -5,6 +5,7 @@ import {
   useCallback,
   useState,
 } from "react";
+import Image from "next/image";
 import { useApiAction } from "../hooks/use-api-resource";
 import {
   ApiClientError,
@@ -30,6 +31,7 @@ const signInErrorMessage = (error: unknown) =>
 export function SignInClient() {
   const tenantRuntime = useTenant();
   const { tenant } = tenantRuntime;
+  const support = tenant.contacts.support;
   const [mode, setMode] = useState<AuthMode>("sign_in");
   const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
   const signInAction = useCallback(
@@ -323,18 +325,40 @@ export function SignInClient() {
             will be connected when those providers are configured.
           </p>
         </div>
-        <p className="auth-support">
-          Trouble signing in?{" "}
-          <a href={`mailto:${tenant.supportEmail}`}>Contact student support</a>
-        </p>
+        {support.email || support.url ? (
+          <p className="auth-support">
+            Trouble signing in?{" "}
+            <a
+              href={
+                support.url
+                  ? tenantRuntime.href(support.url)
+                  : `mailto:${support.email}`
+              }
+            >
+              Contact {support.label.toLowerCase()}
+            </a>
+          </p>
+        ) : null}
       </section>
       <aside className="auth-story" aria-label={`${tenant.name} student experience`}>
+        {tenant.branding.heroImageUrl ? (
+          <Image
+            className="auth-story__image"
+            src={tenant.branding.heroImageUrl}
+            alt={tenant.branding.heroImageAlt || ""}
+            height={1200}
+            unoptimized
+            width={900}
+          />
+        ) : null}
         <div>
-          <span className="auth-story__index">{tenant.foundedLabel}</span>
+          <span className="auth-story__index">
+            {tenant.academicContext.currentTermLabel || "Student portal"}
+          </span>
           <blockquote>
-            “{tenant.welcomeQuote}”
+            “Your next step starts here.”
           </blockquote>
-          <p>Office of Student Enrollment</p>
+          <p>{tenant.academicContext.defaultCampusName || tenant.name}</p>
         </div>
       </aside>
     </main>

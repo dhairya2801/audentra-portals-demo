@@ -21,6 +21,7 @@ import { StudentNotificationCenter } from "./student-notification-center";
 import { connectStudentRealtime } from "./student-realtime";
 import { TenantLink as Link } from "./tenant-link";
 import { useTenant } from "./tenant-provider";
+import { formatTenantMoney } from "../lib/tenant";
 
 export type PortalSection =
   | "dashboard"
@@ -115,13 +116,6 @@ function initials(fullName: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("");
-}
-
-function bookstoreCredit(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(cents / 100);
 }
 
 const experienceKindLabels: Record<StudentExperienceUpdate["kind"], string> = {
@@ -319,6 +313,35 @@ export function PortalShell({
 }) {
   const tenantRuntime = useTenant();
   const { tenant } = tenantRuntime;
+  const advisorContact =
+    tenant.contacts.admissions ??
+    tenant.contacts.financialAid ??
+    tenant.contacts.support;
+  const visibleNavigation = navigation.filter((item) => {
+    if (item.key === "campus_life") {
+      return tenant.capabilities.campusLife !== false;
+    }
+    if (item.key === "edward") {
+      return tenant.capabilities.assistant !== false;
+    }
+    return true;
+  });
+  const publicFooterLinks: { label: string; href: string }[] = [];
+  if (tenant.publicLinks.privacy) {
+    publicFooterLinks.push({ label: "Privacy", href: tenant.publicLinks.privacy });
+  }
+  if (tenant.publicLinks.accessibility) {
+    publicFooterLinks.push({
+      label: "Accessibility",
+      href: tenant.publicLinks.accessibility,
+    });
+  }
+  if (tenant.publicLinks.institution) {
+    publicFooterLinks.push({
+      label: "Institution website",
+      href: tenant.publicLinks.institution,
+    });
+  }
   const [menuOpen, setMenuOpen] = useState(false);
   const [experienceUpdates, setExperienceUpdates] = useState<
     StudentExperienceUpdate[]
@@ -554,7 +577,7 @@ export function PortalShell({
         <Link
           className="aster-brand"
           href="/dashboard"
-          aria-label={tenant.portalLabel}
+          aria-label={`${tenant.name} student portal`}
         >
           <PortalMark />
           <span>
@@ -566,7 +589,7 @@ export function PortalShell({
           {identity.data.rewards ? (
             <div
               className="aster-points-balance"
-              title={`${bookstoreCredit(identity.data.rewards.bookstoreCreditCents)} in bookstore credit`}
+              title={`${formatTenantMoney(identity.data.rewards.bookstoreCreditCents, tenant)} in bookstore credit`}
             >
               <span aria-hidden="true">✦</span>
               <div>
@@ -613,7 +636,7 @@ export function PortalShell({
       >
         <p className="aster-sidebar__label">Student portal</p>
         <nav aria-label="Student portal sections">
-          {navigation.map((item) => (
+          {visibleNavigation.map((item) => (
             <Link
               className={active === item.key ? "aster-nav-link--active" : undefined}
               href={item.href}
@@ -636,8 +659,9 @@ export function PortalShell({
               <small>{identity.data.rewards.pointName}</small>
               <strong>{identity.data.rewards.lifetimePoints} points</strong>
               <p>
-                {bookstoreCredit(
+                {formatTenantMoney(
                   identity.data.rewards.bookstoreCreditCents,
+                  tenant,
                 )}{" "}
                 bookstore credit
               </p>
@@ -649,13 +673,16 @@ export function PortalShell({
           <div>
             <strong>Your student support team</strong>
             <p>
-              {tenant.shortName} enrollment and financial-aid advisors are
-              available weekdays.
+              {advisorContact.hours || `${tenant.shortName} advisors are available to help.`}
             </p>
             <div className="aster-sidebar__support-links">
-              <a href={`mailto:${tenant.admissionsEmail}`}>
-                {tenant.admissionsEmail}
-              </a>
+              {advisorContact.email ? (
+                <a href={`mailto:${advisorContact.email}`}>
+                  {advisorContact.email}
+                </a>
+              ) : advisorContact.url ? (
+                <a href={tenantRuntime.href(advisorContact.url)}>{advisorContact.label}</a>
+              ) : null}
               <Link href="/appointments">Book an advisor</Link>
             </div>
           </div>
@@ -673,16 +700,22 @@ export function PortalShell({
         </header>
         {children}
         <footer className="aster-footer">
-          <p>© {new Date().getFullYear()} {tenant.name}</p>
+          <p>© {new Date().getFullYear()} {tenant.legalName}</p>
           <nav aria-label="Portal policies">
-            <Link href="/help">Privacy & accessibility</Link>
+            {publicFooterLinks.map((link) =>
+              link.href.startsWith("/") && !link.href.startsWith("//") ? (
+                <Link href={link.href} key={link.label}>{link.label}</Link>
+              ) : (
+                <a href={link.href} key={link.label}>{link.label}</a>
+              ),
+            )}
             <Link href="/help">Student support</Link>
           </nav>
         </footer>
       </main>
 
       <nav className="aster-mobile-nav" aria-label="Mobile portal navigation">
-        {navigation.slice(0, 5).map((item) => (
+        {visibleNavigation.slice(0, 5).map((item) => (
           <Link
             className={active === item.key ? "aster-mobile-nav__active" : undefined}
             href={item.href}
@@ -695,7 +728,7 @@ export function PortalShell({
         ))}
       </nav>
 
-      {active !== "edward" ? (
+      {active !== "edward" && tenant.capabilities.assistant !== false ? (
         <EdwardAssistant
           studentName={identity.data.student.preferredName}
           variant="floating"

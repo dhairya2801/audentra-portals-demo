@@ -49,6 +49,7 @@ import type {
   StudentProfile,
   StudentRequirementDetail,
   StudentRequirementList,
+  TenantBootstrap,
   ReviewStaffDocumentInput,
   RecordStaffCommunicationInput,
   RegisterCampusEventInput,
@@ -159,14 +160,17 @@ async function parseError(response: Response): Promise<ApiClientError> {
 async function request<T>(
   path: string,
   init: RequestInit = {},
-  options: { notifyStudentRecordChanged?: boolean } = {},
+  options: {
+    notifyStudentRecordChanged?: boolean;
+    tenantSlug?: string;
+  } = {},
 ): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     credentials: "include",
     headers: {
       Accept: "application/json",
-      "X-Tenant-Slug": currentTenantSlug(),
+      "X-Tenant-Slug": options.tenantSlug ?? currentTenantSlug(),
       ...init.headers,
     },
   });
@@ -184,6 +188,14 @@ async function request<T>(
     window.dispatchEvent(new Event("vv:student-record-changed"));
   }
   return result;
+}
+
+export function getTenantBootstrap(slug: string, signal?: AbortSignal) {
+  return request<TenantBootstrap>(
+    `/v1/tenants/${encodeURIComponent(slug)}/bootstrap`,
+    { signal },
+    { tenantSlug: slug },
+  );
 }
 
 export function getStudentBootstrap(signal?: AbortSignal) {

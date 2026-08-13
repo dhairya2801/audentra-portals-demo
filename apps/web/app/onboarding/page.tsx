@@ -59,6 +59,7 @@ import {
   latestDocumentForCategory,
   reconcileDocumentExtractionProjection,
 } from "../lib/document-extraction-ui";
+import { formatTenantDate, formatTenantMoney } from "../lib/tenant";
 import { getPostAcceptanceRoute } from "./offer-acceptance";
 
 const onboardingSteps: {
@@ -71,20 +72,20 @@ const onboardingSteps: {
   {
     key: "offer",
     label: "Offer",
-    title: "Your place at Aster",
+    title: "Your place at {institution}",
     subtitle: "Begin by confirming the admission decision that brought you here.",
   },
   {
     key: "about_you",
     label: "About you",
     title: "Identity & home address",
-    subtitle: "Add the personal details and permanent address Aster needs to prepare your student record.",
+    subtitle: "Add the personal details and permanent address {institution} needs to prepare your student record.",
   },
   {
     key: "housing",
     label: "Housing",
     title: "One personalized story",
-    subtitle: "Tell us where you imagine starting your Aster experience.",
+    subtitle: "Tell us where you imagine starting your {institution} experience.",
   },
   {
     key: "campus_life",
@@ -97,7 +98,7 @@ const onboardingSteps: {
     key: "emergency_contacts",
     label: "Emergency contacts",
     title: "People in your corner",
-    subtitle: "Enter one or more people Aster may contact in an emergency.",
+    subtitle: "Enter one or more people {institution} may contact in an emergency.",
   },
   {
     key: "family_permissions",
@@ -121,13 +122,13 @@ const onboardingSteps: {
 ];
 
 const campusInterestOptions = [
-  ["aster_robotics", "Aster Robotics"],
+  ["aster_robotics", "Robotics"],
   ["code_collective", "Code Collective"],
   ["women_in_business", "Women in Business"],
   ["late_night_radio", "Late Night Radio"],
   ["pixel_league", "Pixel League"],
-  ["outdoor_aster", "Outdoor Aster"],
-  ["boston_neighbors", "Boston Neighbors"],
+  ["outdoor_aster", "Outdoor activities"],
+  ["boston_neighbors", "Local community"],
   ["global_table", "Global Table"],
   ["first_year_council", "First-Year Council"],
   ["campus_rec_mix", "Campus Rec Mix"],
@@ -204,14 +205,6 @@ type OnboardingPageData = {
   campusLife: CampusLifeFeed;
   documents: StudentDocumentList;
 };
-
-function formatMoney(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(cents / 100);
-}
 
 function OnboardingProgress({
   steps,
@@ -915,18 +908,8 @@ function CampusLifeFields({
   data: StudentOnboardingData;
   clubs: CampusLifeFeed["clubs"];
 }) {
-  const { tenant, copy } = useTenant();
-  const interestByClubName: Record<string, string> = {
-    "Aster Robotics": "aster_robotics",
-    "Harvard Undergraduate Robotics Club": "aster_robotics",
-    "Code Collective": "code_collective",
-    "Harvard Computer Society": "code_collective",
-    "Women in Business": "women_in_business",
-    "Harvard Undergraduate Women in Business": "women_in_business",
-    "Outdoor Aster": "outdoor_aster",
-    "Harvard Outing Club": "outdoor_aster",
-  };
-  const visualInterestValues = new Set(Object.values(interestByClubName));
+  const { tenant } = useTenant();
+  const visualInterestValues = new Set(clubs.slice(0, 4).map((club) => club.id));
   return (
     <>
       <fieldset className="form-section">
@@ -937,9 +920,7 @@ function CampusLifeFields({
         </p>
         <div className="onboarding-club-showcase">
           {clubs.slice(0, 4).map((club) => {
-            const value =
-              interestByClubName[club.name] ??
-              club.name.toLowerCase().replaceAll(/[^a-z0-9]+/g, "_");
+            const value = club.id;
             return (
               <label className="onboarding-club-card" key={club.id}>
                 <input
@@ -966,7 +947,7 @@ function CampusLifeFields({
             <Choice
               name="campusInterests"
               value={value}
-              label={copy(label)}
+              label={label}
               defaultChecked={data.campusInterests?.includes(value)}
               key={value}
             />
@@ -1272,7 +1253,8 @@ function FamilyPermissionFields({ data }: { data: StudentOnboardingData }) {
 }
 
 function onboardingDocumentsForTenant(tenantSlug: string) {
-  const assetPrefix = tenantSlug === "harvard" ? "harvard" : "aster";
+  const assetPrefix = tenantSlug === "harvard" || tenantSlug === "aster" ? tenantSlug : null;
+  if (!assetPrefix) return [];
   return [
     {
       id: "ferpa_release",
@@ -1402,6 +1384,15 @@ function ReviewAndSignFields({ data }: { data: StudentOnboardingData }) {
   );
   const document =
     onboardingDocuments[activeDocument] ?? onboardingDocuments[0];
+
+  if (!document) {
+    return (
+      <section className="resource-state" role="alert">
+        <strong>Signing documents are not configured for this institution.</strong>
+        <p>Please contact your institution before completing this onboarding step.</p>
+      </section>
+    );
+  }
 
   return (
     <>
@@ -1888,6 +1879,7 @@ function StepFields({
   onIdentityDocumentChanged: (document: StudentDocument) => void;
 }) {
   const { tenant } = useTenant();
+  const formatMoney = (cents: number) => formatTenantMoney(cents, tenant);
   const aboutYouRoot = useRef<HTMLDivElement>(null);
   const identityQuickUploadEnabled =
     screenConfiguration?.identityQuickUpload !== false;
@@ -1961,12 +1953,11 @@ function StepFields({
               <div>
                 <dt>Respond by</dt>
                 <dd>
-                  {new Intl.DateTimeFormat("en-US", {
+                  {formatTenantDate(offer.responseDeadline, tenant, {
                     month: "long",
                     day: "numeric",
                     year: "numeric",
-                    timeZone: "UTC",
-                  }).format(new Date(offer.responseDeadline))}
+                  })}
                 </dd>
               </div>
               <div>
@@ -2296,11 +2287,10 @@ function StepFields({
                     type="radio"
                     name="depositChoice"
                     value="pay_later"
-                    label={`Accept now, pay by ${new Intl.DateTimeFormat("en-US", {
+                    label={`Accept now, pay by ${formatTenantDate(offer.responseDeadline, tenant, {
                       month: "long",
                       day: "numeric",
-                      timeZone: "UTC",
-                    }).format(new Date(offer.responseDeadline))}`}
+                    })}`}
                     defaultChecked={data.depositChoice === "pay_later"}
                     required
                   />
@@ -2582,6 +2572,7 @@ function OnboardingFlow({
 }) {
   const tenantRuntime = useTenant();
   const { tenant } = tenantRuntime;
+  const admissionsContact = tenant.contacts.admissions ?? tenant.contacts.support;
   const [onboarding, setOnboarding] = useState(initial);
   const [viewingStep, setViewingStep] = useState<OnboardingStep>(
     initial.currentStep,
@@ -2642,13 +2633,11 @@ function OnboardingFlow({
   const complete = useApiAction(completeAction);
   const configuredSteps = onboardingSteps.map((candidate) => {
     const configured = onboarding.screenConfigurations?.[candidate.key];
-    const tenantCopy = (value: string) =>
-      value.replaceAll("Aster", tenant.shortName);
     return {
       ...candidate,
       label: configured?.label || candidate.label,
-      title: tenantCopy(configured?.title || candidate.title),
-      subtitle: tenantCopy(configured?.description || candidate.subtitle),
+      title: tenantRuntime.copy(configured?.title || candidate.title),
+      subtitle: tenantRuntime.copy(configured?.description || candidate.subtitle),
     };
   });
   const withScreenConfiguration = (result: StudentOnboarding): StudentOnboarding => ({
@@ -2827,7 +2816,13 @@ function OnboardingFlow({
               {offerCannotAdvance ? (
                 <a
                   className="button button--primary"
-                  href={`mailto:${tenant.admissionsEmail}`}
+                  href={
+                    (admissionsContact.url
+                      ? tenantRuntime.href(admissionsContact.url)
+                      : admissionsContact.email
+                      ? `mailto:${admissionsContact.email}`
+                      : tenantRuntime.href("/help"))
+                  }
                 >
                   Get help with this offer <span aria-hidden="true">→</span>
                 </a>
@@ -2909,7 +2904,8 @@ function OnboardingFlow({
 }
 
 function OnboardingResource() {
-  const { tenant } = useTenant();
+  const tenantRuntime = useTenant();
+  const { tenant } = tenantRuntime;
   const loadOnboarding = useCallback(
     async (signal: AbortSignal): Promise<OnboardingPageData> => {
       const [
@@ -2990,9 +2986,18 @@ function OnboardingResource() {
           >
             Try again
           </button>
-          <a className="text-link" href={`mailto:${tenant.supportEmail}`}>
-            Get help
-          </a>
+          {tenant.contacts.support.email || tenant.contacts.support.url ? (
+            <a
+              className="text-link"
+              href={
+                tenant.contacts.support.url
+                  ? tenantRuntime.href(tenant.contacts.support.url)
+                  : `mailto:${tenant.contacts.support.email}`
+              }
+            >
+              Get help
+            </a>
+          ) : null}
         </div>
       </main>
     );

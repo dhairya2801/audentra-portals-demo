@@ -3,7 +3,7 @@ import { StudentDashboardPage } from "../student-dashboard";
 
 export const metadata: Metadata = {
   title: "Dashboard",
-  description: "Your Aster University enrollment dashboard.",
+  description: "Your institution’s enrollment dashboard.",
 };
 
 export default function DashboardPage() {

@@ -20,6 +20,8 @@ import {
   createStudentAppointment,
   getStudentAppointments,
 } from "../lib/api-client";
+import { useTenant } from "../components/tenant-provider";
+import { formatTenantDate } from "../lib/tenant";
 
 const appointmentLabels: Record<StudentAppointmentType, string> = {
   admissions_counseling: "Admissions counseling",
@@ -34,6 +36,7 @@ function AppointmentWorkspace({
   list: StudentAppointmentList;
   reload: () => void;
 }) {
+  const { tenant } = useTenant();
   const form = useRef<HTMLFormElement>(null);
   const intentKey = useRef<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -83,7 +86,7 @@ function AppointmentWorkspace({
         {list.items.length === 0 ? (
           <EmptyState
             title="No appointments scheduled"
-            description="Book time with an Aster advisor whenever you need a conversation."
+            description="Book time with a {institution} advisor whenever you need a conversation."
           />
         ) : (
           <ul className="resource-list">
@@ -94,14 +97,14 @@ function AppointmentWorkspace({
                   dateTime={appointment.startsAt}
                 >
                   <strong>
-                    {new Intl.DateTimeFormat("en-US", {
+                    {formatTenantDate(appointment.startsAt, tenant, {
                       day: "numeric",
-                    }).format(new Date(appointment.startsAt))}
+                    })}
                   </strong>
                   <span>
-                    {new Intl.DateTimeFormat("en-US", {
+                    {formatTenantDate(appointment.startsAt, tenant, {
                       month: "short",
-                    }).format(new Date(appointment.startsAt))}
+                    })}
                   </span>
                 </time>
                 <div className="resource-list__content">
@@ -111,10 +114,10 @@ function AppointmentWorkspace({
                   </div>
                   <div className="resource-list__meta">
                     <span>
-                      {new Intl.DateTimeFormat("en-US", {
+                      {formatTenantDate(appointment.startsAt, tenant, {
                         dateStyle: "long",
                         timeStyle: "short",
-                      }).format(new Date(appointment.startsAt))}
+                      })}
                     </span>
                   </div>
                   {appointment.notes ? <p>{appointment.notes}</p> : null}
@@ -184,7 +187,7 @@ export default function AppointmentsPage() {
       active="appointments"
       eyebrow="Personal guidance"
       title="Appointments"
-      description="Schedule focused time with an Aster advisor for the questions that matter."
+      description="Schedule focused time with a {institution} advisor for the questions that matter."
     >
       {appointments.status === "loading" ? (
         <LoadingState label="Loading your appointments" />

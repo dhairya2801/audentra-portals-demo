@@ -34,7 +34,7 @@ export const metadata: Metadata = {
         url: "/og.png",
         width: 1734,
         height: 907,
-        alt: "Aster University — Your enrollment starts here.",
+        alt: "Audentra institutional portal",
       },
     ],
   },

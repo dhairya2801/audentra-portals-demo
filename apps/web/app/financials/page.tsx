@@ -5,6 +5,7 @@ import { TenantLink as Link } from "../components/tenant-link";
 import { useCallback, useEffect, useState } from "react";
 import { PortalShell } from "../components/portal-shell";
 import { ErrorState, LoadingState, StatusPill } from "../components/portal-ui";
+import { useTenant } from "../components/tenant-provider";
 import { useActivityTracking } from "../hooks/use-activity-tracking";
 import { useApiResource } from "../hooks/use-api-resource";
 import {
@@ -12,15 +13,7 @@ import {
   selectFinancialPaymentPlan,
 } from "../lib/api-client";
 import { safePortalDestination } from "../lib/safe-destination";
-
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(cents / 100);
-}
+import { formatTenantDate, formatTenantMoney } from "../lib/tenant";
 
 function awardLabel(award: FinancialAward) {
   return {
@@ -111,6 +104,8 @@ function FinancialPaymentSchedule({
 }: {
   items: readonly FinancialPaymentScheduleItem[];
 }) {
+  const { tenant } = useTenant();
+  const money = (cents: number) => formatTenantMoney(cents, tenant);
   if (items.length === 0) return null;
   return (
     <section className="aster-section financial-payment-schedule">
@@ -125,12 +120,11 @@ function FinancialPaymentSchedule({
         {items.map((item) => (
           <li className={`financial-payment-schedule__item is-${item.status}`} key={item.id}>
             <time dateTime={item.dueAt}>
-              {new Intl.DateTimeFormat("en-US", {
+              {formatTenantDate(item.dueAt, tenant, {
                 month: "short",
                 day: "numeric",
                 year: "numeric",
-                timeZone: "UTC",
-              }).format(new Date(item.dueAt))}
+              })}
             </time>
             <div>
               <span>{item.kind === "deposit" ? "Enrollment deposit" : "Plan installment"}</span>
@@ -162,6 +156,8 @@ function FinancialAidDonut({
 }: {
   financials: StudentFinancials;
 }) {
+  const { tenant } = useTenant();
+  const money = (cents: number) => formatTenantMoney(cents, tenant);
   const acceptedByType = financials.awards.reduce(
     (totals, award) => {
       if (award.type !== "work_study") {
@@ -270,6 +266,8 @@ function FinancialAidDonut({
 }
 
 export default function FinancialsPage() {
+  const { tenant } = useTenant();
+  const money = (cents: number) => formatTenantMoney(cents, tenant);
   const load = useCallback(
     (signal: AbortSignal) => getStudentFinancials(signal),
     [],
@@ -459,12 +457,11 @@ export default function FinancialsPage() {
                       {document.dueAt ? (
                         <small>
                           Due{" "}
-                          {new Intl.DateTimeFormat("en-US", {
+                          {formatTenantDate(document.dueAt, tenant, {
                             month: "short",
                             day: "numeric",
                             year: "numeric",
-                            timeZone: "UTC",
-                          }).format(new Date(document.dueAt))}
+                          })}
                         </small>
                       ) : null}
                     </div>

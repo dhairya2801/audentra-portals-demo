@@ -16,7 +16,6 @@ import type {
   StaffWorkItemType,
   StudentClub,
 } from "@vv/contracts";
-import { dump, load } from "js-yaml";
 import {
   type DragEvent as ReactDragEvent,
   type FormEvent,
@@ -365,11 +364,11 @@ type ManagedDocument = Record<string, unknown>;
 function editableConfigurationDocument(
   configuration: StaffManagedConfiguration,
 ): ManagedDocument {
-  const document = load(configuration.yaml);
+  const document = configuration.document;
   if (!document || typeof document !== "object" || Array.isArray(document)) {
     throw new Error("The managed configuration is not an editable document.");
   }
-  return structuredClone(document as ManagedDocument);
+  return structuredClone(document);
 }
 
 function managedRecords(
@@ -381,14 +380,6 @@ function managedRecords(
     throw new Error(`The managed configuration has no ${key} records.`);
   }
   return records as Array<Record<string, unknown>>;
-}
-
-function configurationYaml(document: ManagedDocument) {
-  return dump(document, {
-    lineWidth: 100,
-    noCompatMode: true,
-    noRefs: true,
-  });
 }
 
 function utcInputValue(value: string) {
@@ -1663,7 +1654,8 @@ function ConfigurationAssistant({
   const saveAction = useApiAction(updateStaffManagedConfiguration);
   const edwardAction = useApiAction(draftStaffConfigurationWithEdward);
   const [instruction, setInstruction] = useState("");
-  const [draftYaml, setDraftYaml] = useState<string | null>(null);
+  const [draftDocument, setDraftDocument] = useState<ManagedDocument | null>(null);
+  const [draftVersion, setDraftVersion] = useState<number | null>(null);
   const [draftSummary, setDraftSummary] = useState<{
     summary: string;
     changes: string[];
@@ -1679,7 +1671,8 @@ function ConfigurationAssistant({
         expectedVersion: configuration.version,
         instruction,
       });
-      setDraftYaml(draft.yaml);
+      setDraftDocument(structuredClone(draft.document));
+      setDraftVersion(draft.expectedVersion);
       setDraftSummary({
         summary: draft.summary,
         changes: draft.changes,
@@ -1687,23 +1680,25 @@ function ConfigurationAssistant({
       });
       setSavedMessage(null);
     } catch {
+      setDraftVersion(null);
       setDraftSummary(null);
     }
   };
 
   const publish = async () => {
-    if (!draftYaml) return;
+    if (!draftDocument || draftVersion === null) return;
     try {
       const saved = await saveAction.run(kind, {
-        expectedVersion: configuration.version,
-        yaml: draftYaml,
+        expectedVersion: draftVersion,
+        document: draftDocument,
         changeSummary:
           draftSummary?.summary ?? "Published from Edward's reviewed draft.",
       });
       setSavedMessage(
         `${saved.fileName} published as version ${saved.version}.`,
       );
-      setDraftYaml(null);
+      setDraftDocument(null);
+      setDraftVersion(null);
       setDraftSummary(null);
       onSaved();
     } catch {
@@ -1787,7 +1782,7 @@ function ConfigurationAssistant({
         <button
           className="button button--primary"
           type="button"
-          disabled={saveAction.status === "loading" || !draftYaml}
+          disabled={saveAction.status === "loading" || !draftDocument}
           onClick={() => void publish()}
         >
           {saveAction.status === "loading"
@@ -1877,7 +1872,7 @@ function EventEditor({
       });
       await action.run("campus_life", {
         expectedVersion: configuration.version,
-        yaml: configurationYaml(document),
+        document,
         changeSummary: campusEvent
           ? `Updated campus event ${campusEvent.title}.`
           : `Created campus event ${title}.`,
@@ -1901,7 +1896,7 @@ function EventEditor({
       );
       await action.run("campus_life", {
         expectedVersion: configuration.version,
-        yaml: configurationYaml(document),
+        document,
         changeSummary: `Removed campus event ${campusEvent.title}.`,
       });
       onSaved();
@@ -2229,7 +2224,7 @@ function CourseEditor({
       });
       await action.run("academics", {
         expectedVersion: configuration.version,
-        yaml: configurationYaml(document),
+        document,
         changeSummary: `Updated course ${course.code}.`,
       });
       onSaved();
