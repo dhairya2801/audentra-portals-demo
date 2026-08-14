@@ -24,18 +24,18 @@
   },
   "dependencies": {
     "@vv/contracts": "file:../../packages/contracts",
-    "js-yaml": "4.3.1",
+    "js-yaml": "5.2.3",
     "livekit-client": "2.21.0",
     "next": "16.3.0",
-    "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
-    "@types/react": "19.2.14",
-    "@types/react-dom": "19.2.3",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
     "eslint": "9.39.4",
@@ -48,7 +48,7 @@
     "wrangler": "4.92.0"
   },
   "optionalDependencies": {
-    "@tailwindcss/oxide-win32-x64-msvc": "4.2.1"
+    "@tailwindcss/oxide-win32-x64-msvc": "4.3.3"
   },
   "type": "module"
 }
