@@ -1,7 +1,14 @@
 "use client";
 
 import type { StudentHelpRequest } from "@vv/contracts";
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Suspense,
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useSearchParams } from "next/navigation";
 import { PortalShell } from "../components/portal-shell";
 import {
@@ -181,7 +188,7 @@ function InquiryThread({
   );
 }
 
-export default function HelpPage() {
+function HelpPageContent() {
   const [category, setCategory] = useState<HelpCategory>("all");
   const searchParams = useSearchParams();
   const selectedConversationId = searchParams.get("conversation");
@@ -300,5 +307,13 @@ export default function HelpPage() {
         </div>
       )}
     </PortalShell>
+  );
+}
+
+export default function HelpPage() {
+  return (
+    <Suspense fallback={<LoadingState label="Loading Aster help" />}>
+      <HelpPageContent />
+    </Suspense>
   );
 }
