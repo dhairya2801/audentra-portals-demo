@@ -20,8 +20,12 @@ import {
   type TraceListEntry,
 } from "../lib/edward-lab";
 import { EdwardAssistant, type EdwardTurnEvent } from "./edward-assistant";
+import { EdwardLabCompare } from "./edward-lab-compare";
 import { EdwardTraceInspector } from "./edward-trace-inspector";
 import styles from "./edward-lab.module.css";
+
+/** "chat" is the original trace dashboard; "compare" runs one question twice. */
+type LabView = "chat" | "compare";
 
 interface LabPersona {
   name: string;
@@ -54,6 +58,7 @@ export function EdwardLab() {
   const [selectedTraceId, setSelectedTraceId] = useState<string | null>(null);
   const [recent, setRecent] = useState<TraceListEntry[]>([]);
   const [labError, setLabError] = useState<string | null>(null);
+  const [view, setView] = useState<LabView>("chat");
   const turnCounter = useRef(0);
 
   const refreshRecent = useCallback(() => {
@@ -194,6 +199,20 @@ export function EdwardLab() {
       <header className={styles.topBar}>
         <h1>Edward Lab</h1>
         <span className={styles.devBadge}>Developer tool</span>
+        <div className={styles.viewTabs} role="tablist" aria-label="Lab view">
+          {(["chat", "compare"] as const).map((candidate) => (
+            <button
+              key={candidate}
+              type="button"
+              role="tab"
+              aria-selected={view === candidate}
+              className={view === candidate ? styles.viewTabActive : styles.viewTab}
+              onClick={() => setView(candidate)}
+            >
+              {candidate === "chat" ? "Chat + trace" : "Normal vs deterministic"}
+            </button>
+          ))}
+        </div>
         <div className={styles.personaControls}>
           {personaSupported ? (
             <>
@@ -237,6 +256,9 @@ export function EdwardLab() {
           {labError}
         </div>
       ) : null}
+      {view === "compare" ? (
+        <EdwardLabCompare resetKey={`${activePersona}:${chatEpoch}`} />
+      ) : (
       <div className={styles.shell}>
         <div className={styles.chatColumn}>
           <section className={`card ${styles.chatCard}`}>
@@ -335,6 +357,7 @@ export function EdwardLab() {
           </section>
         </div>
       </div>
+      )}
     </>
   );
 }

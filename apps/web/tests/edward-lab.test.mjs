@@ -301,3 +301,234 @@ test("the inspector renders tools, grounding, evidence, and raw JSON sections", 
     assert.ok(source.includes(marker), `inspector must render "${marker}"`);
   }
 });
+
+/* --- normal vs deterministic comparison ------------------------------------ */
+
+function traceFixture(overrides = {}) {
+  return {
+    traceId: "t",
+    executionMode: "default",
+    classification: { requestType: "enrollment_checklist" },
+    toolSelectionSource: "deterministic",
+    selectedTools: ["getEnrollmentChecklist"],
+    toolCalls: [
+      { tool: "getEnrollmentChecklist", status: "ok", round: "initial" },
+      { tool: "getAccountBalance", status: "ok", round: "dependency" },
+    ],
+    evidence: ["Open checklist step: Final transcript"],
+    modelCalls: [
+      {
+        operation: "assistant_composer",
+        attempt: 1,
+        durationMs: 900,
+        outcome: "accepted",
+        model: "gpt-4o-mini",
+        usage: { promptTokens: 1000, completionTokens: 100, totalTokens: 1100 },
+      },
+    ],
+    responseSource: "model_prose",
+    provider: "openai",
+    model: "gpt-4o-mini",
+    failureCodes: [],
+    durationMs: 1400,
+    ...overrides,
+  };
+}
+
+function sideFixture(mode, overrides = {}) {
+  return {
+    mode,
+    requestId: `req-${mode}`,
+    message: "You still owe your final transcript.",
+    blocks: [{ type: "text" }, { type: "checklist" }],
+    trace: traceFixture({ executionMode: mode }),
+    latencyMs: 1500.4,
+    error: null,
+    ...overrides,
+  };
+}
+
+test("comparison facts read only what the trace recorded", async () => {
+  const { comparisonFacts } = await labModule();
+  const facts = comparisonFacts(sideFixture("default"));
+  assert.equal(facts.modeConfirmed, true);
+  assert.equal(facts.requestType, "enrollment_checklist");
+  assert.deepEqual(facts.executedTools, ["getEnrollmentChecklist", "getAccountBalance"]);
+  assert.equal(facts.toolCallCount, 2);
+  assert.equal(facts.dependencyToolCount, 1);
+  assert.equal(facts.evidenceCount, 1);
+  assert.deepEqual(facts.blockTypes, ["text", "checklist"]);
+  assert.equal(facts.modelCallCount, 1);
+  assert.equal(facts.totalTokens, 1100);
+  assert.equal(facts.serverDurationMs, 1400);
+  assert.equal(facts.clientLatencyMs, 1500);
+  assert.equal(facts.unsupported, false);
+});
+
+test("a run whose mode the platform did not confirm is never presented as proven", async () => {
+  const { comparisonFacts } = await labModule();
+  // No trace at all: the Lab cannot claim a zero-LLM turn happened.
+  const missing = comparisonFacts(sideFixture("deterministic", { trace: null }));
+  assert.equal(missing.modeConfirmed, false);
+  assert.equal(missing.modelCallCount, 0);
+
+  // A trace that reports the *other* mode (an ignored header) is also unconfirmed.
+  const ignored = comparisonFacts(
+    sideFixture("deterministic", { trace: traceFixture({ executionMode: "default" }) }),
+  );
+  assert.equal(ignored.modeConfirmed, false);
+});
+
+test("deterministic facts report zero model calls, zero tokens, and zero cost", async () => {
+  const { comparisonFacts } = await labModule();
+  const facts = comparisonFacts(
+    sideFixture("deterministic", {
+      trace: traceFixture({
+        executionMode: "deterministic",
+        modelCalls: [],
+        responseSource: "deterministic",
+        provider: "guided",
+        model: null,
+        durationMs: 40,
+      }),
+    }),
+  );
+  assert.equal(facts.modeConfirmed, true);
+  assert.equal(facts.modelCallCount, 0);
+  assert.equal(facts.totalTokens, 0);
+  assert.equal(facts.estimatedCostUsd, 0);
+  assert.equal(facts.responseSource, "deterministic");
+  assert.equal(facts.provider, "guided");
+});
+
+test("model cost is estimated only for priced models, never guessed", async () => {
+  const { estimateModelCostUsd } = await labModule();
+  assert.equal(estimateModelCostUsd(traceFixture({ modelCalls: [] })), 0);
+  const priced = estimateModelCostUsd(traceFixture());
+  assert.ok(priced > 0 && priced < 0.001, `unexpected estimate ${priced}`);
+  const unpriced = estimateModelCostUsd(
+    traceFixture({
+      modelCalls: [
+        {
+          operation: "assistant_composer",
+          attempt: 1,
+          durationMs: 1,
+          outcome: "accepted",
+          model: "some-unlisted-model",
+          usage: { promptTokens: 10, completionTokens: 10, totalTokens: 20 },
+        },
+      ],
+    }),
+  );
+  assert.equal(unpriced, null);
+});
+
+test("the delta names what actually differs between the two runs", async () => {
+  const { comparisonDelta, comparisonFacts } = await labModule();
+  const normal = comparisonFacts(sideFixture("default"));
+  const deterministic = comparisonFacts(
+    sideFixture("deterministic", {
+      message: "Final transcript: still required.",
+      trace: traceFixture({
+        executionMode: "deterministic",
+        modelCalls: [],
+        provider: "guided",
+        model: null,
+        responseSource: "deterministic",
+        durationMs: 45,
+        toolCalls: [{ tool: "getEnrollmentChecklist", status: "ok", round: "initial" }],
+      }),
+    }),
+  );
+  const delta = comparisonDelta(
+    normal,
+    deterministic,
+    "You still owe your final transcript.",
+    "Final transcript: still required.",
+  );
+  assert.equal(delta.sameMessage, false);
+  assert.equal(delta.sameRequestType, true);
+  assert.equal(delta.sameTools, false);
+  assert.deepEqual(delta.toolsOnlyInNormal, ["getAccountBalance"]);
+  assert.deepEqual(delta.toolsOnlyInDeterministic, []);
+  assert.equal(delta.serverDurationDeltaMs, 45 - 1400);
+  assert.equal(delta.tokensSaved, 1100);
+  assert.ok(delta.costSavedUsd > 0);
+  assert.deepEqual(delta.unverified, []);
+});
+
+test("the experiment set covers every comparison category the study needs", async () => {
+  const { COMPARISON_EXPERIMENTS } = await labModule();
+  const categories = COMPARISON_EXPERIMENTS.map((item) => item.category);
+  assert.deepEqual(categories, [
+    "Direct simple",
+    "Direct financial",
+    "Cross-domain",
+    "Aggregation",
+    "Ambiguous",
+    "Multi-intent",
+    "Follow-up",
+    "Unsupported",
+  ]);
+  // A follow-up is only meaningful with prior context, and both runs must get it.
+  const followUp = COMPARISON_EXPERIMENTS.find((item) => item.category === "Follow-up");
+  assert.ok(followUp.history.length > 0);
+});
+
+/* --- the mode header is a lab control, not a default ----------------------- */
+
+test("askEdward sends the mode header only when the lab explicitly asks for it", async () => {
+  const { EDWARD_EXECUTION_MODE_HEADER } = await labModule();
+  const source = await readFile(
+    new URL("../app/lib/api-client.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    source,
+    /\.\.\.\(options\.executionMode\s*\?\s*\{\s*\[EDWARD_EXECUTION_MODE_HEADER\]: options\.executionMode\s*\}\s*:\s*\{\}\)/,
+  );
+  // The client declares the header itself so it carries no runtime dependency
+  // on Lab code; the two declarations must not drift apart.
+  assert.match(
+    source,
+    new RegExp(
+      `const EDWARD_EXECUTION_MODE_HEADER = "${EDWARD_EXECUTION_MODE_HEADER}";`,
+    ),
+  );
+  // Lab types may be imported, Lab runtime values may not.
+  assert.match(source, /import type \{ EdwardExecutionMode \} from "\.\/edward-lab";/);
+  // No other call site may pin a mode.
+  const callers = await readdir(new URL("../app/components/", import.meta.url));
+  for (const file of callers) {
+    if (!file.endsWith(".tsx") || file === "edward-lab-compare.tsx") continue;
+    const content = await readFile(
+      new URL(`../app/components/${file}`, import.meta.url),
+      "utf8",
+    );
+    assert.doesNotMatch(
+      content,
+      /executionMode/,
+      `${file} must not pin an Edward execution mode`,
+    );
+  }
+});
+
+test("the comparison panel runs both modes over identical, unpersisted state", async () => {
+  const source = await readFile(
+    new URL("../app/components/edward-lab-compare.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /const MODES: readonly EdwardExecutionMode\[\] = \["default", "deterministic"\]/);
+  // Conversation-less turns: no conversationId and no clientMessageId, so the
+  // platform never persists an exchange between the two runs.
+  assert.doesNotMatch(source, /conversationId/);
+  assert.doesNotMatch(source, /clientMessageId/);
+  // Both runs get the same fixed page context and the same replayed history.
+  assert.match(source, /pageContext: PAGE_CONTEXT/);
+  assert.match(source, /history\.length > 0 \? \{ history \} : \{\}/);
+  // Traces are read through the shared same-origin proxy helper, never by
+  // reaching the platform's worker-token endpoints from the browser.
+  assert.match(source, /fetchTraceWithRetry\(requestId, labFetch\)/);
+  assert.doesNotMatch(source, /internal\/assistant/);
+  assert.doesNotMatch(source, /x-vv-worker-token/i);
+});

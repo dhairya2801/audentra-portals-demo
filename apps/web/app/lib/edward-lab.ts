@@ -7,6 +7,16 @@
  * `/api/edward-lab/*` route handlers, which hold the credential server-side.
  */
 
+/**
+ * How one Edward turn was allowed to execute. `default` is exactly what
+ * production does; `deterministic` removes the model planner and the prose
+ * composer for that single turn, so the platform makes zero provider calls.
+ * The platform honours the header only where its own Lab controls are on.
+ */
+export type EdwardExecutionMode = "default" | "deterministic";
+
+export const EDWARD_EXECUTION_MODE_HEADER = "X-Edward-Mode";
+
 /** One executed tool read as recorded in the AssistantTurnTrace. */
 export interface TraceToolCall {
   tool: string;
@@ -53,6 +63,10 @@ export interface EdwardTurnTrace {
   conversationId?: string | null;
   inputMode?: string;
   path?: string;
+  /** "default" is production execution; "deterministic" is the Lab's zero-LLM turn. */
+  executionMode?: EdwardExecutionMode;
+  /** A mode the platform refused to honour, recorded but never applied. */
+  ignoredExecutionModeRequest?: string | null;
   userMessage?: string;
   pagePath?: string | null;
   pageLabel?: string | null;
@@ -94,6 +108,7 @@ export interface TraceListEntry {
   assistantKind?: string;
   startedAt?: string;
   path?: string;
+  executionMode?: EdwardExecutionMode;
   inputMode?: string;
   conversationId?: string | null;
   studentId?: string | null;
@@ -271,3 +286,217 @@ export function evidenceTone(line: string): "warn" | "done" | "neutral" {
   if (/^Open checklist step:|^Deadline:/.test(line)) return "warn";
   return "neutral";
 }
+
+/* --- normal vs deterministic comparison ---------------------------------- */
+
+/**
+ * Lab-only model prices, USD per token. Deliberately a short, explicit table:
+ * an unpriced model reports no cost rather than a made-up one, because the
+ * point of the comparison is to be honest about what the model costs.
+ */
+export const LAB_MODEL_PRICING: Readonly<
+  Record<string, { input: number; output: number }>
+> = Object.freeze({
+  "gpt-4o-mini": { input: 0.15 / 1_000_000, output: 0.6 / 1_000_000 },
+  "gpt-4o-mini-2024-07-18": { input: 0.15 / 1_000_000, output: 0.6 / 1_000_000 },
+  "openai/gpt-4o-mini": { input: 0.15 / 1_000_000, output: 0.6 / 1_000_000 },
+});
+
+/** Summed cost of every model call on a trace; null when nothing is priceable. */
+export function estimateModelCostUsd(trace: EdwardTurnTrace | null): number | null {
+  const calls = trace?.modelCalls ?? [];
+  let total = 0;
+  let priced = 0;
+  for (const call of calls) {
+    const pricing = call.model ? LAB_MODEL_PRICING[call.model] : undefined;
+    if (!pricing || !call.usage) continue;
+    priced += 1;
+    total +=
+      (call.usage.promptTokens ?? 0) * pricing.input +
+      (call.usage.completionTokens ?? 0) * pricing.output;
+  }
+  if (calls.length === 0) return 0;
+  return priced > 0 ? total : null;
+}
+
+export function formatUsd(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  if (value === 0) return "$0";
+  return `$${value.toFixed(6)}`;
+}
+
+/** One side of a comparison: everything the Lab shows for a single run. */
+export interface ComparisonSide {
+  mode: EdwardExecutionMode;
+  requestId: string | null;
+  message: string;
+  blocks: Array<{ type?: string }>;
+  trace: EdwardTurnTrace | null;
+  /** Client-observed round trip, which includes network and proxying. */
+  latencyMs: number;
+  error: string | null;
+}
+
+/** The comparable facts for one side, derived only from what was recorded. */
+export interface ComparisonFacts {
+  mode: EdwardExecutionMode;
+  /** True only when the trace positively confirms the requested mode ran. */
+  modeConfirmed: boolean;
+  requestType: string | null;
+  toolSelectionSource: string | null;
+  selectedTools: string[];
+  executedTools: string[];
+  toolCallCount: number;
+  dependencyToolCount: number;
+  evidenceCount: number;
+  blockTypes: string[];
+  responseSource: string | null;
+  provider: string | null;
+  model: string | null;
+  modelCallCount: number;
+  totalTokens: number | null;
+  estimatedCostUsd: number | null;
+  serverDurationMs: number | null;
+  clientLatencyMs: number;
+  failureCodes: string[];
+  /** Deterministic Edward saying it cannot answer — the useful failure signal. */
+  unsupported: boolean;
+  messageCharacters: number;
+  error: string | null;
+}
+
+const UNSUPPORTED_REQUEST_TYPES = new Set([
+  "unsupported_or_out_of_scope",
+  "human_handoff",
+]);
+
+export function comparisonFacts(side: ComparisonSide): ComparisonFacts {
+  const trace = side.trace;
+  const toolCalls = trace?.toolCalls ?? [];
+  const modelCalls = trace?.modelCalls ?? [];
+  const requestType = trace?.classification?.requestType ?? null;
+  const tokens = modelCalls.reduce(
+    (sum, call) => sum + (call.usage?.totalTokens ?? 0),
+    0,
+  );
+  return {
+    mode: side.mode,
+    // A trace that never arrived cannot confirm anything; the Lab must not
+    // present an unverified run as a zero-LLM run.
+    modeConfirmed: trace?.executionMode === side.mode,
+    requestType,
+    toolSelectionSource: trace?.toolSelectionSource ?? null,
+    selectedTools: trace?.selectedTools ?? [],
+    executedTools: toolCalls.map((call) => call.tool),
+    toolCallCount: toolCalls.length,
+    dependencyToolCount: toolCalls.filter((call) => call.round === "dependency").length,
+    evidenceCount: trace?.evidence?.length ?? 0,
+    blockTypes: side.blocks.map((block) => String(block?.type ?? "unknown")),
+    responseSource: trace?.responseSource ?? null,
+    provider: trace?.provider ?? null,
+    model: trace?.model ?? null,
+    modelCallCount: modelCalls.length,
+    totalTokens: modelCalls.length > 0 ? tokens : 0,
+    estimatedCostUsd: estimateModelCostUsd(trace),
+    serverDurationMs: trace?.durationMs ?? null,
+    clientLatencyMs: Math.round(side.latencyMs),
+    failureCodes: trace?.failureCodes ?? [],
+    unsupported:
+      (requestType !== null && UNSUPPORTED_REQUEST_TYPES.has(requestType)) ||
+      trace?.path === "pre_pipeline_safety_gate",
+    messageCharacters: side.message.length,
+    error: side.error,
+  };
+}
+
+export interface ComparisonDelta {
+  /** Identical final message text, ignoring surrounding whitespace. */
+  sameMessage: boolean;
+  /** Both runs read the same records, in the same order. */
+  sameTools: boolean;
+  /** Both runs classified the request the same way. */
+  sameRequestType: boolean;
+  /** Both runs produced the same structured block shape. */
+  sameBlockTypes: boolean;
+  /** Tools normal Edward read that the deterministic run did not, and vice versa. */
+  toolsOnlyInNormal: string[];
+  toolsOnlyInDeterministic: string[];
+  /** Deterministic minus normal; negative means deterministic was faster. */
+  serverDurationDeltaMs: number | null;
+  tokensSaved: number | null;
+  costSavedUsd: number | null;
+  /** Set when the platform did not confirm one of the two requested modes. */
+  unverified: EdwardExecutionMode[];
+}
+
+export function comparisonDelta(
+  normal: ComparisonFacts,
+  deterministic: ComparisonFacts,
+  normalMessage: string,
+  deterministicMessage: string,
+): ComparisonDelta {
+  const onlyIn = (a: string[], b: string[]) => a.filter((item) => !b.includes(item));
+  const unverified: EdwardExecutionMode[] = [];
+  if (!normal.modeConfirmed) unverified.push("default");
+  if (!deterministic.modeConfirmed) unverified.push("deterministic");
+  return {
+    sameMessage: normalMessage.trim() === deterministicMessage.trim(),
+    sameTools:
+      normal.executedTools.join("|") === deterministic.executedTools.join("|"),
+    sameRequestType: normal.requestType === deterministic.requestType,
+    sameBlockTypes: normal.blockTypes.join("|") === deterministic.blockTypes.join("|"),
+    toolsOnlyInNormal: onlyIn(normal.executedTools, deterministic.executedTools),
+    toolsOnlyInDeterministic: onlyIn(
+      deterministic.executedTools,
+      normal.executedTools,
+    ),
+    serverDurationDeltaMs:
+      normal.serverDurationMs === null || deterministic.serverDurationMs === null
+        ? null
+        : deterministic.serverDurationMs - normal.serverDurationMs,
+    tokensSaved: normal.totalTokens === null ? null : normal.totalTokens,
+    costSavedUsd: normal.estimatedCostUsd,
+    unverified,
+  };
+}
+
+/**
+ * The experiment set the Lab offers as one-click questions. Categories mirror
+ * the comparison study: the point is to see *where* the model changes the
+ * answer, not to score a leaderboard.
+ */
+export const COMPARISON_EXPERIMENTS: ReadonlyArray<{
+  category: string;
+  question: string;
+  /** Prior turns replayed as client history, for follow-up experiments. */
+  history?: ReadonlyArray<{ role: "user" | "assistant"; content: string }>;
+}> = Object.freeze([
+  { category: "Direct simple", question: "What is my transcript status?" },
+  { category: "Direct financial", question: "How much is my deposit?" },
+  {
+    category: "Cross-domain",
+    question: "I paid my deposit. Why can't I apply for housing?",
+  },
+  { category: "Aggregation", question: "What do I still have to do?" },
+  { category: "Ambiguous", question: "Am I good to go?" },
+  {
+    category: "Multi-intent",
+    question: "What's my transcript status and what do I still owe?",
+  },
+  {
+    category: "Follow-up",
+    question: "Which of those do I need to do first?",
+    history: [
+      { role: "user", content: "What do I still have to do?" },
+      {
+        role: "assistant",
+        content:
+          "You still have open enrollment steps on your checklist, including your final transcript and your enrollment deposit.",
+      },
+    ],
+  },
+  {
+    category: "Unsupported",
+    question: "What was my roommate's high school GPA?",
+  },
+]);
