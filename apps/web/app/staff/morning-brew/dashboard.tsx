@@ -2,7 +2,6 @@
 
 import { useTenant } from "../../components/tenant-provider";
 import { BREW_INCLUDES } from "./catalog";
-import { attendeeAvatar } from "./data";
 import { EnrollmentPulse } from "./pulse";
 import type {
   BrewBriefing,
@@ -67,18 +66,22 @@ export function MorningBrewDashboard({
   const generatedAt = new Date(briefing.updatedAt);
   const updatedClock = clockFormatter.format(generatedAt);
   const fullDate = dateFormatter.format(generatedAt);
-  const deliveryClock = `${briefing.deliveryLabel} AM ET`;
   const alerts =
-    briefing.emails.filter((email) => email.priority === "high").length +
+    briefing.glance.requestsAwaitingReply +
     briefing.priorities.filter((priority) => priority.level === "High").length;
   const includedCount = BREW_INCLUDES.filter((include) => preferences.include[include.id]).length;
 
-  const showCalendar = preferences.include.calendar;
-  const showEmail = preferences.include.inbox;
+  const showDeadlines = preferences.include.deadlines;
+  const showRequests = preferences.include.requests;
   const showImpact = preferences.insightDetail !== "headline";
   const showRecommendation = preferences.insightDetail === "full";
   const showPriorities = briefing.priorities.length > 0;
-  const showDayGrid = showCalendar || showEmail || showPriorities;
+  const showDayGrid = showDeadlines || showRequests || showPriorities;
+  const emptyBriefing =
+    !briefing.insights.length &&
+    !briefing.kpis.length &&
+    !briefing.changes.length &&
+    !showDayGrid;
 
   return (
     <div className="brew">
@@ -98,7 +101,7 @@ export function MorningBrewDashboard({
         </div>
         <div className="brew-masthead__meta">
           <span className="brew-masthead__updated">
-            <i aria-hidden="true">↻</i> Last updated {updatedClock}
+            <i aria-hidden="true">↻</i> Read at {updatedClock}
           </span>
           <button
             className="brew-masthead__bell"
@@ -124,29 +127,46 @@ export function MorningBrewDashboard({
         <div className="brew-hero__greeting">
           <h1>Good Morning {briefing.greetingName},</h1>
           <p>{briefing.deck}</p>
+          {briefing.bullets.length ? (
+            <ul className="brew-hero__bullets">
+              {briefing.bullets.map((bullet) => (
+                <li key={bullet}>{bullet}</li>
+              ))}
+            </ul>
+          ) : null}
           <p className="brew-hero__read">
             <span aria-hidden="true">◷</span> Read time: ~{briefing.readTimeMinutes} min
           </p>
-          <small>All times as of {deliveryClock}</small>
+          <small>
+            {briefing.students} students on the roster · changes cover {briefing.windowLabel}
+          </small>
         </div>
 
         <div className="brew-hero__cards">
           <button
             className="brew-glance"
             type="button"
-            onClick={() => (showEmail ? onOpenDetail({ kind: "email", id: briefing.emails[0]?.id ?? "" }) : onManageConnections())}
+            onClick={() =>
+              showRequests
+                ? onOpenDetail({ kind: "request", id: briefing.requests[0]?.id ?? "" })
+                : onManageConnections()
+            }
           >
             <span className="brew-glance__head">
               <i className="brew-glance__icon brew-glance__icon--mail" aria-hidden="true">
                 ✉
               </i>
-              Outlook
+              Student requests
             </span>
-            <strong>{showEmail ? briefing.inbox.unread : "—"}</strong>
-            <small>{showEmail ? "Unread emails" : "Turned off"}</small>
-            <em>{showEmail ? `${briefing.inbox.highPriority} High priority` : "Switch it on to see your inbox"}</em>
+            <strong>{showRequests ? briefing.glance.requests : "—"}</strong>
+            <small>{showRequests ? "Active conversations" : "Turned off"}</small>
+            <em>
+              {showRequests
+                ? `${briefing.glance.requestsAwaitingReply} awaiting a first reply`
+                : "Switch it on to see who is waiting"}
+            </em>
             <span className="brew-glance__link">
-              {showEmail ? "View highlights" : "Turn it on"} <i aria-hidden="true">→</i>
+              {showRequests ? "View requests" : "Turn it on"} <i aria-hidden="true">→</i>
             </span>
           </button>
 
@@ -154,22 +174,26 @@ export function MorningBrewDashboard({
             className="brew-glance"
             type="button"
             onClick={() =>
-              showCalendar ? onOpenDetail({ kind: "meeting", id: briefing.meetings[0]?.id ?? "" }) : onManageConnections()
+              showDeadlines
+                ? onOpenDetail({ kind: "deadline", id: briefing.deadlines[0]?.id ?? "" })
+                : onManageConnections()
             }
           >
             <span className="brew-glance__head">
               <i className="brew-glance__icon brew-glance__icon--calendar" aria-hidden="true">
                 ▦
               </i>
-              Calendar
+              Deadlines
             </span>
-            <strong>{showCalendar ? briefing.inbox.meetings : "—"}</strong>
-            <small>{showCalendar ? "Meetings today" : "Turned off"}</small>
+            <strong>{showDeadlines ? briefing.glance.deadlinesOverdue : "—"}</strong>
+            <small>{showDeadlines ? "Students past a due date" : "Turned off"}</small>
             <em>
-              {showCalendar ? `${briefing.inbox.meetingsHighPriority} High priority` : "Switch it on to see your day"}
+              {showDeadlines
+                ? `${briefing.glance.deadlinesThisWeek} with a date inside the week`
+                : "Switch it on to see the runway"}
             </em>
             <span className="brew-glance__link">
-              {showCalendar ? "View agenda" : "Turn it on"} <i aria-hidden="true">→</i>
+              {showDeadlines ? "View runway" : "Turn it on"} <i aria-hidden="true">→</i>
             </span>
           </button>
 
@@ -194,22 +218,39 @@ export function MorningBrewDashboard({
         </div>
       </section>
 
+      {emptyBriefing ? (
+        <section className="brew-empty" aria-live="polite">
+          <span aria-hidden="true">◔</span>
+          <div>
+            <strong>Nothing to report in the topics you follow.</strong>
+            <p>
+              Every section you switched on came back empty against today&rsquo;s canonical
+              records. That is the whole answer — there is no fallback content to show in its
+              place.
+            </p>
+          </div>
+          <button className="button button--primary" type="button" onClick={onCustomize}>
+            Follow more topics
+          </button>
+        </section>
+      ) : null}
+
       {briefing.insights.length ? (
         <section className="brew-insights" aria-labelledby="brew-insights-title">
           <header className="brew-panel-head">
             <div>
               <p className="brew-eyebrow" id="brew-insights-title">
-                <span aria-hidden="true">✦</span> Emerging AI insights for you
+                <span aria-hidden="true">✦</span> What needs attention
               </p>
-              <p>Insights that may impact enrollment and need your attention today.</p>
+              <p>Cohorts that are stuck today, ranked by how much they hold up.</p>
             </div>
             <div className="brew-panel-head__actions">
               <EdwardChip
-                label="Ask for insights"
-                onClick={() => onAskEdward({ mode: "insights", context: "today's insights" })}
+                label="Ask for the students"
+                onClick={() => onAskEdward({ mode: "insights", context: "today's attention list" })}
               />
-              <button className="brew-link" type="button" onClick={() => navigate("overview")}>
-                View all insights <span aria-hidden="true">→</span>
+              <button className="brew-link" type="button" onClick={() => navigate("students")}>
+                Open the roster <span aria-hidden="true">→</span>
               </button>
             </div>
           </header>
@@ -231,12 +272,16 @@ export function MorningBrewDashboard({
                     </button>
                   </h3>
                   <span className={`brew-chip brew-chip--${insight.severity}`}>
-                    {insight.severity === "positive" ? "Positive" : insight.severity === "high" ? "High" : "Medium"}
+                    {insight.severity === "positive"
+                      ? "Clear"
+                      : insight.severity === "high"
+                        ? "High"
+                        : "Medium"}
                   </span>
                 </div>
 
                 <p className="brew-insight__summary">{insight.summary}</p>
-                {showImpact ? <p className="brew-insight__projection">{insight.projection}</p> : null}
+                {showImpact ? <p className="brew-insight__projection">{insight.scope}</p> : null}
 
                 {showImpact ? (
                   <div className="brew-insight__impact">
@@ -253,14 +298,14 @@ export function MorningBrewDashboard({
 
                 {showRecommendation ? (
                   <div className="brew-insight__action">
-                    <small>Recommended action</small>
+                    <small>Recommended action · {insight.label}</small>
                     <p>{insight.recommendedAction}</p>
                   </div>
                 ) : null}
 
                 <footer className="brew-insight__foot">
                   <span>
-                    Impact: <b>{insight.impactLevel}</b> &nbsp;·&nbsp; Confidence: <b>{insight.confidence}%</b>
+                    Priority: <b>{insight.impactLevel}</b> &nbsp;·&nbsp; <b>Canonical records</b>
                   </span>
                   <button
                     className="brew-link"
@@ -278,9 +323,13 @@ export function MorningBrewDashboard({
 
       <EnrollmentPulse
         kpis={briefing.kpis}
+        timeframes={briefing.timeframes}
         refreshedAt={`${updatedClock} ET`}
-        onOpenKpi={(id: string, timeframe: BrewTimeframeId) => onOpenDetail({ kind: "kpi", id, timeframe })}
-        onAskEdward={() => onAskEdward({ mode: "insights", context: "the enrollment pulse" })}
+        students={briefing.students}
+        onOpenKpi={(id: string, timeframe: BrewTimeframeId) =>
+          onOpenDetail({ kind: "kpi", id, timeframe })
+        }
+        onAskEdward={() => onAskEdward({ mode: "insights", context: "the enrollment funnel" })}
         onOpenDashboard={() => navigate("overview")}
       />
 
@@ -291,12 +340,14 @@ export function MorningBrewDashboard({
               <p className="brew-eyebrow" id="brew-changes-title">
                 <span aria-hidden="true">↻</span> Since yesterday
               </p>
-              <p>What actually moved in the last 24 hours across your topics.</p>
+              <p>Canonical records written in {briefing.windowLabel}.</p>
             </div>
             <div className="brew-panel-head__actions">
               <EdwardChip
                 label="Summarize"
-                onClick={() => onAskEdward({ mode: "summarize", context: "what changed since yesterday" })}
+                onClick={() =>
+                  onAskEdward({ mode: "summarize", context: "what changed since yesterday" })
+                }
               />
             </div>
           </header>
@@ -316,9 +367,9 @@ export function MorningBrewDashboard({
                 </h3>
                 <p>{change.detail}</p>
                 <span className="brew-change__foot">
-                  {change.metric ? <b>{change.metric}</b> : null}
-                  <i className={`brew-source brew-source--${change.source}`}>
-                    {change.source === "workspace" ? "Live workspace" : "Modeled"}
+                  <b>{change.metric}</b>
+                  <i className="brew-source brew-source--workspace">
+                    {change.exact ? "Canonical" : "Last write"}
                   </i>
                 </span>
               </li>
@@ -329,121 +380,155 @@ export function MorningBrewDashboard({
 
       {showDayGrid ? (
         <div className="brew-day-grid">
-          {showCalendar ? (
-            <section className="brew-panel" aria-labelledby="brew-calendar-title">
+          {showDeadlines ? (
+            <section className="brew-panel" aria-labelledby="brew-deadlines-title">
               <header className="brew-panel__head">
-                <p className="brew-eyebrow" id="brew-calendar-title">
-                  <span aria-hidden="true">▦</span> Today&rsquo;s calendar
+                <p className="brew-eyebrow" id="brew-deadlines-title">
+                  <span aria-hidden="true">▦</span> Deadlines ahead
                 </p>
                 <EdwardChip
-                  label="Prep me"
-                  onClick={() => onAskEdward({ mode: "prep", context: "today's calendar" })}
+                  label="Who is affected?"
+                  onClick={() =>
+                    onAskEdward({
+                      mode: "cohort",
+                      context: "Which students have a requirement due in the next 7 days?",
+                    })
+                  }
                 />
               </header>
-              <ul className="brew-list brew-list--meetings">
-                {briefing.meetings.map((meeting) => (
-                  <li key={meeting.id}>
-                    <span className={`brew-dot brew-dot--${meeting.priority}`} aria-hidden="true" />
-                    <time>
-                      {meeting.time}
-                      <small>{meeting.duration}</small>
-                    </time>
-                    <div>
-                      <h3>
-                        <button
-                          className="brew-stretch"
-                          type="button"
-                          onClick={() => onOpenDetail({ kind: "meeting", id: meeting.id })}
-                        >
-                          {meeting.title}
-                        </button>
-                      </h3>
-                      <p>{meeting.detail}</p>
-                      {preferences.calendarPrep && meeting.priority === "high" && meeting.prep[0] ? (
-                        <p className="brew-prep-line">
-                          <span aria-hidden="true">✎</span> {meeting.prep[0]}
-                        </p>
-                      ) : null}
-                      <span className="brew-avatars">
-                        {meeting.attendees.map((attendee) => (
-                          <img src={attendeeAvatar(attendee)} alt={attendee} title={attendee} key={attendee} />
-                        ))}
-                        {meeting.extraAttendees ? <b>{meeting.extraAttendees}</b> : null}
+              {briefing.deadlines.length ? (
+                <ul className="brew-list brew-list--meetings brew-list--deadlines">
+                  {briefing.deadlines.map((deadline) => (
+                    <li key={deadline.id}>
+                      <span
+                        className={`brew-dot brew-dot--${deadline.priority}`}
+                        aria-hidden="true"
+                      />
+                      <time>
+                        {deadline.dueLabel}
+                        <small>{deadline.relativeLabel}</small>
+                      </time>
+                      <div>
+                        <h3>
+                          <button
+                            className="brew-stretch"
+                            type="button"
+                            onClick={() => onOpenDetail({ kind: "deadline", id: deadline.id })}
+                          >
+                            {deadline.title}
+                          </button>
+                        </h3>
+                        <p>{deadline.detail}</p>
+                        {preferences.deadlineNextStep && deadline.priority === "high" ? (
+                          <p className="brew-prep-line">
+                            <span aria-hidden="true">✎</span> {deadline.nextStep}
+                          </p>
+                        ) : null}
+                        <span className="brew-count-pill">
+                          {deadline.students} {deadline.students === 1 ? "student" : "students"}
+                        </span>
+                      </div>
+                      <span className={`brew-chip brew-chip--${deadline.priority}`}>
+                        {deadline.bucket === "overdue"
+                          ? "Overdue"
+                          : deadline.bucket === "today"
+                            ? "Today"
+                            : deadline.bucket === "this_week"
+                              ? "This week"
+                              : "This month"}
                       </span>
-                    </div>
-                    <span className={`brew-chip brew-chip--${meeting.priority}`}>
-                      {meeting.priority === "high"
-                        ? "High priority"
-                        : meeting.priority === "medium"
-                          ? "Medium priority"
-                          : "Low priority"}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="brew-panel__empty">
+                  No requirement due dates or offer deadlines fall inside the next 30 days for the
+                  topics you follow.
+                </p>
+              )}
               <footer className="brew-panel__foot">
-                <button className="brew-link" type="button" onClick={() => navigate("overview")}>
-                  View full calendar <span aria-hidden="true">→</span>
+                <button className="brew-link" type="button" onClick={() => navigate("journeys")}>
+                  Open enrollment journeys <span aria-hidden="true">→</span>
                 </button>
               </footer>
             </section>
           ) : null}
 
-          {showEmail ? (
-            <section className="brew-panel" aria-labelledby="brew-email-title">
+          {showRequests ? (
+            <section className="brew-panel" aria-labelledby="brew-requests-title">
               <header className="brew-panel__head">
-                <p className="brew-eyebrow" id="brew-email-title">
-                  <span aria-hidden="true">✉</span> Email highlights
+                <p className="brew-eyebrow" id="brew-requests-title">
+                  <span aria-hidden="true">✉</span> Student requests
                 </p>
                 <EdwardChip
                   label="Summarize"
-                  onClick={() => onAskEdward({ mode: "summarize", context: "today's email highlights" })}
+                  onClick={() =>
+                    onAskEdward({ mode: "summarize", context: "today's student requests" })
+                  }
                 />
               </header>
-              <ul className="brew-list brew-list--emails">
-                {briefing.emails.map((email) => (
-                  <li key={email.id}>
-                    <span className={`brew-dot brew-dot--${email.priority}`} aria-hidden="true" />
-                    <div>
-                      <span className="brew-email__top">
-                        <i className={`brew-chip brew-chip--${email.priority}`}>
-                          {email.priority === "high" ? "High" : email.priority === "medium" ? "Medium" : "Low"}
-                        </i>
-                        <time>{email.time}</time>
-                      </span>
-                      <h3>
-                        <button
-                          className="brew-stretch"
-                          type="button"
-                          onClick={() => onOpenDetail({ kind: "email", id: email.id })}
-                        >
-                          {email.subject}
-                        </button>
-                      </h3>
-                      <p>{email.summary}</p>
-                      <span className="brew-row-actions">
-                        <button type="button" onClick={() => onOpenDetail({ kind: "email", id: email.id })}>
-                          View email
-                        </button>
-                        {preferences.draftReplies ? (
-                          <button
-                            className="is-edward"
-                            type="button"
-                            onClick={() =>
-                              onAskEdward({ mode: "draft_reply", context: email.subject, emailId: email.id })
-                            }
+              {briefing.requests.length ? (
+                <ul className="brew-list brew-list--emails">
+                  {briefing.requests.map((request) => (
+                    <li key={request.id}>
+                      <span
+                        className={`brew-dot brew-dot--${
+                          request.priority === "urgent" || request.priority === "high"
+                            ? "high"
+                            : request.priority
+                        }`}
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <span className="brew-email__top">
+                          <i
+                            className={`brew-chip brew-chip--${
+                              request.status === "new" ? "high" : "medium"
+                            }`}
                           >
-                            <span aria-hidden="true">E</span> Draft reply
+                            {request.status === "new"
+                              ? "No reply yet"
+                              : request.status === "waiting_on_student"
+                                ? "With the student"
+                                : "Open"}
+                          </i>
+                          <time>{request.waitingLabel}</time>
+                        </span>
+                        <h3>
+                          <button
+                            className="brew-stretch"
+                            type="button"
+                            onClick={() => onOpenDetail({ kind: "request", id: request.id })}
+                          >
+                            {request.subject}
                           </button>
-                        ) : null}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                        </h3>
+                        <p>
+                          {request.studentName} · {request.summary}
+                        </p>
+                        <span className="brew-row-actions">
+                          <button
+                            type="button"
+                            onClick={() => onOpenDetail({ kind: "request", id: request.id })}
+                          >
+                            View request
+                          </button>
+                          <button type="button" onClick={() => navigate("messages")}>
+                            Reply in Messages
+                          </button>
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="brew-panel__empty">
+                  No active student support conversations are waiting on your team.
+                </p>
+              )}
               <footer className="brew-panel__foot">
                 <button className="brew-link" type="button" onClick={() => navigate("messages")}>
-                  View all emails <span aria-hidden="true">→</span>
+                  Open Messages <span aria-hidden="true">→</span>
                 </button>
               </footer>
             </section>
@@ -453,17 +538,20 @@ export function MorningBrewDashboard({
             <section className="brew-panel" aria-labelledby="brew-priorities-title">
               <header className="brew-panel__head">
                 <p className="brew-eyebrow" id="brew-priorities-title">
-                  <span aria-hidden="true">⚑</span> Today&rsquo;s priorities
+                  <span aria-hidden="true">⚑</span> Today&rsquo;s queues
                 </p>
                 <EdwardChip
                   label="Summarize"
-                  onClick={() => onAskEdward({ mode: "summarize", context: "today's priorities" })}
+                  onClick={() => onAskEdward({ mode: "summarize", context: "today's queues" })}
                 />
               </header>
               <ul className="brew-list brew-list--priorities">
                 {briefing.priorities.map((priority) => (
                   <li key={priority.id}>
-                    <span className={`brew-priority-icon brew-priority-icon--${priority.level.toLowerCase()}`} aria-hidden="true">
+                    <span
+                      className={`brew-priority-icon brew-priority-icon--${priority.level.toLowerCase()}`}
+                      aria-hidden="true"
+                    >
                       {priority.icon}
                     </span>
                     <div>
@@ -477,7 +565,9 @@ export function MorningBrewDashboard({
                             {priority.title}
                           </button>
                         </h3>
-                        <i className={`brew-chip brew-chip--${priority.level.toLowerCase()}`}>{priority.level}</i>
+                        <i className={`brew-chip brew-chip--${priority.level.toLowerCase()}`}>
+                          {priority.level}
+                        </i>
                       </span>
                       <p>{priority.detail}</p>
                       <span className="brew-row-actions">
@@ -497,17 +587,17 @@ export function MorningBrewDashboard({
             </section>
           ) : null}
 
-          {!showCalendar || !showEmail ? (
+          {!showDeadlines || !showRequests ? (
             <section className="brew-connect-card">
               <span aria-hidden="true">↗</span>
               <div>
-                <strong>Want more of your day in here?</strong>
+                <strong>Want more of your morning in here?</strong>
                 <p>
-                  {!showCalendar && !showEmail
-                    ? "Switch on your calendar and inbox and we'll add today's meetings and the messages that actually need you."
-                    : !showCalendar
-                      ? "Switch on your calendar and we'll add today's meetings, with a line on what to walk in knowing."
-                      : "Switch on your inbox and we'll pull out the messages that need a decision before noon."}
+                  {!showDeadlines && !showRequests
+                    ? "Switch on deadlines and student requests and we'll add the dated obligations and the conversations waiting on a reply."
+                    : !showDeadlines
+                      ? "Switch on deadlines and we'll add the requirement dates and offer deadlines landing soon."
+                      : "Switch on student requests and we'll pull out the support conversations waiting on your team."}
                 </p>
                 <small>
                   {includedCount} of {BREW_INCLUDES.length} switched on
@@ -521,54 +611,27 @@ export function MorningBrewDashboard({
         </div>
       ) : null}
 
-      {briefing.news.length ? (
-        <section className="brew-news" aria-labelledby="brew-news-title">
-          <header className="brew-panel-head">
-            <div>
-              <h2 id="brew-news-title">
-                <span className="brew-panel-head__glyph" aria-hidden="true">
-                  ◎
-                </span>
-                Higher Ed News
-              </h2>
-              <p>Curated for you</p>
-            </div>
-            <div className="brew-panel-head__actions">
-              <EdwardChip
-                label="Why it matters"
-                onClick={() => onAskEdward({ mode: "insights", context: "today's higher ed news" })}
-              />
-              <button className="brew-link" type="button" onClick={() => navigate("knowledge")}>
-                View all news <span aria-hidden="true">→</span>
-              </button>
-            </div>
-          </header>
-
-          <div className="brew-news-grid">
-            {briefing.news.map((item) => (
-              <article className="brew-news-card" key={item.id}>
-                <img src={item.image} alt={item.imageAlt} loading="lazy" />
-                <div>
-                  <span className="brew-news-card__meta">
-                    <b>{item.sourceName}</b>
-                    <time>{item.published}</time>
-                  </span>
-                  <h3>
-                    <button
-                      className="brew-stretch"
-                      type="button"
-                      onClick={() => onOpenDetail({ kind: "news", id: item.id })}
-                    >
-                      {item.headline}
-                    </button>
-                  </h3>
-                  <small>{item.readTime}</small>
-                </div>
-              </article>
+      <section className="brew-coverage" aria-labelledby="brew-coverage-title">
+        <p className="brew-eyebrow" id="brew-coverage-title">
+          <span aria-hidden="true">◎</span> What this briefing does and does not cover
+        </p>
+        <ul className="brew-coverage__notes">
+          {briefing.coverage.notes.map((note) => (
+            <li key={note}>{note}</li>
+          ))}
+        </ul>
+        <details className="brew-coverage__details">
+          <summary>Metrics this briefing will not show ({briefing.coverage.unsupported.length})</summary>
+          <dl>
+            {briefing.coverage.unsupported.map((item) => (
+              <div key={item.metric}>
+                <dt>{item.metric}</dt>
+                <dd>{item.reason}</dd>
+              </div>
             ))}
-          </div>
-        </section>
-      ) : null}
+          </dl>
+        </details>
+      </section>
 
       <footer className="brew-colophon">
         <p>
@@ -587,14 +650,15 @@ export function MorningBrewDashboard({
             type="button"
             onClick={() => onAskEdward({ mode: "ask", context: "this briefing", question: "" })}
           >
-            Have feedback? <span aria-hidden="true">💬</span>
+            Ask Edward <span aria-hidden="true">💬</span>
           </button>
         </div>
       </footer>
 
       <p className="brew-disclaimer">
-        Items labeled &ldquo;Live workspace&rdquo; are derived from your Audentra data. Insights, connector
-        content, and external news are synthetic demonstration material.
+        Every figure above is a count of canonical records in your Audentra database, read at{" "}
+        {updatedClock} ET. Nothing on this page is modelled, projected, or generated by a language
+        model.
       </p>
     </div>
   );

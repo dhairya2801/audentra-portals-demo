@@ -4,55 +4,59 @@ import type {
   BrewInclude,
   BrewIncludeId,
   BrewInsightDetailId,
-  BrewInboxDepthId,
-  BrewTopic,
-  BrewTopicId,
+  BrewRequestDepthId,
   BrewTimeframeId,
   BrewToneOption,
+  BrewTopic,
+  BrewTopicId,
 } from "./types";
 
 /**
- * The demo reader. What we pre-select on the first screen is justified against
- * this role, so the setup reads like it already knows who is sitting there.
+ * What the reader can choose, and what each choice actually shows.
+ *
+ * Every entry here names a canonical record type rather than a vendor. The
+ * earlier catalogue offered an Outlook inbox, a calendar, and a news feed; the
+ * platform has none of those, so the same slots now carry the real inbound
+ * channel (student support conversations) and the real dated obligations
+ * (requirement due dates and offer response deadlines).
  */
-export const BREW_READER_ROLE = "Executive Director of Financial Aid";
 
 export const BREW_TOPICS: BrewTopic[] = [
   {
     id: "financial_aid",
     title: "Financial aid",
-    blurb: "Where families are getting stuck, and how fast we're clearing it.",
-    preview: "Verification waits · appeals · packaging pace",
+    blurb: "Where aid files are stuck, and who is waiting on whom.",
+    preview: "Aid documents · verification · action required",
     icon: "◆",
     accent: "purple",
     recommended: true,
-    recommendation: "You run this one",
+    recommendation: "Aid blocks the most enrollment steps",
   },
   {
     id: "admissions",
     title: "Admissions & enrollment",
-    blurb: "Who's applying, who's saying yes, and who's still deciding.",
-    preview: "Applications · deposits · yield",
+    blurb: "Who was offered, who accepted, and who has actually deposited.",
+    preview: "Offers · acceptances · deposits",
     icon: "▲",
     accent: "blue",
     recommended: true,
-    recommendation: "Your aid calls move these",
+    recommendation: "The funnel your team is measured on",
   },
   {
     id: "student_success",
-    title: "Student success",
-    blurb: "Students who've committed but haven't quite landed yet.",
-    preview: "Melt risk · advising · orientation",
+    title: "Student progress",
+    blurb: "Students who committed but are still blocked or overdue.",
+    preview: "Blockers · overdue work · support requests",
     icon: "◇",
     accent: "teal",
     recommended: true,
-    recommendation: "Aid gaps show up here first",
+    recommendation: "Where a deposit quietly stops converting",
   },
   {
     id: "housing",
     title: "Housing",
-    blurb: "Rooms, contracts, and anything blocking a student from moving in.",
-    preview: "Contracts · room selection · blockers",
+    blurb: "The housing step, and anything holding it closed.",
+    preview: "Selected · actionable · blocked",
     icon: "⌂",
     accent: "amber",
     recommended: false,
@@ -60,74 +64,56 @@ export const BREW_TOPICS: BrewTopic[] = [
   },
   {
     id: "registrar",
-    title: "Records & registration",
-    blurb: "Transcripts, holds, and the paperwork that quietly stalls people.",
-    preview: "Transfer credit · holds · census",
+    title: "Records & documents",
+    blurb: "Transcripts and the documents waiting on a decision.",
+    preview: "Transcripts · uploads · reviews",
     icon: "▤",
     accent: "navy",
     recommended: false,
-    recommendation: "Handy around census dates",
+    recommendation: "Handy when the review queue backs up",
   },
 ];
 
-/**
- * What the reader wants pulled into their morning. Some of these reach into the
- * day around them (inbox, calendar); the rest are things Audentra assembles.
- */
 export const BREW_INCLUDES: BrewInclude[] = [
   {
-    id: "inbox",
-    title: "Your inbox",
-    blurb: "We'll pull out the handful of messages that actually need you, and leave the rest alone.",
-    source: "Outlook · priya.shah@aster.example.edu",
-    icon: "✉",
-    accent: "blue",
-    alwaysOn: false,
-  },
-  {
-    id: "calendar",
-    title: "Your calendar",
-    blurb: "Today's meetings, each with a line on what you'd want to walk in knowing.",
-    source: "Outlook Calendar",
-    icon: "▦",
-    accent: "teal",
-    alwaysOn: false,
-  },
-  {
     id: "numbers",
-    title: "The numbers you watch",
-    blurb: "Applications, deposits, yield — compared however you like to look at them.",
-    source: "Your workspace · Tableau",
+    title: "The enrollment funnel",
+    blurb: "Offers, acceptances, deposits, and what share of each stage converts.",
+    source: "Offers, payments, and journeys in your Audentra database",
     icon: "◈",
     accent: "purple",
-    alwaysOn: false,
   },
   {
     id: "signals",
-    title: "What we spot overnight",
-    blurb: "Patterns worth a look, with what they might cost and what we'd do about it.",
-    source: "Audentra",
+    title: "What needs attention",
+    blurb: "The cohorts that are stuck, why they are stuck, and who owns the fix.",
+    source: "Requirements, documents, and aid records",
     icon: "✦",
     accent: "purple",
-    alwaysOn: false,
   },
   {
     id: "movements",
-    title: "What moved since yesterday",
-    blurb: "A short log of what actually changed while you were away.",
-    source: "Audentra",
+    title: "What changed overnight",
+    blurb: "Deposits, acceptances, uploads, and staff work recorded in the last 24 hours.",
+    source: "Canonical record timestamps",
     icon: "↻",
     accent: "navy",
-    alwaysOn: false,
   },
   {
-    id: "headlines",
-    title: "What the rest of higher ed is reading",
-    blurb: "Headlines and newsletters, filtered down to the ones that touch your work.",
-    source: "Publications and feeds you choose",
-    icon: "◎",
-    accent: "amber",
-    alwaysOn: false,
+    id: "deadlines",
+    title: "Deadlines ahead",
+    blurb: "Requirement due dates and offer response deadlines, with who they affect.",
+    source: "Requirement due dates and admission offers",
+    icon: "▦",
+    accent: "teal",
+  },
+  {
+    id: "requests",
+    title: "Student requests",
+    blurb: "The support conversations waiting on a reply from your team.",
+    source: "Student support conversations",
+    icon: "✉",
+    accent: "blue",
   },
 ];
 
@@ -151,9 +137,9 @@ export const BREW_DEPTH_OPTIONS: BrewDepthOption[] = [
   {
     id: "deep",
     title: "Give me everything",
-    description: "All of it, plus the drivers and segments behind each number.",
-    readTime: "about 7 minutes",
-    storyCount: 5,
+    description: "All of it, plus the cohorts and evidence behind each number.",
+    readTime: "about 6 minutes",
+    storyCount: 4,
   },
 ];
 
@@ -161,38 +147,37 @@ export const BREW_TONE_OPTIONS: BrewToneOption[] = [
   {
     id: "executive",
     title: "Straight to the point",
-    description: "Numbers first, short sentences, the decision up front.",
-    sample: "Deposit pace is 6.4% behind. $1.8M is exposed. Clear 312 aid-incomplete files.",
+    description: "The counted facts, in one line each.",
+    sample: "4 deposits posted in the last 24 hours.",
   },
   {
     id: "narrative",
-    title: "A bit more story",
-    description: "A little context on why the number moved and what it means.",
-    sample: "Commuter deposits slowed once the verification queue grew, putting about $1.8M at risk this month.",
+    title: "A bit more context",
+    description: "The same facts, with the cohort they describe spelled out.",
+    sample:
+      "4 deposits posted in the last 24 hours, taking the deposited group to 9 of 11 accepted students.",
   },
 ];
 
-export const BREW_INBOX_DEPTHS: { id: BrewInboxDepthId; title: string; caption: string }[] = [
+export const BREW_REQUEST_DEPTHS: {
+  id: BrewRequestDepthId;
+  title: string;
+  caption: string;
+}[] = [
   { id: "urgent", title: "Only what's urgent", caption: "The two or three that can't wait" },
-  { id: "handful", title: "A short list", caption: "Roughly four, ranked" },
-  { id: "everything", title: "Everything worth a look", caption: "All flagged messages" },
+  { id: "handful", title: "A short list", caption: "Roughly four, longest wait first" },
+  { id: "everything", title: "Everything open", caption: "All active conversations" },
 ];
 
-export const BREW_INSIGHT_DETAILS: { id: BrewInsightDetailId; title: string; caption: string }[] = [
+export const BREW_INSIGHT_DETAILS: {
+  id: BrewInsightDetailId;
+  title: string;
+  caption: string;
+}[] = [
   { id: "headline", title: "Just the headline", caption: "What we found, one line" },
-  { id: "impact", title: "With the likely impact", caption: "Plus what it could cost" },
-  { id: "full", title: "The full reasoning", caption: "Impact and what we'd do next" },
+  { id: "impact", title: "With the affected cohort", caption: "Plus how many students" },
+  { id: "full", title: "The full reasoning", caption: "Cohort and what we'd do next" },
 ];
-
-/** Publications and feeds the reader can pick from on the last screen. */
-export const BREW_READING_SOURCES = [
-  { id: "Inside Higher Ed", label: "Inside Higher Ed", kind: "Publication" },
-  { id: "The Chronicle", label: "The Chronicle", kind: "Publication" },
-  { id: "Higher Ed Dive", label: "Higher Ed Dive", kind: "Publication" },
-  { id: "EAB", label: "EAB Research", kind: "Newsletter" },
-  { id: "NASFAA", label: "NASFAA Today", kind: "Newsletter" },
-  { id: "Federal Register", label: "Federal Register", kind: "Policy feed" },
-] as const;
 
 export const BREW_DELIVERY_TIMES: { id: BrewDeliveryTime; label: string; caption: string }[] = [
   { id: "06:00", label: "6:00 AM", caption: "Before the commute" },
@@ -201,32 +186,33 @@ export const BREW_DELIVERY_TIMES: { id: BrewDeliveryTime; label: string; caption
   { id: "07:30", label: "7:30 AM", caption: "Just before stand-up" },
 ];
 
+/**
+ * Fallback comparison windows. The live list comes from the API, which only
+ * declares windows it can actually reconstruct — there is no week, month, or
+ * year here because the platform keeps no end-of-period snapshot.
+ */
 export const BREW_TIMEFRAMES: { id: BrewTimeframeId; label: string; short: string }[] = [
-  { id: "yesterday", label: "Yesterday", short: "1D" },
-  { id: "week", label: "This week", short: "1W" },
-  { id: "month", label: "This month", short: "1M" },
-  { id: "year", label: "vs Last year", short: "1Y" },
+  { id: "now", label: "Now", short: "NOW" },
+  { id: "day", label: "Last 24 hours", short: "24H" },
 ];
 
 /* ----------------------------------------------------------------- defaults */
 
-export const DEFAULT_BREW_TOPICS: BrewTopicId[] = BREW_TOPICS.filter((topic) => topic.recommended).map(
-  (topic) => topic.id,
-);
+export const DEFAULT_BREW_TOPICS: BrewTopicId[] = BREW_TOPICS.filter(
+  (topic) => topic.recommended,
+).map((topic) => topic.id);
 
 export const DEFAULT_BREW_INCLUDES: Record<BrewIncludeId, boolean> = {
-  inbox: true,
-  calendar: true,
+  requests: true,
+  deadlines: true,
   numbers: true,
   signals: true,
   movements: true,
-  headlines: true,
 };
-
-export const DEFAULT_READING_SOURCES: string[] = BREW_READING_SOURCES.map((source) => source.id);
 
 export const BREW_INCLUDE_IDS: BrewIncludeId[] = BREW_INCLUDES.map((include) => include.id);
 export const BREW_TOPIC_IDS: BrewTopicId[] = BREW_TOPICS.map((topic) => topic.id);
 
 export const topicById = (id: BrewTopicId) => BREW_TOPICS.find((topic) => topic.id === id);
-export const includeById = (id: BrewIncludeId) => BREW_INCLUDES.find((include) => include.id === id);
+export const includeById = (id: BrewIncludeId) =>
+  BREW_INCLUDES.find((include) => include.id === id);

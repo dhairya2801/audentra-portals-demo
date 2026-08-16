@@ -1,20 +1,18 @@
 import {
   BREW_INCLUDE_IDS,
-  BREW_READING_SOURCES,
   BREW_TOPIC_IDS,
   DEFAULT_BREW_INCLUDES,
   DEFAULT_BREW_TOPICS,
-  DEFAULT_READING_SOURCES,
 } from "./catalog";
 import type {
   BrewDeliveryTime,
   BrewDepthId,
   BrewIncludeId,
-  BrewInboxDepthId,
   BrewInsightDetailId,
   BrewPreferences,
-  BrewTopicId,
+  BrewRequestDepthId,
   BrewToneId,
+  BrewTopicId,
 } from "./types";
 
 export interface BrewPreferenceStore {
@@ -23,20 +21,25 @@ export interface BrewPreferenceStore {
   clear(scope: string): void;
 }
 
-const STORAGE_PREFIX = "audentra:morning-brew:v4";
-/** Earlier shapes: v3 kept separate connector/section maps, v1–v2 broad topics. */
+const STORAGE_PREFIX = "audentra:morning-brew:v5";
+/**
+ * Earlier shapes. v4 offered inbox/calendar/news sections that were backed by
+ * synthetic content; those slots now carry canonical student requests and
+ * deadlines, so a returning reader is walked back through setup rather than
+ * silently re-subscribed to something different.
+ */
 const LEGACY_PREFIXES = [
+  "audentra:morning-brew:v4",
   "audentra:morning-brew:v3",
   "audentra:morning-brew:v2",
   "audentra:morning-brew:v1",
 ];
 
 const TOPIC_IDS = new Set<string>(BREW_TOPIC_IDS);
-const SOURCE_IDS = new Set<string>(BREW_READING_SOURCES.map((source) => source.id));
 const DEPTHS = new Set<string>(["headlines", "balanced", "deep"]);
 const TONES = new Set<string>(["executive", "narrative"]);
 const TIMES = new Set<string>(["06:00", "06:30", "07:00", "07:30"]);
-const INBOX_DEPTHS = new Set<string>(["urgent", "handful", "everything"]);
+const REQUEST_DEPTHS = new Set<string>(["urgent", "handful", "everything"]);
 const INSIGHT_DETAILS = new Set<string>(["headline", "impact", "full"]);
 
 export const DEFAULT_BREW_PREFERENCES: Omit<BrewPreferences, "version" | "updatedAt"> = {
@@ -45,17 +48,17 @@ export const DEFAULT_BREW_PREFERENCES: Omit<BrewPreferences, "version" | "update
   depth: "balanced",
   tone: "executive",
   deliveryTime: "07:00",
-  inboxDepth: "handful",
-  draftReplies: true,
-  calendarPrep: true,
+  requestDepth: "handful",
+  deadlineNextStep: true,
   insightDetail: "full",
-  readingSources: DEFAULT_READING_SOURCES,
   onboardingComplete: false,
 };
 
 function normalizeTopics(value: unknown): BrewTopicId[] {
   if (!Array.isArray(value)) return [...DEFAULT_BREW_TOPICS];
-  const topics = value.filter((item): item is BrewTopicId => typeof item === "string" && TOPIC_IDS.has(item));
+  const topics = value.filter(
+    (item): item is BrewTopicId => typeof item === "string" && TOPIC_IDS.has(item),
+  );
   return topics.length ? [...new Set(topics)] : [...DEFAULT_BREW_TOPICS];
 }
 
@@ -69,15 +72,9 @@ function normalizeInclude(value: unknown): Record<BrewIncludeId, boolean> {
   ) as Record<BrewIncludeId, boolean>;
 }
 
-function normalizeSources(value: unknown): string[] {
-  if (!Array.isArray(value)) return [...DEFAULT_READING_SOURCES];
-  const sources = value.filter((item): item is string => typeof item === "string" && SOURCE_IDS.has(item));
-  return sources.length ? [...new Set(sources)] : [...DEFAULT_READING_SOURCES];
-}
-
 function normalize(value: Partial<BrewPreferences>): BrewPreferences {
   return {
-    version: 4,
+    version: 5,
     topics: normalizeTopics(value.topics),
     include: normalizeInclude(value.include),
     depth: DEPTHS.has(String(value.depth)) ? (value.depth as BrewDepthId) : "balanced",
@@ -85,22 +82,20 @@ function normalize(value: Partial<BrewPreferences>): BrewPreferences {
     deliveryTime: TIMES.has(String(value.deliveryTime))
       ? (value.deliveryTime as BrewDeliveryTime)
       : "07:00",
-    inboxDepth: INBOX_DEPTHS.has(String(value.inboxDepth))
-      ? (value.inboxDepth as BrewInboxDepthId)
+    requestDepth: REQUEST_DEPTHS.has(String(value.requestDepth))
+      ? (value.requestDepth as BrewRequestDepthId)
       : "handful",
-    draftReplies: value.draftReplies !== false,
-    calendarPrep: value.calendarPrep !== false,
+    deadlineNextStep: value.deadlineNextStep !== false,
     insightDetail: INSIGHT_DETAILS.has(String(value.insightDetail))
       ? (value.insightDetail as BrewInsightDetailId)
       : "full",
-    readingSources: normalizeSources(value.readingSources),
     onboardingComplete: value.onboardingComplete === true,
     updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : new Date().toISOString(),
   };
 }
 
 /**
- * Carry a returning reader's shape forward where we can, then send them back
+ * Carry a returning reader's topics forward where we can, then send them back
  * through setup so they can answer the questions this version adds.
  */
 function migrateLegacy(scope: string): BrewPreferences | null {
@@ -112,20 +107,35 @@ function migrateLegacy(scope: string): BrewPreferences | null {
         topics?: string[];
         teams?: string[];
         interests?: string[];
+        include?: Record<string, boolean>;
         connectors?: Record<string, boolean>;
         sections?: Record<string, boolean>;
         depth?: string;
         tone?: string;
         deliveryTime?: string;
       };
-      const previous = new Set([...(legacy.topics ?? []), ...(legacy.teams ?? []), ...(legacy.interests ?? [])]);
+      const previous = new Set([
+        ...(legacy.topics ?? []),
+        ...(legacy.teams ?? []),
+        ...(legacy.interests ?? []),
+      ]);
       const topics: BrewTopicId[] = [];
-      if (previous.has("financial_aid") || previous.has("financial_health")) topics.push("financial_aid");
-      if (previous.has("admissions") || previous.has("enrollment_admissions") || previous.has("enrollment"))
+      if (previous.has("financial_aid") || previous.has("financial_health"))
+        topics.push("financial_aid");
+      if (
+        previous.has("admissions") ||
+        previous.has("enrollment_admissions") ||
+        previous.has("enrollment")
+      )
         topics.push("admissions");
-      if (previous.has("student_success") || previous.has("student_operations")) topics.push("student_success");
+      if (previous.has("student_success") || previous.has("student_operations"))
+        topics.push("student_success");
       if (previous.has("housing")) topics.push("housing");
-      if (previous.has("registrar") || previous.has("academics") || previous.has("executive_performance"))
+      if (
+        previous.has("registrar") ||
+        previous.has("academics") ||
+        previous.has("executive_performance")
+      )
         topics.push("registrar");
       if (!topics.length) continue;
 
@@ -133,12 +143,14 @@ function migrateLegacy(scope: string): BrewPreferences | null {
         ...DEFAULT_BREW_PREFERENCES,
         topics,
         include: {
-          inbox: legacy.connectors?.outlook ?? true,
-          calendar: legacy.connectors?.calendar ?? true,
-          numbers: legacy.sections?.pulse ?? true,
-          signals: legacy.sections?.insights ?? true,
-          movements: legacy.sections?.changes ?? true,
-          headlines: legacy.sections?.news ?? true,
+          // The old inbox and calendar switches described connectors that never
+          // existed. Their nearest honest successors are the canonical student
+          // request and deadline sections, so the intent carries over.
+          requests: legacy.include?.inbox ?? legacy.connectors?.outlook ?? true,
+          deadlines: legacy.include?.calendar ?? legacy.connectors?.calendar ?? true,
+          numbers: legacy.include?.numbers ?? legacy.sections?.pulse ?? true,
+          signals: legacy.include?.signals ?? legacy.sections?.insights ?? true,
+          movements: legacy.include?.movements ?? legacy.sections?.changes ?? true,
         },
         depth: legacy.depth as BrewDepthId | undefined,
         tone: legacy.tone as BrewToneId | undefined,
@@ -158,7 +170,7 @@ export const browserBrewPreferenceStore: BrewPreferenceStore = {
       const raw = window.localStorage.getItem(`${STORAGE_PREFIX}:${scope}`);
       if (!raw) return migrateLegacy(scope);
       const value = JSON.parse(raw) as Partial<BrewPreferences>;
-      if (value.version !== 4) return migrateLegacy(scope);
+      if (value.version !== 5) return migrateLegacy(scope);
       return normalize(value);
     } catch {
       return null;

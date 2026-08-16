@@ -1184,41 +1184,61 @@ test("staff authentication forms survive ambient focus refreshes", async () => {
   );
 });
 
-test("Morning Brew is a personalized, persisted staff workspace briefing", async () => {
-  const [portal, onboarding, dashboard, edward, data, preferences, styles] = await Promise.all([
-    readFile(new URL("../app/staff/staff-portal.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/staff/morning-brew/onboarding.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/staff/morning-brew/dashboard.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/staff/morning-brew/edward-panel.tsx", import.meta.url), "utf8"),
-    readFile(
-      new URL("../app/staff/morning-brew/data.ts", import.meta.url),
-      "utf8",
-    ),
-    readFile(
-      new URL("../app/staff/morning-brew/preferences.ts", import.meta.url),
-      "utf8",
-    ),
-    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
-  ]);
+test("Morning Brew renders a canonical briefing, not a synthetic one", async () => {
+  const [portal, container, onboarding, dashboard, edward, data, preferences, styles] =
+    await Promise.all([
+      readFile(new URL("../app/staff/staff-portal.tsx", import.meta.url), "utf8"),
+      readFile(
+        new URL("../app/staff/morning-brew/morning-brew.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(new URL("../app/staff/morning-brew/onboarding.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/staff/morning-brew/dashboard.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/staff/morning-brew/edward-panel.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/staff/morning-brew/data.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/staff/morning-brew/preferences.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    ]);
 
   assert.match(portal, /id: "morning_brew", label: "Morning Brew"/);
   assert.match(portal, /<MorningBrewView workspace={workspace} navigate={navigate}/);
+
+  // The briefing is its own canonical read with its own failure state, never a
+  // derivation of the workspace payload.
+  assert.match(container, /getStaffMorningBrew/);
+  assert.match(container, /Today&rsquo;s briefing could not be assembled/);
+
   assert.match(onboarding, /What do you want to catch up on each morning\?/);
   assert.match(onboarding, /What should we bring you\?/);
   assert.match(onboarding, /how do you like it\?/);
   assert.match(dashboard, /Customize your Morning Brew/);
   assert.match(dashboard, /Since yesterday/);
-  assert.match(dashboard, /Ask for insights/);
-  assert.match(dashboard, /Live workspace/);
-  assert.match(edward, /Briefing context attached/);
-  assert.match(data, /synthetic draft for the demo/);
+  assert.match(dashboard, /What needs attention/);
+  assert.match(dashboard, /count of canonical records/);
+  assert.match(edward, /askStaffEdward/);
   assert.match(data, /buildBrewBriefing/);
-  assert.match(data, /Live-workspace substitutions/);
+  assert.match(preferences, /audentra:morning-brew:v5/);
   assert.match(preferences, /audentra:morning-brew:v2/);
   assert.match(preferences, /LEGACY_PREFIXES/);
   assert.match(preferences, /BrewPreferenceStore/);
   assert.match(styles, /\.brew-setup/);
   assert.match(styles, /@media \(max-width: 520px\)/);
+
+  // Guard the whole surface against the synthetic corpus coming back: no
+  // fabricated dollar impact, no confidence score, no external news, and no
+  // preview-workspace risk band.
+  const surface = [container, onboarding, dashboard, edward, data].join("\n");
+  for (const forbidden of [
+    /Confidence: /,
+    /meltLikelihoodPercent/,
+    /recoveryLikelihoodPercent/,
+    /risk\.band/,
+    /Higher Ed News/,
+    /Outlook/,
+    /\$\d+(\.\d+)?M/,
+  ]) {
+    assert.doesNotMatch(surface, forbidden, `Morning Brew must not contain ${forbidden}`);
+  }
 });
 
 test("coordinates recoverable server state and composes the dashboard calendar", async () => {

@@ -72,6 +72,7 @@ import type {
   StaffKnowledgeCard,
   StaffManagedConfiguration,
   StaffManagedConfigurationKind,
+  StaffMorningBrew,
   StaffNotificationList,
   StaffNotificationReadResult,
   StaffOperationsWorkspace,
@@ -661,6 +662,20 @@ export function getStaffWorkItemDetail(
 
 export function getStaffOperationsWorkspace(signal?: AbortSignal) {
   return request<StaffOperationsWorkspace>("/v1/staff/workspace", {
+    method: "GET",
+    headers: staffHeaders,
+    signal,
+  });
+}
+
+/**
+ * The Morning Brew briefing. Kept separate from the workspace read because the
+ * briefing is an aggregate over the whole tenant, not the staff member's own
+ * queue, and because it must be able to fail on its own without taking the
+ * workspace shell down with it.
+ */
+export function getStaffMorningBrew(signal?: AbortSignal) {
+  return request<StaffMorningBrew>("/v1/staff/morning-brew", {
     method: "GET",
     headers: staffHeaders,
     signal,
