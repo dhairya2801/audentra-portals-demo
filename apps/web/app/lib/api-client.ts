@@ -252,6 +252,41 @@ export function signOutStudent() {
   );
 }
 
+export interface DemoAuthSession {
+  authenticated: true;
+  mode: "demo";
+  actorType: "student";
+  student: {
+    id: string;
+    preferredName: string;
+    externalRef: string | null;
+  };
+  notice: string;
+}
+
+/**
+ * Opens a named demo student's portal.
+ *
+ * Development and preview only: the platform returns 404 for this route in
+ * production, and rejects any reference that does not resolve inside the
+ * requested tenant. Signing in reads that student's stored state — it never
+ * resets it.
+ */
+export function signInDemoStudent(input: { studentRef: string }) {
+  return request<DemoAuthSession>("/v1/auth/demo/sign-in-as", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function signOutDemoStudent() {
+  return request<{ authenticated: false; mode: "demo" }>(
+    "/v1/auth/demo/sign-out",
+    { method: "POST" },
+  );
+}
+
 export function getStudentDashboard(signal?: AbortSignal) {
   return request<StudentDashboard>("/v1/student/dashboard", {
     method: "GET",
