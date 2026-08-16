@@ -128,7 +128,7 @@ export default function MessagesPage() {
       active="messages"
       eyebrow="Student inbox"
       title="Messages"
-      description="Official updates and guidance from your Aster enrollment team."
+      description="Official updates and guidance from your {institution} enrollment team."
     >
       {messages.status === "loading" ? (
         <LoadingState label="Loading your messages" />

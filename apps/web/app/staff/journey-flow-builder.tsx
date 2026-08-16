@@ -8,7 +8,6 @@ import type {
   StaffJourneyBlueprintItem,
   StaffManagedConfiguration,
 } from "@vv/contracts";
-import { dump, load } from "js-yaml";
 import {
   type DragEvent as ReactDragEvent,
   type FormEvent,
@@ -138,11 +137,11 @@ const taskTypeOptions: Array<{
 ];
 
 function editableDocument(configuration: StaffManagedConfiguration) {
-  const document = load(configuration.yaml);
+  const document = configuration.document;
   if (!document || typeof document !== "object" || Array.isArray(document)) {
     throw new Error("The journey configuration is not an editable document.");
   }
-  return structuredClone(document as ManagedDocument);
+  return structuredClone(document);
 }
 
 function flowRecords(document: ManagedDocument) {
@@ -155,17 +154,6 @@ function flowRecords(document: ManagedDocument) {
 function taskRecords(flow: ManagedRecord) {
   if (!Array.isArray(flow.tasks)) flow.tasks = [];
   return flow.tasks as ManagedRecord[];
-}
-
-function yamlFor(document: ManagedDocument) {
-  return dump(document, {
-    lineWidth: 100,
-    // The FastAPI side uses PyYAML's YAML 1.1-compatible loader. Keep js-yaml's
-    // compatibility quoting so string choices such as "yes" and "no" do not
-    // arrive as booleans.
-    noCompatMode: false,
-    noRefs: true,
-  });
 }
 
 function stringList(value: unknown) {
@@ -1707,7 +1695,7 @@ function JourneyTaskEditor({
 
       const updatedConfiguration = await action.run("journeys", {
         expectedVersion: configuration.version,
-        yaml: yamlFor(document),
+        document,
         changeSummary: isNew
           ? `Added journey step ${title}.`
           : `Updated journey step ${item.title}.`,
@@ -1764,7 +1752,7 @@ function JourneyTaskEditor({
       task.input = input;
       const updatedConfiguration = await action.run("journeys", {
         expectedVersion: configuration.version,
-        yaml: yamlFor(document),
+        document,
         changeSummary: `Updated onboarding screen ${item.title}.`,
       });
       onConfigurationSaved(updatedConfiguration);
@@ -1809,7 +1797,7 @@ function JourneyTaskEditor({
       }
       const updatedConfiguration = await action.run("journeys", {
         expectedVersion: configuration.version,
-        yaml: yamlFor(document),
+        document,
         changeSummary: `Deleted journey step ${item.title}.`,
       });
       onConfigurationSaved(updatedConfiguration);
@@ -2732,7 +2720,7 @@ export function JourneyFlowBuilder({
   const publish = async (document: ManagedDocument, changeSummary: string) => {
     const updatedConfiguration = await action.run("journeys", {
       expectedVersion: workingConfigurationRef.current.version,
-      yaml: yamlFor(document),
+      document,
       changeSummary,
     });
     acceptPublishedConfiguration(updatedConfiguration);

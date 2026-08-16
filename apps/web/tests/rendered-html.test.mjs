@@ -26,7 +26,7 @@ async function render(path = "/") {
   );
 }
 
-test("server-renders the branded, accessible portal selector", async () => {
+test("server-renders the neutral, accessible institution portal selector", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
@@ -34,14 +34,14 @@ test("server-renders the branded, accessible portal selector", async () => {
   const html = await response.text();
   assert.match(html, /<title>Audentra \| Institutional intelligence for what’s next<\/title>/i);
   assert.match(html, /Institutional intelligence/);
+  assert.match(html, /Institution portal ID/);
   assert.match(html, /Student portal/);
   assert.match(html, /Staff portal/);
-  assert.match(html, /href="\/aster\/sign-in"/);
-  assert.match(html, /href="\/aster\/staff"/);
+  assert.doesNotMatch(html, /href="\/(?:aster|harvard)\//);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
 });
 
-test("all student portal routes render and the dynamic requirement route resolves", async () => {
+test("unscoped portal routes fail closed without a configured tenant", async () => {
   const routes = [
     "/sign-in",
     "/onboarding",
@@ -61,7 +61,8 @@ test("all student portal routes render and the dynamic requirement route resolve
     const response = await render(route);
     assert.equal(response.status, 200, `${route} should render`);
     const html = await response.text();
-    assert.match(html, /Aster University|Aster/);
+    assert.match(html, /Choose your institution from the portal entry page/);
+    assert.doesNotMatch(html, /Aster University|Harvard University/);
     assert.doesNotMatch(
       html,
       /<h1[^>]*>\s*404\s*<\/h1>|\bPage not found\b/i,
@@ -69,15 +70,14 @@ test("all student portal routes render and the dynamic requirement route resolve
   }
 
   const signInResponse = await render("/sign-in");
-  const signInHtml = await signInResponse.text();
-  assert.match(signInHtml, /Sign in/);
-  assert.match(signInHtml, /Create account/);
-  assert.match(signInHtml, /Email address/);
-  assert.doesNotMatch(signInHtml, /demo student/i);
+  assert.match(
+    await signInResponse.text(),
+    /We couldn’t open this institution portal/,
+  );
 });
 
 test("tenant routes render and preserve tenant-aware internal destinations", async () => {
-  for (const tenant of ["aster", "harvard"]) {
+  for (const tenant of ["aster", "northbridge-college"]) {
     for (const route of [
       `/${tenant}/sign-in`,
       `/${tenant}/onboarding`,
@@ -110,17 +110,213 @@ test("tenant routes render and preserve tenant-aware internal destinations", asy
 
   assert.equal(tenant.tenantHref("/dashboard", "aster"), "/aster/dashboard");
   assert.equal(
-    tenant.tenantHref("/campus-life?view=clubs#featured", "harvard"),
-    "/harvard/campus-life?view=clubs#featured",
+    tenant.tenantHref("/campus-life?view=clubs#featured", "northbridge-college"),
+    "/northbridge-college/campus-life?view=clubs#featured",
   );
   assert.equal(
-    tenant.tenantHref("/offer", "harvard"),
-    "/harvard/onboarding",
+    tenant.tenantHref("/offer", "northbridge-college"),
+    "/northbridge-college/onboarding",
+  );
+  assert.equal(tenant.isTenantSlug("northbridge-college"), true);
+  assert.equal(tenant.isTenantSlug("not/a/slug"), false);
+  assert.equal(tenant.isTenantSlug("northbridge-"), false);
+  for (const reserved of ["sign-in", "staff", "offer", "v1", "health"]) {
+    assert.equal(tenant.isTenantSlug(reserved), false, `${reserved} is reserved`);
+  }
+  assert.equal(
+    tenant.tenantSlugFromPathname("/northbridge-college/dashboard"),
+    "northbridge-college",
   );
   assert.equal(
-    tenant.tenantCopy("Your place at Aster University", tenant.tenantConfigs.harvard),
-    "Your place at Harvard University",
+    tenant.tenantSlugFromPathname("/sign-in"),
+    tenant.defaultTenantSlug,
   );
+  assert.equal(
+    tenant.tenantCopy(
+      "Your place at {institutionName}",
+      tenant.tenantConfigFromBootstrap({
+        tenantId: "tenant-1",
+        slug: "northbridge-college",
+        version: 1,
+        names: {
+          displayName: "Northbridge College",
+          legalName: "Northbridge College",
+          shortName: "Northbridge",
+        },
+        branding: {
+          logoUrl: "/logo.svg",
+          logoAlt: "Northbridge College",
+          logoDarkUrl: null,
+          logoDarkAlt: null,
+          faviconUrl: null,
+          heroImageUrl: null,
+          heroImageAlt: null,
+          primaryColor: "#123456",
+          secondaryColor: "#f7f7f7",
+          accentColor: "#abcdef",
+        },
+        localization: {
+          locale: "en-GB",
+          timeZone: "Europe/London",
+          currencyCode: "GBP",
+          countryCode: "GB",
+        },
+        academicContext: {
+          academicYearLabel: "2027–28",
+          currentTermLabel: "Autumn 2027",
+          defaultCampusName: null,
+        },
+        contacts: {
+          support: { label: "Support", email: null, phone: null, hours: null, url: null },
+          admissions: null,
+          financialAid: null,
+        },
+        capabilities: {},
+        publicLinks: {},
+        updatedAt: "2027-01-01T00:00:00Z",
+      }),
+    ),
+    "Your place at Northbridge College",
+  );
+});
+
+test("tenant runtime gates pages on the public bootstrap and keeps managed CRUD document-first", async () => {
+  const [provider, apiClient, requirement, staffPortal, journeyBuilder] =
+    await Promise.all([
+      readFile(
+        new URL("../app/components/tenant-provider.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
+      readFile(
+        new URL(
+          "../app/enrollment/requirements/[slug]/page.tsx",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL("../app/staff/staff-portal.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../app/staff/journey-flow-builder.tsx", import.meta.url),
+        "utf8",
+      ),
+    ]);
+
+  assert.match(apiClient, /\/v1\/tenants\/\$\{encodeURIComponent\(slug\)\}\/bootstrap/);
+  assert.match(provider, /getTenantBootstrap\(slug, controller\.signal\)/);
+  assert.match(provider, /runtime\.status !== "ready"/);
+  assert.match(provider, /children[\s\S]*TenantContext\.Provider/);
+  assert.match(provider, /runtime\.reload/);
+  assert.match(provider, /We couldn’t open this institution portal/);
+
+  assert.match(requirement, /plan\.residences\.map/);
+  assert.match(requirement, /persistedPlan\?\.residences\.find/);
+  assert.doesNotMatch(requirement, /const residenceOptions/);
+  assert.doesNotMatch(requirement, /studentId\.slice\(-4\) : "\d+"/);
+  assert.doesNotMatch(requirement, /Incoming class\s*[·-]\s*20\d\d/);
+  assert.match(requirement, /tenant\.academicContext\.academicYearLabel/);
+
+  for (const source of [staffPortal, journeyBuilder]) {
+    assert.match(source, /configuration\.document/);
+    assert.match(source, /document,/);
+    assert.doesNotMatch(source, /from "js-yaml"/);
+    assert.doesNotMatch(source, /configuration\.yaml/);
+  }
+});
+
+test("tenant routing, links, branding, and capabilities fail closed", async () => {
+  const [tenant, provider, shell, help, signIn, profile, onboarding, edward] =
+    await Promise.all([
+      readFile(new URL("../app/lib/tenant.ts", import.meta.url), "utf8"),
+      readFile(
+        new URL("../app/components/tenant-provider.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../app/components/portal-shell.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(new URL("../app/help/page.tsx", import.meta.url), "utf8"),
+      readFile(
+        new URL("../app/sign-in/sign-in-client.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(new URL("../app/profile/page.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/onboarding/page.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/edward/page.tsx", import.meta.url), "utf8"),
+    ]);
+
+  assert.match(tenant, /export const defaultTenantSlug:[\s\S]*?: null;/);
+  assert.doesNotMatch(tenant, /defaultTenantSlug[\s\S]{0,180}: "aster"/);
+  assert.match(tenant, /!portalRouteSegments\.has\(value\)/);
+  assert.match(tenant, /"offer"/);
+  assert.match(tenant, /"v1"/);
+  assert.match(tenant, /"health"/);
+  assert.match(provider, /if \(isUnscopedLanding \|\| !slug\) return;/);
+  assert.match(provider, /Choose your institution from the portal entry page/);
+  assert.match(provider, /querySelector<HTMLLinkElement>\(faviconSelector\)\?\.remove\(\)/);
+
+  assert.match(shell, /tenant\.capabilities\.campusLife !== false/);
+  assert.match(shell, /tenant\.capabilities\.assistant !== false/);
+  assert.match(shell, /tenant\.publicLinks\.privacy/);
+  assert.match(shell, /tenant\.publicLinks\.accessibility/);
+  assert.match(shell, /tenant\.publicLinks\.institution/);
+  assert.match(shell, /tenantRuntime\.href\(advisorContact\.url\)/);
+  assert.match(help, /tenantRuntime\.href\(support\.url\)/);
+  assert.match(signIn, /tenantRuntime\.href\(support\.url\)/);
+  assert.match(profile, /tenantRuntime\.href\(tenant\.contacts\.support\.url\)/);
+  assert.match(onboarding, /tenantRuntime\.href\(admissionsContact\.url\)/);
+  assert.match(edward, /tenant\.capabilities\.assistant === false/);
+});
+
+test("student money and dates use tenant localization", async () => {
+  const [financials, payments, onboarding, appointments] = await Promise.all([
+    readFile(new URL("../app/financials/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/payments/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/onboarding/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/appointments/page.tsx", import.meta.url), "utf8"),
+  ]);
+
+  for (const source of [financials, payments, onboarding, appointments]) {
+    assert.match(source, /formatTenantDate/);
+    assert.match(source, /useTenant/);
+    assert.doesNotMatch(source, /Intl\.DateTimeFormat\("en-US"/);
+    assert.doesNotMatch(source, /timeZone:\s*"UTC"/);
+  }
+  for (const source of [financials, payments, onboarding]) {
+    assert.match(source, /formatTenantMoney/);
+    assert.doesNotMatch(source, /currency:\s*"USD"/);
+  }
+});
+
+test("tenant regressions fail closed for legal documents, stale drafts, and staff branding", async () => {
+  const [onboarding, staffPortal, styles] = await Promise.all([
+    readFile(new URL("../app/onboarding/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/staff/staff-portal.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(
+    onboarding,
+    /tenantSlug === "harvard" \|\| tenantSlug === "aster" \? tenantSlug : null/,
+  );
+  assert.match(onboarding, /if \(!assetPrefix\) return \[\]/);
+  assert.match(onboarding, /Signing documents are not configured for this institution/);
+  assert.doesNotMatch(onboarding, /tenantSlug === "harvard" \? "harvard" : "aster"/);
+
+  assert.match(staffPortal, /setDraftVersion\(draft\.expectedVersion\)/);
+  assert.match(staffPortal, /expectedVersion: draftVersion/);
+  assert.doesNotMatch(
+    staffPortal,
+    /expectedVersion: configuration\.version,[\s\S]{0,180}document: draftDocument/,
+  );
+
+  assert.match(styles, /--staff-tenant-accent: var\(--tenant-primary/);
+  assert.match(styles, /--staff-tenant-accent-contrast: var\(--tenant-secondary/);
+  assert.doesNotMatch(styles, /\[data-tenant="harvard"\]\s+\.staff-shell--workspace/);
 });
 
 test("removes the disposable starter preview", async () => {
@@ -188,7 +384,8 @@ test("keeps housing and deposit actions inside their enrollment tasks", async ()
     "utf8",
   );
 
-  assert.match(requirementPage, /aster-residence-hall-room\.jpg/);
+  assert.match(requirementPage, /plan\.residences\.map/);
+  assert.doesNotMatch(requirementPage, /aster-residence-hall-room\.jpg/);
   assert.match(requirementPage, /onHousingPreviewChange/);
   assert.match(requirementPage, /name="roommateMatching"/);
   assert.match(requirementPage, /name="knownRoommateName"/);
@@ -586,7 +783,7 @@ test("typed client wires every resource route and mutation contract", async () =
     });
     await client.updateStaffManagedConfiguration("journeys", {
       expectedVersion: 1,
-      yaml: "schema_version: 1\nconfiguration: journeys\nflows: []\n",
+      document: { schema_version: 1, configuration: "journeys", flows: [] },
       changeSummary: "Test request",
     });
     await client.draftStaffConfigurationWithEdward({
@@ -1456,7 +1653,7 @@ test("DSM feedback surfaces remain connected to portal data and safe fallbacks",
   assert.match(edward, /webkitSpeechRecognition/);
   assert.match(edward, /speechSynthesis\.speak/);
   assert.match(edward, /Microphone access was blocked/);
-  assert.match(shell, /tenant\.admissionsEmail/);
+  assert.match(shell, /tenant\.contacts\.admissions/);
   assert.match(enrollment, /OptionalSupportChecklist/);
   assert.match(enrollment, /<StudentCalendar/);
   assert.match(enrollment, /title="Enrollment deadlines"/);
@@ -1746,7 +1943,9 @@ test("staff journeys share a typed, accessible flow builder", async () => {
   assert.match(builder, /\+ Add step/);
   assert.match(builder, /createJourneyTaskId\(kind, ids\)/);
   assert.match(builder, /createJourneyFlowId\(/);
-  assert.match(builder, /noCompatMode: false/);
+  assert.match(builder, /const document = configuration\.document/);
+  assert.match(builder, /document,\s*changeSummary/);
+  assert.doesNotMatch(builder, /from "js-yaml"/);
   assert.match(builder, /workingConfigurationRef = useRef\(configuration\)/);
   assert.match(
     builder,

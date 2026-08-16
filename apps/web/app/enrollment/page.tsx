@@ -390,7 +390,7 @@ export default function EnrollmentPage() {
       active="enrollment"
       eyebrow="Enrollment center"
       title="Your requirements"
-      description="Everything needed to secure your place at Aster, organized in one clear path."
+      description="Everything needed to secure your place at {institution}, organized in one clear path."
     >
       {enrollment.status === "loading" ? (
         <LoadingState label="Loading your enrollment requirements" />

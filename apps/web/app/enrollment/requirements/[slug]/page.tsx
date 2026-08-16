@@ -60,6 +60,12 @@ import {
   reconcileDocumentExtractionProjection,
   type DocumentExtractionProjectionState,
 } from "../../../lib/document-extraction-ui";
+import { useTenant } from "../../../components/tenant-provider";
+import {
+  formatTenantDate,
+  formatTenantMoney,
+  type TenantConfig,
+} from "../../../lib/tenant";
 
 type RequirementKind =
   | "profile"
@@ -88,7 +94,7 @@ const housingChoices: Array<{
     value: "on_campus",
     icon: "⌂",
     title: "On campus",
-    description: "Live in an Aster residence community.",
+    description: "Live in an {institution} residence community.",
   },
   {
     value: "off_campus",
@@ -113,44 +119,6 @@ const housingChoices: Array<{
     icon: "⌂",
     title: "Family or dependent housing",
     description: "Connect with family-friendly housing guidance.",
-  },
-];
-
-const residenceOptions: Array<{
-  value: ResidenceOption;
-  title: string;
-  subtitle: string;
-  description: string;
-  amenities: string[];
-  image: string;
-  imageAlt: string;
-}> = [
-  {
-    value: "aster_residence_hall",
-    title: "Aster Residence Hall",
-    subtitle: "Classic campus living",
-    description: "A lively, central home minutes from classes and campus dining.",
-    amenities: ["Dining hall", "High-speed Wi-Fi", "Study lounges"],
-    image: "/media/housing/aster-residence-hall-room.jpg",
-    imageAlt: "Bright shared room with two beds, wardrobes, and a window desk",
-  },
-  {
-    value: "aster_apartments",
-    title: "Aster Apartments",
-    subtitle: "Independent living",
-    description: "Apartment-style rooms with more privacy and in-unit routines.",
-    amenities: ["In-unit laundry", "Kitchenette", "Fitness room"],
-    image: "/media/housing/aster-apartments-room.jpg",
-    imageAlt: "Bright furnished apartment with a kitchenette and living area",
-  },
-  {
-    value: "student_village",
-    title: "Student Village",
-    subtitle: "A connected community",
-    description: "Shared suites surrounded by green space and resident events.",
-    amenities: ["Community kitchen", "Courtyard", "Bike storage"],
-    image: "/media/housing/student-village-room.jpg",
-    imageAlt: "Shared student room with bunk beds and large windows",
   },
 ];
 
@@ -213,21 +181,13 @@ function humanize(value: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function formatDueDate(value: string | null) {
+function formatDueDate(value: string | null, tenant: TenantConfig) {
   if (!value) return "No due date";
-  return new Intl.DateTimeFormat("en-US", {
+  return formatTenantDate(value, tenant, {
     month: "long",
     day: "numeric",
     year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(value));
-}
-
-function formatMoney(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(cents / 100);
+  });
 }
 
 function initials(value: string | null | undefined) {
@@ -282,6 +242,7 @@ function ProfileActionForm({
   profile: StudentProfile;
   onSaved: (profile: StudentProfile) => void;
 }) {
+  const { tenant } = useTenant();
   const [preferredName, setPreferredName] = useState(profile.preferredName);
   const [pronouns, setPronouns] = useState(profile.pronouns || "");
   const [mobilePhone, setMobilePhone] = useState(profile.mobilePhone || "");
@@ -320,7 +281,7 @@ function ProfileActionForm({
       <div className="requirement-action-intro">
         <span aria-hidden="true">✓</span>
         <div>
-          <strong>Confirm the information Aster can update here.</strong>
+          <strong>Confirm the information {tenant.shortName} can update here.</strong>
           <p>
             Legal identity and academic records remain protected; your preferred
             details and contact choices are yours to manage.
@@ -424,6 +385,7 @@ function HousingActionForm({
   onSaved: (plan: StudentHousingPlan) => void;
   onPreviewChange: (selection: HousingPreviewSelection) => void;
 }) {
+  const tenantRuntime = useTenant();
   const expandedPlan = plan as ExpandedStudentHousingPlan;
   const [preference, setPreference] = useState<HousingPreference | null>(
     plan.preference,
@@ -583,7 +545,7 @@ function HousingActionForm({
                   {choice.icon}
                 </span>
                 <strong>{choice.title}</strong>
-                <small>{choice.description}</small>
+                <small>{tenantRuntime.copy(choice.description)}</small>
               </label>
             );
           })}
@@ -614,7 +576,7 @@ function HousingActionForm({
             </p>
           )}
           <div className="residence-option-grid">
-            {residenceOptions.map((option) => {
+            {plan.residences.map((option) => {
               const selected = residenceOption === option.value;
               return (
                 <label
@@ -636,15 +598,15 @@ function HousingActionForm({
                   />
                   <Image
                     className="residence-option__photo"
-                    src={option.image}
+                    src={option.imageUrl}
                     alt={option.imageAlt}
                     height={220}
                     unoptimized
                     width={320}
                   />
                   <span className="residence-option__content">
-                    <strong>{option.title}</strong>
-                    <small>{option.subtitle}</small>
+                    <strong>{option.name}</strong>
+                    {option.attribution ? <small>{option.attribution}</small> : null}
                     <em>{option.description}</em>
                     <span className="residence-option__amenities">
                       {option.amenities.map((amenity) => (
@@ -1146,6 +1108,7 @@ function DocumentAction({
 }
 
 function IdentityPreview() {
+  const { tenant } = useTenant();
   const loadIdentityPreview = useCallback(
     async (signal: AbortSignal) => {
       const [profile, documents] = await Promise.all([
@@ -1169,7 +1132,7 @@ function IdentityPreview() {
             ),
         )
       : null;
-  const maskedId = student?.studentId ? student.studentId.slice(-4) : "4821";
+  const maskedId = student?.studentId ? student.studentId.slice(-4) : null;
 
   return (
     <section className="requirement-preview requirement-preview--identity">
@@ -1179,8 +1142,8 @@ function IdentityPreview() {
       </div>
       <div className="student-id-card" aria-label="Student ID preview">
         <div className="student-id-card__brand">
-          <span>A</span>
-          <strong>Aster University</strong>
+          <span>{tenant.mark}</span>
+          <strong>{tenant.name}</strong>
         </div>
         <div className="student-id-card__body">
           <span className="student-id-card__avatar">
@@ -1199,11 +1162,15 @@ function IdentityPreview() {
           <div>
             <small>Student</small>
             <strong>{student?.preferredName || "Your name"}</strong>
-            <span>Incoming class · 2027</span>
+            <span>
+              {tenant.academicContext.academicYearLabel ||
+                tenant.academicContext.currentTermLabel ||
+                "Student record"}
+            </span>
           </div>
         </div>
         <div className="student-id-card__footer">
-          <span>ASTER ID •••• {maskedId}</span>
+          <span>{maskedId ? `STUDENT ID •••• ${maskedId}` : "STUDENT ID · Pending"}</span>
           <span>STUDENT</span>
         </div>
       </div>
@@ -1223,6 +1190,7 @@ function TranscriptPreview({
   document: StudentDocument | null;
   refreshKey: number;
 }) {
+  const { tenant } = useTenant();
   const loadAcademics = useCallback(
     (signal: AbortSignal) => getStudentAcademics(signal),
     [],
@@ -1276,7 +1244,7 @@ function TranscriptPreview({
             </div>
             <b aria-hidden="true">→</b>
             <div>
-              <small>Aster equivalent</small>
+              <small>{tenant.shortName} equivalent</small>
               <strong>{leadingRecommendation.targetCourseCode}</strong>
               <span>{leadingRecommendation.targetCourseTitle}</span>
             </div>
@@ -1296,7 +1264,7 @@ function TranscriptPreview({
           </span>
           <strong>
             {academics.status === "loading"
-              ? `Checking ${courses.length} ${courses.length === 1 ? "course" : "courses"} against Aster rules`
+              ? `Checking ${courses.length} ${courses.length === 1 ? "course" : "courses"} against ${tenant.shortName} rules`
               : extraction?.courseExemptionEvaluation
                 ? "No policy-backed equivalency matched yet"
                 : "Course mapping needs advisor review"}
@@ -1317,7 +1285,7 @@ function TranscriptPreview({
         <div className="transcript-preview__paper">
           <div className="transcript-preview__paper-heading">
             <span>Academic record</span>
-            <b>ASTER</b>
+            <b>{tenant.mark}</b>
           </div>
           <div className="transcript-preview__lines" aria-hidden="true">
             <span />
@@ -1461,7 +1429,7 @@ function HousingPreview({
   const housing = useApiResource(loadHousing);
   const persistedPlan = housing.status === "ready" ? housing.data : null;
   const plan = selection ?? persistedPlan;
-  const selected = residenceOptions.find(
+  const selected = persistedPlan?.residences.find(
     (option) => option.value === plan?.residenceOption,
   );
   const preferenceLabel = plan?.preference
@@ -1474,25 +1442,21 @@ function HousingPreview({
         <span>Your housing snapshot</span>
         <span aria-hidden="true">⌂</span>
       </div>
-      <Image
-        className="housing-preview__photo"
-        height={420}
-        src={
-          selected?.image ??
-          (plan?.preference === "off_campus"
-            ? "/media/housing/aster-apartments-room.jpg"
-            : "/media/housing/aster-residence-hall-room.jpg")
-        }
-        alt={
-          selected?.imageAlt ??
-          (plan?.preference === "off_campus"
-            ? "Sample independent apartment living space"
-            : "Sample Aster campus residence")
-        }
-        unoptimized
-        width={960}
-      />
-      <strong>{selected?.title || preferenceLabel}</strong>
+      {selected ? (
+        <Image
+          className="housing-preview__photo"
+          height={420}
+          src={selected.imageUrl}
+          alt={selected.imageAlt}
+          unoptimized
+          width={960}
+        />
+      ) : (
+        <div className="housing-preview__photo housing-preview__photo--empty" aria-hidden="true">
+          <span>⌂</span>
+        </div>
+      )}
+      <strong>{selected?.name || preferenceLabel}</strong>
       <p>
         {selected
           ? selected.description
@@ -1514,6 +1478,7 @@ function HousingPreview({
 }
 
 function GeneralPreview({ requirement }: { requirement: StudentRequirementDetail }) {
+  const { tenant } = useTenant();
   const isComplete = ["completed", "waived", "not_applicable"].includes(
     requirement.status,
   );
@@ -1534,7 +1499,7 @@ function GeneralPreview({ requirement }: { requirement: StudentRequirementDetail
       <p>
         {isComplete
           ? "You can return here at any time to review this completed enrollment task."
-          : "Complete this step and Aster will refresh the next eligible tasks in your enrollment path."}
+          : `Complete this step and ${tenant.shortName} will refresh the next eligible tasks in your enrollment path.`}
       </p>
     </section>
   );
@@ -1552,6 +1517,7 @@ function DepositPaymentAction({
   dueAt: string | null;
   onPaid: () => void;
 }) {
+  const { tenant } = useTenant();
   const loadDeposit = useCallback(
     async (signal: AbortSignal): Promise<DepositWorkspaceData> => {
       const [dashboard, payments] = await Promise.all([
@@ -1616,19 +1582,19 @@ function DepositPaymentAction({
       <dl className="deposit-inline-card__summary">
         <div>
           <dt>Deposit amount</dt>
-          <dd>{formatMoney(deposit.data.dashboard.offer.depositAmountCents)}</dd>
+          <dd>{formatTenantMoney(deposit.data.dashboard.offer.depositAmountCents, tenant)}</dd>
           <small>Applied to first-semester tuition and fees.</small>
         </div>
         <div>
           <dt>Payment deadline</dt>
-          <dd>{formatDueDate(dueAt)}</dd>
+          <dd>{formatDueDate(dueAt, tenant)}</dd>
           <small>Your enrollment checklist updates immediately.</small>
         </div>
       </dl>
       <div className="deposit-inline-card__about">
         <strong>About this step</strong>
         <p>
-          The deposit confirms your intent to attend Aster and unlocks housing
+          The deposit confirms your intent to attend {tenant.shortName} and unlocks housing
           assignment and course-registration preparation.
         </p>
       </div>
@@ -1661,7 +1627,7 @@ function DepositPaymentAction({
             ? "Processing deposit…"
             : pay.status === "error"
               ? "Retry deposit payment"
-              : `Pay ${formatMoney(deposit.data.dashboard.offer.depositAmountCents)} deposit`}
+              : `Pay ${formatTenantMoney(deposit.data.dashboard.offer.depositAmountCents, tenant)} deposit`}
         </button>
       )}
     </section>
@@ -1721,6 +1687,7 @@ function RequirementAction({
   onHousingPreviewChange?: (selection: HousingPreviewSelection) => void;
   prerequisite?: Pick<StudentRequirementDetail, "slug" | "title"> | null;
 }) {
+  const { tenant } = useTenant();
   if (requirement.status === "blocked") {
     return (
       <div className="requirement-next-action" role="status">
@@ -1819,7 +1786,7 @@ function RequirementAction({
     <div className="requirement-next-action">
       <span aria-hidden="true">?</span>
       <div>
-        <strong>This step needs assistance from Aster.</strong>
+        <strong>This step needs assistance from {tenant.shortName}.</strong>
         <p>
           Your enrollment advisor can explain the next action and record any
           required exception.
@@ -1833,6 +1800,7 @@ function RequirementAction({
 }
 
 export default function RequirementDetailPage() {
+  const { tenant } = useTenant();
   const params = useParams<{ slug: string | string[] }>();
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
   const [helpState, setHelpState] = useState({
@@ -1893,7 +1861,7 @@ export default function RequirementDetailPage() {
   const pageDescription =
     kind === "transcript"
       ? "Upload your transcript to discover potential course exemptions and unlock AI-powered course and career planning."
-      : "Complete this step here. Your enrollment record will update as soon as Aster receives the change.";
+      : `Complete this step here. Your enrollment record will update as soon as ${tenant.shortName} receives the change.`;
   const relatedRequirements = requirements.status === "ready"
     ? requirements.data.items
     : [];
@@ -1996,7 +1964,7 @@ export default function RequirementDetailPage() {
             ) : (
               <section className="requirement-context-card">
                 <p className="eyebrow">Why we ask</p>
-                <h2>One protected step toward your place at Aster.</h2>
+                <h2>One protected step toward your place at {tenant.shortName}.</h2>
                 <p>
                   {requirement.data.responsibleOffice} confirms this information
                   before it becomes part of your enrollment record.
@@ -2008,7 +1976,7 @@ export default function RequirementDetailPage() {
                   </div>
                   <div>
                     <dt>Due</dt>
-                    <dd>{formatDueDate(requirement.data.dueAt)}</dd>
+                    <dd>{formatDueDate(requirement.data.dueAt, tenant)}</dd>
                   </div>
                   <div>
                     <dt>Task progress</dt>

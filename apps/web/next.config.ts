@@ -16,6 +16,13 @@ const nextConfig: NextConfig = {
   // can receive non-JSON process output in workspace builds on Vercel.
   experimental: {
     useTypeScriptCli: false,
+    // Vinext inspects multipart POSTs as possible progressive Server Actions
+    // before applying external rewrites. Keep that transport ceiling above the
+    // platform's 10 MiB per-document contract so the API, rather than the
+    // portal proxy, remains authoritative for upload validation.
+    serverActions: {
+      bodySizeLimit: "12mb",
+    },
   },
   async rewrites() {
     if (!apiProxyOrigin) return [];

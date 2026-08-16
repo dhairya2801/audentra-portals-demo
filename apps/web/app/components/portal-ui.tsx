@@ -1,11 +1,24 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Image from "next/image";
+import { useTenant } from "./tenant-provider";
 
 export function PortalMark() {
+  const { tenant } = useTenant();
   return (
     <span className="portal-mark" aria-hidden="true">
-      A
+      {tenant.branding.logoUrl ? (
+        <Image
+          src={tenant.branding.logoUrl}
+          alt=""
+          height={64}
+          unoptimized
+          width={64}
+        />
+      ) : (
+        tenant.mark
+      )}
     </span>
   );
 }

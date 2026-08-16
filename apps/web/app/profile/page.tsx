@@ -227,7 +227,17 @@ function ProfileForm({
             These fields are student-controlled. Changes to legal identity or
             academic records require support from the registrar.
           </p>
-          <a href={`mailto:${tenant.registrarEmail}`}>Contact the registrar</a>
+          {tenant.contacts.support.email || tenant.contacts.support.url ? (
+            <a
+              href={
+                tenant.contacts.support.url
+                  ? tenantRuntime.href(tenant.contacts.support.url)
+                  : `mailto:${tenant.contacts.support.email}`
+              }
+            >
+              Contact {tenant.contacts.support.label.toLowerCase()}
+            </a>
+          ) : null}
         </div>
         <PageCard title="Record details">
           <dl className="stacked-details">

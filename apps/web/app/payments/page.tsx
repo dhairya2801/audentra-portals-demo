@@ -20,18 +20,12 @@ import {
   getStudentPayments,
 } from "../lib/api-client";
 import { useTenant } from "../components/tenant-provider";
+import { formatTenantDate, formatTenantMoney } from "../lib/tenant";
 
 type PaymentPageData = {
   payments: StudentPaymentList;
   dashboard: StudentDashboard;
 };
-
-function formatMoney(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(cents / 100);
-}
 
 function PaymentWorkspace({
   data,
@@ -41,6 +35,7 @@ function PaymentWorkspace({
   reload: () => void;
 }) {
   const { tenant } = useTenant();
+  const formatMoney = (cents: number) => formatTenantMoney(cents, tenant);
   const intentKey = useRef<string | null>(null);
   const payDepositAction = useCallback(
     (offerId: string, key: string) =>
@@ -92,9 +87,9 @@ function PaymentWorkspace({
                 <div>
                   <dt>Paid</dt>
                   <dd>
-                    {new Intl.DateTimeFormat("en-US", {
+                    {formatTenantDate(successfulDeposit.createdAt, tenant, {
                       dateStyle: "long",
-                    }).format(new Date(successfulDeposit.createdAt))}
+                    })}
                   </dd>
                 </div>
                 <div>

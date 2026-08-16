@@ -23,6 +23,7 @@ import {
   createStudentInquiryMessage,
   getStudentHelp,
 } from "../lib/api-client";
+import { useTenant } from "../components/tenant-provider";
 
 const categoryLabels = {
   all: "All topics",
@@ -189,6 +190,9 @@ function InquiryThread({
 }
 
 function HelpPageContent() {
+  const tenantRuntime = useTenant();
+  const { tenant } = tenantRuntime;
+  const support = tenant.contacts.support;
   const [category, setCategory] = useState<HelpCategory>("all");
   const searchParams = useSearchParams();
   const selectedConversationId = searchParams.get("conversation");
@@ -219,10 +223,10 @@ function HelpPageContent() {
       active="help"
       eyebrow="Student support"
       title="How can we help?"
-      description="Plain-language answers and human support for every part of your Aster journey."
+      description={`Plain-language answers and human support for every part of your ${tenant.shortName} journey.`}
     >
       {help.status === "loading" ? (
-        <LoadingState label="Loading Aster help" />
+        <LoadingState label={`Loading ${tenant.shortName} help`} />
       ) : help.status === "error" ? (
         <ErrorState message={help.error} onRetry={help.reload} />
       ) : (
@@ -245,7 +249,7 @@ function HelpPageContent() {
             {articles.length === 0 ? (
               <EmptyState
                 title="No articles in this topic"
-                description="Choose another topic or contact the Aster support team."
+                description={`Choose another topic or contact ${support.label}.`}
               />
             ) : (
               <div className="faq-list">
@@ -279,28 +283,38 @@ function HelpPageContent() {
           <aside className="resource-aside">
             <StudentInquiryForm onSent={help.refresh} />
             <div className="support-card">
-              <span className="support-card__mark" aria-hidden="true">A</span>
+              <span className="support-card__mark" aria-hidden="true">{tenant.mark}</span>
               <p className="eyebrow">Talk with a person</p>
               <h2>Student support</h2>
-              <p>{help.data.support.hours}</p>
-              <a
-                className="button button--light"
-                href={`mailto:${help.data.support.email}`}
-              >
-                Email support
-              </a>
-              <a href={`tel:${help.data.support.phone.replace(/[^\d+]/g, "")}`}>
-                {help.data.support.phone}
-              </a>
+              <p>{support.hours || help.data.support.hours}</p>
+              {support.email ? (
+                <a className="button button--light" href={`mailto:${support.email}`}>
+                  Email support
+                </a>
+              ) : support.url ? (
+                <a className="button button--light" href={tenantRuntime.href(support.url)}>Contact support</a>
+              ) : null}
+              {support.phone ? (
+                <a href={`tel:${support.phone.replace(/[^\d+]/g, "")}`}>
+                  {support.phone}
+                </a>
+              ) : null}
             </div>
             <PageCard title="More ways to connect">
               <nav className="aside-links" aria-label="Support options">
-                <a href={`mailto:${help.data.support.email}`}>
-                  {help.data.support.email} <span>→</span>
-                </a>
-                <a href={`tel:${help.data.support.phone.replace(/[^\d+]/g, "")}`}>
-                  Call student support <span>→</span>
-                </a>
+                {support.email ? (
+                  <a href={`mailto:${support.email}`}>
+                    {support.email} <span>→</span>
+                  </a>
+                ) : null}
+                {support.phone ? (
+                  <a href={`tel:${support.phone.replace(/[^\d+]/g, "")}`}>
+                    Call student support <span>→</span>
+                  </a>
+                ) : null}
+                {support.url && !support.email ? (
+                  <a href={tenantRuntime.href(support.url)}>{support.label} <span>→</span></a>
+                ) : null}
               </nav>
             </PageCard>
           </aside>
@@ -312,7 +326,7 @@ function HelpPageContent() {
 
 export default function HelpPage() {
   return (
-    <Suspense fallback={<LoadingState label="Loading Aster help" />}>
+    <Suspense fallback={<LoadingState label="Loading help" />}>
       <HelpPageContent />
     </Suspense>
   );
