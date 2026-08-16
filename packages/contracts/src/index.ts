@@ -1,5 +1,66 @@
 export type OfferStatus = "offered" | "accepted" | "declined" | "expired";
 
+export interface TenantContact {
+  label: string;
+  email: string | null;
+  phone: string | null;
+  hours: string | null;
+  url: string | null;
+}
+
+export interface TenantBootstrap {
+  tenantId: string;
+  slug: string;
+  version: number;
+  names: {
+    displayName: string;
+    legalName: string;
+    shortName: string;
+  };
+  branding: {
+    logoUrl: string;
+    logoAlt: string;
+    logoDarkUrl: string | null;
+    logoDarkAlt: string | null;
+    faviconUrl: string | null;
+    heroImageUrl: string | null;
+    heroImageAlt: string | null;
+    primaryColor: string;
+    secondaryColor: string;
+    accentColor: string;
+  };
+  localization: {
+    locale: string;
+    timeZone: string;
+    currencyCode: string;
+    countryCode: string;
+  };
+  academicContext: {
+    academicYearLabel: string;
+    currentTermLabel: string;
+    defaultCampusName: string | null;
+  };
+  contacts: {
+    support: TenantContact;
+    admissions: TenantContact | null;
+    financialAid: TenantContact | null;
+  };
+  capabilities: Record<string, boolean>;
+  publicLinks: Record<string, string>;
+  updatedAt: string;
+}
+
+export interface UpdateTenantPortalConfigurationRequest {
+  expectedVersion: number;
+  names?: TenantBootstrap["names"];
+  branding?: TenantBootstrap["branding"];
+  localization?: TenantBootstrap["localization"];
+  academicContext?: TenantBootstrap["academicContext"];
+  contacts?: TenantBootstrap["contacts"];
+  capabilities?: Record<string, boolean>;
+  publicLinks?: Record<string, string>;
+}
+
 export type RequirementStatus =
   | "not_applicable"
   | "blocked"
@@ -140,11 +201,8 @@ export type HousingPreference =
   | "commuting"
   | "undecided"
   | "family";
-export type HousingResidenceOption =
-  | "aster_residence_hall"
-  | "aster_apartments"
-  | "student_village"
-  | null;
+/** Tenant-owned residence code returned by the active housing inventory. */
+export type HousingResidenceOption = string | null;
 
 export interface OnboardingEmergencyContact {
   fullName: string;
@@ -1513,6 +1571,7 @@ export interface StaffManagedConfiguration {
   kind: StaffManagedConfigurationKind;
   fileName: string;
   version: number;
+  document: Record<string, unknown>;
   yaml: string;
   recordCount: number;
   updatedAt: string;
@@ -1522,7 +1581,9 @@ export interface StaffManagedConfiguration {
 
 export interface UpdateStaffManagedConfigurationInput {
   expectedVersion: number;
-  yaml: string;
+  document?: Record<string, unknown>;
+  /** Legacy import/audit compatibility. `document` is the canonical representation. */
+  yaml?: string;
   changeSummary?: string;
 }
 
@@ -1535,11 +1596,13 @@ export interface StaffEdwardConfigurationDraftInput {
 export interface StaffEdwardConfigurationDraft {
   kind: StaffManagedConfigurationKind;
   expectedVersion: number;
+  document: Record<string, unknown>;
   yaml: string;
   summary: string;
   changes: string[];
   warnings: string[];
   executionMode: "draft_requires_confirmation";
+  persisted: false;
 }
 
 export interface StaffCommunicationHistoryItem {
@@ -1616,7 +1679,7 @@ export interface StaffPersonalActionCenter {
 }
 
 export interface StaffCohortSeed {
-  synthetic: true;
+  synthetic: boolean;
   count: number;
   purpose: string;
   generatedAt: string;
@@ -1680,7 +1743,8 @@ export interface StaffOperationsWorkspace {
     inquiryReplies: true;
     externalOutreach: "simulation_only";
     staffEdward: "preview_only";
-    managedYaml: true;
+    managedYaml: "import_only";
+    managedDocument: true;
   };
   generatedAt: string;
 }
@@ -1978,32 +2042,29 @@ export interface AssistantConversationMessagesResponse {
 }
 
 /* ---------------------------------------------------------------------------
- * Staff Edward — the read-only staff assistant.
+ * Staff Edward — read-only staff assistant and its durable transcript.
  *
- * Staff turns reuse the student block family and add the `draft` block: a
- * proposed outbound message (email/SMS) that Edward writes but never sends.
- * The disclaimer travels with the block so no client can render a draft
- * without it.
+ * Tenant, staff member, and student referent identities are intentionally
+ * absent from the request. The API binds staff/tenant identity from the
+ * authenticated session and resolves student referents server-side.
  * ------------------------------------------------------------------------- */
 
 export interface StaffAssistantDraftBlock {
   type: "draft";
   fallbackText: string;
-  channel: string;
+  channel: "email" | "sms";
   subject?: string;
   body: string;
   disclaimer: string;
 }
 
-export type StaffAssistantResponseBlock =
-  | AssistantResponseBlock
-  | StaffAssistantDraftBlock;
+export type StaffAssistantResponseBlock = AssistantResponseBlock | StaffAssistantDraftBlock;
 
 export interface AskStaffEdwardInput {
   message: string;
-  /** Omitted for a stateless turn; created via the conversations endpoint. */
+  /** Omit for a stateless turn or when `clientMessageId` should create the conversation. */
   conversationId?: string;
-  /** Client-generated id so a retried send never duplicates a message. */
+  /** Staff-scoped replay key; retries return the exact stored exchange. */
   clientMessageId?: string;
 }
 
@@ -2012,27 +2073,53 @@ export interface StaffAssistantResolvedStudent {
   name: string;
 }
 
+export interface StaffAssistantContextReceipt {
+  source: string;
+}
+
 export interface AskStaffEdwardResponse {
   message: string;
   blocks?: StaffAssistantResponseBlock[];
-  provider: string;
+  provider: AskEdwardResponse["provider"];
   model: string | null;
   usage: AskEdwardResponse["usage"];
-  contextReceipts: { source: string }[];
-  /** The student this turn was grounded in, when Edward resolved one. */
-  resolvedStudent: StaffAssistantResolvedStudent | null;
+  contextReceipts: StaffAssistantContextReceipt[];
+  /** Present on student-grounded turns; omitted by pre-pipeline safety replies. */
+  resolvedStudent?: StaffAssistantResolvedStudent | null;
   requestId: string;
-  /** Present when the platform persisted this exchange to a conversation. */
+  /** Present when the platform persisted this exchange. */
   conversationId?: string;
   userMessageId?: string;
   assistantMessageId?: string;
 }
 
+export interface StaffAssistantConversationMessage {
+  id: string;
+  conversationId: string;
+  role: AssistantMessageRole;
+  content: string;
+  clientMessageId: string | null;
+  requestId: string | null;
+  provider: AskEdwardResponse["provider"] | null;
+  model: string | null;
+  usage: AskEdwardResponse["usage"];
+  blocks: StaffAssistantResponseBlock[] | null;
+  contextReceipts: StaffAssistantContextReceipt[];
+  referencedStudentId: string | null;
+  createdAt: string;
+}
+
 export interface StaffAssistantConversation {
   id: string;
   status: AssistantConversationStatus;
-  messages: unknown[];
+  messages: StaffAssistantConversationMessage[];
   createdAt: string;
+}
+
+export interface StaffAssistantConversationMessagesResponse {
+  conversationId: string;
+  activeStudentId: string | null;
+  messages: StaffAssistantConversationMessage[];
 }
 
 export interface CreateAssistantVoiceSessionInput {
