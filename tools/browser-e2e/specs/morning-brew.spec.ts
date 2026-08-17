@@ -2,9 +2,9 @@ import { expect, test } from "@playwright/test";
 import { signInDemoStaff } from "../support/demo-session";
 
 // Staff portal + Morning Brew journey against the live platform: sign in,
-// complete the first-use setup, and confirm the briefing and the rest of the
-// workspace stay healthy. Requires E2E_STAFF_PASSWORD like the other staff
-// journeys.
+// complete the first-use setup, and confirm the briefing renders from the
+// canonical `/v1/staff/morning-brew` read. Requires E2E_STAFF_PASSWORD like the
+// other staff journeys.
 test("staff portal serves Morning Brew alongside the workspace", async ({
   page,
 }) => {
@@ -36,8 +36,13 @@ test("staff portal serves Morning Brew alongside the workspace", async ({
     await expect(briefing.first()).toBeVisible();
   }
 
-  // The briefing must show live-workspace substitutions, not an error state.
+  // The briefing must render canonical content, not an error state and not the
+  // retired synthetic corpus.
   await expect(page.locator(".staff-shell--workspace")).toBeVisible();
+  await expect(page.locator(".brew-unavailable")).toHaveCount(0);
+  await expect(page.getByText(/count of canonical records/)).toBeVisible();
+  await expect(page.getByText(/Higher Ed News/)).toHaveCount(0);
+  await expect(page.getByText(/Confidence:/)).toHaveCount(0);
 
   // Other staff views still respond after Morning Brew.
   await page

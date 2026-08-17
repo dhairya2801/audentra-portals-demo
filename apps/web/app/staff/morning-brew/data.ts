@@ -1,198 +1,351 @@
-import type { StaffOperationsWorkspace } from "@vv/contracts";
-import { BREW_DEPTH_OPTIONS } from "./catalog";
-import {
-  BREW_CHANGES,
-  BREW_EMAILS,
-  BREW_INSIGHTS,
-  BREW_KPIS,
-  BREW_MEETINGS,
-  BREW_NEWS,
-  BREW_PRIORITIES,
-  BREW_QUICK_LINKS,
-  attendeeAvatar,
-} from "./content";
+import type {
+  StaffBrewAttentionItem,
+  StaffBrewChange,
+  StaffBrewDeadline,
+  StaffBrewMetric,
+  StaffBrewPriority,
+  StaffBrewRequest,
+  StaffMorningBrew,
+} from "@vv/contracts";
+import { BREW_DEPTH_OPTIONS, BREW_TIMEFRAMES } from "./catalog";
 import type {
   BrewBriefing,
   BrewChange,
+  BrewDeadline,
   BrewInsight,
-  BrewNumberFormat,
+  BrewKpi,
+  BrewKpiFrame,
   BrewPreferences,
   BrewPriority,
-  EdwardAnswer,
-  EdwardRequest,
+  BrewQuickLink,
+  BrewRequest,
+  BrewTimeframeId,
+  BrewTopicId,
 } from "./types";
 
-export {
-  BREW_CHANGES,
-  BREW_EMAILS,
-  BREW_INSIGHTS,
-  BREW_KPIS,
-  BREW_MEETINGS,
-  BREW_NEWS,
-  BREW_PRIORITIES,
-  BREW_QUICK_LINKS,
-  attendeeAvatar,
-};
-
-/* ---------------------------------------------------------------- formatting */
+/**
+ * Turn the canonical briefing payload into the shape the page renders.
+ *
+ * This module does exactly two things: rename fields, and apply the reader's
+ * own filters and limits. It computes no metric, derives no severity, and
+ * writes no prose about the institution. That rule is why the frontend cannot
+ * quietly disagree with the API — there is nothing here to disagree with.
+ */
 
 const INT = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
-const ONE_DECIMAL = new Intl.NumberFormat("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const ONE_DECIMAL = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
 
 /** Formats a KPI value. Shared by the static card and the animated ticker. */
-export function formatBrewNumber(value: number, format: BrewNumberFormat): string {
-  switch (format) {
-    case "percent":
-      return `${ONE_DECIMAL.format(value)}%`;
-    case "currencyM":
-      return `$${ONE_DECIMAL.format(value)}M`;
-    case "currencyK":
-      return `$${INT.format(value)}K`;
-    default:
-      return INT.format(value);
-  }
+export function formatBrewNumber(value: number): string {
+  return INT.format(value);
 }
 
-/* ------------------------------------------------------------------- builder */
+export function formatBrewPercent(value: number): string {
+  return `${ONE_DECIMAL.format(value)}%`;
+}
+
+const CLOCK = new Intl.DateTimeFormat("en-US", {
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: "America/New_York",
+});
+
+const DAY = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  timeZone: "America/New_York",
+});
+
+/* ---------------------------------------------------------------- filtering */
 
 const depthOption = (preferences: BrewPreferences) =>
   BREW_DEPTH_OPTIONS.find((option) => option.id === preferences.depth) ?? BREW_DEPTH_OPTIONS[1];
 
 const readTimeFor = (preferences: BrewPreferences) =>
-  preferences.depth === "headlines" ? 2 : preferences.depth === "deep" ? 7 : 4;
+  preferences.depth === "headlines" ? 2 : preferences.depth === "deep" ? 6 : 4;
 
-const kpiLimit = (preferences: BrewPreferences) => (preferences.depth === "deep" ? 8 : 6);
+const kpiLimit = (preferences: BrewPreferences) => (preferences.depth === "deep" ? 12 : 6);
 const changeLimit = (preferences: BrewPreferences) =>
-  preferences.depth === "headlines" ? 4 : preferences.depth === "deep" ? 7 : 5;
+  preferences.depth === "headlines" ? 4 : preferences.depth === "deep" ? 12 : 6;
 const priorityLimit = (preferences: BrewPreferences) => (preferences.depth === "deep" ? 5 : 3);
-const newsLimit = (preferences: BrewPreferences) => (preferences.depth === "deep" ? 6 : 4);
-const meetingLimit = (preferences: BrewPreferences) => (preferences.depth === "headlines" ? 3 : 5);
+const deadlineLimit = (preferences: BrewPreferences) =>
+  preferences.depth === "headlines" ? 3 : 6;
 
-/** The reader's own answer about their inbox wins over the general length. */
-const emailLimit = (preferences: BrewPreferences) =>
-  preferences.inboxDepth === "urgent" ? 2 : preferences.inboxDepth === "everything" ? 5 : 4;
+/** The reader's own answer about their request list wins over the general length. */
+const requestLimit = (preferences: BrewPreferences) =>
+  preferences.requestDepth === "urgent" ? 2 : preferences.requestDepth === "everything" ? 12 : 4;
 
-function deckFor(preferences: BrewPreferences, urgent: number): string {
-  const time = preferences.deliveryTime === "06:00" ? "6:00" : preferences.deliveryTime.replace(/^0/, "");
-  if (preferences.tone === "narrative") {
-    return `Here is your enrollment executive morning brief as of today ${time} AM ET. ${
-      urgent > 3
-        ? "A few decisions today can protect this week's momentum."
-        : "Momentum is healthy — conversion still deserves the closest look."
-    }`;
-  }
-  return `Here is your enrollment executive morning brief as of today ${time} AM ET.`;
+/* ------------------------------------------------------------------ mapping */
+
+function frameFor(frame: StaffBrewMetric["frames"][number]): BrewKpiFrame {
+  return {
+    numeric: frame.value,
+    window: frame.window,
+    basisLabel: frame.basisLabel,
+    basisPercent: frame.basisPercent,
+    delta: frame.change ? frame.change.label : null,
+    direction: frame.change ? frame.change.direction : "flat",
+    favorable: frame.change ? frame.change.favorable : true,
+    comparison: frame.change ? frame.change.comparison : null,
+    note: frame.note,
+    unavailable: frame.unavailable,
+  };
+}
+
+function toKpi(metric: StaffBrewMetric): BrewKpi {
+  const frames = {} as Record<BrewTimeframeId, BrewKpiFrame>;
+  for (const frame of metric.frames) frames[frame.windowId] = frameFor(frame);
+  return {
+    id: metric.id,
+    topic: metric.topic,
+    label: metric.label,
+    icon: metric.icon,
+    source: metric.source,
+    cohort: metric.cohort,
+    frames,
+    detail: {
+      definition: metric.definition,
+      segments: metric.segments.map((segment) => ({
+        label: segment.label,
+        value: segment.value,
+        percent: segment.percent,
+      })),
+      notes: [
+        `Cohort: ${metric.cohort.clauses.join("; ") || "every student in this tenant"}.`,
+        "Counted from canonical PostgreSQL records at the time shown in the masthead.",
+      ],
+    },
+  };
+}
+
+function toInsight(item: StaffBrewAttentionItem): BrewInsight {
+  return {
+    id: item.id,
+    topic: item.topic,
+    label: item.label,
+    title: item.title,
+    severity: item.severity,
+    summary: item.summary,
+    scope: item.scope,
+    impactLabel: item.impactLabel,
+    impact: item.impact,
+    recommendedAction: item.recommendedAction,
+    impactLevel: item.priorityLevel,
+    destination: item.destination,
+    cohort: item.cohort,
+    detail: item.detail,
+  };
+}
+
+function toChange(change: StaffBrewChange): BrewChange {
+  return {
+    id: change.id,
+    topic: change.topic,
+    time: change.occurredAt ? CLOCK.format(new Date(change.occurredAt)) : "No activity",
+    title: change.title,
+    detail: change.detail,
+    tone: change.tone,
+    count: change.count,
+    metric: change.metric,
+    destination: change.destination,
+    basis: change.basis,
+    basisNote: change.basisNote,
+    exact: change.exact,
+  };
 }
 
 /**
- * Assembles today's briefing from the reader's preferences.
+ * Deadlines carry no topic of their own on the wire, so route them to the
+ * topic that owns the underlying requirement. An unknown code stays under
+ * student progress rather than being dropped — a deadline nobody claims is
+ * still a deadline.
+ */
+const DEADLINE_TOPICS: Record<string, BrewTopicId> = {
+  offer_response: "admissions",
+  enrollment_deposit: "admissions",
+  financial_aid_verification: "financial_aid",
+  fafsa_submission: "financial_aid",
+  official_transcript: "registrar",
+  identity_document: "registrar",
+  transcript_upload: "registrar",
+  housing_preference: "housing",
+  housing_contract: "housing",
+};
+
+const NEXT_STEP: Record<BrewDeadline["bucket"], string> = {
+  overdue: "Confirm whether the student or the university is holding this.",
+  today: "Clear it today or move the date deliberately.",
+  this_week: "Remind the affected students before the date passes.",
+  this_month: "Schedule the reminder so it does not arrive late.",
+};
+
+function toDeadline(deadline: StaffBrewDeadline): BrewDeadline {
+  const bucket = deadline.bucket;
+  return {
+    id: deadline.id,
+    topic: DEADLINE_TOPICS[deadline.code] ?? "student_success",
+    kind: deadline.kind,
+    kindLabel:
+      deadline.kind === "offer_response" ? "Admission offer response" : "Enrollment requirement",
+    code: deadline.code,
+    title: deadline.title,
+    detail: deadline.detail,
+    bucket,
+    dueLabel: DAY.format(new Date(deadline.dueAt)),
+    relativeLabel: deadline.relativeLabel,
+    students: deadline.students,
+    priority: deadline.priority,
+    nextStep: NEXT_STEP[bucket],
+    destination: deadline.destination,
+  };
+}
+
+const REQUEST_TOPICS: Record<string, BrewTopicId> = {
+  payments: "admissions",
+  documents: "registrar",
+  getting_started: "student_success",
+  support: "student_success",
+};
+
+function toRequest(request: StaffBrewRequest): BrewRequest {
+  return {
+    id: request.id,
+    topic: REQUEST_TOPICS[request.topicCode] ?? "student_success",
+    subject: request.subject,
+    summary: request.summary,
+    studentName: request.studentName,
+    programName: request.programName,
+    status: request.status,
+    priority: request.priority,
+    waitingLabel: request.waitingLabel,
+    assigneeName: request.assigneeName,
+    destination: request.destination,
+  };
+}
+
+function toPriority(priority: StaffBrewPriority): BrewPriority {
+  return {
+    id: priority.id,
+    topic: priority.topic,
+    title: priority.title,
+    level: priority.level,
+    detail: priority.detail,
+    icon: priority.icon,
+    linkLabel: priority.linkLabel,
+    destination: priority.destination,
+    breakdown: priority.breakdown,
+    steps: priority.steps,
+    window: priority.window,
+    count: priority.count,
+  };
+}
+
+export const BREW_QUICK_LINKS: BrewQuickLink[] = [
+  { id: "students", label: "Student roster", destination: "students" },
+  { id: "tasks", label: "Action Center", destination: "tasks" },
+  { id: "messages", label: "Messages", destination: "messages" },
+  { id: "edward", label: "Ask Edward", destination: "edward" },
+];
+
+/* ------------------------------------------------------------------- builder */
+
+function deckFor(preferences: BrewPreferences, brew: StaffMorningBrew): string {
+  if (preferences.tone === "narrative" && brew.synthesis.bullets.length) {
+    return `${brew.synthesis.headline} ${brew.synthesis.bullets[0]}`;
+  }
+  return brew.synthesis.headline;
+}
+
+/**
+ * Assemble today's briefing from the canonical payload and the reader's
+ * choices.
  *
- * Items tagged `workspace` are recomputed here against the live staff workspace
- * so the label on screen stays truthful; everything else is clearly modeled.
+ * Preferences only ever subtract. A section the reader switched off is empty;
+ * a topic they do not follow is filtered out; a shorter read is a shorter
+ * slice. Nothing here can add a value the API did not send.
  */
 export function buildBrewBriefing(
-  workspace: StaffOperationsWorkspace,
+  brew: StaffMorningBrew,
   preferences: BrewPreferences,
+  staffName: string,
 ): BrewBriefing {
-  const topics = new Set(preferences.topics);
-  const cohort = workspace.cohort;
-  const highRisk = cohort.filter((student) => student.risk.band === "high" || student.risk.band === "critical");
-  const recommendedToday = cohort.filter((student) => student.recommendedAction.recommendedToday);
-  const openTasks = workspace.actionCenter.items.filter((item) => item.status !== "done");
-  const urgentTasks = openTasks.filter((item) => item.priority === "urgent" || item.escalated);
+  const topics = new Set<BrewTopicId>(preferences.topics);
+  const { requests, deadlines, numbers, signals, movements } = preferences.include;
 
-  /* Live-workspace substitutions ------------------------------------------- */
+  const kpis = brew.metrics
+    .filter((metric) => topics.has(metric.topic))
+    .slice(0, kpiLimit(preferences))
+    .map(toKpi);
 
-  const insights: BrewInsight[] = BREW_INSIGHTS.filter((insight) => topics.has(insight.topic)).map(
-    (insight) => {
-      if (insight.id !== "verification-backlog") return insight;
-      const students = highRisk.slice(0, 3).map((student) => ({
-        name: student.name,
-        program: student.programName,
-        note: student.recommendedAction.recommendedToday
-          ? "Recommended for action today"
-          : `Risk signal: ${student.risk.category}`,
-        risk: (student.risk.band === "critical" ? "critical" : student.risk.band === "high" ? "high" : "medium") as
-          | "critical"
-          | "high"
-          | "medium",
-      }));
-      return students.length ? { ...insight, detail: { ...insight.detail, students } } : insight;
-    },
+  const insights = brew.attention
+    .filter((item) => topics.has(item.topic))
+    .slice(0, depthOption(preferences).storyCount)
+    .map(toInsight);
+
+  // Quiet classes stay in the payload but only surface at the deepest read;
+  // a rail of zeroes buries the one line that moved.
+  const changeItems = brew.changes.filter(
+    (change) => topics.has(change.topic) && (change.count > 0 || preferences.depth === "deep"),
   );
 
-  const changes: BrewChange[] = BREW_CHANGES.filter((change) => topics.has(change.topic)).map((change) => {
-    if (change.id !== "early-alerts") return change;
-    return {
-      ...change,
-      title: `${recommendedToday.length} intervention recommendation${recommendedToday.length === 1 ? "" : "s"} are ready`,
-      detail: `${highRisk.length} students in your workspace are high or critical risk with a clear next action.`,
-      metric: `${recommendedToday.length} ready`,
-    };
-  });
+  const deadlineItems = brew.deadlines
+    .map(toDeadline)
+    .filter((deadline) => topics.has(deadline.topic))
+    .slice(0, deadlineLimit(preferences));
 
-  const priorities: BrewPriority[] = BREW_PRIORITIES.filter((priority) => topics.has(priority.topic)).map(
-    (priority) => {
-      if (priority.id !== "verification-surge") return priority;
-      return {
-        ...priority,
-        breakdown: [
-          ...priority.breakdown,
-          { label: "Open staff work items", value: String(openTasks.length) },
-          { label: "Urgent or escalated", value: String(urgentTasks.length) },
-        ],
-      };
-    },
-  );
+  const requestItems = brew.requests.items
+    .map(toRequest)
+    .filter((request) => topics.has(request.topic) || request.priority === "urgent")
+    .slice(0, requestLimit(preferences));
 
-  /* Section assembly -------------------------------------------------------- */
+  const priorities = brew.priorities
+    .filter((priority) => topics.has(priority.topic))
+    .slice(0, priorityLimit(preferences))
+    .map(toPriority);
 
-  // Give every followed topic at least one tile before filling the board in
-  // editorial order, so a reader who only follows Housing still gets a pulse.
-  const eligibleKpis = BREW_KPIS.filter((kpi) => topics.has(kpi.topic));
-  const limit = kpiLimit(preferences);
-  const chosen = new Set(
-    preferences.topics
-      .map((topic) => eligibleKpis.find((kpi) => kpi.topic === topic))
-      .filter((kpi) => kpi !== undefined)
-      .slice(0, limit),
-  );
-  for (const kpi of eligibleKpis) {
-    if (chosen.size >= limit) break;
-    chosen.add(kpi);
-  }
-  const kpis = eligibleKpis.filter((kpi) => chosen.has(kpi));
+  const timeframes = (brew.windows.length ? brew.windows : BREW_TIMEFRAMES).map((window) => ({
+    id: window.id as BrewTimeframeId,
+    label: window.label,
+    short: window.short,
+  }));
 
-  // Reading choices from the last setup screen narrow the headline feed.
-  const readingSources = new Set(preferences.readingSources);
-  const news = BREW_NEWS.filter(
-    (item) => item.topics.some((topic) => topics.has(topic)) && readingSources.has(item.sourceName),
-  );
-  const emails = BREW_EMAILS.filter((email) => topics.has(email.topic) || email.priority === "high");
-
-  const { inbox, calendar, numbers, signals, movements, headlines } = preferences.include;
-  const meetings = calendar ? BREW_MEETINGS.slice(0, meetingLimit(preferences)) : [];
+  // Headcounts, not a sum over deadline rows: a student with four overdue
+  // requirements is one person to chase, and summing the rows would print a
+  // number larger than the roster.
+  const overdue = brew.population.cohorts.overdue ?? 0;
+  const thisWeek = brew.population.cohorts.due_soon ?? 0;
 
   return {
-    greetingName: workspace.currentStaff.name.split(" ")[0] || "there",
-    deck: deckFor(preferences, urgentTasks.length),
+    greetingName: staffName.split(" ")[0] || "there",
+    deck: deckFor(preferences, brew),
+    bullets: signals ? brew.synthesis.bullets : [],
     readTimeMinutes: readTimeFor(preferences),
-    updatedAt: workspace.generatedAt,
+    updatedAt: brew.generatedAt,
+    windowLabel: brew.window.label,
     deliveryLabel: preferences.deliveryTime.replace(/^0/, ""),
-    insights: signals ? insights.slice(0, depthOption(preferences).storyCount) : [],
+    students: brew.population.students,
+    timeframes,
+    insights: signals ? insights : [],
     kpis: numbers ? kpis : [],
-    changes: movements ? changes.slice(0, changeLimit(preferences)) : [],
-    meetings,
-    emails: inbox ? emails.slice(0, emailLimit(preferences)) : [],
-    priorities: signals ? priorities.slice(0, priorityLimit(preferences)) : [],
-    news: headlines ? news.slice(0, newsLimit(preferences)) : [],
+    changes: movements ? changeItems.slice(0, changeLimit(preferences)).map(toChange) : [],
+    deadlines: deadlines ? deadlineItems : [],
+    requests: requests ? requestItems : [],
+    priorities: signals ? priorities : [],
     quickLinks: BREW_QUICK_LINKS,
-    inbox: {
-      unread: inbox ? 23 : 0,
-      highPriority: inbox ? emails.filter((email) => email.priority === "high").length : 0,
-      meetings: meetings.length,
-      meetingsHighPriority: meetings.filter((meeting) => meeting.priority === "high").length,
+    glance: {
+      requests: requests ? brew.requests.total : 0,
+      requestsAwaitingReply: requests ? brew.requests.awaitingFirstReply : 0,
+      deadlinesOverdue: deadlines ? overdue : 0,
+      deadlinesThisWeek: deadlines ? thisWeek : 0,
     },
+    coverage: {
+      notes: brew.coverage.notes,
+      unsupported: brew.coverage.unsupported,
+    },
+    engagementScanAvailable: brew.engagementScan.available,
   };
 }
 
@@ -200,192 +353,37 @@ export function buildBrewBriefing(
 
 export const EDWARD_SUGGESTIONS = [
   "What should I pay attention to today?",
-  "What are our biggest enrollment risks?",
-  "What changed since yesterday?",
-  "Summarize today's important emails.",
-  "How should I prepare for the 8:30 huddle?",
+  "Which deposited students have an overdue requirement?",
+  "Which accepted students have not paid their enrollment deposit?",
+  "What is blocking the most students right now?",
+  "Which students have a requirement due in the next 7 days?",
 ] as const;
 
-function summarize(briefing: BrewBriefing, context: string): EdwardAnswer {
-  const bullets = [
-    ...briefing.insights.slice(0, 2).map((insight) => `${insight.title} — ${insight.recommendedAction}`),
-    ...briefing.priorities.slice(0, 2).map((priority) => `${priority.title}: ${priority.detail}`),
-  ];
-  return {
-    question: `Summarize ${context.toLowerCase()}`,
-    answer: bullets.length
-      ? "Here is the short version of what is in front of you."
-      : "There is nothing material in that section today.",
-    bullets: bullets.slice(0, 4),
-    followUp: "If you only do one thing this morning, clear the aid files blocking commuter deposits.",
-  };
-}
-
-function insightsAnswer(briefing: BrewBriefing, context: string): EdwardAnswer {
-  const insight = briefing.insights[0];
-  if (!insight) {
-    return {
-      question: `What stands out in ${context.toLowerCase()}?`,
-      answer: "Nothing in that section crosses the threshold I would bring to you today.",
-      followUp: "Turn on more topics in Customize if you want a wider read.",
-    };
+/**
+ * The opening question for an Edward turn launched from a Morning Brew card.
+ *
+ * Every branch hands Edward a cohort question it can answer from canonical
+ * reads. The panel deliberately does not compose an answer itself: a second
+ * answering path beside the real assistant is exactly how a briefing starts
+ * quoting numbers nothing produced.
+ */
+export function edwardOpeningQuestion(
+  mode: "ask" | "summarize" | "insights" | "cohort",
+  context: string,
+  briefing: BrewBriefing,
+  question?: string,
+): string {
+  const trimmed = (question ?? "").trim();
+  if (trimmed) return trimmed;
+  if (mode === "cohort") return context;
+  if (mode === "insights") {
+    const first = briefing.insights[0];
+    return first
+      ? `${first.cohort.question} And what is the most common blocker among them?`
+      : "What should I pay attention to across the incoming class today?";
   }
-  return {
-    question: `What stands out in ${context.toLowerCase()}?`,
-    answer: `${insight.title}. ${insight.summary}`,
-    bullets: [
-      ...insight.detail.drivers.slice(0, 3).map((driver) => `${driver.label}: ${driver.value} — ${driver.note}`),
-      `Recommended: ${insight.recommendedAction}`,
-    ],
-    followUp: `Confidence is ${insight.confidence}%. ${insight.projection}`,
-  };
-}
-
-function draftReply(briefing: BrewBriefing, emailId?: string): EdwardAnswer {
-  const email = briefing.emails.find((item) => item.id === emailId) ?? briefing.emails[0];
-  if (!email) {
-    return {
-      question: "Draft a reply",
-      answer: "Outlook is not connected, so I do not have a message to reply to.",
-      followUp: "Turn on the Email connection in Customize to use drafting.",
-    };
+  if (mode === "summarize") {
+    return `Summarise ${context.toLowerCase()} for the incoming class, using canonical records only.`;
   }
-  return {
-    question: `Draft a reply to "${email.subject}"`,
-    answer: `Here is a draft answering ${email.senderRole.split(",")[0]} directly. I pulled the numbers from today's briefing — review before sending.`,
-    bullets: email.asks.map((ask) => `Addresses: ${ask}`),
-    draft: {
-      subject: email.suggestedReply.subject,
-      body: [
-        email.suggestedReply.greeting,
-        ...email.suggestedReply.body,
-        email.suggestedReply.signoff,
-      ],
-    },
-    followUp: "This is a synthetic draft for the demo. Nothing is sent and no mailbox is contacted.",
-  };
-}
-
-function prepAnswer(briefing: BrewBriefing, context: string): EdwardAnswer {
-  const meeting = briefing.meetings[0];
-  if (!meeting) {
-    return {
-      question: `Prepare me for ${context.toLowerCase()}`,
-      answer: "Your calendar is not connected, so I cannot see today's agenda.",
-      followUp: "Turn on the Calendar connection in Customize.",
-    };
-  }
-  return {
-    question: `How should I prepare for ${meeting.title}?`,
-    answer: `${meeting.time} · ${meeting.duration} · organized by ${meeting.organizer}. Here is what matters.`,
-    bullets: [...meeting.prep, ...meeting.agenda.slice(0, 2)],
-    followUp: "You own the verification staffing decision — everything else on that agenda is informational.",
-  };
-}
-
-export function answerEdward(request: EdwardRequest, briefing: BrewBriefing): EdwardAnswer {
-  if (request.mode === "draft_reply") return draftReply(briefing, request.emailId);
-  if (request.mode === "summarize") return summarize(briefing, request.context);
-  if (request.mode === "insights") return insightsAnswer(briefing, request.context);
-  if (request.mode === "prep") return prepAnswer(briefing, request.context);
-
-  const question = (request.question ?? "").trim();
-  const normalized = question.toLowerCase();
-
-  if (normalized.includes("more useful") || normalized.includes("feedback")) {
-    return {
-      question,
-      answer: "Tell me what you skipped this morning and I will stop sending it.",
-      bullets: [
-        "Use Customize to change which topics, sections, and length you get.",
-        "Ask me to summarize any panel and I will compress it into three lines.",
-        "If a number looks wrong, open it — every KPI shows its definition and owner.",
-      ],
-      followUp: "Preferences apply from tomorrow's edition onward, and you can change them any morning.",
-    };
-  }
-
-  if (normalized.includes("email") || normalized.includes("inbox")) {
-    return briefing.emails.length
-      ? {
-          question,
-          answer: `${briefing.inbox.highPriority} of your messages need a decision before noon.`,
-          bullets: briefing.emails
-            .filter((email) => email.priority === "high")
-            .slice(0, 3)
-            .map((email) => `${email.sender}: ${email.summary}`),
-          followUp:
-            "Handle the provost's reallocation request first — it is tied to today's commuter strategy and she asked for a read before noon.",
-        }
-      : {
-          question,
-          answer: "Email is not connected, so I cannot summarize your inbox.",
-          followUp: "Turn on the Email connection in Customize.",
-        };
-  }
-
-  if (normalized.includes("prepare") || normalized.includes("huddle") || normalized.includes("meeting")) {
-    return prepAnswer(briefing, "your next meeting");
-  }
-
-  if (normalized.includes("changed") || normalized.includes("yesterday") || normalized.includes("overnight")) {
-    return {
-      question,
-      answer: briefing.changes.length
-        ? "Three things moved overnight, and only one of them needs you."
-        : "Nothing material moved overnight in the topics you follow.",
-      bullets: briefing.changes.slice(0, 3).map((change) => `${change.time} — ${change.title}`),
-      followUp: "Verification throughput improving is real progress. The commuter deposit slide is the one to act on.",
-    };
-  }
-
-  if (normalized.includes("risk") || normalized.includes("worry") || normalized.includes("concern")) {
-    return {
-      question,
-      answer: "The biggest risk is friction after students have already shown intent.",
-      bullets: [
-        "312 commuter admits are one document away from depositing.",
-        "Verification median wait is 11.2 days against a 5-day standard.",
-        "Deposit rate is 1.7 points behind last cycle — roughly 104 enrolled students.",
-      ],
-      followUp: "Clear the operational blockers before spending anything on additional outreach.",
-    };
-  }
-
-  if (normalized.includes("news") || normalized.includes("policy") || normalized.includes("industry")) {
-    return briefing.news.length
-      ? {
-          question,
-          answer: "Two of today's stories bear directly on decisions you are already making.",
-          bullets: briefing.news.slice(0, 3).map((item) => `${item.sourceName}: ${item.headline}`),
-          followUp:
-            "The EAB piece argues against raising awards for stalled students — worth citing in your reply to the provost.",
-        }
-      : {
-          question,
-          answer: "Higher ed news is turned off in your briefing preferences.",
-          followUp: "Turn it back on in Customize if you want the industry read.",
-        };
-  }
-
-  if (normalized.includes("yield") || normalized.includes("deposit") || normalized.includes("tuition")) {
-    return {
-      question,
-      answer:
-        "Volume is fine. Conversion is the problem. Deposit rate is 40.1% against a 45.0% target, and commuter explains 78% of the gap.",
-      bullets: [
-        "Net tuition projects to $98.4M, up 5.2% year over year but $11.6M below plan.",
-        "Every point of deposit rate is worth about 61 enrolled students.",
-        "The commuter segment converts at 33.2%, down 6.4 points year over year.",
-      ],
-      followUp: "The fastest lever available today is verification throughput, not additional aid.",
-    };
-  }
-
-  return {
-    question: question || "What should I pay attention to today?",
-    answer: "Start with the students whose intent is already visible but whose next step is blocked.",
-    bullets: briefing.priorities.slice(0, 3).map((priority) => `${priority.title}: ${priority.detail}`),
-    followUp: "Then use the 8:30 huddle to assign owners while the room is together.",
-  };
+  return "What should I pay attention to today?";
 }

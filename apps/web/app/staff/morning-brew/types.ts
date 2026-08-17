@@ -1,12 +1,27 @@
 /**
- * Morning Brew — a personalized executive briefing for university leadership.
+ * Morning Brew — the enrollment leader's first read of the day.
  *
- * The reader picks the topics they care about, chooses what gets pulled into
- * the brief, then answers a few follow-ups about those choices. The briefing
- * builder assembles only what they asked for.
+ * Every value rendered on this surface arrives from `GET /v1/staff/morning-brew`
+ * as a count of canonical records. The types below are a *presentation* shape:
+ * they rename and trim the API payload for the components, and they add nothing
+ * to it. There is deliberately no field for a target, a forecast, or a
+ * confidence score — the platform holds none of those, and a slot for one is
+ * how invented numbers get in.
+ *
+ * The reader still chooses what lands in their morning; those choices only ever
+ * filter and bound what the API already sent.
  */
 
-/** Subjects a leader can follow each morning. */
+import type {
+  StaffBrewCohortRef,
+  StaffBrewDestination,
+  StaffBrewSeverity,
+  StaffBrewTone,
+  StaffBrewWindowId,
+  StaffMorningBrew,
+} from "@vv/contracts";
+
+/** Subjects a leader can follow each morning; each maps to canonical state. */
 export type BrewTopicId =
   | "financial_aid"
   | "admissions"
@@ -14,37 +29,34 @@ export type BrewTopicId =
   | "registrar"
   | "student_success";
 
-/** What gets pulled into the morning read. */
-export type BrewIncludeId = "inbox" | "calendar" | "numbers" | "signals" | "movements" | "headlines";
+/**
+ * Sections the reader can switch on. The identifiers are stable across
+ * versions so a saved preference survives; the labels in `catalog.ts` describe
+ * what each one actually shows today.
+ */
+export type BrewIncludeId =
+  | "requests"
+  | "deadlines"
+  | "numbers"
+  | "signals"
+  | "movements";
 
 /** How much the reader wants in front of them each morning. */
 export type BrewDepthId = "headlines" | "balanced" | "deep";
 
-/** Voice of the generated prose. */
+/** Voice of the generated summary. */
 export type BrewToneId = "executive" | "narrative";
 
 export type BrewDeliveryTime = "06:00" | "06:30" | "07:00" | "07:30";
 
-/** Comparison windows offered by the Enrollment Pulse carousel. */
-export type BrewTimeframeId = "yesterday" | "week" | "month" | "year";
+/** Comparison windows the API declares it can actually support. */
+export type BrewTimeframeId = StaffBrewWindowId;
 
-export type BrewInboxDepthId = "urgent" | "handful" | "everything";
+export type BrewRequestDepthId = "urgent" | "handful" | "everything";
 export type BrewInsightDetailId = "headline" | "impact" | "full";
 
-export type BrewSignalSource = "workspace" | "modeled" | "connected_demo";
-
 /** Staff workspace views the briefing can hand the reader off to. */
-export type MorningBrewDestination =
-  | "overview"
-  | "outreach"
-  | "tasks"
-  | "students"
-  | "messages"
-  | "campus_life"
-  | "academics"
-  | "journeys"
-  | "knowledge"
-  | "edward";
+export type MorningBrewDestination = StaffBrewDestination;
 
 export type BrewAccent = "purple" | "blue" | "teal" | "navy" | "amber";
 
@@ -56,7 +68,6 @@ export interface BrewTopic {
   preview: string;
   icon: string;
   accent: BrewAccent;
-  /** Pre-selected for the demo reader (Executive Director of Financial Aid). */
   recommended: boolean;
   recommendation: string;
 }
@@ -65,11 +76,10 @@ export interface BrewInclude {
   id: BrewIncludeId;
   title: string;
   blurb: string;
-  /** Where it comes from, named plainly rather than as a vendor list. */
+  /** The canonical records behind it, named plainly. */
   source: string;
   icon: string;
   accent: BrewAccent;
-  alwaysOn: boolean;
 }
 
 export interface BrewDepthOption {
@@ -88,18 +98,15 @@ export interface BrewToneOption {
 }
 
 export interface BrewPreferences {
-  version: 4;
+  version: 5;
   topics: BrewTopicId[];
   include: Record<BrewIncludeId, boolean>;
   depth: BrewDepthId;
   tone: BrewToneId;
   deliveryTime: BrewDeliveryTime;
-  /* Follow-ups, each asked only when the matching choice is switched on. */
-  inboxDepth: BrewInboxDepthId;
-  draftReplies: boolean;
-  calendarPrep: boolean;
+  requestDepth: BrewRequestDepthId;
+  deadlineNextStep: boolean;
   insightDetail: BrewInsightDetailId;
-  readingSources: string[];
   onboardingComplete: boolean;
   updatedAt: string;
 }
@@ -118,11 +125,12 @@ export interface BrewInsightAction {
   due: string;
 }
 
+/** A named student from the cohort behind a headline. Never a risk score. */
 export interface BrewInsightStudent {
+  id: string;
   name: string;
   program: string;
   note: string;
-  risk: "critical" | "high" | "medium";
 }
 
 export interface BrewInsight {
@@ -130,42 +138,49 @@ export interface BrewInsight {
   topic: BrewTopicId;
   label: string;
   title: string;
-  severity: "high" | "medium" | "positive";
+  severity: StaffBrewSeverity;
   summary: string;
-  projection: string;
+  /** The cohort stated against the roster, e.g. "3 of 14 students". */
+  scope: string;
   impactLabel: string;
   impact: BrewImpactChip[];
   recommendedAction: string;
   impactLevel: "High" | "Medium" | "Low";
-  confidence: number;
-  source: BrewSignalSource;
-  destination?: MorningBrewDestination;
+  destination: MorningBrewDestination;
+  cohort: StaffBrewCohortRef;
   detail: {
     narrative: string[];
     drivers: { label: string; value: string; note: string }[];
-    trend: { label: string; value: number }[];
-    trendUnit: string;
+    breakdown: {
+      code: string;
+      title: string;
+      students: number;
+      requirements: number;
+      overdue: number;
+    }[];
+    breakdownNote: string | null;
     actions: BrewInsightAction[];
     students: BrewInsightStudent[];
+    studentsNote: string | null;
     evidence: string[];
   };
 }
 
-export type BrewNumberFormat = "int" | "percent" | "currencyM" | "currencyK";
-
 export interface BrewKpiFrame {
   /** Raw number the ticker animates toward. */
   numeric: number;
-  /** Window the value describes, e.g. "yesterday" or "cycle to date". */
+  /** What the value describes in this window. */
   window: string;
-  delta: string;
+  /** Share of a denominator, replacing the notion of "progress to target". */
+  basisLabel: string | null;
+  basisPercent: number | null;
+  /** Only present where the change is reconstructable from a timestamp. */
+  delta: string | null;
   direction: "up" | "down" | "flat";
   favorable: boolean;
-  comparison: string;
-  points: number[];
-  target: string;
-  targetProgress: number;
+  comparison: string | null;
   note: string;
+  unavailable: boolean;
 }
 
 export interface BrewKpi {
@@ -173,16 +188,12 @@ export interface BrewKpi {
   topic: BrewTopicId;
   label: string;
   icon: string;
-  format: BrewNumberFormat;
-  source: BrewSignalSource;
+  source: "canonical_postgres";
+  cohort: StaffBrewCohortRef;
   frames: Record<BrewTimeframeId, BrewKpiFrame>;
   detail: {
     definition: string;
-    owner: string;
-    updated: string;
-    segments: { label: string; value: string; delta: string; favorable: boolean }[];
-    history: { label: string; value: number; benchmark: number }[];
-    historyUnit: string;
+    segments: { label: string; value: number; percent: number | null }[];
     notes: string[];
   };
 }
@@ -190,45 +201,49 @@ export interface BrewKpi {
 export interface BrewChange {
   id: string;
   topic: BrewTopicId;
+  /** Clock time of the latest such event, or the window when none occurred. */
   time: string;
   title: string;
   detail: string;
-  tone: "positive" | "watch" | "neutral";
-  source: BrewSignalSource;
-  destination?: MorningBrewDestination;
-  metric?: string;
+  tone: StaffBrewTone;
+  count: number;
+  metric: string;
+  destination: MorningBrewDestination;
+  basis: string;
+  basisNote: string;
+  exact: boolean;
 }
 
-export interface BrewMeeting {
+export interface BrewDeadline {
   id: string;
-  time: string;
-  duration: string;
+  topic: BrewTopicId;
+  kind: "requirement" | "offer_response";
+  kindLabel: string;
+  /** The canonical requirement code, so a deadline can be traced back. */
+  code: string;
   title: string;
   detail: string;
+  bucket: "overdue" | "today" | "this_week" | "this_month";
+  dueLabel: string;
+  relativeLabel: string;
+  students: number;
   priority: "high" | "medium" | "low";
-  attendees: string[];
-  extraAttendees?: string;
-  location: string;
-  organizer: string;
-  agenda: string[];
-  prep: string[];
-  destination?: MorningBrewDestination;
+  nextStep: string;
+  destination: MorningBrewDestination;
 }
 
-export interface BrewEmail {
+export interface BrewRequest {
   id: string;
-  time: string;
-  sender: string;
-  senderRole: string;
+  topic: BrewTopicId;
   subject: string;
   summary: string;
-  priority: "high" | "medium" | "low";
-  topic: BrewTopicId;
-  body: string[];
-  asks: string[];
-  thread: { sender: string; time: string; excerpt: string }[];
-  suggestedReply: { subject: string; greeting: string; body: string[]; signoff: string };
-  destination?: MorningBrewDestination;
+  studentName: string;
+  programName: string;
+  status: "new" | "open" | "waiting_on_student" | "resolved";
+  priority: "urgent" | "high" | "medium" | "low";
+  waitingLabel: string;
+  assigneeName: string | null;
+  destination: MorningBrewDestination;
 }
 
 export interface BrewPriority {
@@ -240,25 +255,10 @@ export interface BrewPriority {
   icon: string;
   linkLabel: string;
   destination: MorningBrewDestination;
-  source: BrewSignalSource;
   breakdown: { label: string; value: string }[];
   steps: string[];
   window: string;
-}
-
-export interface BrewNewsItem {
-  id: string;
-  sourceName: string;
-  published: string;
-  headline: string;
-  readTime: string;
-  image: string;
-  imageAlt: string;
-  topics: BrewTopicId[];
-  summary: string;
-  keyPoints: string[];
-  relevance: string;
-  category: "Industry" | "Policy" | "Research" | "Technology";
+  count: number;
 }
 
 export interface BrewQuickLink {
@@ -267,57 +267,58 @@ export interface BrewQuickLink {
   destination: MorningBrewDestination;
 }
 
-export interface BrewInboxSummary {
-  unread: number;
-  highPriority: number;
-  meetings: number;
-  meetingsHighPriority: number;
+export interface BrewGlance {
+  requests: number;
+  requestsAwaitingReply: number;
+  deadlinesOverdue: number;
+  deadlinesThisWeek: number;
 }
 
 export interface BrewBriefing {
   greetingName: string;
   deck: string;
+  bullets: string[];
   readTimeMinutes: number;
   updatedAt: string;
+  windowLabel: string;
   deliveryLabel: string;
+  students: number;
+  timeframes: { id: BrewTimeframeId; label: string; short: string }[];
   insights: BrewInsight[];
   kpis: BrewKpi[];
   changes: BrewChange[];
-  meetings: BrewMeeting[];
-  emails: BrewEmail[];
+  deadlines: BrewDeadline[];
+  requests: BrewRequest[];
   priorities: BrewPriority[];
-  news: BrewNewsItem[];
   quickLinks: BrewQuickLink[];
-  inbox: BrewInboxSummary;
+  glance: BrewGlance;
+  coverage: {
+    notes: string[];
+    unsupported: { metric: string; reason: string }[];
+  };
+  engagementScanAvailable: boolean;
 }
+
+/** The raw payload, re-exported so components can name the source shape. */
+export type BrewSource = StaffMorningBrew;
 
 /* ------------------------------------------------------------------- detail */
 
 export type BrewDetailRef =
   | { kind: "insight"; id: string }
   | { kind: "kpi"; id: string; timeframe: BrewTimeframeId }
-  | { kind: "meeting"; id: string }
-  | { kind: "email"; id: string }
+  | { kind: "deadline"; id: string }
+  | { kind: "request"; id: string }
   | { kind: "priority"; id: string }
-  | { kind: "change"; id: string }
-  | { kind: "news"; id: string };
+  | { kind: "change"; id: string };
 
 /* ------------------------------------------------------------------- edward */
 
-export type EdwardMode = "ask" | "summarize" | "insights" | "draft_reply" | "prep";
+export type EdwardMode = "ask" | "summarize" | "insights" | "cohort";
 
 export interface EdwardRequest {
   mode: EdwardMode;
   /** Human label for the surface Edward was launched from. */
   context: string;
   question?: string;
-  emailId?: string;
-}
-
-export interface EdwardAnswer {
-  question: string;
-  answer: string;
-  bullets?: string[];
-  followUp?: string;
-  draft?: { subject: string; body: string[] };
 }

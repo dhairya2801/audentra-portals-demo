@@ -1,17 +1,7 @@
 "use client";
 
-import { BREW_TIMEFRAMES, topicById } from "./catalog";
-import {
-  BREW_CHANGES,
-  BREW_EMAILS,
-  BREW_INSIGHTS,
-  BREW_KPIS,
-  BREW_MEETINGS,
-  BREW_NEWS,
-  BREW_PRIORITIES,
-  attendeeAvatar,
-  formatBrewNumber,
-} from "./data";
+import { topicById } from "./catalog";
+import { formatBrewNumber } from "./data";
 import type { BrewBriefing, BrewDetailRef, EdwardRequest, MorningBrewDestination } from "./types";
 
 const DESTINATION_LABELS: Record<MorningBrewDestination, string> = {
@@ -31,122 +21,72 @@ const WIDTH = 680;
 const HEIGHT = 150;
 const PAD = 10;
 const SLOT = (series: { label: string }[]) => (WIDTH - PAD * 2) / series.length;
-const CENTRE = (series: { label: string }[], index: number) => PAD + SLOT(series) * index + SLOT(series) / 2;
+const CENTRE = (series: { label: string }[], index: number) =>
+  PAD + SLOT(series) * index + SLOT(series) / 2;
 
 function ChartGrid() {
   return (
     <>
       {[0, 0.25, 0.5, 0.75, 1].map((step) => (
-        <line className="brew-chart__grid" x1={PAD} x2={WIDTH - PAD} y1={HEIGHT * step} y2={HEIGHT * step} key={step} />
+        <line
+          className="brew-chart__grid"
+          x1={PAD}
+          x2={WIDTH - PAD}
+          y1={HEIGHT * step}
+          y2={HEIGHT * step}
+          key={step}
+        />
       ))}
     </>
   );
 }
 
 /**
- * A trend of one measure. Drawn as a line on a padded domain — a zero-anchored
- * bar chart flattens series like "deposit rate 44.2% → 38.2%" into a solid block.
+ * Composition, zero-anchored so the bars stay comparable.
+ *
+ * This is the only chart Morning Brew draws, because a count of students in
+ * each bucket is the only series the platform actually holds. There is no
+ * history table behind these numbers, so there is no trend line to draw and no
+ * benchmark to draw it against.
  */
-function TrendPlot({ series, unit }: { series: { label: string; value: number }[]; unit: string }) {
-  const values = series.map((point) => point.value);
-  const low = Math.min(...values);
-  const high = Math.max(...values);
-  const pad = Math.max((high - low) * 0.22, Math.abs(high) * 0.02, Number.EPSILON);
-  const min = low - pad;
-  const range = high + pad - min;
-  const points = series.map((point, index) => ({
-    x: CENTRE(series, index),
-    y: HEIGHT - ((point.value - min) / range) * HEIGHT,
-  }));
-  const path = points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+function CompositionPlot({ series }: { series: { label: string; value: number }[] }) {
+  const max = Math.max(...series.map((point) => point.value), 1);
+  const barWidth = Math.min(48, SLOT(series) * 0.5);
+  const yFor = (value: number) => HEIGHT - (value / max) * HEIGHT;
 
   return (
-    <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label={`${unit} by period`}>
-      <ChartGrid />
-      <polygon className="brew-chart__area" points={`${points[0].x},${HEIGHT} ${path} ${points[points.length - 1].x},${HEIGHT}`} />
-      <polyline className="brew-chart__line" points={path} />
-      {points.map((point, index) => (
-        <circle className="brew-chart__node" cx={point.x} cy={point.y} r={4} key={series[index].label} />
-      ))}
-    </svg>
-  );
-}
-
-/** Two measures per period, zero-anchored so the bar lengths stay comparable. */
-function BarPlot({ series }: { series: { label: string; value: number; benchmark?: number }[] }) {
-  const values = series.flatMap((point) => [point.value, point.benchmark ?? point.value]);
-  const max = Math.max(...values);
-  const min = Math.min(...values, 0);
-  const range = Math.max(max - min, Number.EPSILON);
-  const barWidth = Math.min(26, SLOT(series) * 0.36);
-  const yFor = (value: number) => HEIGHT - ((value - min) / range) * HEIGHT;
-
-  return (
-    <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Values by period against benchmark">
+    <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Students in each group">
       <ChartGrid />
       {series.map((point, index) => {
         const centre = CENTRE(series, index);
         return (
-          <g key={point.label}>
-            {point.benchmark !== undefined ? (
-              <rect
-                className="brew-chart__benchmark"
-                x={centre + 2}
-                y={yFor(point.benchmark)}
-                width={barWidth}
-                height={Math.max(2, HEIGHT - yFor(point.benchmark))}
-                rx={3}
-              />
-            ) : null}
-            <rect
-              className="brew-chart__bar"
-              x={centre - barWidth - 2}
-              y={yFor(point.value)}
-              width={barWidth}
-              height={Math.max(2, HEIGHT - yFor(point.value))}
-              rx={3}
-            />
-          </g>
+          <rect
+            className="brew-chart__bar"
+            x={centre - barWidth / 2}
+            y={yFor(point.value)}
+            width={barWidth}
+            height={Math.max(2, HEIGHT - yFor(point.value))}
+            rx={3}
+            key={point.label}
+          />
         );
       })}
     </svg>
   );
 }
 
-function BrewChart({
-  series,
-  unit,
-  benchmarkLabel,
-}: {
-  series: { label: string; value: number; benchmark?: number }[];
-  unit: string;
-  benchmarkLabel?: string;
-}) {
-  const hasBenchmark = series.some((point) => point.benchmark !== undefined);
-  const first = series[0]?.value;
-  const last = series[series.length - 1]?.value;
-
+function BrewChart({ series, unit }: { series: { label: string; value: number }[]; unit: string }) {
+  if (series.length < 2) return null;
   return (
     <figure className="brew-chart">
       <figcaption>
-        <span>
-          {unit}
-          {!hasBenchmark && series.length > 1 ? (
-            <b>
-              {" "}
-              {first} → {last}
-            </b>
-          ) : null}
-        </span>
-        {hasBenchmark ? (
-          <span className="brew-chart__legend">
-            <i className="is-current" aria-hidden="true" /> This cycle
-            <i className="is-benchmark" aria-hidden="true" /> {benchmarkLabel ?? "Benchmark"}
-          </span>
-        ) : null}
+        <span>{unit}</span>
       </figcaption>
-      {hasBenchmark ? <BarPlot series={series} /> : <TrendPlot series={series} unit={unit} />}
-      <div className="brew-chart__axis" style={{ gridTemplateColumns: `repeat(${series.length}, minmax(0, 1fr))` }}>
+      <CompositionPlot series={series} />
+      <div
+        className="brew-chart__axis"
+        style={{ gridTemplateColumns: `repeat(${series.length}, minmax(0, 1fr))` }}
+      >
         {series.map((point) => (
           <span key={point.label}>{point.label}</span>
         ))}
@@ -188,11 +128,57 @@ function DetailShell({
 
 function NotFound({ onBack }: { onBack: () => void }) {
   return (
-    <DetailShell eyebrow="Morning Brew" title="That item is no longer in today's brief" onBack={onBack}>
+    <DetailShell
+      eyebrow="Morning Brew"
+      title="That item is no longer in today's brief"
+      onBack={onBack}
+    >
       <p className="brew-detail__lede">
-        Your briefing was rebuilt with different preferences, so this item is not part of today&rsquo;s edition.
+        Your briefing was rebuilt with different preferences, so this item is not part of
+        today&rsquo;s edition.
       </p>
     </DetailShell>
+  );
+}
+
+/**
+ * The cohort behind a number, stated as the filter that produced it plus the
+ * question that reproduces it. This block is the point of the whole detail
+ * view: a leader who does not believe a figure gets the definition and a
+ * one-click way to see the students it counted.
+ */
+function CohortEvidence({
+  cohort,
+  onAskEdward,
+}: {
+  cohort: { label: string; clauses: string[]; question: string };
+  onAskEdward: (request: EdwardRequest) => void;
+}) {
+  return (
+    <section className="brew-detail__section brew-detail__section--evidence">
+      <h2>How this was counted</h2>
+      <p className="brew-detail__lede">
+        Students matching <strong>{cohort.label}</strong>, counted from canonical records.
+      </p>
+      {cohort.clauses.length ? (
+        <ul className="brew-note-list">
+          {cohort.clauses.map((clause) => (
+            <li key={clause}>{clause}</li>
+          ))}
+        </ul>
+      ) : (
+        <ul className="brew-note-list">
+          <li>no filter — every student in this tenant</li>
+        </ul>
+      )}
+      <button
+        className="brew-edward-chip"
+        type="button"
+        onClick={() => onAskEdward({ mode: "cohort", context: cohort.question })}
+      >
+        <span aria-hidden="true">E</span> Ask Edward: “{cohort.question}”
+      </button>
+    </section>
   );
 }
 
@@ -211,431 +197,380 @@ export function MorningBrewDetail({
 }) {
   const openWorkspace = (destination?: MorningBrewDestination) =>
     destination ? (
-      <button className="button button--primary" type="button" onClick={() => navigate(destination)}>
+      <button
+        className="button button--primary"
+        type="button"
+        onClick={() => navigate(destination)}
+      >
         Open {DESTINATION_LABELS[destination]} <span aria-hidden="true">→</span>
       </button>
     ) : null;
 
   if (detail.kind === "insight") {
-    const insight = BREW_INSIGHTS.find((item) => item.id === detail.id);
+    const insight = briefing.insights.find((item) => item.id === detail.id);
     if (!insight) return <NotFound onBack={onBack} />;
     const topic = topicById(insight.topic);
+
     return (
       <DetailShell
-        eyebrow={`${insight.label} · ${topic?.title ?? "Institution"}`}
+        eyebrow={`${topic?.title ?? "Enrollment"} · ${insight.label}`}
         title={insight.title}
         onBack={onBack}
         meta={
           <>
             <span className={`brew-chip brew-chip--${insight.severity}`}>
-              {insight.severity === "positive" ? "Positive" : insight.severity === "high" ? "High" : "Medium"}
+              {insight.severity === "positive"
+                ? "Clear"
+                : insight.severity === "high"
+                  ? "High"
+                  : "Medium"}
             </span>
-            <span>
-              Impact <b>{insight.impactLevel}</b>
-            </span>
-            <span>
-              Confidence <b>{insight.confidence}%</b>
-            </span>
-            <span className={`brew-source brew-source--${insight.source}`}>
-              {insight.source === "workspace" ? "Live workspace" : "Modeled"}
-            </span>
+            <span>Priority: {insight.impactLevel}</span>
+            <span>{insight.scope}</span>
           </>
         }
         actions={
           <>
             {openWorkspace(insight.destination)}
             <button
-              className="button button--secondary"
+              className="brew-edward-chip"
               type="button"
-              onClick={() => onAskEdward({ mode: "insights", context: insight.title })}
+              onClick={() => onAskEdward({ mode: "cohort", context: insight.cohort.question })}
             >
-              Ask Edward about this
+              <span aria-hidden="true">E</span> Ask Edward for these students
             </button>
           </>
         }
       >
-        <p className="brew-detail__lede">{insight.projection}</p>
-
-        <div className="brew-detail__impact">
-          {insight.impact.map((chip) => (
-            <span className={`brew-impact brew-impact--${chip.tone}`} key={chip.label}>
-              {chip.label}
-            </span>
-          ))}
-        </div>
+        <p className="brew-detail__lede">{insight.summary}</p>
 
         {insight.detail.narrative.map((paragraph) => (
-          <p key={paragraph.slice(0, 40)}>{paragraph}</p>
+          <p className="brew-detail__paragraph" key={paragraph.slice(0, 32)}>
+            {paragraph}
+          </p>
         ))}
 
-        <section className="brew-detail__section">
-          <h2>What is driving it</h2>
-          <div className="brew-stat-grid">
-            {insight.detail.drivers.map((driver) => (
-              <div className="brew-stat" key={driver.label}>
-                <small>{driver.label}</small>
-                <strong>{driver.value}</strong>
-                <p>{driver.note}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="brew-detail__section">
-          <h2>Trend</h2>
-          <BrewChart series={insight.detail.trend} unit={insight.detail.trendUnit} />
-        </section>
-
-        <section className="brew-detail__section">
-          <h2>Recommended actions</h2>
-          <ol className="brew-action-list">
-            {insight.detail.actions.map((action) => (
-              <li key={action.title}>
-                <div>
-                  <strong>{action.title}</strong>
-                  <p>{action.detail}</p>
+        {insight.detail.drivers.length ? (
+          <section className="brew-detail__section">
+            <h2>Related cohorts</h2>
+            <div className="brew-stat-grid">
+              {insight.detail.drivers.map((driver) => (
+                <div className="brew-stat" key={driver.label}>
+                  <small>{driver.label}</small>
+                  <strong>{driver.value}</strong>
+                  <p>{driver.note}</p>
                 </div>
-                <span>
-                  <b>{action.owner}</b>
-                  <small>{action.due}</small>
-                </span>
-              </li>
-            ))}
-          </ol>
-        </section>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {insight.detail.breakdown.length ? (
+          <section className="brew-detail__section">
+            <h2>What is blocking them</h2>
+            <BrewChart
+              series={insight.detail.breakdown.map((row) => ({
+                label: row.title,
+                value: row.students,
+              }))}
+              unit="Students with this requirement open"
+            />
+            <table className="brew-table">
+              <thead>
+                <tr>
+                  <th scope="col">Requirement</th>
+                  <th scope="col">Students</th>
+                  <th scope="col">Overdue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {insight.detail.breakdown.map((row) => (
+                  <tr key={row.code}>
+                    <th scope="row">{row.title}</th>
+                    <td>{row.students}</td>
+                    <td>{row.overdue}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {insight.detail.breakdownNote ? (
+              <p className="brew-detail__note">{insight.detail.breakdownNote}</p>
+            ) : null}
+          </section>
+        ) : null}
 
         {insight.detail.students.length ? (
           <section className="brew-detail__section">
-            <h2>Students behind this signal</h2>
+            <h2>Students in this cohort</h2>
             <ul className="brew-student-list">
               {insight.detail.students.map((student) => (
-                <li key={student.name}>
-                  <span className={`brew-risk brew-risk--${student.risk}`}>{student.risk}</span>
+                <li key={student.id}>
                   <div>
                     <strong>{student.name}</strong>
                     <small>{student.program}</small>
                   </div>
-                  <p>{student.note}</p>
+                  <span>{student.note}</span>
                 </li>
               ))}
             </ul>
-            <button className="brew-link" type="button" onClick={() => navigate("students")}>
-              Open the full student list <span aria-hidden="true">→</span>
-            </button>
+            {insight.detail.studentsNote ? (
+              <p className="brew-detail__note">{insight.detail.studentsNote}</p>
+            ) : null}
           </section>
         ) : null}
 
-        <section className="brew-detail__section brew-detail__section--quiet">
-          <h2>How this was produced</h2>
-          <ul className="brew-note-list">
-            {insight.detail.evidence.map((note) => (
-              <li key={note}>{note}</li>
-            ))}
-          </ul>
-        </section>
+        {insight.detail.actions.length ? (
+          <section className="brew-detail__section">
+            <h2>What to do next</h2>
+            <ol className="brew-action-list">
+              {insight.detail.actions.map((action) => (
+                <li key={action.title}>
+                  <div>
+                    <strong>{action.title}</strong>
+                    {action.detail ? <p>{action.detail}</p> : null}
+                  </div>
+                  <span>
+                    {action.owner} · {action.due}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : null}
+
+        <CohortEvidence cohort={insight.cohort} onAskEdward={onAskEdward} />
       </DetailShell>
     );
   }
 
   if (detail.kind === "kpi") {
-    const kpi = BREW_KPIS.find((item) => item.id === detail.id);
+    const kpi = briefing.kpis.find((item) => item.id === detail.id);
     if (!kpi) return <NotFound onBack={onBack} />;
-    const frame = kpi.frames[detail.timeframe];
+    const frame = kpi.frames[detail.timeframe] ?? kpi.frames.now;
+    const timeframe = briefing.timeframes.find((entry) => entry.id === detail.timeframe);
     const topic = topicById(kpi.topic);
+
     return (
       <DetailShell
-        eyebrow={`Enrollment pulse · ${topic?.title ?? "Institution"}`}
+        eyebrow={`${topic?.title ?? "Enrollment"} · Enrollment Pulse`}
         title={kpi.label}
         onBack={onBack}
         meta={
           <>
-            <span>
-              <b>{formatBrewNumber(frame.numeric, kpi.format)}</b> {frame.window.toLowerCase()}
-            </span>
-            <span className={frame.favorable ? "brew-delta" : "brew-delta brew-delta--watch"}>
-              {frame.direction === "up" ? "▲" : frame.direction === "down" ? "▼" : "■"} {frame.delta}{" "}
-              {frame.comparison}
-            </span>
-            <span>Updated {kpi.detail.updated}</span>
+            <b>{formatBrewNumber(frame.numeric)}</b>
+            <span>{frame.window}</span>
+            {timeframe ? <span>{timeframe.label}</span> : null}
           </>
         }
         actions={
           <>
-            {openWorkspace("overview")}
+            {openWorkspace("students")}
             <button
-              className="button button--secondary"
+              className="brew-edward-chip"
               type="button"
-              onClick={() => onAskEdward({ mode: "insights", context: kpi.label })}
+              onClick={() => onAskEdward({ mode: "cohort", context: kpi.cohort.question })}
             >
-              Ask Edward about this
+              <span aria-hidden="true">E</span> Ask Edward for these students
             </button>
           </>
         }
       >
         <p className="brew-detail__lede">{kpi.detail.definition}</p>
-        <p className="brew-detail__owner">Owned by {kpi.detail.owner}</p>
 
         <section className="brew-detail__section">
-          <h2>Every comparison period</h2>
-          <div className="brew-frame-grid">
-            {BREW_TIMEFRAMES.map((entry) => {
-              const value = kpi.frames[entry.id];
-              return (
-                <div
-                  className={entry.id === detail.timeframe ? "brew-frame is-active" : "brew-frame"}
-                  key={entry.id}
-                >
-                  <small>{entry.label}</small>
-                  <strong>{formatBrewNumber(value.numeric, kpi.format)}</strong>
-                  <span className={value.favorable ? "brew-delta" : "brew-delta brew-delta--watch"}>
-                    {value.direction === "up" ? "▲" : value.direction === "down" ? "▼" : "■"} {value.delta}
-                  </span>
-                  <p>{value.note}</p>
-                  <i>
-                    {value.target} · {value.targetProgress}%
-                  </i>
-                </div>
-              );
-            })}
+          <h2>This window</h2>
+          <div className="brew-stat-grid">
+            <div className="brew-stat">
+              <small>Value</small>
+              <strong>{formatBrewNumber(frame.numeric)}</strong>
+              <p>{frame.window}</p>
+            </div>
+            {frame.basisLabel && frame.basisPercent !== null ? (
+              <div className="brew-stat">
+                <small>Share</small>
+                <strong>{frame.basisPercent}%</strong>
+                <p>{frame.basisLabel}</p>
+              </div>
+            ) : null}
+            <div className="brew-stat">
+              <small>Change</small>
+              <strong>{frame.delta ?? "Not tracked"}</strong>
+              <p>{frame.comparison ?? "No timestamp proves a change for this metric"}</p>
+            </div>
           </div>
+          <p className="brew-detail__note">{frame.note}</p>
         </section>
 
-        <section className="brew-detail__section">
-          <h2>History</h2>
-          <BrewChart
-            series={kpi.detail.history.map((point) => ({
-              label: point.label,
-              value: point.value,
-              benchmark: point.benchmark,
-            }))}
-            unit={kpi.detail.historyUnit}
-            benchmarkLabel="Last cycle / plan"
-          />
-        </section>
-
-        <section className="brew-detail__section">
-          <h2>By segment</h2>
-          <table className="brew-table">
-            <thead>
-              <tr>
-                <th scope="col">Segment</th>
-                <th scope="col">Value</th>
-                <th scope="col">Change</th>
-              </tr>
-            </thead>
-            <tbody>
-              {kpi.detail.segments.map((segment) => (
-                <tr key={segment.label}>
-                  <th scope="row">{segment.label}</th>
-                  <td>{segment.value}</td>
-                  <td className={segment.favorable ? "brew-delta" : "brew-delta brew-delta--watch"}>
-                    {segment.delta}
-                  </td>
+        {kpi.detail.segments.length ? (
+          <section className="brew-detail__section">
+            <h2>Composition</h2>
+            <BrewChart
+              series={kpi.detail.segments.map((segment) => ({
+                label: segment.label,
+                value: segment.value,
+              }))}
+              unit="Students"
+            />
+            <table className="brew-table">
+              <thead>
+                <tr>
+                  <th scope="col">Group</th>
+                  <th scope="col">Students</th>
+                  <th scope="col">Share of roster</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+              </thead>
+              <tbody>
+                {kpi.detail.segments.map((segment) => (
+                  <tr key={segment.label}>
+                    <th scope="row">{segment.label}</th>
+                    <td>{segment.value}</td>
+                    <td>{segment.percent === null ? "—" : `${segment.percent}%`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        ) : null}
 
-        <section className="brew-detail__section brew-detail__section--quiet">
-          <h2>What to keep in mind</h2>
+        <section className="brew-detail__section">
+          <h2>Notes</h2>
           <ul className="brew-note-list">
             {kpi.detail.notes.map((note) => (
               <li key={note}>{note}</li>
             ))}
           </ul>
         </section>
+
+        <CohortEvidence cohort={kpi.cohort} onAskEdward={onAskEdward} />
       </DetailShell>
     );
   }
 
-  if (detail.kind === "meeting") {
-    const meeting = BREW_MEETINGS.find((item) => item.id === detail.id);
-    if (!meeting) return <NotFound onBack={onBack} />;
+  if (detail.kind === "deadline") {
+    const deadline = briefing.deadlines.find((item) => item.id === detail.id);
+    if (!deadline) return <NotFound onBack={onBack} />;
+    const topic = topicById(deadline.topic);
+
     return (
       <DetailShell
-        eyebrow="Today's calendar"
-        title={meeting.title}
+        eyebrow={`${topic?.title ?? "Enrollment"} · Deadline`}
+        title={deadline.title}
         onBack={onBack}
         meta={
           <>
+            <span className={`brew-chip brew-chip--${deadline.priority}`}>
+              {deadline.relativeLabel}
+            </span>
+            <span>{deadline.dueLabel}</span>
             <span>
-              <b>{meeting.time}</b> · {meeting.duration}
-            </span>
-            <span>{meeting.location}</span>
-            <span className={`brew-chip brew-chip--${meeting.priority}`}>
-              {meeting.priority === "high" ? "High priority" : meeting.priority === "medium" ? "Medium" : "Low"}
+              {deadline.students} {deadline.students === 1 ? "student" : "students"}
             </span>
           </>
         }
-        actions={
-          <>
-            {openWorkspace(meeting.destination)}
-            <button
-              className="button button--secondary"
-              type="button"
-              onClick={() => onAskEdward({ mode: "prep", context: meeting.title })}
-            >
-              Prepare me with Edward
-            </button>
-          </>
-        }
+        actions={openWorkspace(deadline.destination)}
       >
-        <p className="brew-detail__lede">{meeting.detail}</p>
-        <p className="brew-detail__owner">Organized by {meeting.organizer}</p>
-
+        <p className="brew-detail__lede">{deadline.detail}</p>
         <section className="brew-detail__section">
-          <h2>Agenda</h2>
-          <ol className="brew-ordered">
-            {meeting.agenda.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ol>
+          <h2>What to do next</h2>
+          <p className="brew-detail__paragraph">{deadline.nextStep}</p>
         </section>
-
-        <section className="brew-detail__section">
-          <h2>What you should walk in knowing</h2>
-          <ul className="brew-note-list brew-note-list--accent">
-            {meeting.prep.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
+        <section className="brew-detail__section brew-detail__section--evidence">
+          <h2>How this was counted</h2>
+          <ul className="brew-note-list">
+            <li>
+              {deadline.kindLabel} due{" "}
+              {deadline.bucket === "overdue" ? "before today" : "inside the next 30 days"}
+            </li>
+            <li>Requirements that are still incomplete on a student&rsquo;s journey</li>
+            <li>Students counted once per requirement, not once per due date</li>
           </ul>
-        </section>
-
-        <section className="brew-detail__section">
-          <h2>Attendees</h2>
-          <span className="brew-avatars brew-avatars--large">
-            {meeting.attendees.map((attendee) => (
-              <img src={attendeeAvatar(attendee)} alt={attendee} title={attendee} key={attendee} />
-            ))}
-            {meeting.extraAttendees ? <b>{meeting.extraAttendees}</b> : null}
-          </span>
         </section>
       </DetailShell>
     );
   }
 
-  if (detail.kind === "email") {
-    const email = BREW_EMAILS.find((item) => item.id === detail.id);
-    if (!email) return <NotFound onBack={onBack} />;
+  if (detail.kind === "request") {
+    const request = briefing.requests.find((item) => item.id === detail.id);
+    if (!request) return <NotFound onBack={onBack} />;
+
     return (
       <DetailShell
-        eyebrow="Email highlights"
-        title={email.subject}
+        eyebrow="Student request"
+        title={request.subject}
         onBack={onBack}
         meta={
           <>
-            <span>
-              <b>{email.sender}</b> · {email.senderRole}
+            <span className={`brew-chip brew-chip--${request.status === "new" ? "high" : "medium"}`}>
+              {request.status === "new" ? "No reply yet" : "Open"}
             </span>
-            <span>{email.time}</span>
-            <span className={`brew-chip brew-chip--${email.priority}`}>
-              {email.priority === "high" ? "High" : email.priority === "medium" ? "Medium" : "Low"}
-            </span>
+            <span>{request.studentName}</span>
+            <span>{request.programName}</span>
+            <span>Last message {request.waitingLabel}</span>
           </>
         }
-        actions={
-          <>
-            <button
-              className="button button--primary"
-              type="button"
-              onClick={() => onAskEdward({ mode: "draft_reply", context: email.subject, emailId: email.id })}
-            >
-              Draft a response with Edward
-            </button>
-            {openWorkspace(email.destination)}
-          </>
-        }
+        actions={openWorkspace("messages")}
       >
+        <p className="brew-detail__lede">{request.summary}</p>
         <section className="brew-detail__section">
-          <h2>What they are asking</h2>
-          <ul className="brew-note-list brew-note-list--accent">
-            {email.asks.map((ask) => (
-              <li key={ask}>{ask}</li>
-            ))}
-          </ul>
+          <h2>Ownership</h2>
+          <p className="brew-detail__paragraph">
+            {request.assigneeName
+              ? `Assigned to ${request.assigneeName}.`
+              : "Nobody is assigned to this conversation yet."}
+          </p>
+          <p className="brew-detail__note">
+            The full thread lives in Messages. Morning Brew shows the opening message only, and
+            never a draft reply — replies are written against the canonical conversation.
+          </p>
         </section>
-
-        <section className="brew-detail__section">
-          <h2>Message</h2>
-          <div className="brew-message">
-            {email.body.map((paragraph) => (
-              <p key={paragraph.slice(0, 40)}>{paragraph}</p>
-            ))}
-          </div>
-        </section>
-
-        {email.thread.length ? (
-          <section className="brew-detail__section">
-            <h2>Earlier in this thread</h2>
-            <ul className="brew-thread">
-              {email.thread.map((entry) => (
-                <li key={`${entry.sender}-${entry.time}`}>
-                  <span>
-                    <strong>{entry.sender}</strong>
-                    <time>{entry.time}</time>
-                  </span>
-                  <p>{entry.excerpt}</p>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
       </DetailShell>
     );
   }
 
   if (detail.kind === "priority") {
-    const priority = briefing.priorities.find((item) => item.id === detail.id)
-      ?? BREW_PRIORITIES.find((item) => item.id === detail.id);
+    const priority = briefing.priorities.find((item) => item.id === detail.id);
     if (!priority) return <NotFound onBack={onBack} />;
     const topic = topicById(priority.topic);
+
     return (
       <DetailShell
-        eyebrow={`Today's priorities · ${topic?.title ?? "Institution"}`}
+        eyebrow={`${topic?.title ?? "Enrollment"} · Queue`}
         title={priority.title}
         onBack={onBack}
         meta={
           <>
-            <span className={`brew-chip brew-chip--${priority.level.toLowerCase()}`}>{priority.level}</span>
-            <span>{priority.window}</span>
-            <span className={`brew-source brew-source--${priority.source}`}>
-              {priority.source === "workspace" ? "Live workspace" : "Modeled"}
+            <span className={`brew-chip brew-chip--${priority.level.toLowerCase()}`}>
+              {priority.level}
             </span>
+            <span>{priority.window}</span>
+            <b>{formatBrewNumber(priority.count)}</b>
           </>
         }
-        actions={
-          <>
-            {openWorkspace(priority.destination)}
-            <button
-              className="button button--secondary"
-              type="button"
-              onClick={() => onAskEdward({ mode: "summarize", context: priority.title })}
-            >
-              Ask Edward to summarize
-            </button>
-          </>
-        }
+        actions={openWorkspace(priority.destination)}
       >
         <p className="brew-detail__lede">{priority.detail}</p>
 
         <section className="brew-detail__section">
-          <h2>The numbers</h2>
+          <h2>Breakdown</h2>
           <div className="brew-stat-grid">
-            {priority.breakdown.map((entry) => (
-              <div className="brew-stat" key={entry.label}>
-                <small>{entry.label}</small>
-                <strong>{entry.value}</strong>
+            {priority.breakdown.map((row) => (
+              <div className="brew-stat" key={row.label}>
+                <small>{row.label}</small>
+                <strong>{row.value}</strong>
               </div>
             ))}
           </div>
         </section>
 
         <section className="brew-detail__section">
-          <h2>How to clear it</h2>
-          <ol className="brew-ordered">
+          <h2>What to do next</h2>
+          <ol className="brew-action-list">
             {priority.steps.map((step) => (
-              <li key={step}>{step}</li>
+              <li key={step}>
+                <div>
+                  <strong>{step}</strong>
+                </div>
+              </li>
             ))}
           </ol>
         </section>
@@ -644,104 +579,44 @@ export function MorningBrewDetail({
   }
 
   if (detail.kind === "change") {
-    const change = briefing.changes.find((item) => item.id === detail.id)
-      ?? BREW_CHANGES.find((item) => item.id === detail.id);
+    const change = briefing.changes.find((item) => item.id === detail.id);
     if (!change) return <NotFound onBack={onBack} />;
     const topic = topicById(change.topic);
+
     return (
       <DetailShell
-        eyebrow={`Since yesterday · ${topic?.title ?? "Institution"}`}
+        eyebrow={`${topic?.title ?? "Enrollment"} · Since yesterday`}
         title={change.title}
         onBack={onBack}
         meta={
           <>
-            <span>{change.time}</span>
-            {change.metric ? (
-              <span className={change.tone === "positive" ? "brew-delta" : "brew-delta brew-delta--watch"}>
-                {change.metric}
-              </span>
-            ) : null}
-            <span className={`brew-source brew-source--${change.source}`}>
-              {change.source === "workspace" ? "Live workspace" : "Modeled"}
+            <span className={`brew-chip brew-chip--${change.tone === "watch" ? "medium" : "low"}`}>
+              {change.metric}
             </span>
+            <span>{change.time}</span>
+            <span>{briefing.windowLabel}</span>
           </>
         }
-        actions={
-          <>
-            {openWorkspace(change.destination)}
-            <button
-              className="button button--secondary"
-              type="button"
-              onClick={() => onAskEdward({ mode: "summarize", context: change.title })}
-            >
-              Ask Edward to summarize
-            </button>
-          </>
-        }
+        actions={openWorkspace(change.destination)}
       >
         <p className="brew-detail__lede">{change.detail}</p>
-        <section className="brew-detail__section">
-          <h2>Everything else that moved</h2>
+        <section className="brew-detail__section brew-detail__section--evidence">
+          <h2>How this was counted</h2>
           <ul className="brew-note-list">
-            {briefing.changes
-              .filter((item) => item.id !== change.id)
-              .map((item) => (
-                <li key={item.id}>
-                  <b>{item.time}</b> — {item.title}
-                </li>
-              ))}
+            <li>
+              Source column: <code>{change.basis}</code>
+            </li>
+            <li>{change.basisNote}</li>
+            <li>
+              {change.exact
+                ? "This timestamp records the event itself."
+                : "This timestamp records the last write to the record, not the transition, so treat the count as an upper bound."}
+            </li>
           </ul>
         </section>
       </DetailShell>
     );
   }
 
-  const article = BREW_NEWS.find((item) => item.id === detail.id);
-  if (!article) return <NotFound onBack={onBack} />;
-  return (
-    <DetailShell
-      eyebrow={`Higher ed news · ${article.category}`}
-      title={article.headline}
-      onBack={onBack}
-      meta={
-        <>
-          <span>
-            <b>{article.sourceName}</b>
-          </span>
-          <span>{article.published}</span>
-          <span>{article.readTime}</span>
-        </>
-      }
-      actions={
-        <button
-          className="button button--secondary"
-          type="button"
-          onClick={() => onAskEdward({ mode: "insights", context: article.headline })}
-        >
-          Ask Edward what it means for us
-        </button>
-      }
-    >
-      <img className="brew-detail__art" src={article.image} alt={article.imageAlt} />
-      <p className="brew-detail__lede">{article.summary}</p>
-
-      <section className="brew-detail__section">
-        <h2>Key points</h2>
-        <ul className="brew-note-list">
-          {article.keyPoints.map((point) => (
-            <li key={point}>{point}</li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="brew-detail__section brew-detail__section--accent">
-        <h2>Why it matters here</h2>
-        <p>{article.relevance}</p>
-      </section>
-
-      <p className="brew-detail__owner">
-        Synthetic demonstration article. No external publication was contacted or reproduced.
-      </p>
-    </DetailShell>
-  );
+  return <NotFound onBack={onBack} />;
 }

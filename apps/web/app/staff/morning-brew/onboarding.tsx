@@ -1,11 +1,9 @@
 import {
   BREW_DELIVERY_TIMES,
   BREW_DEPTH_OPTIONS,
-  BREW_INBOX_DEPTHS,
   BREW_INCLUDES,
   BREW_INSIGHT_DETAILS,
-  BREW_READER_ROLE,
-  BREW_READING_SOURCES,
+  BREW_REQUEST_DEPTHS,
   BREW_TOPICS,
   BREW_TONE_OPTIONS,
 } from "./catalog";
@@ -15,8 +13,8 @@ import type {
   BrewDeliveryTime,
   BrewDepthId,
   BrewIncludeId,
-  BrewInboxDepthId,
   BrewInsightDetailId,
+  BrewRequestDepthId,
   BrewTopicId,
   BrewToneId,
 } from "./types";
@@ -29,11 +27,9 @@ export interface OnboardingDraft {
   depth: BrewDepthId;
   tone: BrewToneId;
   deliveryTime: BrewDeliveryTime;
-  inboxDepth: BrewInboxDepthId;
-  draftReplies: boolean;
-  calendarPrep: boolean;
+  requestDepth: BrewRequestDepthId;
+  deadlineNextStep: boolean;
   insightDetail: BrewInsightDetailId;
-  readingSources: string[];
 }
 
 /** One question: a short label on the left, a compact control on the right. */
@@ -151,16 +147,17 @@ function BrewLivePreview({
   draft: OnboardingDraft;
   firstName: string;
 }) {
-  const { inbox, calendar, numbers, signals, movements, headlines } = draft.include;
+  const { requests, deadlines, numbers, signals, movements } = draft.include;
   const showImpact = draft.insightDetail !== "headline";
-  const columns = [calendar && "Calendar", inbox && "Email", briefing.priorities.length && "Priorities"].filter(
-    Boolean,
-  ) as string[];
+  const columns = [
+    deadlines && "Deadlines",
+    requests && "Requests",
+    briefing.priorities.length && "Queues",
+  ].filter(Boolean) as string[];
   const isEmpty =
     !briefing.insights.length &&
     !briefing.kpis.length &&
     !briefing.changes.length &&
-    !briefing.news.length &&
     !columns.length;
 
   return (
@@ -193,18 +190,18 @@ function BrewLivePreview({
                 <Bar width="54%" />
               </div>
 
-              {inbox || calendar ? (
+              {requests || deadlines ? (
                 <div className="bp-glance">
-                  {inbox ? (
+                  {requests ? (
                     <span>
-                      <b>{briefing.inbox.unread}</b>
-                      <i>Unread</i>
+                      <b>{briefing.glance.requests}</b>
+                      <i>Requests</i>
                     </span>
                   ) : null}
-                  {calendar ? (
+                  {deadlines ? (
                     <span>
-                      <b>{briefing.inbox.meetings}</b>
-                      <i>Meetings</i>
+                      <b>{briefing.glance.deadlinesOverdue}</b>
+                      <i>Overdue</i>
                     </span>
                   ) : null}
                   <span className="bp-glance__links">
@@ -217,7 +214,7 @@ function BrewLivePreview({
 
               {signals && briefing.insights.length ? (
                 <section className="bp-block">
-                  <p className="bp-eyebrow">✦ Emerging AI insights</p>
+                  <p className="bp-eyebrow">✦ What needs attention</p>
                   <div className="bp-insights">
                     {briefing.insights.map((insight, index) => (
                       <article className={`bp-insight bp-insight--${insight.severity}`} key={insight.id}>
@@ -241,7 +238,7 @@ function BrewLivePreview({
                     {briefing.kpis.slice(0, 6).map((kpi) => (
                       <span key={kpi.id}>
                         <i>{kpi.label}</i>
-                        <b>{formatBrewNumber(kpi.frames.yesterday.numeric, kpi.format)}</b>
+                        <b>{formatBrewNumber(kpi.frames.now.numeric)}</b>
                       </span>
                     ))}
                   </div>
@@ -279,20 +276,6 @@ function BrewLivePreview({
                 </div>
               ) : null}
 
-              {headlines && briefing.news.length ? (
-                <section className="bp-block">
-                  <p className="bp-eyebrow">◎ Higher ed news</p>
-                  <div className="bp-news">
-                    {briefing.news.slice(0, 4).map((item) => (
-                      <span key={item.id}>
-                        <img src={item.image} alt="" loading="lazy" />
-                        <Bar width="90%" />
-                        <Bar width="64%" />
-                      </span>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
             </>
           )}
         </div>
@@ -312,7 +295,6 @@ export function MorningBrewOnboarding({
   customizing,
   onToggleTopic,
   onToggleInclude,
-  onToggleSource,
   onChange,
   onStep,
   onComplete,
@@ -328,7 +310,6 @@ export function MorningBrewOnboarding({
   customizing: boolean;
   onToggleTopic: (topic: BrewTopicId) => void;
   onToggleInclude: (include: BrewIncludeId) => void;
-  onToggleSource: (source: string) => void;
   onChange: (patch: Partial<OnboardingDraft>) => void;
   onStep: (step: OnboardingStep) => void;
   onComplete: () => void;
@@ -336,8 +317,8 @@ export function MorningBrewOnboarding({
 }) {
   const includedCount = BREW_INCLUDES.filter((include) => draft.include[include.id]).length;
   const depth = BREW_DEPTH_OPTIONS.find((option) => option.id === draft.depth) ?? BREW_DEPTH_OPTIONS[1];
-  const { inbox, calendar, signals, headlines } = draft.include;
-  const hasFollowUps = inbox || calendar || signals || headlines;
+  const { requests, deadlines, signals } = draft.include;
+  const hasFollowUps = requests || deadlines || signals;
 
   const heading =
     step === 1
@@ -350,7 +331,7 @@ export function MorningBrewOnboarding({
     step === 1
       ? "We picked a few based on what you look after. Add anything else you keep half an eye on, and drop what you don't. Nothing here is permanent."
       : step === 2
-        ? "Your morning read gets a lot better when it knows about the rest of your day. Everything below is a polished demo — no real account is touched, and nothing leaves this browser."
+        ? "Each of these is a slice of your live enrollment data. Switch off anything you don't want in front of you and the section simply won't appear."
         : "A few quick calls, then you're done. Everything is already answered sensibly.";
 
   return (
@@ -382,7 +363,8 @@ export function MorningBrewOnboarding({
         {step === 1 ? (
           <>
             <p className="brew-setup__role">
-              Signed in as <strong>{firstName}</strong> · {BREW_READER_ROLE}
+              Signed in as <strong>{firstName}</strong> · {preview.students} students on your
+              roster
             </p>
             <div className="brew-topic-grid">
               {BREW_TOPICS.map((topic) => {
@@ -450,10 +432,10 @@ export function MorningBrewOnboarding({
             <aside className="brew-privacy-note">
               <span aria-hidden="true">✓</span>
               <div>
-                <strong>Nothing here leaves your browser</strong>
+                <strong>Every section reads your live records</strong>
                 <p>
-                  The mail and calendar you&rsquo;ll see are believable stand-ins written for this demo. We only
-                  remember which switches you flipped.
+                  Nothing here is modelled or generated. Only your choice of sections is remembered,
+                  and it stays in this browser.
                 </p>
               </div>
             </aside>
@@ -495,71 +477,38 @@ export function MorningBrewOnboarding({
                 <section className="brew-ask-card">
                   <h2>About the bits you picked</h2>
 
-                  {inbox ? (
-                    <>
-                      <Ask label="How much of your inbox?" icon={iconFor("inbox")}>
-                        <Segmented
-                          label="Inbox depth"
-                          value={draft.inboxDepth}
-                          onChange={(id) => onChange({ inboxDepth: id })}
-                          options={BREW_INBOX_DEPTHS.map((option) => ({ id: option.id, label: option.title }))}
-                        />
-                      </Ask>
-                      <SwitchRow
-                        sub
-                        on={draft.draftReplies}
-                        onClick={() => onChange({ draftReplies: !draft.draftReplies })}
-                        title="Edward drafts a reply for each"
-                        caption="Ready for you to edit or throw away"
+                  {requests ? (
+                    <Ask label="How many student requests?" icon={iconFor("requests")}>
+                      <Segmented
+                        label="Request depth"
+                        value={draft.requestDepth}
+                        onChange={(id) => onChange({ requestDepth: id })}
+                        options={BREW_REQUEST_DEPTHS.map((option) => ({
+                          id: option.id,
+                          label: option.title,
+                        }))}
                       />
-                    </>
+                    </Ask>
                   ) : null}
 
-                  {calendar ? (
+                  {deadlines ? (
                     <SwitchRow
-                      on={draft.calendarPrep}
-                      onClick={() => onChange({ calendarPrep: !draft.calendarPrep })}
-                      icon={iconFor("calendar")}
-                      title="Prep note on the meetings that matter"
-                      caption="One line on what to know before you walk in"
+                      on={draft.deadlineNextStep}
+                      onClick={() => onChange({ deadlineNextStep: !draft.deadlineNextStep })}
+                      icon={iconFor("deadlines")}
+                      title="Next step on the dates that already passed"
+                      caption="One line on what to check before chasing anyone"
                     />
                   ) : null}
 
                   {signals ? (
-                    <Ask label="How much detail on what we spot?" icon={iconFor("signals")}>
+                    <Ask label="How much detail on what needs attention?" icon={iconFor("signals")}>
                       <Segmented
                         label="Signal detail"
                         value={draft.insightDetail}
                         onChange={(id) => onChange({ insightDetail: id })}
                         options={BREW_INSIGHT_DETAILS.map((option) => ({ id: option.id, label: option.title }))}
                       />
-                    </Ask>
-                  ) : null}
-
-                  {headlines ? (
-                    <Ask
-                      label="Where should we read from?"
-                      icon={iconFor("headlines")}
-                      hint={`${draft.readingSources.length} of ${BREW_READING_SOURCES.length} selected`}
-                      stack
-                    >
-                      <span className="brew-source-row">
-                        {BREW_READING_SOURCES.map((source) => {
-                          const on = draft.readingSources.includes(source.id);
-                          return (
-                            <button
-                              className={on ? "brew-source-chip is-on" : "brew-source-chip"}
-                              type="button"
-                              aria-pressed={on}
-                              onClick={() => onToggleSource(source.id)}
-                              key={source.id}
-                            >
-                              <i aria-hidden="true">{on ? "✓" : "+"}</i>
-                              {source.label}
-                            </button>
-                          );
-                        })}
-                      </span>
                     </Ask>
                   ) : null}
                 </section>
@@ -588,7 +537,7 @@ export function MorningBrewOnboarding({
               ? "Pick at least one. You can change this any morning."
               : step === 2
                 ? "All optional — your read still works without any of them."
-                : `Ready for you every weekday at ${draft.deliveryTime.replace(/^0/, "")} AM.`}
+                : `You'll aim to read it around ${draft.deliveryTime.replace(/^0/, "")} AM. The page always shows the time it was read.`}
           </span>
         </div>
         <div className="brew-setup__actions">
