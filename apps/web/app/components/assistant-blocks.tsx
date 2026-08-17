@@ -1,5 +1,17 @@
 import type { AssistantResponseBlock } from "@vv/contracts";
+import { safePortalDestination } from "../lib/safe-destination";
 import { TenantLink as Link } from "./tenant-link";
+
+/**
+ * Assistant hrefs may only be internal portal routes — the contract says
+ * "never an action or an external link" — so anything external or malformed
+ * renders as plain text rather than a link.
+ */
+function internalHref(href: string | null | undefined): string | null {
+  if (!href) return null;
+  const destination = safePortalDestination(href, "/dashboard");
+  return !destination.external && destination.href === href.trim() ? destination.href : null;
+}
 
 /**
  * The structured renderer for an assistant turn.
@@ -51,15 +63,14 @@ function AssistantBlockView({
         <section className="assistant-block assistant-block--bullets">
           {block.title ? <h4>{block.title}</h4> : null}
           <ul>
-            {block.items.map((item, index) => (
-              <li key={`${idPrefix}-item-${index}`}>
-                {item.href ? (
-                  <Link href={item.href}>{item.text}</Link>
-                ) : (
-                  item.text
-                )}
-              </li>
-            ))}
+            {block.items.map((item, index) => {
+              const href = internalHref(item.href);
+              return (
+                <li key={`${idPrefix}-item-${index}`}>
+                  {href ? <Link href={href}>{item.text}</Link> : item.text}
+                </li>
+              );
+            })}
           </ul>
         </section>
       );
@@ -70,20 +81,19 @@ function AssistantBlockView({
         <section className="assistant-block assistant-block--steps">
           {block.title ? <h4>{block.title}</h4> : null}
           <ol>
-            {block.items.map((item, index) => (
-              <li key={`${idPrefix}-item-${index}`}>
-                {item.href ? (
-                  <Link href={item.href}>{item.text}</Link>
-                ) : (
-                  item.text
-                )}
-                {"owner" in item && item.owner === "university" ? (
-                  <span className="assistant-block__owner">
-                    waiting on the university
-                  </span>
-                ) : null}
-              </li>
-            ))}
+            {block.items.map((item, index) => {
+              const href = internalHref(item.href);
+              return (
+                <li key={`${idPrefix}-item-${index}`}>
+                  {href ? <Link href={href}>{item.text}</Link> : item.text}
+                  {"owner" in item && item.owner === "university" ? (
+                    <span className="assistant-block__owner">
+                      waiting on the university
+                    </span>
+                  ) : null}
+                </li>
+              );
+            })}
           </ol>
         </section>
       );
@@ -113,22 +123,34 @@ function AssistantBlockView({
                 </tr>
               </thead>
               <tbody>
-                {block.rows.map((row, rowIndex) => (
-                  <tr key={`${idPrefix}-row-${rowIndex}`}>
-                    {block.columns.map((column) => (
-                      <td
-                        key={`${idPrefix}-row-${rowIndex}-${column.key}`}
-                        style={
-                          column.align === "right"
-                            ? { textAlign: "right" }
-                            : undefined
-                        }
-                      >
-                        {row[column.key] ?? "—"}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
+                {block.rows.map((row, rowIndex) => {
+                  // A row's destination links its first cell, so the row's
+                  // entity opens on its real portal page.
+                  const rowHref = internalHref(block.rowHrefs?.[rowIndex]);
+                  return (
+                    <tr key={`${idPrefix}-row-${rowIndex}`}>
+                      {block.columns.map((column, columnIndex) => {
+                        const value = row[column.key] ?? "—";
+                        return (
+                          <td
+                            key={`${idPrefix}-row-${rowIndex}-${column.key}`}
+                            style={
+                              column.align === "right"
+                                ? { textAlign: "right" }
+                                : undefined
+                            }
+                          >
+                            {columnIndex === 0 && rowHref ? (
+                              <Link href={rowHref}>{value}</Link>
+                            ) : (
+                              value
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
