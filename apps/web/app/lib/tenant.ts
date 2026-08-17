@@ -115,6 +115,10 @@ const portalRouteSegments = new Set([
   "campus-life",
   "classrooms",
   "dashboard",
+  // Developer-only surfaces (the Edward Lab). Reserved like every other
+  // top-level route: without this, /dev/edward reads "dev" as a tenant slug
+  // and the tenant bootstrap 404s before the page can render.
+  "dev",
   "documents",
   "edward",
   "enrollment",

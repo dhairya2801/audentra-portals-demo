@@ -120,7 +120,7 @@ test("tenant routes render and preserve tenant-aware internal destinations", asy
   assert.equal(tenant.isTenantSlug("northbridge-college"), true);
   assert.equal(tenant.isTenantSlug("not/a/slug"), false);
   assert.equal(tenant.isTenantSlug("northbridge-"), false);
-  for (const reserved of ["sign-in", "staff", "offer", "v1", "health"]) {
+  for (const reserved of ["sign-in", "staff", "offer", "v1", "health", "dev"]) {
     assert.equal(tenant.isTenantSlug(reserved), false, `${reserved} is reserved`);
   }
   assert.equal(
