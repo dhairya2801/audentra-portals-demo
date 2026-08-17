@@ -897,3 +897,206 @@
   font-size: 0.66rem;
   color: var(--ink-soft);
 }
+
+/* --- view tabs ---------------------------------------------------------- */
+
+.viewTabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.15rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--paper);
+}
+
+.viewTab,
+.viewTabActive {
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border: 0;
+  border-radius: 0.38rem;
+  padding: 0.24rem 0.6rem;
+  cursor: pointer;
+  color: var(--ink-soft);
+  background: none;
+}
+
+.viewTabActive {
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 12%);
+}
+
+/* --- normal vs deterministic comparison --------------------------------- */
+
+.compareShell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem 2rem;
+  max-width: 110rem;
+  margin: 0 auto;
+}
+
+.compareControls,
+.compareDelta {
+  padding: 0.85rem 1rem;
+}
+
+.compareForm {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.compareForm input {
+  font: inherit;
+  font-size: 0.82rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.compareForm button {
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 0.42rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  background: var(--audentra-blue);
+  color: #fff;
+  cursor: pointer;
+}
+
+.compareForm button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.compareChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.55rem;
+}
+
+.experimentChip {
+  font: inherit;
+  font-size: 0.7rem;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.16rem 0.6rem;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.experimentChip:hover:not(:disabled) {
+  background: var(--paper);
+}
+
+.experimentChip:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.experimentCategory {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.blockChip,
+.failureChip {
+  font-size: 0.66rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.08rem 0.5rem;
+  color: var(--ink-soft);
+}
+
+.failureChip {
+  color: #991b1b;
+  background: #fef2f2;
+  border-color: #fecaca;
+  font-weight: 700;
+}
+
+.compareGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  align-items: start;
+}
+
+@media (max-width: 980px) {
+  .compareGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.compareColumn {
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.compareColumnHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.compareColumnHead h3 {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.compareMessage {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  border-left: 2px solid var(--line);
+  padding-left: 0.7rem;
+}
+
+.compareWarning,
+.compareError {
+  margin: 0;
+  font-size: 0.72rem;
+  border-radius: 0.45rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.compareError {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.compareHistoryNote,
+.compareTraceId {
+  margin: 0;
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+}

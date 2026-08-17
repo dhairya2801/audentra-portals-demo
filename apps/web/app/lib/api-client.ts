@@ -101,6 +101,7 @@ import type {
   UpdateStudentHousingPlanInput,
   UpdateStudentProfileInput,
 } from "@vv/contracts";
+import type { EdwardExecutionMode } from "./edward-lab";
 import { currentTenantSlug } from "./tenant";
 
 const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
@@ -108,6 +109,11 @@ const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
 // A relative fallback is safe in previews and production. Real deployments
 // should set NEXT_PUBLIC_API_BASE_URL to the public Audentra API origin.
 export const API_BASE_URL = (configuredApiBaseUrl || "").replace(/\/+$/, "");
+
+// The platform's Edward Lab execution-mode header. Declared here as a literal
+// so this module carries no runtime dependency on Lab code; `edward-lab.ts`
+// exports the same constant and a test pins the two together.
+const EDWARD_EXECUTION_MODE_HEADER = "X-Edward-Mode";
 
 export class ApiClientError extends Error {
   readonly status: number;
@@ -1299,12 +1305,28 @@ export function refreshAssistantVoiceSessionToken(voiceSessionId: string) {
   );
 }
 
-export function askEdward(input: AskEdwardInput, signal?: AbortSignal) {
+/**
+ * `options.executionMode` is an Edward Lab control and nothing else: it adds
+ * the platform's `X-Edward-Mode` header so one turn can be forced down the
+ * zero-LLM path. Omitting it — which every product call site does — sends the
+ * request exactly as before. The platform honours the header only where its
+ * own development/evaluation controls are enabled and never in production.
+ */
+export function askEdward(
+  input: AskEdwardInput,
+  signal?: AbortSignal,
+  options: { executionMode?: EdwardExecutionMode } = {},
+) {
   return request<AskEdwardResponse>(
     "/v1/student/assistant/messages",
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.executionMode
+          ? { [EDWARD_EXECUTION_MODE_HEADER]: options.executionMode }
+          : {}),
+      },
       body: JSON.stringify(input),
       signal,
     },
