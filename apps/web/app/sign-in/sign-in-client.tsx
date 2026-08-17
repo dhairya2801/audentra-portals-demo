@@ -10,9 +10,15 @@ import { useApiAction } from "../hooks/use-api-resource";
 import {
   ApiClientError,
   getStudentBootstrap,
+  signInDemoStudent,
   signInStudent,
   signUpStudent,
 } from "../lib/api-client";
+import {
+  demoStudentLoginEnabled,
+  normalizeStudentReference,
+  validateStudentReference,
+} from "../lib/demo-student-login";
 import { ActionFeedback, PortalMark } from "../components/portal-ui";
 import { TenantLink as Link } from "../components/tenant-link";
 import { useTenant } from "../components/tenant-provider";
@@ -339,6 +345,7 @@ export function SignInClient() {
             </a>
           </p>
         ) : null}
+        <DemoStudentSignIn />
       </section>
       <aside className="auth-story" aria-label={`${tenant.name} student experience`}>
         {tenant.branding.heroImageUrl ? (
@@ -362,6 +369,111 @@ export function SignInClient() {
         </div>
       </aside>
     </main>
+  );
+}
+
+/**
+ * "Log in as demo student" — a developer affordance, not a product feature.
+ *
+ * The demo campus has thousands of students in genuinely different states, so
+ * the useful question is "show me *this* student", not "show me a student".
+ * Signing in reads their stored state and changes nothing about it, which is
+ * what makes the demo usable for stateful testing: pay a deposit, sign out,
+ * sign back in, and the deposit is still paid.
+ *
+ * Rendered only when the flag allows it, and backed by a platform route that
+ * 404s outside development and preview. The gate below is convenience; the
+ * one that matters is server-side.
+ */
+function DemoStudentSignIn() {
+  const tenantRuntime = useTenant();
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [resolvedName, setResolvedName] = useState<string | null>(null);
+  const demoSignIn = useApiAction(
+    async (studentRef: string) => {
+      const session = await signInDemoStudent({ studentRef });
+      setResolvedName(session.student.preferredName);
+      return getStudentBootstrap();
+    },
+    (error) =>
+      error instanceof ApiClientError
+        ? error.message
+        : "We couldn’t open that student. Check the ID and try again.",
+  );
+
+  const enabled = demoStudentLoginEnabled({
+    NEXT_PUBLIC_DEMO_STUDENT_LOGIN_ENABLED:
+      process.env.NEXT_PUBLIC_DEMO_STUDENT_LOGIN_ENABLED,
+    NODE_ENV: process.env.NODE_ENV,
+  });
+  if (!enabled) return null;
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const raw = String(new FormData(event.currentTarget).get("studentRef") ?? "");
+    const invalid = validateStudentReference(raw);
+    setFieldError(invalid);
+    if (invalid) return;
+    setResolvedName(null);
+    try {
+      const bootstrap = await demoSignIn.run(normalizeStudentReference(raw));
+      window.location.assign(tenantRuntime.href(bootstrap.initialRoute));
+    } catch {
+      // The typed id stays in the field so it can be corrected.
+    }
+  };
+
+  return (
+    <section className="auth-demo-student" aria-labelledby="demo-student-title">
+      <p className="eyebrow">Development only</p>
+      <h2 id="demo-student-title">Log in as demo student</h2>
+      <p>
+        Open any student in this university’s demo population by ID. Their
+        saved progress is shown as-is; signing in never resets it.
+      </p>
+      <form className="auth-demo-student__form" noValidate onSubmit={submit}>
+        <label className="field">
+          <span>Student ID</span>
+          <input
+            aria-describedby={
+              fieldError ? "demo-student-help demo-student-error" : "demo-student-help"
+            }
+            aria-invalid={fieldError ? true : undefined}
+            name="studentRef"
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={64}
+            onChange={() => setFieldError(null)}
+            placeholder="SYN-000042"
+          />
+          <small id="demo-student-help">
+            The institution reference or the student’s UUID.
+          </small>
+          {fieldError ? (
+            <small className="field-error" id="demo-student-error" role="alert">
+              {fieldError}
+            </small>
+          ) : null}
+        </label>
+        <button
+          className="button button--secondary"
+          type="submit"
+          disabled={demoSignIn.status === "loading"}
+        >
+          {demoSignIn.status === "loading" ? "Opening…" : "Continue"}
+        </button>
+      </form>
+      <ActionFeedback
+        status={demoSignIn.status}
+        error={demoSignIn.message}
+        success={
+          resolvedName
+            ? `Opening ${resolvedName}’s portal…`
+            : "Opening the student’s portal…"
+        }
+      />
+    </section>
   );
 }
 

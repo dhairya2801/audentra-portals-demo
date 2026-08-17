@@ -9219,6 +9219,51 @@ a {
   text-align: center;
 }
 
+/* "Log in as demo student": a development affordance, marked as one.
+   The dashed border and muted panel keep it visually subordinate to the real
+   sign-in form so nobody mistakes it for a product feature. */
+.auth-demo-student {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px dashed #b9c3d6;
+  border-radius: 0.55rem;
+  background: #f2f5fa;
+}
+
+.auth-demo-student .eyebrow {
+  margin: 0;
+}
+
+.auth-demo-student h2 {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  letter-spacing: -0.01em;
+}
+
+.auth-demo-student > p {
+  margin: 0.35rem 0 0.75rem;
+  color: var(--ink-soft);
+  font-size: 0.66rem;
+  line-height: 1.5;
+}
+
+.auth-demo-student__form {
+  display: grid;
+  gap: 0.65rem;
+  align-items: end;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.auth-demo-student__form .field {
+  min-width: 0;
+}
+
+@media (width <= 32rem) {
+  .auth-demo-student__form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .auth-story {
   display: flex;
   min-height: 100vh;
