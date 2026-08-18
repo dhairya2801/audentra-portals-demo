@@ -102,7 +102,6 @@ import type {
   UpdateStudentProfileInput,
 } from "@vv/contracts";
 import type { EdwardExecutionMode } from "./edward-lab";
-import { currentTenantSlug } from "./tenant";
 
 const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
 
@@ -172,7 +171,6 @@ async function request<T>(
   init: RequestInit = {},
   options: {
     notifyStudentRecordChanged?: boolean;
-    tenantSlug?: string;
   } = {},
 ): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -180,7 +178,6 @@ async function request<T>(
     credentials: "include",
     headers: {
       Accept: "application/json",
-      "X-Tenant-Slug": options.tenantSlug ?? currentTenantSlug(),
       ...init.headers,
     },
   });
@@ -200,12 +197,8 @@ async function request<T>(
   return result;
 }
 
-export function getTenantBootstrap(slug: string, signal?: AbortSignal) {
-  return request<TenantBootstrap>(
-    `/v1/tenants/${encodeURIComponent(slug)}/bootstrap`,
-    { signal },
-    { tenantSlug: slug },
-  );
+export function getTenantBootstrap(signal?: AbortSignal) {
+  return request<TenantBootstrap>("/v1/tenant/bootstrap", { signal });
 }
 
 export function getStudentBootstrap(signal?: AbortSignal) {
@@ -1122,7 +1115,6 @@ export async function getStaffCallRecordingContent(
       headers: {
         Accept: "audio/*,video/*",
         ...staffHeaders,
-        "X-Tenant-Slug": currentTenantSlug(),
       },
       signal,
     },
@@ -1246,9 +1238,7 @@ export function getStaffDocumentContentUrl(path: string) {
 }
 
 function tenantAwareDocumentUrl(path: string) {
-  const url = new URL(path, `${API_BASE_URL}/`);
-  url.searchParams.set("tenant", currentTenantSlug());
-  return url.toString();
+  return new URL(path, `${API_BASE_URL}/`).toString();
 }
 
 export function createAssistantConversation(

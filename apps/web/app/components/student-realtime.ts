@@ -1,5 +1,4 @@
 import { API_BASE_URL } from "../lib/api-client";
-import { currentTenantSlug } from "../lib/tenant";
 
 export interface StudentRealtimeEvent<T = unknown> {
   id: number;
@@ -78,7 +77,6 @@ export function connectStudentRealtime(
           credentials: "include",
           headers: {
             Accept: "text/event-stream",
-            "X-Tenant-Slug": currentTenantSlug(),
           },
           cache: "no-store",
           signal: controller.signal,

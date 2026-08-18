@@ -1,5 +1,4 @@
 import { API_BASE_URL } from "../lib/api-client";
-import { currentTenantSlug } from "../lib/tenant";
 
 export interface StaffRealtimeEvent<T = unknown> {
   id: number;
@@ -68,9 +67,7 @@ function parseEventBlock(block: string): StaffRealtimeEvent | null {
 /**
  * Subscribe to durable staff invalidations without depending on sticky sessions.
  *
- * Native EventSource cannot attach the tenant header used by the platform, so
- * this small fetch-based SSE client keeps the same credential and tenant
- * boundary as every other portal request.
+ * This fetch-based SSE client preserves credentials and supports cursor replay.
  */
 export function connectStaffRealtime({
   onEvent,
@@ -96,7 +93,6 @@ export function connectStaffRealtime({
             credentials: "include",
             headers: {
               Accept: "text/event-stream",
-              "X-Tenant-Slug": currentTenantSlug(),
             },
             cache: "no-store",
             signal: controller.signal,

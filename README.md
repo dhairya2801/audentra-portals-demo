@@ -75,9 +75,10 @@ npm run start
 
 All production browser traffic uses `NEXT_PUBLIC_API_BASE_URL` and sends
 credentials. Separate frontend and backend origins therefore require the
-platform to allow the exact portal origin, credentialed CORS, and the
-`X-Tenant-Slug` header. Authentication cookies must use secure cross-site
-settings when the two deployments are on different sites.
+platform to allow the exact portal origin and credentialed CORS. The platform
+resolves the deployment's configured tenant server-side; users do not enter or
+send an institution portal identifier. Authentication cookies must use secure
+cross-site settings when the two deployments are on different sites.
 
 `packages/contracts` is deliberately marked as a temporary vendored snapshot.
 The platform copy is canonical. Before teams change the two repositories

@@ -1,13 +1,6 @@
-"use client";
-
 import Link from "next/link";
-import { useState } from "react";
-import { isTenantSlug } from "./lib/tenant";
 
 export default function PortalLandingPage() {
-  const [institutionSlug, setInstitutionSlug] = useState("");
-  const normalizedSlug = institutionSlug.trim().toLowerCase();
-  const validSlug = isTenantSlug(normalizedSlug) ? normalizedSlug : null;
   return (
     <main className="portal-landing">
       <div className="portal-landing__glow portal-landing__glow--one" aria-hidden="true" />
@@ -31,24 +24,10 @@ export default function PortalLandingPage() {
           Choose your portal to continue.
         </p>
 
-        <label className="portal-landing__tenant-field">
-          <span>Institution portal ID</span>
-          <input
-            value={institutionSlug}
-            onChange={(event) => setInstitutionSlug(event.target.value)}
-            placeholder="your-institution"
-            autoComplete="organization"
-            spellCheck={false}
-          />
-          <small>Use the portal ID provided by your institution.</small>
-        </label>
-
         <div className="portal-choice-grid">
           <Link
-            aria-disabled={!validSlug}
             className="portal-choice portal-choice--student"
-            href={validSlug ? `/${validSlug}/sign-in` : "#"}
-            onClick={(event) => { if (!validSlug) event.preventDefault(); }}
+            href="/sign-in"
           >
             <span className="portal-choice__icon" aria-hidden="true">S</span>
             <span>
@@ -59,10 +38,8 @@ export default function PortalLandingPage() {
             <b aria-hidden="true">→</b>
           </Link>
           <Link
-            aria-disabled={!validSlug}
             className="portal-choice portal-choice--staff"
-            href={validSlug ? `/${validSlug}/staff` : "#"}
-            onClick={(event) => { if (!validSlug) event.preventDefault(); }}
+            href="/staff"
           >
             <span className="portal-choice__icon" aria-hidden="true">A</span>
             <span>

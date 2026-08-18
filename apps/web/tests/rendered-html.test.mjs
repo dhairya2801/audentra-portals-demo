@@ -26,7 +26,7 @@ async function render(path = "/") {
   );
 }
 
-test("server-renders the neutral, accessible institution portal selector", async () => {
+test("server-renders direct, accessible student and staff portal links", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
@@ -34,14 +34,16 @@ test("server-renders the neutral, accessible institution portal selector", async
   const html = await response.text();
   assert.match(html, /<title>Audentra \| Institutional intelligence for what’s next<\/title>/i);
   assert.match(html, /Institutional intelligence/);
-  assert.match(html, /Institution portal ID/);
+  assert.doesNotMatch(html, /Institution portal ID/);
   assert.match(html, /Student portal/);
   assert.match(html, /Staff portal/);
-  assert.doesNotMatch(html, /href="\/(?:aster|harvard)\//);
+  assert.match(html, /href="\/sign-in"/);
+  assert.match(html, /href="\/staff"/);
+  assert.doesNotMatch(html, /aria-disabled|href="#"/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
 });
 
-test("unscoped portal routes fail closed without a configured tenant", async () => {
+test("canonical portal routes load the server-configured institution", async () => {
   const routes = [
     "/sign-in",
     "/onboarding",
@@ -61,7 +63,7 @@ test("unscoped portal routes fail closed without a configured tenant", async () 
     const response = await render(route);
     assert.equal(response.status, 200, `${route} should render`);
     const html = await response.text();
-    assert.match(html, /Choose your institution from the portal entry page/);
+    assert.match(html, /Loading your institution portal/);
     assert.doesNotMatch(html, /Aster University|Harvard University/);
     assert.doesNotMatch(
       html,
@@ -69,32 +71,10 @@ test("unscoped portal routes fail closed without a configured tenant", async () 
     );
   }
 
-  const signInResponse = await render("/sign-in");
-  assert.match(
-    await signInResponse.text(),
-    /We couldn’t open this institution portal/,
-  );
 });
 
-test("tenant routes render and preserve tenant-aware internal destinations", async () => {
-  for (const tenant of ["aster", "northbridge-college"]) {
-    for (const route of [
-      `/${tenant}/sign-in`,
-      `/${tenant}/onboarding`,
-      `/${tenant}/dashboard`,
-      `/${tenant}/campus-life`,
-      `/${tenant}/staff`,
-      `/${tenant}/enrollment/requirements/transcript-upload`,
-    ]) {
-      const response = await render(route);
-      assert.equal(response.status, 200, `${route} should render`);
-      assert.doesNotMatch(
-        await response.text(),
-        /<h1[^>]*>\s*404\s*<\/h1>|\bPage not found\b/i,
-      );
-    }
-  }
-
+test("tenant configuration formats institution-owned copy without slug routing", async () => {
+  await assert.rejects(access(new URL("../app/[tenant]/layout.tsx", import.meta.url)));
   const source = await readFile(
     new URL("../app/lib/tenant.ts", import.meta.url),
     "utf8",
@@ -108,29 +88,6 @@ test("tenant routes render and preserve tenant-aware internal destinations", asy
   const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
   const tenant = await import(moduleUrl);
 
-  assert.equal(tenant.tenantHref("/dashboard", "aster"), "/aster/dashboard");
-  assert.equal(
-    tenant.tenantHref("/campus-life?view=clubs#featured", "northbridge-college"),
-    "/northbridge-college/campus-life?view=clubs#featured",
-  );
-  assert.equal(
-    tenant.tenantHref("/offer", "northbridge-college"),
-    "/northbridge-college/onboarding",
-  );
-  assert.equal(tenant.isTenantSlug("northbridge-college"), true);
-  assert.equal(tenant.isTenantSlug("not/a/slug"), false);
-  assert.equal(tenant.isTenantSlug("northbridge-"), false);
-  for (const reserved of ["sign-in", "staff", "offer", "v1", "health", "dev"]) {
-    assert.equal(tenant.isTenantSlug(reserved), false, `${reserved} is reserved`);
-  }
-  assert.equal(
-    tenant.tenantSlugFromPathname("/northbridge-college/dashboard"),
-    "northbridge-college",
-  );
-  assert.equal(
-    tenant.tenantSlugFromPathname("/sign-in"),
-    tenant.defaultTenantSlug,
-  );
   assert.equal(
     tenant.tenantCopy(
       "Your place at {institutionName}",
@@ -205,8 +162,9 @@ test("tenant runtime gates pages on the public bootstrap and keeps managed CRUD 
       ),
     ]);
 
-  assert.match(apiClient, /\/v1\/tenants\/\$\{encodeURIComponent\(slug\)\}\/bootstrap/);
-  assert.match(provider, /getTenantBootstrap\(slug, controller\.signal\)/);
+  assert.match(apiClient, /\/v1\/tenant\/bootstrap/);
+  assert.doesNotMatch(apiClient, /X-Tenant-Slug|currentTenantSlug/);
+  assert.match(provider, /getTenantBootstrap\(controller\.signal\)/);
   assert.match(provider, /runtime\.status !== "ready"/);
   assert.match(provider, /children[\s\S]*TenantContext\.Provider/);
   assert.match(provider, /runtime\.reload/);
@@ -227,7 +185,7 @@ test("tenant runtime gates pages on the public bootstrap and keeps managed CRUD 
   }
 });
 
-test("tenant routing, links, branding, and capabilities fail closed", async () => {
+test("tenant branding and capabilities load from the server-configured institution", async () => {
   const [tenant, provider, shell, help, signIn, profile, onboarding, edward] =
     await Promise.all([
       readFile(new URL("../app/lib/tenant.ts", import.meta.url), "utf8"),
@@ -249,14 +207,9 @@ test("tenant routing, links, branding, and capabilities fail closed", async () =
       readFile(new URL("../app/edward/page.tsx", import.meta.url), "utf8"),
     ]);
 
-  assert.match(tenant, /export const defaultTenantSlug:[\s\S]*?: null;/);
-  assert.doesNotMatch(tenant, /defaultTenantSlug[\s\S]{0,180}: "aster"/);
-  assert.match(tenant, /!portalRouteSegments\.has\(value\)/);
-  assert.match(tenant, /"offer"/);
-  assert.match(tenant, /"v1"/);
-  assert.match(tenant, /"health"/);
-  assert.match(provider, /if \(isUnscopedLanding \|\| !slug\) return;/);
-  assert.match(provider, /Choose your institution from the portal entry page/);
+  assert.doesNotMatch(tenant, /defaultTenantSlug|tenantSlugFromPathname|tenantHref/);
+  assert.match(provider, /if \(bypassesTenantBootstrap\) return;/);
+  assert.doesNotMatch(provider, /Choose your institution from the portal entry page/);
   assert.match(provider, /querySelector<HTMLLinkElement>\(faviconSelector\)\?\.remove\(\)/);
 
   assert.match(shell, /tenant\.capabilities\.campusLife !== false/);
@@ -548,10 +501,7 @@ test("typed client wires every resource route and mutation contract", async () =
     new URL("../app/lib/api-client.ts", import.meta.url),
     "utf8",
   );
-  const executableSource = source.replace(
-    /import\s+\{\s*currentTenantSlug\s*\}\s+from\s+"\.\/tenant";/,
-    'const currentTenantSlug = () => "aster";',
-  );
+  const executableSource = source;
   const compiled = ts.transpileModule(executableSource, {
     compilerOptions: {
       module: ts.ModuleKind.ESNext,
@@ -828,19 +778,19 @@ test("typed client wires every resource route and mutation contract", async () =
   assert.equal(requests[0].url, "http://localhost:4000/v1/student/bootstrap");
   assert.equal(requests[0].init.method, "GET");
   assert.equal(requests[0].init.credentials, "include");
-  assert.equal(requests[0].init.headers["X-Tenant-Slug"], "aster");
+  assert.equal(requests[0].init.headers["X-Tenant-Slug"], undefined);
   assert.equal(
     client.getStudentDocumentContentUrl({
       contentUrl:
         "/v1/student/documents/00000000-0000-7000-8000-000000000701/content",
     }),
-    "http://localhost:4000/v1/student/documents/00000000-0000-7000-8000-000000000701/content?tenant=aster",
+    "http://localhost:4000/v1/student/documents/00000000-0000-7000-8000-000000000701/content",
   );
   assert.equal(
     client.getStudentDocumentProfilePhotoUrl(
       "00000000-0000-7000-8000-000000000701",
     ),
-    "http://localhost:4000/v1/student/documents/00000000-0000-7000-8000-000000000701/profile-photo?tenant=aster",
+    "http://localhost:4000/v1/student/documents/00000000-0000-7000-8000-000000000701/profile-photo",
   );
 
   const requestByPath = new Map(

@@ -30,7 +30,6 @@ import {
   askStaffEdward,
   createStaffAssistantConversation,
 } from "../lib/api-client";
-import { currentTenantSlug } from "../lib/tenant";
 import { AssistantBlocks } from "./assistant-blocks";
 import labStyles from "./edward-lab.module.css";
 
@@ -50,7 +49,7 @@ interface StaffDisplayMessage {
 }
 
 function conversationStorageKey(): string {
-  return `audentra.staff-edward.portal-conversation.v1:${currentTenantSlug()}`;
+  return "audentra.staff-edward.portal-conversation.v1";
 }
 
 function readStoredConversationId(key: string): string | null {

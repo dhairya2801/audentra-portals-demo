@@ -33,7 +33,6 @@ import {
   summarizeTrace,
   type TraceListEntry,
 } from "../lib/edward-lab";
-import { currentTenantSlug } from "../lib/tenant";
 import { AssistantBlocks } from "./assistant-blocks";
 import { EdwardTraceInspector } from "./edward-trace-inspector";
 import styles from "./edward-lab.module.css";
@@ -62,7 +61,7 @@ async function labFetch(url: string, init?: RequestInit): Promise<Response> {
 }
 
 function conversationStorageKey(): string {
-  return `audentra.edward-lab.staff-conversation.v1:${currentTenantSlug()}`;
+  return "audentra.edward-lab.staff-conversation.v1";
 }
 
 function readStoredConversationId(key: string): string | null {
