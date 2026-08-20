@@ -11,7 +11,13 @@ import type { NextConfig } from "next";
 // same-origin relative paths.
 const apiProxyOrigin = process.env.API_PROXY_ORIGIN?.trim().replace(/\/+$/, "");
 
-const nextConfig: NextConfig = {
+type AudentraNextConfig = NextConfig & {
+  experimental?: NonNullable<NextConfig["experimental"]> & {
+    useTypeScriptCli?: boolean;
+  };
+};
+
+const nextConfig: AudentraNextConfig = {
   // Use the installed TypeScript compiler API. Next 16.3's CLI config parser
   // can receive non-JSON process output in workspace builds on Vercel.
   experimental: {

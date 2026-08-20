@@ -73,6 +73,11 @@ import type {
   StaffManagedConfiguration,
   StaffManagedConfigurationKind,
   StaffMorningBrew,
+  StaffAuthOptions,
+  StaffEmailSendIntent,
+  StaffIdentityProvider,
+  StaffMailboxList,
+  StaffMailMessageList,
   StaffNotificationList,
   StaffNotificationReadResult,
   StaffOperationsWorkspace,
@@ -100,6 +105,9 @@ import type {
   UpdateStudentOnboardingInput,
   UpdateStudentHousingPlanInput,
   UpdateStudentProfileInput,
+  ConfirmStaffEmailSendIntentInput,
+  CreateStaffEmailSendIntentInput,
+  SearchStaffMailInput,
 } from "@vv/contracts";
 import type { EdwardExecutionMode } from "./edward-lab";
 
@@ -186,7 +194,8 @@ async function request<T>(
     throw await parseError(response);
   }
 
-  const result = (await response.json()) as T;
+  const result =
+    response.status === 204 ? (undefined as T) : ((await response.json()) as T);
   if (
     typeof window !== "undefined" &&
     (init.method ?? "GET").toUpperCase() !== "GET" &&
@@ -634,6 +643,109 @@ export function signOutStaff() {
   }>(
     "/v1/auth/staff/sign-out",
     { method: "POST" },
+  );
+}
+
+export function getStaffAuthOptions(tenantSlug: string, signal?: AbortSignal) {
+  const query = new URLSearchParams({ tenantSlug });
+  return request<StaffAuthOptions>(`/v1/auth/staff/options?${query}`, { signal });
+}
+
+function absoluteApiUrl(path: string) {
+  if (API_BASE_URL) return `${API_BASE_URL}${path}`;
+  if (typeof window !== "undefined") return new URL(path, window.location.origin).toString();
+  return path;
+}
+
+export function staffSsoStartUrl(
+  provider: StaffIdentityProvider,
+  tenantSlug: string,
+  returnTo: string,
+) {
+  const query = new URLSearchParams({ tenantSlug, returnTo });
+  return absoluteApiUrl(
+    `/v1/auth/staff/sso/${encodeURIComponent(provider)}/start?${query}`,
+  );
+}
+
+export function staffMailboxConnectUrl(input: {
+  provider: StaffIdentityProvider;
+  mailboxKind: "personal" | "shared";
+  address: string;
+  returnTo: string;
+}) {
+  const query = new URLSearchParams({
+    mailboxKind: input.mailboxKind,
+    address: input.address,
+    returnTo: input.returnTo,
+  });
+  return absoluteApiUrl(
+    `/v1/staff/mail/oauth/${encodeURIComponent(input.provider)}/start?${query}`,
+  );
+}
+
+export function getStaffMailboxes(signal?: AbortSignal) {
+  return request<StaffMailboxList>("/v1/staff/mailboxes", {
+    method: "GET",
+    headers: staffHeaders,
+    signal,
+  });
+}
+
+export function disconnectStaffMailbox(mailboxId: string) {
+  return request<void>(
+    `/v1/staff/mailboxes/${encodeURIComponent(mailboxId)}/connection`,
+    { method: "DELETE", headers: staffHeaders },
+  );
+}
+
+export function getRecentStaffMail(
+  mailboxId: string,
+  limit = 25,
+  signal?: AbortSignal,
+) {
+  const query = new URLSearchParams({ mailboxId, limit: String(limit) });
+  return request<StaffMailMessageList>(`/v1/staff/mail/messages?${query}`, {
+    method: "GET",
+    headers: staffHeaders,
+    signal,
+  });
+}
+
+export function searchStaffMail(input: SearchStaffMailInput) {
+  return request<StaffMailMessageList>("/v1/staff/mail/search", {
+    method: "POST",
+    headers: { ...staffHeaders, "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function createStaffEmailSendIntent(
+  input: CreateStaffEmailSendIntentInput,
+) {
+  return request<StaffEmailSendIntent>("/v1/staff/mail/send-intents", {
+    method: "POST",
+    headers: { ...staffHeaders, "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function confirmStaffEmailSendIntent(
+  intentId: string,
+  input: ConfirmStaffEmailSendIntentInput,
+  idempotencyKey: string,
+) {
+  return request<StaffEmailSendIntent>(
+    `/v1/staff/mail/send-intents/${encodeURIComponent(intentId)}/confirm`,
+    {
+      method: "POST",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(input),
+    },
   );
 }
 
