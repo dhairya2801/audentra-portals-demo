@@ -52,6 +52,8 @@ import type {
   StudentProfile,
   StudentRequirementDetail,
   StudentRequirementList,
+  StudentSsoConfiguration,
+  StudentSsoProviderId,
   TenantBootstrap,
   ReviewStaffDocumentInput,
   RecordStaffCommunicationInput,
@@ -145,6 +147,8 @@ export interface CredentialAuthSession {
   };
   notice: string;
 }
+
+const STUDENT_SSO_RETURN_TO = "/dashboard";
 
 async function parseError(response: Response): Promise<ApiClientError> {
   let payload: ApiErrorResponse | undefined;
@@ -245,8 +249,20 @@ export function signInStudent(input: {
   });
 }
 
+export function getStudentSsoConfiguration(signal?: AbortSignal) {
+  return request<StudentSsoConfiguration>("/v1/auth/sso/providers", {
+    method: "GET",
+    signal,
+  });
+}
+
+export function studentSsoStartUrl(provider: StudentSsoProviderId) {
+  const query = new URLSearchParams({ returnTo: STUDENT_SSO_RETURN_TO });
+  return `${API_BASE_URL}/v1/auth/sso/${encodeURIComponent(provider)}/start?${query.toString()}`;
+}
+
 export function signOutStudent() {
-  return request<{ authenticated: false; mode: "credentials" }>(
+  return request<{ authenticated: false; mode: "credentials" | "oidc" }>(
     "/v1/auth/sign-out",
     { method: "POST" },
   );
