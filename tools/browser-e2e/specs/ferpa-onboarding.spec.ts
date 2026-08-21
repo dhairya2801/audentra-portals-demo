@@ -4,6 +4,7 @@ import {
   type APIRequestContext,
   type Page,
 } from "@playwright/test";
+import { join } from "node:path";
 import type {
   StudentDashboard,
   StudentOnboarding,
@@ -141,8 +142,9 @@ async function positionFreshJourneyAtFerpa(request: APIRequestContext) {
   return onboarding;
 }
 
-async function completeFerpaWithoutDelegates(page: Page) {
-  await page.getByLabel("Full legal name").fill("Maya Chen");
+async function completeFerpaWithParentLink(page: Page) {
+  const signerName = page.getByLabel("Full legal name");
+  await expect(signerName).not.toHaveValue("");
   await page
     .getByLabel(
       "I consent to use this electronic signature for the FERPA authorization.",
@@ -152,8 +154,16 @@ async function completeFerpaWithoutDelegates(page: Page) {
     .getByRole("button", { name: "Sign FERPA authorization" })
     .click();
   await page
-    .getByRole("radio", { name: /Do not grant anyone access/ })
+    .getByRole("radio", { name: /Grant selected access/ })
     .check();
+  await page.getByRole("button", { name: /Add parent or guardian/ }).click();
+  const parent = page
+    .getByText("Authorized person 1", { exact: true })
+    .locator("xpath=ancestor::article[1]");
+  await parent.getByLabel("Full name").fill("Jordan Chen");
+  await parent.getByLabel("Relationship").selectOption("parent");
+  await parent.getByLabel("Email address").fill("jordan.chen@example.test");
+  await parent.getByRole("checkbox", { name: /^Dashboard/ }).check();
 
   const [response] = await Promise.all([
     page.waitForResponse(
@@ -172,7 +182,31 @@ async function completeFerpaWithoutDelegates(page: Page) {
   await expect(
     page.getByRole("button", { name: "Save access", exact: true }),
   ).toBeVisible();
+  await expect(page.getByText(/Copy now—this link is only shown once/i)).toBeVisible();
+  await expect(page.locator('input[value*="/delegate#token="]')).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copy link", exact: true })).toBeVisible();
 }
+
+test("account creation collects contact details before the legal name onboarding step", async ({
+  page,
+}) => {
+  await page.goto("/sign-in");
+  await page.getByRole("tab", { name: "Create account", exact: true }).click();
+
+  await expect(page.getByLabel("Email address")).toBeVisible();
+  await expect(page.getByLabel("Mobile phone")).toBeVisible();
+  await expect(page.getByText("Legal name", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByText(/We’ll collect your legal name.*during onboarding/i),
+  ).toBeVisible();
+  const evidenceDirectory = process.env.E2E_SCREENSHOT_DIR;
+  if (evidenceDirectory) {
+    await page.screenshot({
+      path: join(evidenceDirectory, "create-account-no-legal-name.png"),
+      fullPage: false,
+    });
+  }
+});
 
 test("fresh onboarding mounts canonical FERPA and advances to the FERPA-free signing packet", async ({
   request,
@@ -207,7 +241,7 @@ test("fresh onboarding mounts canonical FERPA and advances to the FERPA-free sig
       page.getByRole("button", { name: "Complete FERPA above" }),
     ).toBeDisabled();
 
-    await completeFerpaWithoutDelegates(page);
+    await completeFerpaWithParentLink(page);
     const advance = page.waitForResponse(
       (response) =>
         new URL(response.url()).pathname === "/v1/student/onboarding" &&

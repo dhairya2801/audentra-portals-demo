@@ -39,6 +39,10 @@ export default function DelegateExchangePage() {
     try {
       const session = await exchangeFerpaDelegateLink(currentToken);
       token.current = null;
+      // Keep the one-time URL available while verification is in flight. If a
+      // temporary network failure occurs, a browser refresh can still retry
+      // the same link; clear it only after the server accepts it.
+      window.history.replaceState({}, "", `${window.location.pathname}${window.location.search}`);
       setCanRetry(false);
       if (session.delegate.scopes.length === 0) {
         setState({
@@ -63,7 +67,6 @@ export default function DelegateExchangePage() {
     started.current = true;
     token.current = fragmentToken();
     setCanRetry(token.current !== null);
-    window.history.replaceState({}, "", `${window.location.pathname}${window.location.search}`);
     void exchange();
   }, [exchange]);
 

@@ -147,6 +147,17 @@
 
 .decisionCards { display: grid; grid-template-columns: repeat(2, 1fr); gap: .7rem; margin-top: 1rem; }
 .delegateList { display: grid; gap: 1rem; margin-top: 1rem; }
+.savedContacts { display: grid; grid-template-columns: minmax(14rem, .85fr) minmax(0, 1.15fr); gap: 1rem; align-items: center; padding: 1rem; border: 1px solid color-mix(in srgb, var(--tenant-secondary, #315e91) 25%, #d7e0e7); border-radius: 16px; background: linear-gradient(135deg, color-mix(in srgb, var(--tenant-secondary, #315e91) 7%, white), #fff); }
+.savedContacts h4, .savedContacts p { margin: .2rem 0 0; }
+.savedContacts p:not(.eyebrow) { color: #667786; font-size: .74rem; line-height: 1.45; }
+.savedContactChoices { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: .55rem; }
+.savedContactChoices button { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .55rem; align-items: center; min-width: 0; padding: .7rem; border: 1px solid #d8e2ea; border-radius: 12px; color: #244863; background: #fff; font: inherit; text-align: left; cursor: pointer; }
+.savedContactChoices button:hover:not(:disabled), .savedContactChoices button:focus-visible { border-color: var(--tenant-secondary, #315e91); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tenant-secondary, #315e91) 14%, transparent); outline: none; }
+.savedContactChoices button:disabled { cursor: not-allowed; opacity: .58; }
+.savedContactChoices button > span { display: grid; width: 1.75rem; height: 1.75rem; place-items: center; border-radius: 50%; color: #fff; background: var(--tenant-secondary, #315e91); font-size: 1.05rem; font-weight: 800; }
+.savedContactChoices div { display: grid; min-width: 0; gap: .15rem; }
+.savedContactChoices strong, .savedContactChoices small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.savedContactChoices small { color: #6c7d8a; font-size: .68rem; }
 .delegateCard { overflow: hidden; border: 1px solid #dbe3ea; border-radius: 18px; background: #fbfcfd; }
 .delegateCard > header { display: flex; gap: .75rem; align-items: center; padding: .9rem 1rem; border-bottom: 1px solid #e4e9ee; background: #fff; }
 .delegateCard > header > div:nth-child(2) { min-width: 0; flex: 1; }
@@ -182,6 +193,7 @@
 .revealedLink label { display: grid; gap: .3rem; min-width: 0; }
 .revealedLink span { color: #725b17; font-size: .66rem; font-weight: 800; }
 .revealedLink input { min-width: 0; padding: .55rem; border: 1px solid #d8c99d; border-radius: 8px; background: #fff; font: 600 .7rem/1.3 ui-monospace, monospace; }
+.linkHint { grid-column: 1 / -1; margin: -.15rem 0 0; color: #657583; }
 .addDelegate { display: flex; gap: .75rem; align-items: center; padding: 1rem; border: 1px dashed #aebdca; border-radius: 16px; color: #284b67; background: #f7fafc; text-align: left; cursor: pointer; }
 .addDelegate > span { display: grid; width: 2.35rem; height: 2.35rem; place-items: center; border-radius: 50%; color: #fff; background: var(--tenant-secondary, #315e91); font-size: 1.2rem; }
 .addDelegate div { display: grid; gap: .15rem; }
@@ -225,7 +237,7 @@
   .sectionHeading { grid-template-columns: auto 1fr; }
   .sectionHeading > :last-child { grid-column: 2; justify-self: start; }
   .sectionIntro { margin-left: 0; }
-  .methodChoice, .decisionCards, .scopeGrid, .identityGrid { grid-template-columns: 1fr; }
+  .methodChoice, .decisionCards, .scopeGrid, .identityGrid, .savedContacts { grid-template-columns: 1fr; }
   .identityGrid label:last-child { grid-column: auto; }
   .scopeHeading, .linkManager, .review { align-items: stretch; flex-direction: column; }
   .scopeHeading { display: flex; }

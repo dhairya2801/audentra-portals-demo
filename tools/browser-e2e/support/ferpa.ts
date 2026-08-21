@@ -200,6 +200,7 @@ export async function delegateApiFetch(
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
+          "X-Audentra-Session-Mode": "delegate",
           ...(requestInit.idempotencyKey
             ? { "Idempotency-Key": requestInit.idempotencyKey }
             : {}),

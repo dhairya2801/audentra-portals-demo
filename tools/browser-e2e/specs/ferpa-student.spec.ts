@@ -143,6 +143,8 @@ test.describe("student FERPA access center", () => {
     await expect(page.getByText("FERPA is complete.")).toBeVisible();
     await expect(page.getByText("Daniel Chen", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Elena Chen", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(/2 secure parent links are ready below/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Copy link" })).toHaveCount(2);
 
     await page.goto("/profile");
     await expect(page.getByRole("heading", { name: "FERPA access" })).toBeVisible();

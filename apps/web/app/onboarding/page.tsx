@@ -331,6 +331,7 @@ const emptyEmergencyContact: OnboardingEmergencyContact = {
   fullName: "",
   relationship: "parent",
   mobilePhone: "",
+  email: "",
 };
 
 function HousingFields({
@@ -1084,6 +1085,20 @@ function EmergencyContactFields({ data }: { data: StudentOnboardingData }) {
                 required
               />
             </label>
+            <label className="field">
+              <span>Email address <small>For optional FERPA portal access</small></span>
+              <input
+                name={`emergencyContacts.${index}.email`}
+                defaultValue={value.email ?? ""}
+                placeholder="parent@example.com"
+                type="email"
+                autoComplete="email"
+                maxLength={254}
+              />
+              <small>
+                This never grants access by itself. It lets you reuse a parent or guardian later when you make your FERPA choice.
+              </small>
+            </label>
           </div>
         </fieldset>
       ))}
@@ -1106,7 +1121,8 @@ function EmergencyContactFields({ data }: { data: StudentOnboardingData }) {
         <h3>Emergency use only</h3>
         <p>
           These contacts are not invited to your portal and cannot discuss
-          your record unless you separately authorize them.
+          your record unless you separately select them and authorize specific
+          FERPA pages.
         </p>
       </div>
     </>
@@ -1741,11 +1757,25 @@ function StepFields({
   const restoredPrefill = identityQuickUploadEnabled
     ? identityPrefillCandidates(identityDocument)
     : {};
+  // Account creation intentionally does not collect a legal name. The
+  // credential bootstrap uses this harmless internal placeholder until the
+  // required About you step supplies the real identity; never show it as a
+  // student-entered value.
+  const hasProvisionalAccountName =
+    data.firstName === "Student" &&
+    data.lastName === "Account" &&
+    data.preferredName === "Student";
   const prefilledData: StudentOnboardingData = {
     ...data,
-    firstName: data.firstName || restoredPrefill.firstName,
-    lastName: data.lastName || restoredPrefill.lastName,
-    preferredName: data.preferredName || restoredPrefill.preferredName,
+    firstName: hasProvisionalAccountName
+      ? restoredPrefill.firstName
+      : data.firstName || restoredPrefill.firstName,
+    lastName: hasProvisionalAccountName
+      ? restoredPrefill.lastName
+      : data.lastName || restoredPrefill.lastName,
+    preferredName: hasProvisionalAccountName
+      ? restoredPrefill.preferredName
+      : data.preferredName || restoredPrefill.preferredName,
     mobilePhone: data.mobilePhone || restoredPrefill.mobilePhone,
     streetAddress: data.streetAddress || restoredPrefill.streetAddress,
     city: data.city || restoredPrefill.city,
@@ -2348,6 +2378,10 @@ function dataFromForm(
               values,
               `emergencyContacts.${index}.mobilePhone`,
             ),
+            email: optionalFormString(
+              values,
+              `emergencyContacts.${index}.email`,
+            )?.toLowerCase(),
           }),
         ),
       };

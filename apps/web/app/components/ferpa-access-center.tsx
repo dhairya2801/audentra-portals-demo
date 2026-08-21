@@ -4,8 +4,10 @@ import type {
   CompleteStudentFerpaInput,
   FerpaDelegateInput,
   FerpaPortalScope,
+  OnboardingEmergencyContact,
   StudentFerpaAuthorization,
   StudentFerpaDelegate,
+  StudentOnboarding,
 } from "@vv/contracts";
 import {
   type PointerEvent as ReactPointerEvent,
@@ -21,6 +23,7 @@ import {
   completeStudentFerpaAuthorization,
   getStudentBootstrap,
   getStudentFerpaAuthorization,
+  getStudentOnboarding,
   issueStudentFerpaDelegateLink,
   revokeStudentFerpaDelegateLink,
   updateStudentFerpaAccess,
@@ -30,6 +33,35 @@ import { ErrorState, LoadingState } from "./portal-ui";
 import styles from "./ferpa-access-center.module.css";
 
 export type FerpaAccessCenterMode = "task" | "manage" | "delegate";
+
+// The platform intentionally returns a link token only at issuance time. An
+// onboarding refresh can remount this component immediately after that call,
+// so keep the one-time disclosure in memory for this portal session rather
+// than losing it before the student has a chance to copy it. It is never
+// persisted to disk or sent back to the server.
+const oneTimeLinksByAuthorization = new Map<string, Record<string, string>>();
+
+function rememberedOneTimeLinks(authorizationId: string) {
+  return { ...(oneTimeLinksByAuthorization.get(authorizationId) ?? {}) };
+}
+
+function rememberOneTimeLinks(authorizationId: string, links: Record<string, string>) {
+  if (Object.keys(links).length === 0) return;
+  oneTimeLinksByAuthorization.set(authorizationId, {
+    ...rememberedOneTimeLinks(authorizationId),
+    ...links,
+  });
+}
+
+function forgetOneTimeLink(authorizationId: string, delegateId: string) {
+  const links = rememberedOneTimeLinks(authorizationId);
+  delete links[delegateId];
+  if (Object.keys(links).length === 0) {
+    oneTimeLinksByAuthorization.delete(authorizationId);
+  } else {
+    oneTimeLinksByAuthorization.set(authorizationId, links);
+  }
+}
 
 const scopeOptions: ReadonlyArray<{
   value: FerpaPortalScope;
@@ -89,6 +121,52 @@ const relationshipOptions: Array<{ value: FerpaDelegateRelationship; label: stri
 
 type DelegateDraft = FerpaDelegateInput & { clientKey: string };
 
+type SavedFerpaContact = Omit<
+  Pick<OnboardingEmergencyContact, "fullName" | "email">,
+  "email"
+> & {
+  email: string;
+  relationship: Extract<FerpaDelegateRelationship, "parent" | "guardian">;
+};
+
+function ferpaSignerName(
+  onboarding: StudentOnboarding,
+  fallback: string,
+) {
+  const firstName = onboarding.data.firstName?.trim() ?? "";
+  const lastName = onboarding.data.lastName?.trim() ?? "";
+  const nameFromOnboarding = `${firstName} ${lastName}`.trim();
+  // A new credential account has an internal placeholder until About you is
+  // completed. It must never leak into a legal FERPA signature field.
+  if (nameFromOnboarding && nameFromOnboarding !== "Student Account") {
+    return nameFromOnboarding;
+  }
+  return fallback === "Student Account" ? "" : fallback;
+}
+
+function savedFerpaContacts(
+  contacts: OnboardingEmergencyContact[] | undefined,
+): SavedFerpaContact[] {
+  const seen = new Set<string>();
+  return (contacts ?? []).flatMap((contact) => {
+    if (
+      (contact.relationship !== "parent" && contact.relationship !== "guardian") ||
+      !contact.fullName.trim()
+    ) {
+      return [];
+    }
+    const email = contact.email?.trim().toLowerCase() ?? "";
+    const key = `${contact.relationship}\u0000${contact.fullName.trim().toLowerCase()}\u0000${email}`;
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [{
+      fullName: contact.fullName.trim(),
+      relationship: contact.relationship,
+      email,
+    }];
+  });
+}
+
 function draftFromDelegate(delegate: StudentFerpaDelegate): DelegateDraft {
   return { ...delegate, clientKey: delegate.id };
 }
@@ -111,6 +189,38 @@ function normalizedDelegates(delegates: DelegateDraft[]): FerpaDelegateInput[] {
     email: delegate.email.trim().toLowerCase(),
     scopes: [...new Set(delegate.scopes)],
   }));
+}
+
+function withIssuedDelegateLink(
+  authorization: StudentFerpaAuthorization,
+  result: {
+    authorizationVersion: number;
+    delegateId: string;
+    issuedAt: string;
+  },
+): StudentFerpaAuthorization {
+  return {
+    ...authorization,
+    version: result.authorizationVersion,
+    delegates: authorization.delegates.map((delegate) =>
+      delegate.id === result.delegateId
+        ? {
+            ...delegate,
+            link: {
+              ...delegate.link,
+              status: "active",
+              issuedAt: delegate.link.issuedAt ?? result.issuedAt,
+              rotatedAt:
+                delegate.link.status === "active"
+                  ? result.issuedAt
+                  : delegate.link.rotatedAt,
+              lastUsedAt: null,
+              updatedAt: result.issuedAt,
+            },
+          }
+        : delegate,
+    ),
+  };
 }
 
 function relationshipLabel(value: FerpaDelegateRelationship) {
@@ -257,11 +367,15 @@ function FerpaEditor({
   initial,
   mode,
   requirementId,
+  savedContacts,
+  studentFullName,
   onSaved,
 }: {
   initial: StudentFerpaAuthorization;
   mode: Exclude<FerpaAccessCenterMode, "delegate">;
   requirementId?: string;
+  savedContacts: SavedFerpaContact[];
+  studentFullName: string;
   onSaved?: () => void;
 }) {
   const tenantRuntime = useTenant();
@@ -273,7 +387,7 @@ function FerpaEditor({
     initial.delegates.length ? initial.delegates.map(draftFromDelegate) : [],
   );
   const [signerName, setSignerName] = useState(
-    initial.document.status === "signed" ? initial.document.signerName : "",
+    initial.document.status === "signed" ? initial.document.signerName : studentFullName,
   );
   const [signatureMethod, setSignatureMethod] = useState<"typed" | "drawn">("typed");
   const [signatureImageData, setSignatureImageData] = useState("");
@@ -282,7 +396,9 @@ function FerpaEditor({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
-  const [revealedLinks, setRevealedLinks] = useState<Record<string, string>>({});
+  const [revealedLinks, setRevealedLinks] = useState<Record<string, string>>(
+    () => rememberedOneTimeLinks(initial.id),
+  );
   const [copiedDelegate, setCopiedDelegate] = useState<string | null>(null);
   const idempotencyKeys = useRef<Record<string, string>>({});
   const feedbackRef = useRef<HTMLDivElement>(null);
@@ -296,6 +412,20 @@ function FerpaEditor({
     () => delegates.reduce((total, delegate) => total + delegate.scopes.length, 0),
     [delegates],
   );
+  const availableSavedContacts = useMemo(() => {
+    const alreadyAdded = new Set(
+      delegates.map(
+        (delegate) =>
+          `${delegate.relationship}\u0000${delegate.fullName.trim().toLowerCase()}\u0000${delegate.email.trim().toLowerCase()}`,
+      ),
+    );
+    return savedContacts.filter(
+      (contact) =>
+        !alreadyAdded.has(
+          `${contact.relationship}\u0000${contact.fullName.toLowerCase()}\u0000${contact.email}`,
+        ),
+    );
+  }, [delegates, savedContacts]);
 
   useEffect(() => {
     if (error) feedbackRef.current?.focus();
@@ -308,13 +438,27 @@ function FerpaEditor({
     setSuccess(null);
   };
 
-  const addDelegate = () => {
-    setDelegates((current) => [...current, emptyDelegate()]);
+  const appendDelegate = (delegate: DelegateDraft) => {
+    setDelegates((current) => [...current, delegate]);
     window.requestAnimationFrame(() => {
       const cards = delegateListRef.current?.querySelectorAll<HTMLElement>(
         `.${styles.delegateCard}`,
       );
       cards?.item(cards.length - 1)?.querySelector<HTMLInputElement>("input")?.focus();
+    });
+  };
+
+  const addDelegate = () => appendDelegate(emptyDelegate());
+
+  const addSavedContact = (contact: SavedFerpaContact) => {
+    setDecision("grant");
+    setSuccess(null);
+    appendDelegate({
+      clientKey: crypto.randomUUID(),
+      fullName: contact.fullName,
+      relationship: contact.relationship,
+      email: contact.email,
+      scopes: [],
     });
   };
 
@@ -378,6 +522,41 @@ function FerpaEditor({
     setSuccess("Signature is ready. Review the access summary, then complete FERPA.");
   };
 
+  const linkUrl = (token: string) =>
+    `${window.location.origin}${tenantRuntime.href("/delegate")}#token=${encodeURIComponent(token)}`;
+
+  const createNewDelegateLinks = async (authorization: StudentFerpaAuthorization) => {
+    let updated = authorization;
+    let created = 0;
+    let failed = 0;
+    const links: Record<string, string> = {};
+    for (const delegate of authorization.delegates) {
+      if (updated.delegates.find((item) => item.id === delegate.id)?.link.status !== "not_issued") {
+        continue;
+      }
+      try {
+        const key = idempotencyKeys.current[delegate.id] ||= crypto.randomUUID();
+        const result = await issueStudentFerpaDelegateLink(
+          updated.id,
+          delegate.id,
+          updated.version,
+          key,
+        );
+        idempotencyKeys.current[delegate.id] = "";
+        updated = withIssuedDelegateLink(updated, result);
+        links[delegate.id] = linkUrl(result.token);
+        created += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    if (Object.keys(links).length) {
+      rememberOneTimeLinks(canonical.id, links);
+      setRevealedLinks((current) => ({ ...current, ...links }));
+    }
+    return { authorization: updated, created, failed };
+  };
+
   const save = async () => {
     setError(null);
     setSuccess(null);
@@ -430,13 +609,28 @@ function FerpaEditor({
           );
       if (!result.authorization) throw new Error("The updated FERPA record was not returned.");
       idempotencyKeys.current.complete = "";
-      setCanonical(result.authorization);
-      setExpectedVersion(result.authorization.version);
-      setDecision(result.authorization.accessDecision);
-      setDelegates(result.authorization.delegates.map(draftFromDelegate));
-      setSignatureReady(result.authorization.document.status === "signed");
+      let updatedAuthorization = result.authorization;
+      const newLinks =
+        updatedAuthorization.status === "completed" &&
+        updatedAuthorization.accessDecision === "grant"
+          ? await createNewDelegateLinks(updatedAuthorization)
+          : null;
+      if (newLinks) updatedAuthorization = newLinks.authorization;
+      setCanonical(updatedAuthorization);
+      setExpectedVersion(updatedAuthorization.version);
+      setDecision(updatedAuthorization.accessDecision);
+      setDelegates(updatedAuthorization.delegates.map(draftFromDelegate));
+      setSignatureReady(updatedAuthorization.document.status === "signed");
       setConflict(false);
-      setSuccess(isCompleted ? "Access changes saved. They apply immediately." : "FERPA is complete. You can manage access here at any time.");
+      setSuccess(
+        newLinks?.failed
+          ? "FERPA is saved. Some secure links could not be created; use Create secure link below to try again."
+          : newLinks?.created
+            ? `FERPA is complete. ${newLinks.created === 1 ? "A secure parent link is" : `${newLinks.created} secure parent links are`} ready below—copy each one now.`
+            : isCompleted
+              ? "Access changes saved. They apply immediately."
+              : "FERPA is complete. You can manage access here at any time.",
+      );
       onSaved?.();
     } catch (caught) {
       handleFailure(caught);
@@ -461,36 +655,17 @@ function FerpaEditor({
           delete next[delegate.id];
           return next;
         });
+        forgetOneTimeLink(canonical.id, delegate.id);
         setSuccess(`Access link revoked for ${delegate.fullName}.`);
       } else {
         const key = idempotencyKeys.current[delegate.id] ||= crypto.randomUUID();
         const result = await issueStudentFerpaDelegateLink(canonical.id, delegate.id, expectedVersion, key);
         idempotencyKeys.current[delegate.id] = "";
-        const rawUrl = `${window.location.origin}${tenantRuntime.href("/delegate")}#token=${encodeURIComponent(result.token)}`;
+        const rawUrl = linkUrl(result.token);
+        rememberOneTimeLinks(canonical.id, { [delegate.id]: rawUrl });
         setRevealedLinks((current) => ({ ...current, [delegate.id]: rawUrl }));
         setExpectedVersion(result.authorizationVersion);
-        setCanonical((current) => ({
-          ...current,
-          version: result.authorizationVersion,
-          delegates: current.delegates.map((currentDelegate) =>
-            currentDelegate.id === delegate.id
-              ? {
-                  ...currentDelegate,
-                  link: {
-                    ...currentDelegate.link,
-                    status: "active",
-                    issuedAt: currentDelegate.link.issuedAt ?? result.issuedAt,
-                    rotatedAt:
-                      currentDelegate.link.status === "active"
-                        ? result.issuedAt
-                        : currentDelegate.link.rotatedAt,
-                    lastUsedAt: null,
-                    updatedAt: result.issuedAt,
-                  },
-                }
-              : currentDelegate,
-          ),
-        }));
+        setCanonical((current) => withIssuedDelegateLink(current, result));
         setSuccess(`A new secure link is ready for ${delegate.fullName}. It will only be shown this time.`);
       }
       onSaved?.();
@@ -639,8 +814,42 @@ function FerpaEditor({
 
           {decision === "grant" ? (
             <div ref={delegateListRef} className={styles.delegateList}>
+              {availableSavedContacts.length ? (
+                <section className={styles.savedContacts} aria-labelledby="ferpa-saved-contact-title">
+                  <div>
+                    <p className={styles.eyebrow}>Saved parent contacts</p>
+                    <h4 id="ferpa-saved-contact-title">Use a parent or guardian from onboarding</h4>
+                    <p>
+                      Copy their saved details here, then choose pages and save.
+                      Selecting someone never grants access on its own.
+                    </p>
+                  </div>
+                  <div className={styles.savedContactChoices}>
+                    {availableSavedContacts.map((contact) => (
+                      <button
+                        type="button"
+                        key={`${contact.relationship}-${contact.fullName}-${contact.email}`}
+                        onClick={() => addSavedContact(contact)}
+                        disabled={!canManage || delegates.length >= 4}
+                      >
+                        <span aria-hidden="true">+</span>
+                        <div>
+                          <strong>{contact.fullName}</strong>
+                          <small>
+                            {relationshipLabel(contact.relationship)}
+                            {contact.email ? ` · ${contact.email}` : " · Add an email before saving"}
+                          </small>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
               {delegates.map((delegate, index) => {
                 const canonicalDelegate = delegate.id ? canonical.delegates.find((item) => item.id === delegate.id) : undefined;
+                const revealedLink = canonicalDelegate
+                  ? revealedLinks[canonicalDelegate.id]
+                  : undefined;
                 return (
                   <article className={styles.delegateCard} key={delegate.clientKey}>
                     <header>
@@ -665,10 +874,10 @@ function FerpaEditor({
                       <div className={styles.linkManager}>
                         <div><small>Permanent secure link</small><strong>{canonicalDelegate.link.status === "active" ? "Active" : canonicalDelegate.link.status === "revoked" ? "Revoked" : "Not created"}</strong><p>Anyone with this link can act within the selected pages. Share it privately.</p></div>
                         <div className={styles.linkActions}>
-                          <button className="button button--secondary" type="button" onClick={() => void manageLink(canonicalDelegate, "issue")} disabled={busy !== null}>{canonicalDelegate.link.status === "active" ? "Rotate link" : "Create secure link"}</button>
+                          <button className="button button--secondary" type="button" onClick={() => void manageLink(canonicalDelegate, "issue")} disabled={busy !== null}>{canonicalDelegate.link.status === "active" ? revealedLink ? "Rotate link" : "Generate replacement link" : "Create secure link"}</button>
                           {canonicalDelegate.link.status === "active" ? <button className={styles.dangerButton} type="button" onClick={() => void manageLink(canonicalDelegate, "revoke")} disabled={busy !== null}>Revoke access</button> : null}
                         </div>
-                        {revealedLinks[canonicalDelegate.id] ? <div className={styles.revealedLink} role="status"><label><span>Copy now—this link is only shown once</span><input readOnly value={revealedLinks[canonicalDelegate.id]} onFocus={(event) => event.currentTarget.select()} /></label><button type="button" onClick={() => void copyLink(canonicalDelegate.id)}>{copiedDelegate === canonicalDelegate.id ? "Copied" : "Copy link"}</button></div> : null}
+                        {revealedLink ? <div className={styles.revealedLink} role="status"><label><span>Copy now—this link is only shown once</span><input readOnly value={revealedLink} onFocus={(event) => event.currentTarget.select()} /></label><button type="button" onClick={() => void copyLink(canonicalDelegate.id)}>{copiedDelegate === canonicalDelegate.id ? "Copied" : "Copy link"}</button></div> : canonicalDelegate.link.status === "active" ? <p className={styles.linkHint}>The earlier URL cannot be recovered. Generate a replacement to copy a fresh secure URL; it invalidates the old link and signs out its active parent session.</p> : null}
                       </div>
                     ) : null}
                   </article>
@@ -708,10 +917,23 @@ export function FerpaAccessCenter({
   const load = useCallback(async (signal: AbortSignal) => {
     const bootstrap = await getStudentBootstrap(signal);
     if (bootstrap.actor?.type === "delegate") {
-      return { delegate: bootstrap.actor, authorization: null };
+      return {
+        delegate: bootstrap.actor,
+        authorization: null,
+        savedContacts: [],
+        studentFullName: "",
+      };
     }
-    const result = await getStudentFerpaAuthorization(signal);
-    return { delegate: null, authorization: result.authorization };
+    const [result, onboarding] = await Promise.all([
+      getStudentFerpaAuthorization(signal),
+      getStudentOnboarding(signal),
+    ]);
+    return {
+      delegate: null,
+      authorization: result.authorization,
+      savedContacts: savedFerpaContacts(onboarding.data.emergencyContacts),
+      studentFullName: ferpaSignerName(onboarding, bootstrap.student.fullName),
+    };
   }, []);
   const resource = useApiResource(load);
 
@@ -744,7 +966,7 @@ export function FerpaAccessCenter({
       </section>
     );
   }
-  return <FerpaEditor initial={resource.data.authorization} mode={mode} requirementId={requirementId} onSaved={() => { onCompletionChange?.(true); resource.refresh(); onSaved?.(); }} />;
+  return <FerpaEditor initial={resource.data.authorization} mode={mode} requirementId={requirementId} savedContacts={resource.data.savedContacts} studentFullName={resource.data.studentFullName} onSaved={() => { onCompletionChange?.(true); resource.refresh(); onSaved?.(); }} />;
 }
 
 export { scopeOptions as ferpaPortalScopeOptions };

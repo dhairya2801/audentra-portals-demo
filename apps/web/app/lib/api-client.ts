@@ -118,6 +118,37 @@ export const API_BASE_URL = (configuredApiBaseUrl || "").replace(/\/+$/, "");
 // so this module carries no runtime dependency on Lab code; `edward-lab.ts`
 // exports the same constant and a test pins the two together.
 const EDWARD_EXECUTION_MODE_HEADER = "X-Edward-Mode";
+const PORTAL_SESSION_MODE_HEADER = "X-Audentra-Session-Mode";
+const DELEGATE_SESSION_MODE_KEY = "vv:delegate-session-mode";
+
+/**
+ * Browser storage contains no bearer credential. It only chooses which of
+ * the separately HTTP-only student/delegate cookies this tab should use.
+ */
+function portalSessionMode(): "student" | "delegate" {
+  if (typeof window === "undefined") return "student";
+  try {
+    return window.sessionStorage.getItem(DELEGATE_SESSION_MODE_KEY) === "delegate"
+      ? "delegate"
+      : "student";
+  } catch {
+    return "student";
+  }
+}
+
+function selectPortalSession(mode: "student" | "delegate") {
+  if (typeof window === "undefined") return;
+  try {
+    if (mode === "delegate") {
+      window.sessionStorage.setItem(DELEGATE_SESSION_MODE_KEY, "delegate");
+    } else {
+      window.sessionStorage.removeItem(DELEGATE_SESSION_MODE_KEY);
+    }
+  } catch {
+    // Safe default: the server will use the student session if browser storage
+    // is unavailable, rather than letting a delegate cookie take over a tab.
+  }
+}
 
 export class ApiClientError extends Error {
   readonly status: number;
@@ -176,6 +207,7 @@ async function request<T>(
   init: RequestInit = {},
   options: {
     notifyStudentRecordChanged?: boolean;
+    includePortalSessionMode?: boolean;
   } = {},
 ): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -184,6 +216,9 @@ async function request<T>(
     headers: {
       Accept: "application/json",
       ...init.headers,
+      ...(options.includePortalSessionMode === false
+        ? {}
+        : { [PORTAL_SESSION_MODE_HEADER]: portalSessionMode() }),
     },
   });
 
@@ -203,14 +238,58 @@ async function request<T>(
 }
 
 export function getTenantBootstrap(signal?: AbortSignal) {
-  return request<TenantBootstrap>("/v1/tenant/bootstrap", { signal });
+  // This endpoint is public configuration. Do not make its availability
+  // depend on which tab-local portal identity happens to be active.
+  return requestWithTimeout<TenantBootstrap>(
+    "/v1/tenant/bootstrap",
+    { method: "GET" },
+    signal,
+    "Your institution portal took too long to respond. Please try again.",
+    { includePortalSessionMode: false },
+  );
+}
+
+async function requestWithTimeout<T>(
+  path: string,
+  init: RequestInit,
+  signal: AbortSignal | undefined,
+  timeoutMessage: string,
+  options: {
+    notifyStudentRecordChanged?: boolean;
+    includePortalSessionMode?: boolean;
+  } = {},
+) {
+  // A portal shell should never leave a student or parent on an indefinite
+  // loading screen if a browser/network request becomes stalled. Preserve a
+  // caller cancellation, but surface a retryable error after a bounded wait.
+  const controller = new AbortController();
+  const forwardAbort = () => controller.abort();
+  if (signal?.aborted) {
+    controller.abort();
+  } else {
+    signal?.addEventListener("abort", forwardAbort, { once: true });
+  }
+  const timeout = globalThis.setTimeout(() => controller.abort(), 15_000);
+  try {
+    return await request<T>(path, { ...init, signal: controller.signal }, options);
+  } catch (error) {
+    if (controller.signal.aborted && !signal?.aborted) {
+      throw new ApiClientError(timeoutMessage, { status: 504, code: "portal_access_timeout" });
+    }
+    throw error;
+  } finally {
+    globalThis.clearTimeout(timeout);
+    signal?.removeEventListener("abort", forwardAbort);
+  }
 }
 
 export function getStudentBootstrap(signal?: AbortSignal) {
-  return request<StudentBootstrap>("/v1/student/bootstrap", {
-    method: "GET",
+  return requestWithTimeout<StudentBootstrap>(
+    "/v1/student/bootstrap",
+    { method: "GET" },
     signal,
-  });
+    "Your portal took too long to respond. Please try again.",
+  );
 }
 
 export function decideStudentExperienceUpdate(
@@ -236,6 +315,9 @@ export function signUpStudent(input: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
+  }).then((session) => {
+    selectPortalSession("student");
+    return session;
   });
 }
 
@@ -247,6 +329,9 @@ export function signInStudent(input: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
+  }).then((session) => {
+    selectPortalSession("student");
+    return session;
   });
 }
 
@@ -254,7 +339,10 @@ export function signOutStudent() {
   return request<{ authenticated: false; mode: "credentials" }>(
     "/v1/auth/sign-out",
     { method: "POST" },
-  );
+  ).then((result) => {
+    selectPortalSession("student");
+    return result;
+  });
 }
 
 export interface DemoAuthSession {
@@ -282,6 +370,9 @@ export function signInDemoStudent(input: { studentRef: string }) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
+  }).then((session) => {
+    selectPortalSession("student");
+    return session;
   });
 }
 
@@ -289,7 +380,10 @@ export function signOutDemoStudent() {
   return request<{ authenticated: false; mode: "demo" }>(
     "/v1/auth/demo/sign-out",
     { method: "POST" },
-  );
+  ).then((result) => {
+    selectPortalSession("student");
+    return result;
+  });
 }
 
 export function getStudentDashboard(signal?: AbortSignal) {
@@ -500,15 +594,20 @@ export function revokeStudentFerpaDelegateLink(
 }
 
 export function exchangeFerpaDelegateLink(token: string) {
-  return request<DelegateSession>(
+  return requestWithTimeout<DelegateSession>(
     "/v1/auth/delegate/exchange",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
     },
-    { notifyStudentRecordChanged: false },
-  );
+    undefined,
+    "This secure link took too long to open. Please try the link again.",
+    { notifyStudentRecordChanged: false, includePortalSessionMode: false },
+  ).then((session) => {
+    selectPortalSession("delegate");
+    return session;
+  });
 }
 
 export function signOutFerpaDelegate() {
@@ -516,7 +615,10 @@ export function signOutFerpaDelegate() {
     "/v1/auth/delegate/sign-out",
     { method: "POST" },
     { notifyStudentRecordChanged: false },
-  );
+  ).then((result) => {
+    selectPortalSession("student");
+    return result;
+  });
 }
 
 export function getStudentMessages(signal?: AbortSignal) {

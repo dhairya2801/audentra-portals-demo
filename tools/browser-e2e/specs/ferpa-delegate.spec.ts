@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import type { FerpaDelegateInput } from "@vv/contracts";
 import {
@@ -10,7 +11,7 @@ import {
   issueFerpaDelegateLink,
   revokeFerpaDelegateLink,
 } from "../support/ferpa";
-import { resetDemoStudent } from "../support/demo-session";
+import { authenticateDemoStudent, resetDemoStudent } from "../support/demo-session";
 
 const delegateDraft: FerpaDelegateInput = {
   fullName: "Daniel Chen",
@@ -111,6 +112,75 @@ test.describe("FERPA delegate boundaries", () => {
       revokedLinkPage.getByRole("heading", { name: "This link could not open" }),
     ).toBeVisible();
     await revokedLinkContext.close();
+  });
+
+  test("keeps student and parent tabs usable after a saved scope change", async ({
+    request,
+    browser,
+    baseURL,
+  }) => {
+    const completed = await completeFerpaThroughApi({
+      request,
+      delegates: [{ ...delegateDraft, scopes: ["dashboard"] }],
+    });
+    const delegate = completed.delegates[0];
+    expect(delegate).toBeTruthy();
+    const link = await issueFerpaDelegateLink({
+      request,
+      authorization: completed,
+      delegateId: delegate.id,
+    });
+
+    // This is the same browser/cookie jar: a student opens a parent link in
+    // another tab. The HTTP-only identities remain distinct per tab via the
+    // explicit session-mode header.
+    const sharedContext = await browser.newContext({ baseURL });
+    await authenticateDemoStudent(sharedContext, baseURL);
+    const studentPage = await sharedContext.newPage();
+    await studentPage.goto("/dashboard");
+    await expect(studentPage.getByRole("heading", { name: /Welcome back/ })).toBeVisible();
+
+    const parentPage = await sharedContext.newPage();
+    await parentPage.goto(delegatePortalUrl(baseURL, link));
+    await expect(parentPage.getByRole("heading", { name: /Welcome back/ })).toBeVisible();
+    const parentNavigation = parentPage.getByRole("navigation", {
+      name: "Student portal sections",
+    });
+    await expect(parentNavigation.getByRole("link", { name: "My Classrooms" })).toHaveCount(0);
+
+    await studentPage.goto("/profile");
+    await expect(studentPage.getByRole("heading", { name: "Profile", exact: true })).toBeVisible();
+    const scopeUpdate = studentPage.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname.includes("/ferpa-authorizations/") &&
+        response.request().method() === "PATCH",
+    );
+    await studentPage.getByRole("checkbox", { name: /My Classrooms/ }).check();
+    await studentPage.getByRole("checkbox", { name: /My Campus Life/ }).check();
+    await studentPage.getByRole("button", { name: "Save access", exact: true }).click();
+    expect((await scopeUpdate).status()).toBe(200);
+
+    await parentPage.reload();
+    await expect(parentPage.getByRole("heading", { name: /Welcome back/ })).toBeVisible();
+    await expect(parentNavigation.getByRole("link", { name: "My Classrooms" })).toBeVisible();
+
+    await studentPage.reload();
+    await expect(studentPage.getByRole("heading", { name: "Profile", exact: true })).toBeVisible();
+    await expect(
+      studentPage.getByRole("region", { name: "FERPA access", exact: true }),
+    ).toBeVisible();
+    const evidenceDirectory = process.env.E2E_SCREENSHOT_DIR;
+    if (evidenceDirectory) {
+      await studentPage.screenshot({
+        path: join(evidenceDirectory, "ferpa-student-after-scope-save.png"),
+        fullPage: false,
+      });
+      await parentPage.screenshot({
+        path: join(evidenceDirectory, "ferpa-parent-after-scope-save.png"),
+        fullPage: false,
+      });
+    }
+    await sharedContext.close();
   });
 
   test("allows granted profile work but blocks ungranted pages and every FERPA mutation", async ({
