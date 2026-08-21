@@ -1221,7 +1221,10 @@ test("coordinates recoverable server state and composes the dashboard calendar",
     readFile(new URL("../app/components/document-upload.tsx", import.meta.url), "utf8"),
   ]);
 
-  assert.match(dashboard, /<StudentCalendar entries=\{calendarEntries\}/);
+  assert.match(
+    dashboard,
+    /<StudentCalendar[\s\S]{0,100}entries=\{calendarEntries\}/,
+  );
   assert.match(dashboard, /Priority enrollment to-dos/);
   assert.doesNotMatch(dashboard, /DashboardEdwardBrief/);
   assert.doesNotMatch(dashboard, /Your enrollment is moving/);
@@ -1677,7 +1680,7 @@ test("student routes enforce bootstrap gating and expose no dead static links", 
     guard,
     /window\.location\.replace\(tenantRuntime\.href\("\/sign-in"\)\)/,
   );
-  assert.match(shell, /onboarding\.required/);
+  assert.match(shell, /onboarding\?\.required/);
   assert.match(shell, /label: "My Documents"/);
   assert.match(shell, /href: "\/documents"/);
   assert.match(bootstrapRouter, /initialRoute/);
@@ -1699,6 +1702,7 @@ test("student routes enforce bootstrap gating and expose no dead static links", 
     "/dashboard",
     "/documents",
     "/enrollment",
+    "/enrollment/ferpa",
     "/help",
     "/messages",
     "/onboarding",
@@ -2004,6 +2008,7 @@ test("staff journeys share a typed, accessible flow builder", async () => {
     "multiple_select",
     "upload_file",
     "signature",
+    "ferpa",
     "payment",
   ]) {
     assert.match(builder, new RegExp(`value: "${type}"`));
@@ -2015,13 +2020,14 @@ test("staff journeys share a typed, accessible flow builder", async () => {
   assert.match(builder, /name="maximumSelections"/);
   assert.match(builder, /name="acceptedFileTypes"/);
   assert.match(builder, /name="documentCategories"/);
-  assert.match(builder, /task\.docusign_template_id = templateId/);
+  assert.doesNotMatch(builder, /task\.docusign_template_id = templateId/);
   assert.match(builder, /task\.accepted_mime_types = acceptedMimeTypes/);
   assert.match(builder, /task\.signature_template_id/);
   assert.match(builder, /task\.accepted_file_types/);
   assert.match(builder, /mimeType\.includes\("\/"\)/);
-  assert.match(builder, /DocuSign \(configuration only\)/);
-  assert.match(builder, /live DocuSign connection must be configured separately/i);
+  assert.match(builder, /DocuSign \(unavailable\)/);
+  assert.match(builder, /DocuSign cannot be published until execution is configured/i);
+  assert.match(builder, /required: selectedType === "ferpa" \|\|/);
   assert.match(
     builder,
     /selectedType === "payment" && item\.id !== "enrollment_deposit"/,
@@ -2244,7 +2250,9 @@ test("generic requirement interactions submit typed, idempotent responses", asyn
   assert.match(action, /signerName/);
   assert.match(action, /signatureMethod/);
   assert.match(action, /\{ appointmentId \}/);
-  assert.match(action, /getStudentAppointments/);
+  assert.match(action, /getStudentRequirementAppointments/);
+  assert.match(action, /createStudentRequirementAppointment/);
+  assert.match(action, /requirementId=\{requirement\.id\}/);
   assert.doesNotMatch(action, /Paste.*appointment|appointment UUID/i);
   assert.match(action, /live\s+connection is not configured yet/);
   assert.match(action, /configuredForm\(requirement\)/);
@@ -2643,7 +2651,7 @@ test("student dashboard orders events before a height-balanced working area", as
   const workingArea = dashboard.indexOf("dashboardStyles.workingArea");
   const enrollment = dashboard.indexOf("Enrollment progress", workingArea);
   const financials = dashboard.indexOf("<DashboardFinancialSnapshot", workingArea);
-  const classrooms = dashboard.indexOf("My Classrooms", workingArea);
+  const classrooms = dashboard.indexOf('href="/classrooms"', financials);
   const calendar = dashboard.indexOf("<StudentCalendar", workingArea);
 
   assert.ok(facts >= 0 && facts < events, "profile facts must precede events");
@@ -2656,4 +2664,26 @@ test("student dashboard orders events before a height-balanced working area", as
   assert.match(styles, /\.workingStack \{[\s\S]*?height: 100%/);
   assert.match(styles, /\.calendarColumn > \* \{[\s\S]*?height: 100%/);
   assert.match(styles, /@media \(max-width: 900px\)/);
+});
+
+test("dashboard-only delegates see document summaries without cross-scope links", async () => {
+  const dashboard = await readFile(
+    new URL("../app/student-dashboard.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(dashboard, /const actionDocuments = financials\s*\?/);
+  assert.doesNotMatch(dashboard, /financials && canRead\("documents"\)/);
+  assert.match(
+    dashboard,
+    /canOpen=\{canRead\(dashboardDocumentScope\(document\)\)\}/,
+  );
+  assert.match(
+    dashboard,
+    /destination\.href\.startsWith\("\/documents"\)[\s\S]*?"documents"[\s\S]*?: "financials"/,
+  );
+  assert.match(
+    dashboard,
+    /canOpen \? \([\s\S]*?<Link[\s\S]*?: \([\s\S]*?<div className=\{dashboardStyles\.progressTask\}>/,
+  );
 });

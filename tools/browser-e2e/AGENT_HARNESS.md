@@ -33,6 +33,8 @@ On Windows the harness terminates the exact isolated portal process tree so
 Playwright can exit promptly after the last assertion.
 
 Staff journeys require an environment-only synthetic credential. Set the same
-random value as `VV_STAFF_BOOTSTRAP_PASSWORD` for the isolated demo API and as
-`E2E_STAFF_PASSWORD` for Playwright. Never commit the value or place it in a
-tracked environment file.
+random value as `VV_STAFF_INVITATION_CODE` for the isolated platform API and as
+`E2E_STAFF_PASSWORD` for Playwright. The legacy lightweight demo API accepts
+that value through `VV_STAFF_BOOTSTRAP_PASSWORD`. Never commit the value or
+place it in a tracked environment file. On a fresh relational database the
+browser helper claims the seeded staff identity once, then signs in normally.

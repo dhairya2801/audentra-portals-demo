@@ -18,7 +18,8 @@ export function StudentRouteGuard({
   );
   const bootstrap = useApiResource(loadBootstrap);
   const needsOnboarding =
-    bootstrap.data?.onboarding.required &&
+    bootstrap.data?.actor?.type !== "delegate" &&
+    bootstrap.data?.onboarding?.required &&
     bootstrap.data.onboarding.status !== "completed";
   const needsSignIn =
     bootstrap.status === "error" &&

@@ -26,6 +26,7 @@ import {
 } from "react";
 import { DocumentExtractionReview } from "../../../components/document-extraction-review";
 import { DocumentUpload } from "../../../components/document-upload";
+import { FerpaAccessCenter } from "../../../components/ferpa-access-center";
 import { PortalShell } from "../../../components/portal-shell";
 import {
   RequirementHelpRequest,
@@ -42,6 +43,7 @@ import { useApiAction, useApiResource } from "../../../hooks/use-api-resource";
 import {
   getStudentAcademics,
   createDepositPayment,
+  getStudentBootstrap,
   getStudentDashboard,
   getStudentHousingPlan,
   getStudentDocuments,
@@ -51,7 +53,7 @@ import {
   getStudentRequirement,
   getStudentRequirements,
   updateStudentHousingPlan,
-  updateStudentProfile,
+  updateStudentRequirementProfile,
 } from "../../../lib/api-client";
 import {
   beginDocumentExtractionProjection,
@@ -68,6 +70,7 @@ import {
 } from "../../../lib/tenant";
 
 type RequirementKind =
+  | "ferpa"
   | "profile"
   | "housing"
   | "identity"
@@ -200,6 +203,7 @@ function initials(value: string | null | undefined) {
 }
 
 function requirementKind(requirement: StudentRequirementDetail): RequirementKind {
+  if (requirement.interactionType === "ferpa") return "ferpa";
   const code = requirement.code.toLowerCase();
   if (code === "profile_verification") return "profile";
   if (code === "housing_preference") return "housing";
@@ -237,9 +241,11 @@ function InlineResourceState({
 
 function ProfileActionForm({
   profile,
+  requirementId,
   onSaved,
 }: {
   profile: StudentProfile;
+  requirementId: string;
   onSaved: (profile: StudentProfile) => void;
 }) {
   const { tenant } = useTenant();
@@ -252,8 +258,9 @@ function ProfileActionForm({
   const [version, setVersion] = useState(profile.version);
   const saveProfile = useApiAction(
     useCallback(
-      (input: UpdateStudentProfileInput) => updateStudentProfile(input),
-      [],
+      (input: UpdateStudentProfileInput) =>
+        updateStudentRequirementProfile(requirementId, input),
+      [requirementId],
     ),
   );
 
@@ -353,7 +360,13 @@ function ProfileActionForm({
   );
 }
 
-function ProfileAction({ onSaved }: { onSaved: (profile: StudentProfile) => void }) {
+function ProfileAction({
+  requirementId,
+  onSaved,
+}: {
+  requirementId: string;
+  onSaved: (profile: StudentProfile) => void;
+}) {
   const loadProfile = useCallback(
     (signal: AbortSignal) => getStudentProfile(signal),
     [],
@@ -373,7 +386,14 @@ function ProfileAction({ onSaved }: { onSaved: (profile: StudentProfile) => void
     );
   }
 
-  return <ProfileActionForm key={profile.data.version} profile={profile.data} onSaved={onSaved} />;
+  return (
+    <ProfileActionForm
+      key={profile.data.version}
+      profile={profile.data}
+      requirementId={requirementId}
+      onSaved={onSaved}
+    />
+  );
 }
 
 function HousingActionForm({
@@ -1107,7 +1127,7 @@ function DocumentAction({
   );
 }
 
-function IdentityPreview() {
+function IdentityPreview({ canViewProfilePhoto }: { canViewProfilePhoto: boolean }) {
   const { tenant } = useTenant();
   const loadIdentityPreview = useCallback(
     async (signal: AbortSignal) => {
@@ -1147,7 +1167,7 @@ function IdentityPreview() {
         </div>
         <div className="student-id-card__body">
           <span className="student-id-card__avatar">
-            {photoDocument ? (
+            {photoDocument && canViewProfilePhoto ? (
               <Image
                 alt="Profile photo extracted from your identity document"
                 height={120}
@@ -1506,9 +1526,12 @@ function GeneralPreview({ requirement }: { requirement: StudentRequirementDetail
 }
 
 type DepositWorkspaceData = {
-  dashboard: StudentDashboard;
+  restricted: false;
+  dashboard: Omit<StudentDashboard, "offer"> & {
+    offer?: StudentDashboard["offer"];
+  };
   payments: StudentPaymentList;
-};
+} | { restricted: true };
 
 function DepositPaymentAction({
   dueAt,
@@ -1520,11 +1543,20 @@ function DepositPaymentAction({
   const { tenant } = useTenant();
   const loadDeposit = useCallback(
     async (signal: AbortSignal): Promise<DepositWorkspaceData> => {
+      const bootstrap = await getStudentBootstrap(signal);
+      if (
+        bootstrap.actor?.type === "delegate" &&
+        !bootstrap.actor.scopes.some((scope) =>
+          ["enrollment", "payments"].includes(scope),
+        )
+      ) {
+        return { restricted: true };
+      }
       const [dashboard, payments] = await Promise.all([
         getStudentDashboard(signal),
         getStudentPayments(signal),
       ]);
-      return { dashboard, payments };
+      return { restricted: false, dashboard, payments };
     },
     [],
   );
@@ -1551,6 +1583,25 @@ function DepositPaymentAction({
     );
   }
 
+  if (deposit.data.restricted) {
+    return (
+      <InlineResourceState
+        label=""
+        message="This payment step is not included in the delegated access granted by the student."
+      />
+    );
+  }
+
+  const offer = deposit.data.dashboard.offer;
+  if (!offer) {
+    return (
+      <InlineResourceState
+        label=""
+        message="The enrollment offer details needed for this payment are unavailable."
+      />
+    );
+  }
+
   const successfulPayment = deposit.data.payments.items.find(
     (payment) =>
       payment.type === "enrollment_deposit" && payment.status === "succeeded",
@@ -1560,7 +1611,7 @@ function DepositPaymentAction({
       paymentIntentKey.current ??
       (paymentIntentKey.current = crypto.randomUUID());
     try {
-      await pay.run(deposit.data.dashboard.offer.id, key);
+      await pay.run(offer.id, key);
       paymentIntentKey.current = null;
       deposit.refresh();
       onPaid();
@@ -1582,7 +1633,7 @@ function DepositPaymentAction({
       <dl className="deposit-inline-card__summary">
         <div>
           <dt>Deposit amount</dt>
-          <dd>{formatTenantMoney(deposit.data.dashboard.offer.depositAmountCents, tenant)}</dd>
+          <dd>{formatTenantMoney(offer.depositAmountCents, tenant)}</dd>
           <small>Applied to first-semester tuition and fees.</small>
         </div>
         <div>
@@ -1627,7 +1678,7 @@ function DepositPaymentAction({
             ? "Processing deposit…"
             : pay.status === "error"
               ? "Retry deposit payment"
-              : `Pay ${formatTenantMoney(deposit.data.dashboard.offer.depositAmountCents, tenant)} deposit`}
+              : `Pay ${formatTenantMoney(offer.depositAmountCents, tenant)} deposit`}
         </button>
       )}
     </section>
@@ -1640,14 +1691,23 @@ function RequirementPreview({
   refreshKey,
   transcriptDocument,
   housingSelection,
+  canViewProfilePhoto,
 }: {
   requirement: StudentRequirementDetail;
   kind: RequirementKind;
   refreshKey: number;
   transcriptDocument?: StudentDocument | null;
   housingSelection?: HousingPreviewSelection | null;
+  canViewProfilePhoto: boolean;
 }) {
-  if (kind === "identity") return <IdentityPreview key={`identity-${refreshKey}`} />;
+  if (kind === "identity") {
+    return (
+      <IdentityPreview
+        canViewProfilePhoto={canViewProfilePhoto}
+        key={`identity-${refreshKey}`}
+      />
+    );
+  }
   if (kind === "transcript") {
     return (
       <TranscriptPreview
@@ -1713,12 +1773,21 @@ function RequirementAction({
       </div>
     );
   }
+  if (requirement.interactionType === "ferpa") {
+    return (
+      <FerpaAccessCenter
+        mode="task"
+        requirementId={requirement.id}
+        onSaved={onRecordChanged}
+      />
+    );
+  }
   if (
     requirement.code === "profile_verification" &&
     kind === "profile" &&
     requirement.interactionType === "form"
   ) {
-    return <ProfileAction onSaved={onRecordChanged} />;
+    return <ProfileAction requirementId={requirement.id} onSaved={onRecordChanged} />;
   }
   if (
     requirement.code === "housing_preference" &&
@@ -1823,6 +1892,11 @@ export default function RequirementDetailPage() {
     [slug],
   );
   const requirement = useApiResource(loadRequirement);
+  const loadBootstrap = useCallback(
+    (signal: AbortSignal) => getStudentBootstrap(signal),
+    [],
+  );
+  const bootstrap = useApiResource(loadBootstrap);
   const loadRequirements = useCallback(
     (signal: AbortSignal) => getStudentRequirements(signal),
     [],
@@ -1832,6 +1906,18 @@ export default function RequirementDetailPage() {
     () => (requirement.status === "ready" ? requirementKind(requirement.data) : null),
     [requirement.data, requirement.status],
   );
+  const delegateScopes =
+    bootstrap.status === "ready" && bootstrap.data.actor?.type === "delegate"
+      ? bootstrap.data.actor.scopes
+      : null;
+  const actorKnown = bootstrap.status === "ready";
+  const canUseRequirementHelp =
+    actorKnown && (delegateScopes === null || delegateScopes.includes("help"));
+  const canViewProfilePhoto =
+    actorKnown &&
+    (delegateScopes === null ||
+      delegateScopes.includes("documents") ||
+      delegateScopes.includes("profile"));
   const refreshAfterRecordChange = useCallback(() => {
     setPreviewRefreshKey((current) => current + 1);
     requirement.refresh();
@@ -1942,11 +2028,13 @@ export default function RequirementDetailPage() {
               onHousingPreviewChange={setHousingSelection}
               prerequisite={firstPrerequisite}
             />
-            <RequirementHelpRequest
-              key={requirement.data.id}
-              requirement={requirement.data}
-              onHelpStateChange={setCurrentHelpRequested}
-            />
+            {canUseRequirementHelp ? (
+              <RequirementHelpRequest
+                key={requirement.data.id}
+                requirement={requirement.data}
+                onHelpStateChange={setCurrentHelpRequested}
+              />
+            ) : null}
           </section>
           <aside className="requirement-workspace__context">
             <RequirementPreview
@@ -1955,6 +2043,7 @@ export default function RequirementDetailPage() {
               refreshKey={previewRefreshKey}
               transcriptDocument={transcriptDocument}
               housingSelection={housingSelection}
+              canViewProfilePhoto={canViewProfilePhoto}
             />
             {kind === "transcript" ? (
               <TranscriptRecordPanel

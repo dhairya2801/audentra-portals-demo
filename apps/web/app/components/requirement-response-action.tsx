@@ -1,7 +1,9 @@
 "use client";
 
 import type {
+  CreateStudentAppointmentInput,
   StudentAppointment,
+  StudentAppointmentType,
   StudentRequirementFormDefinition,
   StudentRequirementDetail,
   StudentRequirementInputField,
@@ -15,9 +17,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { getStudentAppointments, submitStudentRequirementResponse } from "../lib/api-client";
+import {
+  createStudentRequirementAppointment,
+  getStudentRequirementAppointments,
+  submitStudentRequirementResponse,
+} from "../lib/api-client";
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
-import { TenantLink as Link } from "./tenant-link";
 import { ActionFeedback } from "./portal-ui";
 import { visibleConfiguredFields } from "./requirement-response-model";
 
@@ -385,17 +390,59 @@ function BuiltInSignatureForm({
 }
 
 function SchedulingForm({
+  requirementId,
   submit,
   loading,
 }: {
+  requirementId: string;
   submit: SubmitResponse;
   loading: boolean;
 }) {
+  const appointmentForm = useRef<HTMLFormElement>(null);
+  const appointmentKey = useRef<string | null>(null);
+  const [appointmentError, setAppointmentError] = useState<string | null>(null);
   const loadAppointments = useCallback(
-    (signal: AbortSignal) => getStudentAppointments(signal),
-    [],
+    (signal: AbortSignal) =>
+      getStudentRequirementAppointments(requirementId, signal),
+    [requirementId],
   );
   const appointments = useApiResource(loadAppointments);
+  const createAppointment = useApiAction(
+    useCallback(
+      (input: CreateStudentAppointmentInput, key: string) =>
+        createStudentRequirementAppointment(requirementId, input, key),
+      [requirementId],
+    ),
+  );
+  const scheduleAndAttach = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAppointmentError(null);
+    createAppointment.reset();
+    const values = new FormData(event.currentTarget);
+    const startsAt = new Date(String(values.get("startsAt") ?? ""));
+    if (Number.isNaN(startsAt.getTime()) || startsAt.getTime() <= Date.now()) {
+      setAppointmentError("Choose an appointment time in the future.");
+      return;
+    }
+    const notes = String(values.get("notes") ?? "").trim();
+    const key = appointmentKey.current ??
+      (appointmentKey.current = crypto.randomUUID());
+    try {
+      const appointment = await createAppointment.run(
+        {
+          type: String(values.get("type")) as StudentAppointmentType,
+          startsAt: startsAt.toISOString(),
+          ...(notes ? { notes } : {}),
+        },
+        key,
+      );
+      appointmentKey.current = null;
+      appointmentForm.current?.reset();
+      await submit({ appointmentId: appointment.id });
+    } catch {
+      // Preserve both the form and idempotency key for a safe retry.
+    }
+  };
   if (appointments.status === "loading") return <p>Loading your appointments...</p>;
   if (appointments.status === "error") {
     return (
@@ -410,43 +457,76 @@ function SchedulingForm({
   const scheduled = appointments.data.items.filter(
     (appointment: StudentAppointment) => appointment.status === "scheduled",
   );
-  if (scheduled.length === 0) {
-    return (
-      <div>
-        <p>Schedule an appointment first, then return here to attach it.</p>
-        <Link className="button button--secondary" href="/appointments">
-          Open appointments
-        </Link>
-      </div>
-    );
-  }
   return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        const appointmentId = String(
-          new FormData(event.currentTarget).get("appointmentId") ?? "",
-        );
-        void submit({ appointmentId });
-      }}
-    >
-      <label>
-        Scheduled appointment
-        <select name="appointmentId" required defaultValue="">
-          <option value="" disabled>
-            Choose an appointment
-          </option>
-          {scheduled.map((appointment) => (
-            <option key={appointment.id} value={appointment.id}>
-              {new Date(appointment.startsAt).toLocaleString()} · {appointment.type.replaceAll("_", " ")}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button className="button button--primary" type="submit" disabled={loading}>
-        {loading ? "Submitting..." : "Attach appointment"}
-      </button>
-    </form>
+    <div className="requirement-scheduling">
+      {scheduled.length > 0 ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            const appointmentId = String(
+              new FormData(event.currentTarget).get("appointmentId") ?? "",
+            );
+            void submit({ appointmentId });
+          }}
+        >
+          <label>
+            Use a scheduled appointment
+            <select name="appointmentId" required defaultValue="">
+              <option value="" disabled>Choose an appointment</option>
+              {scheduled.map((appointment) => (
+                <option key={appointment.id} value={appointment.id}>
+                  {new Date(appointment.startsAt).toLocaleString()} · {appointment.type.replaceAll("_", " ")}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="button button--primary" type="submit" disabled={loading}>
+            {loading ? "Submitting..." : "Attach appointment"}
+          </button>
+        </form>
+      ) : (
+        <p>No scheduled appointment is available yet. Choose a time below.</p>
+      )}
+
+      <details open={scheduled.length === 0}>
+        <summary>Schedule a new advisor appointment</summary>
+        <form ref={appointmentForm} onSubmit={(event) => void scheduleAndAttach(event)}>
+          <label>
+            Conversation type
+            <select name="type" defaultValue="enrollment_support" required>
+              <option value="enrollment_support">Enrollment support</option>
+              <option value="admissions_counseling">Admissions counseling</option>
+              <option value="financial_aid">Financial aid</option>
+            </select>
+          </label>
+          <label>
+            Date and time
+            <input name="startsAt" type="datetime-local" required />
+          </label>
+          <label>
+            What would you like to discuss? <small>Optional</small>
+            <textarea name="notes" rows={3} maxLength={500} />
+          </label>
+          {appointmentError ? <p className="field-error" role="alert">{appointmentError}</p> : null}
+          <ActionFeedback
+            status={createAppointment.status}
+            error={createAppointment.message}
+            success="Your appointment is scheduled and attached."
+          />
+          <button
+            className="button button--primary"
+            type="submit"
+            disabled={loading || createAppointment.status === "loading"}
+          >
+            {createAppointment.status === "loading"
+              ? "Scheduling..."
+              : createAppointment.status === "error"
+                ? "Retry scheduling"
+                : "Schedule and attach"}
+          </button>
+        </form>
+      </details>
+    </div>
   );
 }
 
@@ -525,15 +605,19 @@ function RequirementResponseContent({
               Your institution selected DocuSign for this step, but the live
               connection is not configured yet.
             </p>
-            <Link className="button button--secondary" href="/help">
-              Get enrollment help
-            </Link>
+            <p>Contact Enrollment Services for an updated signing option.</p>
           </div>
         );
       }
       return <BuiltInSignatureForm submit={onSubmit} loading={loading} />;
     case "scheduling":
-      return <SchedulingForm submit={onSubmit} loading={loading} />;
+      return (
+        <SchedulingForm
+          requirementId={requirement.id}
+          submit={onSubmit}
+          loading={loading}
+        />
+      );
     default:
       return null;
   }

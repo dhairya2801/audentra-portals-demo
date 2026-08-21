@@ -16,6 +16,7 @@ import type {
   CatalogCourse,
   ApiErrorResponse,
   CompleteStudentOnboardingInput,
+  CompleteStudentFerpaInput,
   CompleteStaffInteractionInput,
   ConfirmStudentDocumentExtractionInput,
   CreateStaffActionRuleInput,
@@ -44,6 +45,7 @@ import type {
   StudentHelpRequest,
   StudentHousingPlan,
   StudentFinancials,
+  StudentFerpaAuthorizationEnvelope,
   StudentMessage,
   StudentMessageList,
   StudentOnboarding,
@@ -99,7 +101,10 @@ import type {
   UpdateStaffWorkItemInput,
   UpdateStudentOnboardingInput,
   UpdateStudentHousingPlanInput,
+  UpdateStudentFerpaAccessInput,
   UpdateStudentProfileInput,
+  FerpaDelegateLinkIssueResult,
+  DelegateSession,
 } from "@vv/contracts";
 import type { EdwardExecutionMode } from "./edward-lab";
 
@@ -418,6 +423,99 @@ export function submitStudentRequirementResponse(
       },
       body: JSON.stringify(input),
     },
+  );
+}
+
+export function getStudentFerpaAuthorization(signal?: AbortSignal) {
+  return request<StudentFerpaAuthorizationEnvelope>(
+    "/v1/student/ferpa-authorizations/current",
+    { method: "GET", signal },
+  );
+}
+
+export function completeStudentFerpaAuthorization(
+  requirementId: string,
+  input: CompleteStudentFerpaInput,
+  idempotencyKey: string,
+) {
+  return request<StudentFerpaAuthorizationEnvelope>(
+    `/v1/student/requirements/${encodeURIComponent(requirementId)}/ferpa/complete`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function updateStudentFerpaAccess(
+  authorizationId: string,
+  input: UpdateStudentFerpaAccessInput,
+) {
+  return request<StudentFerpaAuthorizationEnvelope>(
+    `/v1/student/ferpa-authorizations/${encodeURIComponent(authorizationId)}/access`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function issueStudentFerpaDelegateLink(
+  authorizationId: string,
+  delegateId: string,
+  expectedVersion: number,
+  idempotencyKey: string,
+) {
+  return request<FerpaDelegateLinkIssueResult>(
+    `/v1/student/ferpa-authorizations/${encodeURIComponent(authorizationId)}/delegates/${encodeURIComponent(delegateId)}/link`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify({ expectedVersion }),
+    },
+  );
+}
+
+export function revokeStudentFerpaDelegateLink(
+  authorizationId: string,
+  delegateId: string,
+  expectedVersion: number,
+) {
+  return request<StudentFerpaAuthorizationEnvelope>(
+    `/v1/student/ferpa-authorizations/${encodeURIComponent(authorizationId)}/delegates/${encodeURIComponent(delegateId)}/link/revoke`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expectedVersion }),
+    },
+  );
+}
+
+export function exchangeFerpaDelegateLink(token: string) {
+  return request<DelegateSession>(
+    "/v1/auth/delegate/exchange",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function signOutFerpaDelegate() {
+  return request<{ authenticated: false; mode: "delegate" }>(
+    "/v1/auth/delegate/sign-out",
+    { method: "POST" },
+    { notifyStudentRecordChanged: false },
   );
 }
 
@@ -1383,6 +1481,34 @@ export function createStudentAppointment(
   });
 }
 
+export function getStudentRequirementAppointments(
+  requirementId: string,
+  signal?: AbortSignal,
+) {
+  return request<StudentAppointmentList>(
+    `/v1/student/requirements/${encodeURIComponent(requirementId)}/appointments`,
+    { method: "GET", signal },
+  );
+}
+
+export function createStudentRequirementAppointment(
+  requirementId: string,
+  input: CreateStudentAppointmentInput,
+  idempotencyKey: string,
+) {
+  return request<StudentAppointment>(
+    `/v1/student/requirements/${encodeURIComponent(requirementId)}/appointments`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
 export function getStudentPayments(signal?: AbortSignal) {
   return request<StudentPaymentList>("/v1/student/payments", {
     method: "GET",
@@ -1417,6 +1543,20 @@ export function updateStudentProfile(input: UpdateStudentProfileInput) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
+}
+
+export function updateStudentRequirementProfile(
+  requirementId: string,
+  input: UpdateStudentProfileInput,
+) {
+  return request<StudentProfile>(
+    `/v1/student/requirements/${encodeURIComponent(requirementId)}/profile`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export function getStudentHelp(signal?: AbortSignal) {

@@ -130,6 +130,7 @@ const taskTypeOptions: Array<{
   { value: "multiple_select", label: "Multiple select", symbol: "N", description: "Choose several options" },
   { value: "upload_file", label: "File upload", symbol: "UP", description: "Request one or more documents" },
   { value: "signature", label: "E-signature", symbol: "SIG", description: "Review and sign a document" },
+  { value: "ferpa", label: "FERPA access", symbol: "FERPA", description: "E-sign a privacy authorization and configure per-person portal access" },
   { value: "payment", label: "Payment", symbol: "$", description: "Complete the enrollment deposit" },
   { value: "information", label: "Information", symbol: "i", description: "Show guidance with no submission" },
   { value: "selection_flow", label: "Guided choices", symbol: "FLOW", description: "Collect choices over several prompts" },
@@ -561,6 +562,9 @@ function studentInputPreview(task: JourneyBuilderTask) {
   }
   if (task.taskType === "signature") {
     return { label: "Student action", value: "Review and sign", remaining: 0 };
+  }
+  if (task.taskType === "ferpa") {
+    return { label: "Protected workflow", value: "Sign + choose parent access", remaining: 0 };
   }
   if (task.taskType === "payment") {
     return { label: "Student action", value: "Review payment details", remaining: 0 };
@@ -1273,7 +1277,7 @@ function JourneyTaskEditor({
     if (isNew || (item.kind === "onboarding" && item.studentStep)) {
       return "details";
     }
-    return ["form", "selection_flow", "single_select", "multiple_select", "upload_file", "signature"].includes(item.taskType)
+    return ["form", "selection_flow", "single_select", "multiple_select", "upload_file", "signature", "ferpa"].includes(item.taskType)
       ? "experience"
       : "details";
   });
@@ -1451,6 +1455,15 @@ function JourneyTaskEditor({
       if (!title || !description) {
         throw new Error("Step name and student instructions are required.");
       }
+      if (
+        selectedType === "ferpa" &&
+        item.kind === "onboarding" &&
+        item.id !== "family_permissions"
+      ) {
+        throw new Error(
+          "Onboarding FERPA must use the protected Family permissions step. Close this draft and edit that step instead.",
+        );
+      }
       if (!Number.isInteger(points) || points < 0 || points > 10_000) {
         throw new Error("Points must be a whole number between 0 and 10,000.");
       }
@@ -1553,6 +1566,21 @@ function JourneyTaskEditor({
           "Payment actions are only available for the built-in enrollment deposit step.",
         );
       }
+      const willBeActive = form.get("active") === "on";
+      if (
+        selectedType === "ferpa" &&
+        willBeActive &&
+        dependencyTasks.some(
+          (candidate) =>
+            candidate.id !== item.id &&
+            candidate.taskType === "ferpa" &&
+            candidate.active,
+        )
+      ) {
+        throw new Error(
+          "Only one active FERPA task can be published across onboarding and enrollment.",
+        );
+      }
 
       Object.assign(task, {
         id: item.id,
@@ -1563,8 +1591,8 @@ function JourneyTaskEditor({
         submission_type: submissionTypeForTask(selectedType),
         points,
         priority,
-        required: form.get("required") === "on",
-        active: form.get("active") === "on",
+        required: selectedType === "ferpa" || form.get("required") === "on",
+        active: willBeActive,
         depends_on: dependencies,
       });
       if (routeRules.length > 0) {
@@ -1613,15 +1641,17 @@ function JourneyTaskEditor({
         delete task.maximum_selections;
       }
 
-      if (selectedType === "signature") {
-        const provider = String(form.get("signatureProvider"));
-        task.signature_provider = provider;
-        const templateId = String(form.get("signatureTemplateId") ?? "").trim();
-        if (provider === "docusign" && templateId) {
-          task.docusign_template_id = templateId;
-        } else {
-          delete task.docusign_template_id;
+      if (selectedType === "signature" || selectedType === "ferpa") {
+        const provider = String(
+          form.get("signatureProvider") ?? signatureProvider,
+        );
+        if (provider !== "built_in") {
+          throw new Error(
+            "DocuSign cannot be published until execution is configured. Choose built-in e-signature to publish this step.",
+          );
         }
+        task.signature_provider = "built_in";
+        delete task.docusign_template_id;
         delete task.signature_template_id;
       } else {
         delete task.signature_provider;
@@ -1688,6 +1718,26 @@ function JourneyTaskEditor({
         "documentCategories",
       ]) {
         delete existingInput[key];
+      }
+      if (selectedType === "ferpa") {
+        existingInput.portalScopes = [
+          "dashboard",
+          "enrollment",
+          "financials",
+          "classrooms",
+          "campus_life",
+          "edward",
+          "documents",
+          "messages",
+          "appointments",
+          "payments",
+          "profile",
+          "help",
+        ];
+        existingInput.signatureProvider = "built_in";
+        delete existingInput.docusignTemplateId;
+      } else {
+        delete existingInput.portalScopes;
       }
       if (Object.keys(existingInput).length === 0) {
         delete task.input;
@@ -2061,11 +2111,18 @@ function JourneyTaskEditor({
                   key={option.value}
                   value={option.value}
                   disabled={
-                    option.value === "payment" && item.id !== "enrollment_deposit"
+                    (option.value === "payment" && item.id !== "enrollment_deposit") ||
+                    (option.value === "ferpa" &&
+                      item.kind === "onboarding" &&
+                      item.id !== "family_permissions")
                   }
                 >
                   {option.value === "payment"
                     ? "Payment (built-in enrollment deposit only)"
+                    : option.value === "ferpa" &&
+                        item.kind === "onboarding" &&
+                        item.id !== "family_permissions"
+                      ? "FERPA access (use Family permissions step)"
                     : option.label}
                 </option>
               ))}
@@ -2150,7 +2207,7 @@ function JourneyTaskEditor({
           </div>
         ) : null}
 
-        {configuredTaskType === "signature" ? (
+        {configuredTaskType === "signature" || configuredTaskType === "ferpa" ? (
           <div className="staff-type-configuration">
             <div className="staff-form-grid">
               <label>
@@ -2163,24 +2220,49 @@ function JourneyTaskEditor({
                   }
                 >
                   <option value="built_in">Built-in e-signature</option>
-                  <option value="docusign">DocuSign (configuration only)</option>
+                  <option value="docusign" disabled>DocuSign (unavailable)</option>
                 </select>
               </label>
-              {signatureProvider === "docusign" ? (
-                <label>
-                  DocuSign template ID (optional)
-                  <input
-                    name="signatureTemplateId"
-                    defaultValue={item.signatureTemplateId ?? ""}
-                    maxLength={200}
-                  />
-                </label>
-              ) : null}
             </div>
+            {signatureProvider === "docusign" ? (
+              <div className="staff-student-impact-note" role="alert">
+                <strong>DocuSign execution is not available.</strong>
+                <p>
+                  This existing configuration cannot be published or completed
+                  by students. Select built-in e-signature before publishing.
+                </p>
+              </div>
+            ) : null}
             <p>
-              Provider and template settings are saved to the journey configuration.
-              A live DocuSign connection must be configured separately.
+              {configuredTaskType === "ferpa"
+                ? "The signature and access decision are completed together as one protected FERPA task."
+                : "Students review and sign with the portal’s built-in e-signature experience."}
             </p>
+            {configuredTaskType === "ferpa" ? (
+              <section className="staff-ferpa-task-preview" aria-labelledby="staff-ferpa-pages-title">
+                <div>
+                  <span aria-hidden="true">◆</span>
+                  <div>
+                    <p className="eyebrow">Specialized protected task</p>
+                    <h4>FERPA document + parent access</h4>
+                    <p>
+                      Students e-sign the authorization, add up to four trusted
+                      people, and choose pages independently for each person.
+                    </p>
+                  </div>
+                </div>
+                <h5 id="staff-ferpa-pages-title">Fixed page catalog</h5>
+                <div className="staff-ferpa-task-preview__scopes" aria-label="FERPA portal pages">
+                  {["Dashboard", "My Enrollment", "My Financials", "My Classrooms", "My Campus Life", "Edward AI", "My Documents", "Messages", "Appointments", "Payments", "Profile", "Help"].map((label) => (
+                    <span key={label}>✓ {label}</span>
+                  ))}
+                </div>
+                <small>
+                  The catalog is fixed so access enforcement and navigation stay aligned.
+                  Students decide which pages to grant; staff do not preselect them.
+                </small>
+              </section>
+            ) : null}
           </div>
         ) : null}
 
@@ -2537,8 +2619,15 @@ function JourneyTaskEditor({
           </header>
         <div className="staff-form-grid">
           <label className="staff-checkbox">
-            <input name="required" type="checkbox" defaultChecked={item.required} />
+            {configuredTaskType === "ferpa" ? (
+              <input name="required" type="checkbox" checked disabled readOnly />
+            ) : (
+              <input name="required" type="checkbox" defaultChecked={item.required} />
+            )}
             Required for students
+            {configuredTaskType === "ferpa" ? (
+              <small>FERPA always requires both an e-signature and an access decision.</small>
+            ) : null}
           </label>
           <label className="staff-checkbox">
             <input name="active" type="checkbox" defaultChecked={item.active} />

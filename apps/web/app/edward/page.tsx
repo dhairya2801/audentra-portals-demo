@@ -6,26 +6,27 @@ import { PortalShell } from "../components/portal-shell";
 import { ErrorState, LoadingState } from "../components/portal-ui";
 import { useTenant } from "../components/tenant-provider";
 import { useApiResource } from "../hooks/use-api-resource";
-import { getStudentProfile } from "../lib/api-client";
+import { getStudentBootstrap } from "../lib/api-client";
 import styles from "./edward-page.module.css";
 
 function EdwardWorkspace() {
   const load = useCallback(
-    (signal: AbortSignal) => getStudentProfile(signal),
+    (signal: AbortSignal) => getStudentBootstrap(signal),
     [],
   );
-  const profile = useApiResource(load);
+  const bootstrap = useApiResource(load);
 
   return (
     <div className={styles.page}>
-      {profile.status === "loading" ? (
+      {bootstrap.status === "loading" ? (
         <LoadingState label="Connecting Edward to your student context" />
-      ) : profile.status === "error" ? (
-        <ErrorState message={profile.error} onRetry={profile.reload} />
+      ) : bootstrap.status === "error" ? (
+        <ErrorState message={bootstrap.error} onRetry={bootstrap.reload} />
       ) : (
         <EdwardAssistant
-          studentName={profile.data.preferredName}
+          studentName={bootstrap.data.student.preferredName}
           variant="embedded"
+          allowLiveVoice={bootstrap.data.actor?.type !== "delegate"}
         />
       )}
     </div>

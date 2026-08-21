@@ -12,6 +12,7 @@ import {
   useState,
 } from "react";
 import { PortalShell } from "../components/portal-shell";
+import { FerpaAccessCenter } from "../components/ferpa-access-center";
 import {
   ActionFeedback,
   ErrorState,
@@ -21,8 +22,10 @@ import {
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
 import {
   getStudentDocuments,
+  getStudentBootstrap,
   getStudentProfile,
   signOutStudent,
+  signOutFerpaDelegate,
   updateStudentProfile,
 } from "../lib/api-client";
 import { useTenant } from "../components/tenant-provider";
@@ -31,10 +34,12 @@ function ProfileForm({
   profile,
   documents,
   reload,
+  actorType,
 }: {
   profile: StudentProfile;
   documents: StudentDocumentList;
   reload: () => void;
+  actorType: "student" | "delegate";
 }) {
   const tenantRuntime = useTenant();
   const { tenant } = tenantRuntime;
@@ -51,7 +56,12 @@ function ProfileForm({
     [],
   );
   const saveProfile = useApiAction(updateProfileAction);
-  const signOutAction = useCallback(() => signOutStudent(), []);
+  const signOutAction = useCallback(
+    () => (actorType === "delegate" ? signOutFerpaDelegate() : signOutStudent()).then(
+      () => undefined,
+    ),
+    [actorType],
+  );
   const signOut = useApiAction(signOutAction);
   const latestTranscript = documents.items
     .filter((document) => document.category === "transcript")
@@ -305,11 +315,23 @@ function ProfileForm({
 export default function ProfilePage() {
   const { tenant } = useTenant();
   const loadProfile = useCallback(
-    (signal: AbortSignal) =>
-      Promise.all([
+    async (signal: AbortSignal) => {
+      const bootstrap = await getStudentBootstrap(signal);
+      const canReadDocuments =
+        bootstrap.actor?.type !== "delegate" ||
+        bootstrap.actor.scopes.includes("documents");
+      const [profile, documents] = await Promise.all([
         getStudentProfile(signal),
-        getStudentDocuments(signal),
-      ]).then(([profile, documents]) => ({ profile, documents })),
+        canReadDocuments
+          ? getStudentDocuments(signal)
+          : Promise.resolve({ items: [], total: 0 }),
+      ]);
+      return {
+        profile,
+        documents,
+        actorType: bootstrap.actor?.type === "delegate" ? "delegate" as const : "student" as const,
+      };
+    },
     [],
   );
   const profileResource = useApiResource(loadProfile);
@@ -340,12 +362,16 @@ export default function ProfilePage() {
           onRetry={profileResource.reload}
         />
       ) : (
-        <ProfileForm
-          profile={profileResource.data.profile}
-          documents={profileResource.data.documents}
-          reload={profileResource.refresh}
-          key={profileResource.data.profile.version}
-        />
+        <div className="ferpa-page-stack">
+          <FerpaAccessCenter mode="manage" onSaved={profileResource.refresh} />
+          <ProfileForm
+            profile={profileResource.data.profile}
+            documents={profileResource.data.documents}
+            reload={profileResource.refresh}
+            actorType={profileResource.data.actorType}
+            key={profileResource.data.profile.version}
+          />
+        </div>
       )}
     </PortalShell>
   );

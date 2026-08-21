@@ -21,8 +21,8 @@ export type StudentCalendarEntry = {
   endsAt?: string | null;
   location?: string | null;
   status?: string | null;
-  href: string;
-  actionLabel: string;
+  href?: string | null;
+  actionLabel?: string | null;
 };
 
 export type StudentCalendarDay = {

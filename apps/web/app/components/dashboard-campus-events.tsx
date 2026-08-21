@@ -29,9 +29,11 @@ function eventDate(value: string) {
 export function DashboardCampusEvents({
   events,
   asOf,
+  canOpenCampusLife = true,
 }: {
   events: readonly CampusEvent[];
   asOf: string;
+  canOpenCampusLife?: boolean;
 }) {
   const rail = useRef<HTMLUListElement>(null);
   const upcoming = useMemo(
@@ -77,7 +79,9 @@ export function DashboardCampusEvents({
           >
             →
           </button>
-          <Link href="/campus-life">All campus life</Link>
+          {canOpenCampusLife ? (
+            <Link href="/campus-life">All campus life</Link>
+          ) : null}
         </div>
       </header>
 
@@ -123,19 +127,21 @@ export function DashboardCampusEvents({
                     </time>
                     <span>{event.location}</span>
                   </div>
-                  {hasRegistrationDestination && registration.external ? (
-                    <a href={registration.href} target="_blank" rel="noreferrer">
-                      Registration details <span aria-hidden="true">↗</span>
-                    </a>
-                  ) : hasRegistrationDestination ? (
-                    <Link href={registration.href}>
-                      Registration details <span aria-hidden="true">→</span>
-                    </Link>
-                  ) : (
-                    <Link href="/campus-life">
-                      Event details <span aria-hidden="true">→</span>
-                    </Link>
-                  )}
+                  {canOpenCampusLife ? (
+                    hasRegistrationDestination && registration.external ? (
+                      <a href={registration.href} target="_blank" rel="noreferrer">
+                        Registration details <span aria-hidden="true">↗</span>
+                      </a>
+                    ) : hasRegistrationDestination ? (
+                      <Link href={registration.href}>
+                        Registration details <span aria-hidden="true">→</span>
+                      </Link>
+                    ) : (
+                      <Link href="/campus-life">
+                        Event details <span aria-hidden="true">→</span>
+                      </Link>
+                    )
+                  ) : null}
                 </div>
               </li>
             );

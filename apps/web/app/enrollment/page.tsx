@@ -1,6 +1,8 @@
 "use client";
 
 import type {
+  FerpaPortalScope,
+  StudentFerpaAuthorization,
   StudentOnboarding,
   StudentRequirementDetail,
   StudentRequirementList,
@@ -24,12 +26,16 @@ import {
 } from "../hooks/use-activity-tracking";
 import {
   getStudentOnboarding,
+  getStudentBootstrap,
+  getStudentFerpaAuthorization,
   getStudentRequirements,
 } from "../lib/api-client";
 
 type EnrollmentPageData = {
   requirements: StudentRequirementList;
-  onboarding: StudentOnboarding;
+  onboarding: StudentOnboarding | null;
+  authorization: StudentFerpaAuthorization | null;
+  delegateScopes: FerpaPortalScope[] | null;
 };
 
 const residencyReviewLabels = {
@@ -138,6 +144,11 @@ const requirementActionLabels: Record<string, string> = {
 };
 
 function requirementActionLabel(item: StudentRequirementDetail) {
+  if (item.interactionType === "ferpa") {
+    return terminalRequirementStatuses.has(item.status)
+      ? "Manage access"
+      : "Complete FERPA";
+  }
   if (terminalRequirementStatuses.has(item.status)) return "Review";
   if (item.status === "blocked") return "View prerequisites";
   if (item.status === "submitted") return "View submission";
@@ -160,9 +171,11 @@ function requirementActionLabel(item: StudentRequirementDetail) {
 function RequirementItem({
   item,
   onView,
+  studentManaged,
 }: {
   item: StudentRequirementDetail;
   onView: (item: StudentRequirementDetail) => void;
+  studentManaged: boolean;
 }) {
   const progress = normalizedProgress(item.progressPercent);
   const isTerminal = terminalRequirementStatuses.has(item.status);
@@ -226,22 +239,34 @@ function RequirementItem({
         <StatusPill value={item.status} />
         <span>{progress}%</span>
       </div>
-      <Link
-        aria-label={`${actionLabel} ${item.title}`}
-        className="button button--secondary resource-list__action"
-        href={`/enrollment/requirements/${encodeURIComponent(item.slug)}`}
-        onClick={() => onView(item)}
-      >
-        {actionLabel}
-      </Link>
+      {studentManaged ? (
+        <div
+          className="enrollment-requirement__managed resource-list__action"
+          role="note"
+        >
+          <strong>Managed by the student</strong>
+          <span>FERPA settings cannot be opened or changed here.</span>
+        </div>
+      ) : (
+        <Link
+          aria-label={`${actionLabel} ${item.title}`}
+          className="button button--secondary resource-list__action"
+          href={`/enrollment/requirements/${encodeURIComponent(item.slug)}`}
+          onClick={() => onView(item)}
+        >
+          {actionLabel}
+        </Link>
+      )}
     </li>
   );
 }
 
 function OptionalSupportChecklist({
   onboarding,
+  canOpenAppointments,
 }: {
   onboarding: StudentOnboarding;
+  canOpenAppointments: boolean;
 }) {
   const { data } = onboarding;
   const choices = [
@@ -284,7 +309,7 @@ function OptionalSupportChecklist({
           <p className="eyebrow">Optional support choices</p>
           <h2 id="support-choices-title">Your onboarding follow-ups</h2>
         </div>
-        <Link href="/appointments">Ask an advisor</Link>
+        {canOpenAppointments ? <Link href="/appointments">Ask an advisor</Link> : null}
       </div>
       <div className="enrollment-support-choices__grid">
         {choices.map((choice) => (
@@ -309,11 +334,28 @@ function OptionalSupportChecklist({
 export default function EnrollmentPage() {
   const loadEnrollment = useCallback(
     async (signal: AbortSignal): Promise<EnrollmentPageData> => {
-      const [requirements, onboarding] = await Promise.all([
+      const bootstrap = await getStudentBootstrap(signal);
+      const canReadOnboarding =
+        bootstrap.actor?.type !== "delegate" ||
+        bootstrap.actor.scopes.includes("enrollment");
+      const delegateScopes = bootstrap.actor?.type === "delegate"
+        ? bootstrap.actor.scopes
+        : null;
+      const [requirements, onboarding, ferpa] = await Promise.all([
         getStudentRequirements(signal),
-        getStudentOnboarding(signal),
+        canReadOnboarding
+          ? getStudentOnboarding(signal)
+          : Promise.resolve(null),
+        delegateScopes === null
+          ? getStudentFerpaAuthorization(signal)
+          : Promise.resolve({ authorization: null }),
       ]);
-      return { requirements, onboarding };
+      return {
+        requirements,
+        onboarding,
+        authorization: ferpa.authorization,
+        delegateScopes,
+      };
     },
     [],
   );
@@ -346,9 +388,29 @@ export default function EnrollmentPage() {
       entry_point: "enrollment_checklist",
     });
   };
+  const showRetiredFerpa =
+    enrollment.status === "ready" &&
+    enrollment.data.authorization?.status === "completed" &&
+    !enrollment.data.requirements.items.some(
+      (item) =>
+        item.id === enrollment.data.authorization?.requirementId ||
+        item.interactionType === "ferpa",
+    );
   const overallProgress =
+    enrollment.status !== "ready"
+      ? 0
+      : showRetiredFerpa
+        ? Math.round(
+            (enrollment.data.requirements.items.reduce(
+              (total, item) => total + normalizedProgress(item.progressPercent),
+              0,
+            ) + 100) /
+              (enrollment.data.requirements.items.length + 1),
+          )
+        : progressForRequirements(enrollment.data.requirements.items);
+  const displayedRequirementTotal =
     enrollment.status === "ready"
-      ? progressForRequirements(enrollment.data.requirements.items)
+      ? enrollment.data.requirements.total + (showRetiredFerpa ? 1 : 0)
       : 0;
   const groupedRequirements = useMemo(() => {
     const groups: Record<EnrollmentSegment, StudentRequirementDetail[]> = {
@@ -377,8 +439,13 @@ export default function EnrollmentPage() {
               description: item.description,
               startsAt: item.dueAt,
               status: item.status,
-              href: `/enrollment/requirements/${encodeURIComponent(item.slug)}`,
-              actionLabel: requirementActionLabel(item),
+              ...(enrollment.data.delegateScopes !== null &&
+              item.interactionType === "ferpa"
+                ? {}
+                : {
+                    href: `/enrollment/requirements/${encodeURIComponent(item.slug)}`,
+                    actionLabel: requirementActionLabel(item),
+                  }),
             },
           ]
         : [],
@@ -396,7 +463,7 @@ export default function EnrollmentPage() {
         <LoadingState label="Loading your enrollment requirements" />
       ) : enrollment.status === "error" ? (
         <ErrorState message={enrollment.error} onRetry={enrollment.reload} />
-      ) : enrollment.data.requirements.total === 0 ? (
+      ) : displayedRequirementTotal === 0 ? (
         <EmptyState
           title="No requirements assigned"
           description="Your enrollment requirements will appear here once your journey begins."
@@ -413,7 +480,7 @@ export default function EnrollmentPage() {
             <PageCard
               className="enrollment-overview"
               eyebrow="Enrollment checklist"
-              title={`${enrollment.data.requirements.total} ${enrollment.data.requirements.total === 1 ? "requirement" : "requirements"}`}
+              title={`${displayedRequirementTotal} ${displayedRequirementTotal === 1 ? "requirement" : "requirements"}`}
               action={
                 <div className="enrollment-overview__progress-summary">
                   <span>Overall progress</span>
@@ -443,13 +510,55 @@ export default function EnrollmentPage() {
                         <h3 id={`enrollment-segment-${segment.id}`}>{segment.title}</h3>
                         <p>{segment.description}</p>
                       </div>
-                      <span>{groupedRequirements[segment.id].length}</span>
+                      <span>
+                        {groupedRequirements[segment.id].length +
+                          (segment.id === "complete" && showRetiredFerpa ? 1 : 0)}
+                      </span>
                     </header>
-                    {groupedRequirements[segment.id].length > 0 ? (
+                    {groupedRequirements[segment.id].length > 0 ||
+                    (segment.id === "complete" && showRetiredFerpa) ? (
                       <ul className="resource-list">
                         {groupedRequirements[segment.id].map((item) => (
-                          <RequirementItem item={item} onView={viewTask} key={item.id} />
+                          <RequirementItem
+                            item={item}
+                            onView={viewTask}
+                            studentManaged={
+                              enrollment.data.delegateScopes !== null &&
+                              item.interactionType === "ferpa"
+                            }
+                            key={item.id}
+                          />
                         ))}
+                        {segment.id === "complete" && showRetiredFerpa ? (
+                          <li className="resource-list__item enrollment-requirement enrollment-requirement--completed">
+                            <div className="resource-list__symbol" aria-hidden="true">✓</div>
+                            <div className="resource-list__content">
+                              <div className="resource-list__title">
+                                <h3>FERPA release and parent access</h3>
+                              </div>
+                              <p>
+                                Your authorization remains active after the original
+                                journey task is retired. Review people, page access,
+                                and secure links at any time.
+                              </p>
+                              <div className="resource-list__meta">
+                                <span>Registrar</span>
+                                <span>Student managed</span>
+                              </div>
+                            </div>
+                            <div className="enrollment-requirement__status">
+                              <StatusPill value="completed" />
+                              <span>100%</span>
+                            </div>
+                            <Link
+                              aria-label="Manage access FERPA release and parent access"
+                              className="button button--secondary resource-list__action"
+                              href="/enrollment/ferpa"
+                            >
+                              Manage access
+                            </Link>
+                          </li>
+                        ) : null}
                       </ul>
                     ) : (
                       <p className="enrollment-segment__empty">
@@ -464,13 +573,30 @@ export default function EnrollmentPage() {
                 ))}
               </div>
             </PageCard>
-            <OptionalSupportChecklist onboarding={enrollment.data.onboarding} />
+            {enrollment.data.onboarding ? (
+              <OptionalSupportChecklist
+                onboarding={enrollment.data.onboarding}
+                canOpenAppointments={
+                  enrollment.data.delegateScopes === null ||
+                  enrollment.data.delegateScopes.includes("appointments")
+                }
+              />
+            ) : null}
           </div>
           <aside className="resource-aside">
             <nav className="aside-links" aria-label="Related enrollment services">
-              <Link href="/documents">Manage documents <span>→</span></Link>
-              <Link href="/payments">View payments <span>→</span></Link>
-              <Link href="/appointments">Meet an advisor <span>→</span></Link>
+              {enrollment.data.delegateScopes === null ||
+              enrollment.data.delegateScopes.includes("documents") ? (
+                <Link href="/documents">Manage documents <span>→</span></Link>
+              ) : null}
+              {enrollment.data.delegateScopes === null ||
+              enrollment.data.delegateScopes.includes("payments") ? (
+                <Link href="/payments">View payments <span>→</span></Link>
+              ) : null}
+              {enrollment.data.delegateScopes === null ||
+              enrollment.data.delegateScopes.includes("appointments") ? (
+                <Link href="/appointments">Meet an advisor <span>→</span></Link>
+              ) : null}
             </nav>
           </aside>
         </div>

@@ -48,6 +48,7 @@ function entryDateLabel(entry: StudentCalendarEntry) {
 }
 
 function CalendarAction({ entry }: { entry: StudentCalendarEntry }) {
+  if (!entry.href || !entry.actionLabel) return null;
   const fallback =
     entry.kind === "campus"
       ? "/campus-life"
@@ -73,10 +74,12 @@ export function StudentCalendar({
   entries,
   initialMonth,
   title = "Your student calendar",
+  canOpenEntry = () => true,
 }: {
   entries: readonly StudentCalendarEntry[];
   initialMonth?: Date;
   title?: string;
+  canOpenEntry?: (entry: StudentCalendarEntry) => boolean;
 }) {
   const [displayedMonth, setDisplayedMonth] = useState(() =>
     initialMonth ?? defaultStudentCalendarMonth(entries),
@@ -239,7 +242,9 @@ export function StudentCalendar({
                   {selectedEntry.status.replaceAll("_", " ")}
                 </span>
               ) : null}
-              <CalendarAction entry={selectedEntry} />
+              {canOpenEntry(selectedEntry) ? (
+                <CalendarAction entry={selectedEntry} />
+              ) : null}
             </>
           ) : (
             <div className={styles.emptyDetail}>
