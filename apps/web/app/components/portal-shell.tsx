@@ -1,6 +1,7 @@
 "use client";
 
 import type { FerpaPortalScope, StudentExperienceUpdate } from "@vv/contracts";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useActivityTracking } from "../hooks/use-activity-tracking";
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
@@ -23,6 +24,7 @@ import { connectStudentRealtime } from "./student-realtime";
 import { TenantLink as Link } from "./tenant-link";
 import { useTenant } from "./tenant-provider";
 import { formatTenantMoney } from "../lib/tenant";
+import { isParentPortalPath, parentPortalHref } from "../lib/parent-portal-routes";
 
 export type PortalSection =
   | "dashboard"
@@ -344,6 +346,7 @@ export function PortalShell({
   children: React.ReactNode;
 }) {
   const tenantRuntime = useTenant();
+  const pathname = usePathname() || "/";
   const { tenant } = tenantRuntime;
   const advisorContact =
     tenant.contacts.admissions ??
@@ -424,6 +427,20 @@ export function PortalShell({
       window.location.replace(tenantRuntime.href("/onboarding"));
     }
   }, [needsOnboarding, needsSignIn, tenantRuntime]);
+
+  useEffect(() => {
+    if (!delegateActor || isParentPortalPath(pathname)) return;
+
+    // Upgrade old parent bookmarks and a manually entered bare student route
+    // before the parent continues navigating. If the route is student-only
+    // (for example FERPA administration), return to the parent's first
+    // allowed page instead of exposing a student-context destination.
+    const current = `${pathname}${window.location.search}${window.location.hash}`;
+    const destination = parentPortalHref(current);
+    window.location.replace(
+      destination === current ? parentPortalHref(portalHome) : destination,
+    );
+  }, [delegateActor, pathname, portalHome]);
 
   useEffect(() => {
     if (

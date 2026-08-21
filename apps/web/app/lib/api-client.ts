@@ -107,6 +107,7 @@ import type {
   DelegateSession,
 } from "@vv/contracts";
 import type { EdwardExecutionMode } from "./edward-lab";
+import { isParentPortalPath } from "./parent-portal-routes";
 
 const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
 
@@ -124,9 +125,13 @@ const DELEGATE_SESSION_MODE_KEY = "vv:delegate-session-mode";
 /**
  * Browser storage contains no bearer credential. It only chooses which of
  * the separately HTTP-only student/delegate cookies this tab should use.
+ * A /parent route is the stronger, visible signal. Storage remains a fallback
+ * for an older bare URL long enough for the shell to canonicalize it, so a
+ * parent tab cannot silently fall back to the student's cookie mid-visit.
  */
 function portalSessionMode(): "student" | "delegate" {
   if (typeof window === "undefined") return "student";
+  if (isParentPortalPath(window.location.pathname)) return "delegate";
   try {
     return window.sessionStorage.getItem(DELEGATE_SESSION_MODE_KEY) === "delegate"
       ? "delegate"

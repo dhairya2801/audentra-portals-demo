@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { PortalMark } from "../components/portal-ui";
 import { useTenant } from "../components/tenant-provider";
 import { exchangeFerpaDelegateLink } from "../lib/api-client";
+import { parentPortalHref } from "../lib/parent-portal-routes";
 
 function fragmentToken() {
   const fragment = window.location.hash.replace(/^#/, "");
@@ -51,7 +52,7 @@ export default function DelegateExchangePage() {
         });
         return;
       }
-      window.location.replace(tenantRuntime.href(session.initialRoute));
+      window.location.replace(tenantRuntime.href(parentPortalHref(session.initialRoute)));
     } catch (caught) {
       setState({
         status: "error",

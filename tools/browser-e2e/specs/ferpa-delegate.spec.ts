@@ -183,6 +183,76 @@ test.describe("FERPA delegate boundaries", () => {
     await sharedContext.close();
   });
 
+  test("keeps delegated navigation in the explicit parent namespace", async ({
+    request,
+    browser,
+    baseURL,
+  }) => {
+    const completed = await completeFerpaThroughApi({
+      request,
+      delegates: [{ ...delegateDraft, scopes: ["dashboard", "documents"] }],
+    });
+    const delegate = completed.delegates[0];
+    expect(delegate).toBeTruthy();
+    const link = await issueFerpaDelegateLink({
+      request,
+      authorization: completed,
+      delegateId: delegate.id,
+    });
+
+    const sharedContext = await browser.newContext({ baseURL });
+    await authenticateDemoStudent(sharedContext, baseURL);
+    const studentPage = await sharedContext.newPage();
+    await studentPage.goto("/dashboard");
+    await expect(studentPage).toHaveURL(/\/dashboard$/);
+    await expect(
+      studentPage.getByRole("heading", { name: /Welcome back/ }),
+    ).toBeVisible();
+
+    const parentPage = await sharedContext.newPage();
+    await parentPage.goto(delegatePortalUrl(baseURL, link));
+    await expect(parentPage).toHaveURL(/\/parent\/dashboard$/);
+    const parentNavigation = parentPage.getByRole("navigation", {
+      name: "Student portal sections",
+    });
+    await expect(
+      parentNavigation.getByRole("link", { name: "My Documents" }),
+    ).toHaveAttribute("href", "/parent/documents");
+
+    await parentNavigation.getByRole("link", { name: "My Documents" }).click();
+    await expect(parentPage).toHaveURL(/\/parent\/documents$/);
+    await expect(
+      parentPage.getByRole("heading", { name: "Documents", exact: true }),
+    ).toBeVisible();
+
+    // An old bare bookmark must not cause this tab to begin using the shared
+    // student cookie. Its existing delegated tab selection is retained while
+    // the shell upgrades the URL back into the parent namespace.
+    await parentPage.goto("/documents");
+    await expect(parentPage).toHaveURL(/\/parent\/documents$/);
+    await expect(
+      parentPage.getByRole("region", { name: "Delegated portal session" }),
+    ).toBeVisible();
+
+    await studentPage.reload();
+    await expect(studentPage).toHaveURL(/\/dashboard$/);
+    await expect(
+      studentPage.getByRole("heading", { name: /Welcome back/ }),
+    ).toBeVisible();
+    const evidenceDirectory = process.env.E2E_SCREENSHOT_DIR;
+    if (evidenceDirectory) {
+      await parentPage.screenshot({
+        path: join(evidenceDirectory, "ferpa-parent-route-context.png"),
+        fullPage: false,
+      });
+      await studentPage.screenshot({
+        path: join(evidenceDirectory, "ferpa-student-route-context.png"),
+        fullPage: false,
+      });
+    }
+    await sharedContext.close();
+  });
+
   test("allows granted profile work but blocks ungranted pages and every FERPA mutation", async ({
     request,
     browser,
