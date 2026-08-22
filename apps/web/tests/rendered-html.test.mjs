@@ -501,11 +501,26 @@ test("dashboard enrollment CTA advances, waits, and completes from requirement s
 });
 
 test("typed client wires every resource route and mutation contract", async () => {
-  const source = await readFile(
-    new URL("../app/lib/api-client.ts", import.meta.url),
-    "utf8",
+  const [source, parentPortalRoutesSource] = await Promise.all([
+    readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/lib/parent-portal-routes.ts", import.meta.url),
+      "utf8",
+    ),
+  ]);
+  const compiledParentPortalRoutes = ts.transpileModule(parentPortalRoutesSource, {
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const parentPortalRoutesUrl = `data:text/javascript;base64,${Buffer.from(
+    compiledParentPortalRoutes,
+  ).toString("base64")}`;
+  const executableSource = source.replace(
+    'from "./parent-portal-routes";',
+    `from ${JSON.stringify(parentPortalRoutesUrl)};`,
   );
-  const executableSource = source;
   const compiled = ts.transpileModule(executableSource, {
     compilerOptions: {
       module: ts.ModuleKind.ESNext,
