@@ -9142,6 +9142,58 @@ a {
   min-height: 3.2rem;
 }
 
+.auth-sso {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.auth-sso h2 {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.auth-sso__links {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.auth-sso-link {
+  justify-content: center;
+  min-height: 3.2rem;
+  text-align: center;
+}
+
+.auth-sso-alert,
+.auth-sso-status {
+  margin: 0 0 1.25rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.55rem;
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.auth-sso-alert {
+  border: 1px solid #b94a48;
+  background: #fff2f1;
+  color: #7f2725;
+}
+
+.auth-sso-alert:focus {
+  outline: 3px solid rgb(185 74 72 / 25%);
+  outline-offset: 2px;
+}
+
+.auth-sso-status {
+  border: 1px solid var(--line);
+  background: #f3f3ee;
+  color: var(--ink-soft);
+}
+
 .auth-mode-switch {
   display: grid;
   grid-template-columns: 1fr 1fr;

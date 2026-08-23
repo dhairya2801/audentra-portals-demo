@@ -3,16 +3,21 @@
 import {
   type FormEvent,
   useCallback,
+  useEffect,
+  useRef,
   useState,
 } from "react";
+import type { StudentSsoConfiguration } from "@vv/contracts";
 import Image from "next/image";
 import { useApiAction } from "../hooks/use-api-resource";
 import {
   ApiClientError,
+  getStudentSsoConfiguration,
   getStudentBootstrap,
   signInDemoStudent,
   signInStudent,
   signUpStudent,
+  studentSsoStartUrl,
 } from "../lib/api-client";
 import {
   demoStudentLoginEnabled,
@@ -26,6 +31,33 @@ import { useTenant } from "../components/tenant-provider";
 type AuthMode = "sign_in" | "sign_up";
 type AuthField = "email" | "phone" | "password" | "passwordConfirmation";
 type AuthFieldErrors = Partial<Record<AuthField, string>>;
+type SsoCallbackError =
+  | "access_denied"
+  | "invalid_request"
+  | "account_not_linked"
+  | "provider_error";
+
+const ssoCallbackMessages: Record<SsoCallbackError, string> = {
+  access_denied: "Sign-in was cancelled. You can try again.",
+  invalid_request:
+    "This sign-in link expired or was already used. Start again.",
+  account_not_linked:
+    "This Google or Microsoft account is not linked to an active student account. Contact support to link your university account.",
+  provider_error:
+    "The identity provider could not complete sign-in. Try again.",
+};
+
+function callbackErrorMessage(value: string | null) {
+  if (
+    value &&
+    Object.prototype.hasOwnProperty.call(ssoCallbackMessages, value)
+  ) {
+    return ssoCallbackMessages[value as SsoCallbackError];
+  }
+  return value
+    ? "We couldn't complete single sign-on. Start again."
+    : null;
+}
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const phonePattern = /^\+[1-9][0-9]{7,14}$/;
@@ -40,6 +72,14 @@ export function SignInClient() {
   const support = tenant.contacts.support;
   const [mode, setMode] = useState<AuthMode>("sign_in");
   const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
+  const [ssoConfiguration, setSsoConfiguration] =
+    useState<StudentSsoConfiguration | null>(null);
+  const [ssoConfigurationError, setSsoConfigurationError] = useState(false);
+  const [ssoCallbackError, setSsoCallbackError] = useState<string | null>(null);
+  const ssoErrorRef = useRef<HTMLParagraphElement>(null);
+  // Strict Mode replays effects in development. Retain the parsed callback
+  // result before cleaning the URL so the replay cannot make it disappear.
+  const ssoCallbackMessageRef = useRef<string | null | undefined>(undefined);
   const signInAction = useCallback(
     async (input: { email: string; password: string }) => {
       await signInStudent(input);
@@ -56,6 +96,53 @@ export function SignInClient() {
   const signUp = useApiAction(signUpAction);
   const activeAction = mode === "sign_in" ? signIn : signUp;
   const isBusy = signIn.status === "loading" || signUp.status === "loading";
+  const passwordEnabled = ssoConfiguration?.passwordEnabled !== false;
+  const oidcOnlyUnavailable =
+    ssoConfiguration !== null &&
+    !ssoConfiguration.passwordEnabled &&
+    ssoConfiguration.providers.length === 0;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void getStudentSsoConfiguration(controller.signal)
+      .then((configuration) => {
+        if (controller.signal.aborted) return;
+        setSsoConfiguration(configuration);
+        setSsoConfigurationError(false);
+        if (!configuration.passwordEnabled) {
+          setMode("sign_in");
+          setFieldErrors({});
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setSsoConfigurationError(true);
+      });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    if (ssoCallbackMessageRef.current === undefined) {
+      const parameters = new URLSearchParams(window.location.search);
+      const callbackError = parameters.get("sso_error");
+      ssoCallbackMessageRef.current = callbackErrorMessage(callbackError);
+      if (callbackError) {
+        parameters.delete("sso_error");
+        const remainingQuery = parameters.toString();
+        window.history.replaceState(
+          window.history.state,
+          "",
+          `${window.location.pathname}${remainingQuery ? `?${remainingQuery}` : ""}${window.location.hash}`,
+        );
+      }
+    }
+
+    const message = ssoCallbackMessageRef.current;
+    if (message) queueMicrotask(() => setSsoCallbackError(message));
+  }, []);
+
+  useEffect(() => {
+    if (ssoCallbackError) ssoErrorRef.current?.focus();
+  }, [ssoCallbackError]);
 
   const chooseMode = (nextMode: AuthMode) => {
     setMode(nextMode);
@@ -134,7 +221,44 @@ export function SignInClient() {
           </p>
         </div>
 
-        <div className="auth-mode-switch" role="tablist" aria-label="Account access">
+        {mode === "sign_in" && ssoConfiguration?.providers.length ? (
+          <section className="auth-sso" aria-labelledby="student-sso-title">
+            <h2 id="student-sso-title">Use your university account</h2>
+            <div className="auth-sso__links">
+              {ssoConfiguration.providers.map((provider) => (
+                <a
+                  className="button button--secondary auth-sso-link"
+                  href={studentSsoStartUrl(provider.id)}
+                  key={provider.id}
+                >
+                  Continue with {provider.label}
+                </a>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {ssoCallbackError ? (
+          <p
+            className="auth-sso-alert"
+            ref={ssoErrorRef}
+            role="alert"
+            tabIndex={-1}
+          >
+            {ssoCallbackError}
+          </p>
+        ) : null}
+
+        {ssoConfigurationError || oidcOnlyUnavailable ? (
+          <p className="auth-sso-status" role="status">
+            {oidcOnlyUnavailable
+              ? "Single sign-on is not available for this institution. Contact support for access."
+              : "Single sign-on is temporarily unavailable. You can still use email and password when enabled."}
+          </p>
+        ) : null}
+
+        {passwordEnabled ? (
+          <div className="auth-mode-switch" role="tablist" aria-label="Account access">
           <button
             type="button"
             role="tab"
@@ -153,9 +277,11 @@ export function SignInClient() {
           >
             Create account
           </button>
-        </div>
+          </div>
+        ) : null}
 
-        <form className="auth-form" noValidate onSubmit={submit}>
+        {passwordEnabled ? (
+          <form className="auth-form" noValidate onSubmit={submit}>
           <label className="field">
             <span>Email address</span>
             <input
@@ -313,24 +439,29 @@ export function SignInClient() {
                 : "Sign in"}
             <span aria-hidden="true">→</span>
           </button>
-        </form>
+          </form>
+        ) : null}
 
-        <ActionFeedback
-          status={activeAction.status}
-          error={activeAction.message}
-          success={
-            mode === "sign_up"
-              ? "Account created. Opening onboarding…"
-              : "Signed in. Opening your portal…"
-          }
-        />
-        <div className="auth-security-note">
-          <strong>Account verification</strong>
-          <p>
-            Email and SMS verification statuses are already tracked. Delivery
-            will be connected when those providers are configured.
-          </p>
-        </div>
+        {passwordEnabled ? (
+          <>
+            <ActionFeedback
+              status={activeAction.status}
+              error={activeAction.message}
+              success={
+                mode === "sign_up"
+                  ? "Account created. Opening onboarding…"
+                  : "Signed in. Opening your portal…"
+              }
+            />
+            <div className="auth-security-note">
+              <strong>Account verification</strong>
+              <p>
+                Email and SMS verification statuses are already tracked.
+                Delivery will be connected when those providers are configured.
+              </p>
+            </div>
+          </>
+        ) : null}
         {support.email || support.url ? (
           <p className="auth-support">
             Trouble signing in?{" "}
