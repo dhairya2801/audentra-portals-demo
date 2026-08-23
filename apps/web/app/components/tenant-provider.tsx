@@ -16,15 +16,13 @@ import {
   neutralTenant,
   tenantConfigFromBootstrap,
   tenantCopy,
-  tenantHref,
-  tenantSlugFromPathname,
   type TenantConfig,
 } from "../lib/tenant";
 
 type TenantLoadState =
-  | { slug: string; status: "loading"; data: null; error: null }
-  | { slug: string; status: "ready"; data: TenantBootstrap; error: null }
-  | { slug: string; status: "error"; data: null; error: string };
+  | { status: "loading"; data: null; error: null }
+  | { status: "ready"; data: TenantBootstrap; error: null }
+  | { status: "error"; data: null; error: string };
 
 interface TenantRuntime {
   tenant: TenantConfig;
@@ -48,29 +46,26 @@ function tenantErrorMessage(error: unknown) {
 export function TenantProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/";
   const isUnscopedLanding = pathname === "/";
-  const slug = tenantSlugFromPathname(pathname);
-  const stateSlug = slug ?? "unscoped";
+  const bypassesTenantBootstrap = isUnscopedLanding || pathname.startsWith("/dev/");
   const [requestVersion, setRequestVersion] = useState(0);
   const [state, setState] = useState<TenantLoadState>({
-    slug: stateSlug,
     status: "loading",
     data: null,
     error: null,
   });
 
   useEffect(() => {
-    if (isUnscopedLanding || !slug) return;
+    if (bypassesTenantBootstrap) return;
     const controller = new AbortController();
-    void getTenantBootstrap(slug, controller.signal)
+    void getTenantBootstrap(controller.signal)
       .then((data) => {
         if (!controller.signal.aborted) {
-          setState({ slug, status: "ready", data, error: null });
+          setState({ status: "ready", data, error: null });
         }
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) {
           setState({
-            slug,
             status: "error",
             data: null,
             error: tenantErrorMessage(error),
@@ -78,42 +73,33 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         }
       });
     return () => controller.abort();
-  }, [isUnscopedLanding, requestVersion, slug]);
+  }, [bypassesTenantBootstrap, requestVersion]);
 
   const tenant = useMemo(
     () =>
-      state.status === "ready" && state.slug === slug
+      state.status === "ready"
         ? tenantConfigFromBootstrap(state.data)
-        : neutralTenant(stateSlug),
-    [slug, state, stateSlug],
+        : neutralTenant("default"),
+    [state],
   );
   const reload = useCallback(() => {
-    if (!slug) return;
-    setState({ slug, status: "loading", data: null, error: null });
+    setState({ status: "loading", data: null, error: null });
     setRequestVersion((current) => current + 1);
-  }, [slug]);
+  }, []);
   const runtime = useMemo<TenantRuntime>(
     () => ({
       tenant,
-      status: isUnscopedLanding
+      status: bypassesTenantBootstrap
         ? "ready"
-        : !slug
-          ? "error"
-        : state.slug === slug
-          ? state.status
-          : "loading",
-      error: isUnscopedLanding
+        : state.status,
+      error: bypassesTenantBootstrap
         ? null
-        : !slug
-          ? "Choose your institution from the portal entry page before continuing."
-          : state.slug === slug
-            ? state.error
-            : null,
-      href: (value) => (slug ? tenantHref(value, slug) : value),
+        : state.error,
+      href: (value) => value,
       copy: (value) => tenantCopy(value, tenant),
       reload,
     }),
-    [isUnscopedLanding, reload, slug, state.error, state.slug, state.status, tenant],
+    [bypassesTenantBootstrap, reload, state.error, state.status, tenant],
   );
 
   useEffect(() => {
@@ -164,7 +150,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
                 ? "Fetching the current institution configuration…"
                 : runtime.error}
             </p>
-            {runtime.status === "error" && slug ? (
+            {runtime.status === "error" ? (
               <button className="button button--primary" type="button" onClick={runtime.reload}>
                 Try again
               </button>

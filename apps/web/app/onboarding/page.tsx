@@ -1252,9 +1252,16 @@ function FamilyPermissionFields({ data }: { data: StudentOnboardingData }) {
   );
 }
 
+// Every institution signs the same two onboarding documents. Tenants with their
+// own branded templates are listed here; everyone else signs the standard set,
+// so the signing step is never withheld from a student.
+const TENANT_DOCUMENT_ASSET_PREFIXES = new Set(["aster", "harvard"]);
+const DEFAULT_DOCUMENT_ASSET_PREFIX = "aster";
+
 function onboardingDocumentsForTenant(tenantSlug: string) {
-  const assetPrefix = tenantSlug === "harvard" || tenantSlug === "aster" ? tenantSlug : null;
-  if (!assetPrefix) return [];
+  const assetPrefix = TENANT_DOCUMENT_ASSET_PREFIXES.has(tenantSlug)
+    ? tenantSlug
+    : DEFAULT_DOCUMENT_ASSET_PREFIX;
   return [
     {
       id: "ferpa_release",
@@ -1384,15 +1391,6 @@ function ReviewAndSignFields({ data }: { data: StudentOnboardingData }) {
   );
   const document =
     onboardingDocuments[activeDocument] ?? onboardingDocuments[0];
-
-  if (!document) {
-    return (
-      <section className="resource-state" role="alert">
-        <strong>Signing documents are not configured for this institution.</strong>
-        <p>Please contact your institution before completing this onboarding step.</p>
-      </section>
-    );
-  }
 
   return (
     <>
