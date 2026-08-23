@@ -93,12 +93,19 @@ test("the reference field rejects input that could not resolve", async () => {
 });
 
 test("the production build ships the panel behind the gate, not enabled", async () => {
-  const assetsDirectory = new URL("../dist/client/assets/", import.meta.url);
-  const files = await readdir(assetsDirectory);
-  const bundle = files.find((name) => name.startsWith("sign-in-client-"));
+  // Vinext 0.2 emits client chunks below _next/static/chunks rather than the
+  // previous flat dist/client/assets directory.
+  const clientDirectory = new URL("../dist/client/", import.meta.url);
+  const files = await readdir(clientDirectory, { recursive: true });
+  const bundle = files.find((name) =>
+    /(?:^|[\\/])sign-in-client-[^\\/]+\.js$/.test(name),
+  );
   assert.ok(bundle, "the sign-in client bundle was not built");
 
-  const source = await readFile(new URL(bundle, assetsDirectory), "utf8");
+  const source = await readFile(
+    new URL(bundle.replaceAll("\\", "/"), clientDirectory),
+    "utf8",
+  );
   assert.match(source, /Log in as demo student/);
   // Built for production, so the environment branch cannot open the panel and
   // only an explicit build-time flag can. A bundle that inlined `true` here
