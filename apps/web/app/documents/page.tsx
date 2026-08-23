@@ -10,6 +10,7 @@ import { DocumentExtractionRetry } from "../components/document-extraction-retry
 import { DocumentContextMatches } from "../components/document-context-matches";
 import { DocumentUpload } from "../components/document-upload";
 import { PortalShell } from "../components/portal-shell";
+import { SecureStudentDocumentLink } from "../components/secure-student-document-link";
 import {
   ActionFeedback,
   EmptyState,
@@ -21,7 +22,6 @@ import {
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
 import {
   confirmStudentDocumentExtraction,
-  getStudentDocumentContentUrl,
   getStudentDocuments,
 } from "../lib/api-client";
 import {
@@ -314,7 +314,6 @@ function DocumentWorkspace({
           ) : (
             <ul className="submitted-document-grid">
               {list.items.map((document) => {
-                const contentUrl = getStudentDocumentContentUrl(document);
                 const isSigned = document.signature != null;
                 const documentKind = isSigned
                   ? "Signed document"
@@ -397,13 +396,11 @@ function DocumentWorkspace({
                       )}
                       </div>
                       <div className="document-record__actions">
-                        {contentUrl ? (
-                          <a href={contentUrl} target="_blank" rel="noreferrer">
-                            {document.signature
-                              ? "View signed PDF"
-                              : "View original"}{" "}
-                            <span aria-hidden="true">↗</span>
-                          </a>
+                        {document.contentUrl ? (
+                          <SecureStudentDocumentLink
+                            document={document}
+                            label={document.signature ? "View signed PDF" : "View original"}
+                          />
                         ) : null}
                         {document.sha256 ? (
                           <span title={document.sha256}>

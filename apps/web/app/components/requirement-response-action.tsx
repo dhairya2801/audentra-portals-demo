@@ -22,7 +22,11 @@ import {
   getStudentRequirementAppointments,
   submitStudentRequirementResponse,
 } from "../lib/api-client";
-import { useApiAction, useApiResource } from "../hooks/use-api-resource";
+import {
+  getApiErrorMessage,
+  useApiAction,
+  useApiResource,
+} from "../hooks/use-api-resource";
 import { ActionFeedback } from "./portal-ui";
 import { visibleConfiguredFields } from "./requirement-response-model";
 
@@ -183,7 +187,7 @@ function GenericValuesForm({
           className="button button--primary"
           type="button"
           disabled={loading}
-          onClick={() => void submit({ values: {} })}
+          onClick={() => void submit({ values: {} }).catch(() => undefined)}
         >
           {loading ? "Submitting..." : "Complete step"}
         </button>
@@ -274,7 +278,7 @@ function SingleSelectForm({
         const selectedOption = String(
           new FormData(event.currentTarget).get("selectedOption") ?? "",
         );
-        void submit({ selectedOption });
+        void submit({ selectedOption }).catch(() => undefined);
       }}
     >
       <fieldset>
@@ -329,7 +333,7 @@ function MultipleSelectForm({
           return;
         }
         onValidationError(null);
-        void submit({ selectedOptions });
+        void submit({ selectedOptions }).catch(() => undefined);
       }}
     >
       <fieldset>
@@ -364,7 +368,7 @@ function BuiltInSignatureForm({
           accepted: true,
           signerName: String(form.get("signerName") ?? "").trim(),
           signatureMethod: String(form.get("signatureMethod")) as "typed" | "drawn",
-        });
+        }).catch(() => undefined);
       }}
     >
       <label>
@@ -400,7 +404,14 @@ function SchedulingForm({
 }) {
   const appointmentForm = useRef<HTMLFormElement>(null);
   const appointmentKey = useRef<string | null>(null);
+  const pendingAppointmentRef = useRef<StudentAppointment | null>(null);
+  const [pendingAppointment, setPendingAppointment] =
+    useState<StudentAppointment | null>(null);
   const [appointmentError, setAppointmentError] = useState<string | null>(null);
+  const [scheduleStatus, setScheduleStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
+  const [scheduleMessage, setScheduleMessage] = useState<string | null>(null);
   const loadAppointments = useCallback(
     (signal: AbortSignal) =>
       getStudentRequirementAppointments(requirementId, signal),
@@ -417,30 +428,49 @@ function SchedulingForm({
   const scheduleAndAttach = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setAppointmentError(null);
-    createAppointment.reset();
-    const values = new FormData(event.currentTarget);
-    const startsAt = new Date(String(values.get("startsAt") ?? ""));
-    if (Number.isNaN(startsAt.getTime()) || startsAt.getTime() <= Date.now()) {
-      setAppointmentError("Choose an appointment time in the future.");
-      return;
-    }
-    const notes = String(values.get("notes") ?? "").trim();
-    const key = appointmentKey.current ??
-      (appointmentKey.current = crypto.randomUUID());
+    setScheduleStatus("loading");
+    setScheduleMessage(null);
+    let appointment = pendingAppointmentRef.current;
     try {
-      const appointment = await createAppointment.run(
-        {
-          type: String(values.get("type")) as StudentAppointmentType,
-          startsAt: startsAt.toISOString(),
-          ...(notes ? { notes } : {}),
-        },
-        key,
-      );
+      if (!appointment) {
+        createAppointment.reset();
+        const values = new FormData(event.currentTarget);
+        const startsAt = new Date(String(values.get("startsAt") ?? ""));
+        if (Number.isNaN(startsAt.getTime()) || startsAt.getTime() <= Date.now()) {
+          setAppointmentError("Choose an appointment time in the future.");
+          setScheduleStatus("idle");
+          return;
+        }
+        const notes = String(values.get("notes") ?? "").trim();
+        const key = appointmentKey.current ??
+          (appointmentKey.current = crypto.randomUUID());
+        appointment = await createAppointment.run(
+          {
+            type: String(values.get("type")) as StudentAppointmentType,
+            startsAt: startsAt.toISOString(),
+            ...(notes ? { notes } : {}),
+          },
+          key,
+        );
+        pendingAppointmentRef.current = appointment;
+        setPendingAppointment(appointment);
+      }
+
+      await submit({ appointmentId: appointment.id });
+      pendingAppointmentRef.current = null;
+      setPendingAppointment(null);
       appointmentKey.current = null;
       appointmentForm.current?.reset();
-      await submit({ appointmentId: appointment.id });
-    } catch {
-      // Preserve both the form and idempotency key for a safe retry.
+      appointments.refresh();
+      setScheduleStatus("success");
+    } catch (cause) {
+      const pendingAppointment = pendingAppointmentRef.current;
+      setScheduleStatus("error");
+      setScheduleMessage(
+        pendingAppointment
+          ? "Your appointment is scheduled, but it could not be attached to this requirement. Retry to attach the existing appointment."
+          : getApiErrorMessage(cause),
+      );
     }
   };
   if (appointments.status === "loading") return <p>Loading your appointments...</p>;
@@ -466,7 +496,7 @@ function SchedulingForm({
             const appointmentId = String(
               new FormData(event.currentTarget).get("appointmentId") ?? "",
             );
-            void submit({ appointmentId });
+            void submit({ appointmentId }).catch(() => undefined);
           }}
         >
           <label>
@@ -509,19 +539,23 @@ function SchedulingForm({
           </label>
           {appointmentError ? <p className="field-error" role="alert">{appointmentError}</p> : null}
           <ActionFeedback
-            status={createAppointment.status}
-            error={createAppointment.message}
+            status={scheduleStatus}
+            error={scheduleMessage}
             success="Your appointment is scheduled and attached."
           />
           <button
             className="button button--primary"
             type="submit"
-            disabled={loading || createAppointment.status === "loading"}
+            disabled={loading || scheduleStatus === "loading"}
           >
-            {createAppointment.status === "loading"
-              ? "Scheduling..."
-              : createAppointment.status === "error"
-                ? "Retry scheduling"
+            {scheduleStatus === "loading"
+              ? pendingAppointment
+                ? "Attaching..."
+                : "Scheduling..."
+              : scheduleStatus === "error"
+                ? pendingAppointment
+                  ? "Retry attachment"
+                  : "Retry scheduling"
                 : "Schedule and attach"}
           </button>
         </form>
@@ -550,7 +584,7 @@ function RequirementResponseContent({
             className="button button--primary"
             type="button"
             disabled={loading}
-            onClick={() => void onSubmit({ acknowledged: true })}
+            onClick={() => void onSubmit({ acknowledged: true }).catch(() => undefined)}
           >
             {loading ? "Recording..." : "Mark as read"}
           </button>
@@ -564,7 +598,7 @@ function RequirementResponseContent({
             className="button button--primary"
             type="button"
             disabled={loading}
-            onClick={() => void onSubmit({ approved: true })}
+            onClick={() => void onSubmit({ approved: true }).catch(() => undefined)}
           >
             {loading ? "Approving..." : "Approve and continue"}
           </button>
@@ -641,7 +675,9 @@ export function RequirementResponseAction({
     ),
   );
   const submit: SubmitResponse = async (response) => {
-    if (submissionInFlightRef.current) return;
+    if (submissionInFlightRef.current) {
+      throw new Error("This response is already being submitted.");
+    }
     submissionInFlightRef.current = true;
     setValidationError(null);
     const intentKey = idempotencyKeyRef.current ?? crypto.randomUUID();
@@ -653,8 +689,6 @@ export function RequirementResponseAction({
       );
       idempotencyKeyRef.current = null;
       onSaved();
-    } catch {
-      // Keep the key stable so a retry cannot create a duplicate response.
     } finally {
       submissionInFlightRef.current = false;
     }

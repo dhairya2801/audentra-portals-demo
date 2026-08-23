@@ -531,11 +531,22 @@ test("typed client wires every resource route and mutation contract", async () =
   const client = await import(moduleUrl);
   const requests = [];
   const originalFetch = globalThis.fetch;
+  const originalWindow = globalThis.window;
+  const testWindow = {
+    location: { pathname: "/documents" },
+    sessionStorage: {
+      getItem: () => null,
+      setItem: () => undefined,
+      removeItem: () => undefined,
+    },
+    dispatchEvent: () => true,
+  };
 
   globalThis.fetch = async (url, init) => {
     requests.push({ url, init });
     return Response.json({});
   };
+  globalThis.window = testWindow;
 
   try {
     await client.getStudentBootstrap();
@@ -790,27 +801,28 @@ test("typed client wires every resource route and mutation contract", async () =
       },
     );
     await client.signOutStaff();
+    testWindow.location.pathname = "/parent/documents";
+    await client.getStudentDocumentContent({
+      contentUrl:
+        "/v1/student/documents/00000000-0000-7000-8000-000000000701/content",
+    });
+    await client.getStudentDocumentProfilePhoto(
+      "00000000-0000-7000-8000-000000000701",
+    );
   } finally {
     globalThis.fetch = originalFetch;
+    if (originalWindow === undefined) {
+      delete globalThis.window;
+    } else {
+      globalThis.window = originalWindow;
+    }
   }
 
   assert.equal(requests[0].url, "http://localhost:4000/v1/student/bootstrap");
   assert.equal(requests[0].init.method, "GET");
   assert.equal(requests[0].init.credentials, "include");
   assert.equal(requests[0].init.headers["X-Tenant-Slug"], undefined);
-  assert.equal(
-    client.getStudentDocumentContentUrl({
-      contentUrl:
-        "/v1/student/documents/00000000-0000-7000-8000-000000000701/content",
-    }),
-    "http://localhost:4000/v1/student/documents/00000000-0000-7000-8000-000000000701/content",
-  );
-  assert.equal(
-    client.getStudentDocumentProfilePhotoUrl(
-      "00000000-0000-7000-8000-000000000701",
-    ),
-    "http://localhost:4000/v1/student/documents/00000000-0000-7000-8000-000000000701/profile-photo",
-  );
+  assert.equal(requests[0].init.headers["X-Audentra-Session-Mode"], undefined);
 
   const requestByPath = new Map(
     requests.map((entry) => [new URL(entry.url).pathname, entry]),
@@ -836,6 +848,8 @@ test("typed client wires every resource route and mutation contract", async () =
     "/v1/student/documents/upload",
     "/v1/student/documents/document%2F1/confirm-extraction",
     "/v1/student/documents/document%2F1/retry-extraction",
+    "/v1/student/documents/00000000-0000-7000-8000-000000000701/content",
+    "/v1/student/documents/00000000-0000-7000-8000-000000000701/profile-photo",
     "/v1/student/assistant/messages",
     "/v1/student/assistant/conversations",
     "/v1/student/assistant/conversations/00000000-0000-7000-8000-000000000801/messages",
@@ -873,6 +887,16 @@ test("typed client wires every resource route and mutation contract", async () =
   for (const path of expectedPaths) {
     assert.ok(requestByPath.has(path), `missing API request for ${path}`);
   }
+
+  const protectedContent = requestByPath.get(
+    "/v1/student/documents/00000000-0000-7000-8000-000000000701/content",
+  );
+  const protectedPhoto = requestByPath.get(
+    "/v1/student/documents/00000000-0000-7000-8000-000000000701/profile-photo",
+  );
+  assert.equal(protectedContent.init.credentials, "include");
+  assert.equal(protectedContent.init.headers["X-Audentra-Session-Mode"], "delegate");
+  assert.equal(protectedPhoto.init.headers["X-Audentra-Session-Mode"], "delegate");
 
   const experienceDecision = requestByPath.get(
     "/v1/student/experience-updates/update%2F1/decision",
@@ -2343,6 +2367,59 @@ test("generic requirement interactions submit typed, idempotent responses", asyn
       .map((field) => field.id),
     ["choice", "details"],
   );
+});
+
+test("FERPA binary views retain the delegate session and schedule only after attachment", async () => {
+  const [client, documentPage, documentLink, requirementPage, responseAction] =
+    await Promise.all([
+      readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/documents/page.tsx", import.meta.url), "utf8"),
+      readFile(
+        new URL("../app/components/secure-student-document-link.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../app/enrollment/requirements/[slug]/page.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../app/components/requirement-response-action.tsx", import.meta.url),
+        "utf8",
+      ),
+    ]);
+
+  assert.match(client, /async function requestBlob/);
+  assert.match(client, /portalSessionMode\(\) === "delegate"/);
+  assert.match(client, /getStudentDocumentContent/);
+  assert.match(client, /getStudentDocumentProfilePhoto/);
+  assert.doesNotMatch(client, /getStudentDocumentContentUrl/);
+  assert.doesNotMatch(client, /getStudentDocumentProfilePhotoUrl/);
+  assert.match(documentPage, /<SecureStudentDocumentLink/);
+  assert.doesNotMatch(documentPage, /href=\{contentUrl\}/);
+  assert.match(documentLink, /getStudentDocumentContent\(document\)/);
+  assert.match(documentLink, /URL\.createObjectURL/);
+  assert.match(documentLink, /URL\.revokeObjectURL/);
+  assert.match(requirementPage, /getStudentDocumentProfilePhoto\(documentId, controller\.signal\)/);
+  assert.match(requirementPage, /URL\.createObjectURL/);
+  assert.match(requirementPage, /URL\.revokeObjectURL/);
+  assert.doesNotMatch(requirementPage, /src=\{getStudentDocumentProfilePhoto/);
+
+  assert.match(responseAction, /pendingAppointmentRef = useRef/);
+  assert.match(
+    responseAction,
+    /void onSubmit\(\{ acknowledged: true \}\)\.catch\(\(\) => undefined\)/,
+  );
+  assert.match(
+    responseAction,
+    /void onSubmit\(\{ approved: true \}\)\.catch\(\(\) => undefined\)/,
+  );
+  assert.match(responseAction, /await submit\(\{ appointmentId: appointment\.id \}\)/);
+  assert.match(
+    responseAction,
+    /await submit\(\{ appointmentId: appointment\.id \}\);[\s\S]{0,200}pendingAppointmentRef\.current = null[\s\S]{0,200}appointmentKey\.current = null/,
+  );
+  assert.match(responseAction, /Retry to attach the existing appointment/);
+  assert.match(responseAction, /void submit\(\{ appointmentId \}\)\.catch/);
 });
 
 test("the web command wrapper forwards isolated host and port arguments", async () => {

@@ -4923,10 +4923,32 @@
   font-size: 0.63rem;
 }
 
-.document-record__actions a {
+.document-record__actions a,
+.document-record__actions .document-record__open {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--forest);
+  cursor: pointer;
+  font: inherit;
   font-weight: 800;
   text-underline-offset: 0.18rem;
+}
+
+.document-record__actions .document-record__open:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.secure-document-link {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.secure-document-link .field-error {
+  max-width: 20rem;
 }
 
 .document-record__actions > span {

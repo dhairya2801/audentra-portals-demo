@@ -47,7 +47,7 @@ import {
   getStudentDashboard,
   getStudentHousingPlan,
   getStudentDocuments,
-  getStudentDocumentProfilePhotoUrl,
+  getStudentDocumentProfilePhoto,
   getStudentProfile,
   getStudentPayments,
   getStudentRequirement,
@@ -1127,6 +1127,52 @@ function DocumentAction({
   );
 }
 
+function SecuredProfilePhoto({
+  documentId,
+  fallback,
+}: {
+  documentId: string;
+  fallback: string;
+}) {
+  const [loadedPhoto, setLoadedPhoto] = useState<{
+    documentId: string;
+    source: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let objectUrl: string | null = null;
+
+    void getStudentDocumentProfilePhoto(documentId, controller.signal)
+      .then((blob) => {
+        if (controller.signal.aborted) return;
+        objectUrl = URL.createObjectURL(blob);
+        setLoadedPhoto({ documentId, source: objectUrl });
+      })
+      .catch(() => {
+        // Keep an identity preview private if the current delegate session no
+        // longer has document/profile access or was revoked while loading.
+      });
+
+    return () => {
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [documentId]);
+
+  if (loadedPhoto?.documentId === documentId) {
+    // Next's image loader cannot forward the tab's delegate-session selector.
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img
+      alt="Profile photo extracted from your identity document"
+      height={120}
+      src={loadedPhoto.source}
+      width={96}
+    />;
+  }
+  return <span aria-hidden="true">{fallback}</span>;
+}
+
 function IdentityPreview({ canViewProfilePhoto }: { canViewProfilePhoto: boolean }) {
   const { tenant } = useTenant();
   const loadIdentityPreview = useCallback(
@@ -1168,12 +1214,9 @@ function IdentityPreview({ canViewProfilePhoto }: { canViewProfilePhoto: boolean
         <div className="student-id-card__body">
           <span className="student-id-card__avatar">
             {photoDocument && canViewProfilePhoto ? (
-              <Image
-                alt="Profile photo extracted from your identity document"
-                height={120}
-                src={getStudentDocumentProfilePhotoUrl(photoDocument.id)}
-                unoptimized
-                width={96}
+              <SecuredProfilePhoto
+                documentId={photoDocument.id}
+                fallback={initials(student?.preferredName)}
               />
             ) : (
               <span aria-hidden="true">{initials(student?.preferredName)}</span>

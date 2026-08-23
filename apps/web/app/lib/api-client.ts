@@ -155,6 +155,38 @@ function selectPortalSession(mode: "student" | "delegate") {
   }
 }
 
+function portalSessionHeaders(
+  includePortalSessionMode = true,
+): Record<string, string> {
+  // The platform already defaults to the student cookie. Only a delegate tab
+  // needs an explicit selector, which also keeps ordinary student and public
+  // reads simple CORS requests.
+  if (includePortalSessionMode && portalSessionMode() === "delegate") {
+    return { [PORTAL_SESSION_MODE_HEADER]: "delegate" };
+  }
+  return {};
+}
+
+function requestHeaders(
+  accept: string,
+  initHeaders: HeadersInit | undefined,
+  includePortalSessionMode = true,
+): Record<string, string> {
+  const headers: Record<string, string> = { Accept: accept };
+  const entries = initHeaders instanceof Headers
+    ? [...initHeaders.entries()]
+    : Array.isArray(initHeaders)
+      ? initHeaders
+      : Object.entries(initHeaders ?? {});
+  for (const [name, value] of entries) {
+    headers[name] = value;
+  }
+  return {
+    ...headers,
+    ...portalSessionHeaders(includePortalSessionMode),
+  };
+}
+
 export class ApiClientError extends Error {
   readonly status: number;
   readonly code: string;
@@ -218,13 +250,11 @@ async function request<T>(
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     credentials: "include",
-    headers: {
-      Accept: "application/json",
-      ...init.headers,
-      ...(options.includePortalSessionMode === false
-        ? {}
-        : { [PORTAL_SESSION_MODE_HEADER]: portalSessionMode() }),
-    },
+    headers: requestHeaders(
+      "application/json",
+      init.headers,
+      options.includePortalSessionMode,
+    ),
   });
 
   if (!response.ok) {
@@ -240,6 +270,29 @@ async function request<T>(
     window.dispatchEvent(new Event("vv:student-record-changed"));
   }
   return result;
+}
+
+/**
+ * Fetches protected binary content through the same credentialed, tab-aware
+ * transport as JSON requests. Do not turn these paths into href/src values:
+ * browser navigation and Next's image loader cannot send a delegate selector.
+ */
+async function requestBlob(
+  path: string,
+  init: RequestInit = {},
+  options: { includePortalSessionMode?: boolean } = {},
+): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    credentials: "include",
+    headers: requestHeaders("*/*", init.headers, options.includePortalSessionMode),
+  });
+
+  if (!response.ok) {
+    throw await parseError(response);
+  }
+
+  return response.blob();
 }
 
 export function getTenantBootstrap(signal?: AbortSignal) {
@@ -804,14 +857,28 @@ export function retryStudentDocumentExtraction(
   );
 }
 
-export function getStudentDocumentContentUrl(document: StudentDocument) {
-  if (!document.contentUrl) return null;
-  return tenantAwareDocumentUrl(document.contentUrl);
+export function getStudentDocumentContent(
+  document: Pick<StudentDocument, "contentUrl">,
+  signal?: AbortSignal,
+) {
+  if (!document.contentUrl) {
+    return Promise.reject(
+      new ApiClientError("This document is no longer available.", {
+        status: 404,
+        code: "document_content_unavailable",
+      }),
+    );
+  }
+  return requestBlob(document.contentUrl, { method: "GET", signal });
 }
 
-export function getStudentDocumentProfilePhotoUrl(documentId: string) {
-  return tenantAwareDocumentUrl(
+export function getStudentDocumentProfilePhoto(
+  documentId: string,
+  signal?: AbortSignal,
+) {
+  return requestBlob(
     `/v1/student/documents/${encodeURIComponent(documentId)}/profile-photo`,
+    { method: "GET", signal },
   );
 }
 
