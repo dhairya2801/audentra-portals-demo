@@ -236,6 +236,15 @@ export async function exchangeDelegateToken(page: Page, token: string) {
       `Delegate link exchange returned ${result.status}: ${JSON.stringify(result.body)}`,
     );
   }
+
+  // The API establishes the cookie, while the portal's delegate-link page also
+  // records this tab's explicit session selection. Raw API exchange helpers
+  // must mirror that browser-visible behavior before navigating to a portal
+  // route, otherwise the shell deliberately selects the student session.
+  await page.evaluate(() => {
+    window.sessionStorage.setItem("vv:delegate-session-mode", "delegate");
+  });
+
   return result.body;
 }
 

@@ -50,6 +50,9 @@ test.describe("staff FERPA journey authoring", () => {
           exact: true,
         }),
       });
+    await onboardingBuilder
+      .getByRole("button", { name: "Step list", exact: true })
+      .click();
     const canonicalFerpa = onboardingBuilder
       .locator(".staff-journey-list > li")
       .filter({ hasText: "FERPA release and parent access" });
@@ -67,6 +70,17 @@ test.describe("staff FERPA journey authoring", () => {
         .getByRole("button", { name: "Save and publish" })
         .click();
     });
+    // Saving refreshes the workspace and remounts the builder in its default
+    // Flow map view. Wait for that remount before choosing the Step list again.
+    await expect(
+      onboardingBuilder.getByRole("button", {
+        name: "Flow map",
+        exact: true,
+      }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await onboardingBuilder
+      .getByRole("button", { name: "Step list", exact: true })
+      .click();
     await expect(canonicalFerpa).toBeVisible();
 
     await page.getByRole("tab", { name: "Enrollment checklist" }).click();
@@ -78,12 +92,21 @@ test.describe("staff FERPA journey authoring", () => {
           exact: true,
         }),
       });
+    await enrollmentBuilder
+      .getByRole("button", { name: "Step list", exact: true })
+      .click();
     await enrollmentBuilder.getByRole("button", { name: "Add step" }).click();
     const addEditor = page.getByRole("dialog", { name: "Add journey step" });
     await addEditor.getByLabel("Input / action type").selectOption("ferpa");
     await addEditor.getByRole("button", { name: /02 Student input/ }).click();
     await expect(addEditor.getByLabel("E-signature provider")).toBeVisible();
-    await expect(addEditor).toContainText(/parent.*guardian.*access/i);
+    await expect(
+      addEditor.getByRole("heading", {
+        name: "FERPA document + parent access",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(addEditor).toContainText(/Students decide which pages to grant/i);
     await expect(addEditor).toContainText(/Dashboard/i);
     await expect(addEditor).toContainText(/My Enrollment/i);
     await expect(addEditor).toContainText(/Profile/i);

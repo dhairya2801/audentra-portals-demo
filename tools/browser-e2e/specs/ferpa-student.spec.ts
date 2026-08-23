@@ -3,11 +3,25 @@ import { resetAndAuthenticateDemoStudent } from "../support/demo-session";
 
 async function openFerpaTask(page: Page) {
   await page.goto("/enrollment");
-  const updateDialog = page.getByRole("dialog");
-  if (await updateDialog.isVisible()) {
-    await updateDialog.getByRole("button", { name: "Handle now" }).click();
-    await expect(page.getByRole("heading", { name: "FERPA access" })).toBeVisible();
-    return;
+  const updateDialog = page.locator(".experience-update-dialog");
+  const updateAppeared = await updateDialog
+    .waitFor({ state: "visible", timeout: 3_000 })
+    .then(
+      () => true,
+      () => false,
+    );
+  if (updateAppeared) {
+    const deferred = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname ===
+          "/v1/student/experience-updates/defer" &&
+        response.request().method() === "POST",
+    );
+    await updateDialog
+      .getByRole("button", { name: "Remind me later" })
+      .click();
+    expect((await deferred).ok()).toBeTruthy();
+    await expect(updateDialog).toBeHidden();
   }
   const link = page.getByRole("link", { name: /FERPA.*access/i }).first();
   await expect(link).toBeVisible();

@@ -75,11 +75,16 @@ test("production build serves neither the lab page nor its proxy routes", async 
 /* --- credential boundary --------------------------------------------------- */
 
 test("no worker credential or internal trace path leaks into client assets", async () => {
-  const assetsDir = new URL("../dist/client/assets/", import.meta.url);
-  const files = await readdir(assetsDir);
+  // Vinext 0.2 nests emitted browser assets under _next/static. Scan the
+  // complete client output so a new chunk layout cannot hide a credential.
+  const clientDirectory = new URL("../dist/client/", import.meta.url);
+  const files = await readdir(clientDirectory, { recursive: true });
   for (const file of files) {
     if (!/\.(js|css)$/.test(file)) continue;
-    const content = await readFile(new URL(file, assetsDir), "utf8");
+    const content = await readFile(
+      new URL(file.replaceAll("\\", "/"), clientDirectory),
+      "utf8",
+    );
     assert.doesNotMatch(
       content,
       /local-development-document-worker-token/,

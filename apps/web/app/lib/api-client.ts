@@ -54,6 +54,8 @@ import type {
   StudentProfile,
   StudentRequirementDetail,
   StudentRequirementList,
+  StudentSsoConfiguration,
+  StudentSsoProviderId,
   TenantBootstrap,
   ReviewStaffDocumentInput,
   RecordStaffCommunicationInput,
@@ -155,6 +157,16 @@ function selectPortalSession(mode: "student" | "delegate") {
   }
 }
 
+/**
+ * Select the student's HTTP-only session for the current browser tab before
+ * starting an external student sign-in flow. The server intentionally retains
+ * a delegate cookie so a parent tab can remain open; this removes the
+ * tab-local delegate selector so the SSO return path uses the student cookie.
+ */
+export function selectStudentPortalSession() {
+  selectPortalSession("student");
+}
+
 function portalSessionHeaders(
   includePortalSessionMode = true,
 ): Record<string, string> {
@@ -218,6 +230,8 @@ export interface CredentialAuthSession {
   };
   notice: string;
 }
+
+const STUDENT_SSO_RETURN_TO = "/dashboard";
 
 async function parseError(response: Response): Promise<ApiClientError> {
   let payload: ApiErrorResponse | undefined;
@@ -393,8 +407,20 @@ export function signInStudent(input: {
   });
 }
 
+export function getStudentSsoConfiguration(signal?: AbortSignal) {
+  return request<StudentSsoConfiguration>("/v1/auth/sso/providers", {
+    method: "GET",
+    signal,
+  });
+}
+
+export function studentSsoStartUrl(provider: StudentSsoProviderId) {
+  const query = new URLSearchParams({ returnTo: STUDENT_SSO_RETURN_TO });
+  return `${API_BASE_URL}/v1/auth/sso/${encodeURIComponent(provider)}/start?${query.toString()}`;
+}
+
 export function signOutStudent() {
-  return request<{ authenticated: false; mode: "credentials" }>(
+  return request<{ authenticated: false; mode: "credentials" | "oidc" }>(
     "/v1/auth/sign-out",
     { method: "POST" },
   ).then((result) => {

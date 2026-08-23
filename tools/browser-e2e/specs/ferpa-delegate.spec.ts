@@ -260,7 +260,7 @@ test.describe("FERPA delegate boundaries", () => {
   }) => {
     const completed = await completeFerpaThroughApi({
       request,
-      delegates: [delegateDraft],
+      delegates: [{ ...delegateDraft, scopes: ["profile", "enrollment"] }],
     });
     const delegate = completed.delegates[0];
     const link = await issueFerpaDelegateLink({
@@ -283,7 +283,7 @@ test.describe("FERPA delegate boundaries", () => {
     await expect(delegateNavigation.getByRole("link", { name: "Profile" })).toBeVisible();
     await expect(
       delegateNavigation.getByRole("link", { name: "My Enrollment" }),
-    ).toHaveCount(0);
+    ).toBeVisible();
     await expect(
       page.getByRole("button", {
         name: /Save access|Complete FERPA|Add parent or guardian|Rotate link|Revoke access/,
@@ -300,16 +300,17 @@ test.describe("FERPA delegate boundaries", () => {
     expect((await profileResponse).status()).toBe(200);
     await expect(page.getByText("Your profile changes are saved.")).toBeVisible();
 
-    const ungrantedRequirements = await delegateApiFetch(
+    const ungrantedFinancials = await delegateApiFetch(
       page,
-      "/v1/student/requirements",
+      "/v1/student/financials",
     );
-    expect(ungrantedRequirements.status).toBe(403);
-    expect(apiErrorCode(ungrantedRequirements.body)).toBe(
+    expect(ungrantedFinancials.status).toBe(403);
+    expect(apiErrorCode(ungrantedFinancials.body)).toBe(
       "DELEGATE_SCOPE_REQUIRED",
     );
 
-    await page.goto("/enrollment");
+    await page.goto("/financials");
+    await page.waitForURL(/\/parent\/financials$/);
     await expect(
       page.getByRole("heading", { name: "This page is not shared" }),
     ).toBeVisible();
