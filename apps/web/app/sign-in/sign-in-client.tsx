@@ -77,6 +77,9 @@ export function SignInClient() {
   const [ssoConfigurationError, setSsoConfigurationError] = useState(false);
   const [ssoCallbackError, setSsoCallbackError] = useState<string | null>(null);
   const ssoErrorRef = useRef<HTMLParagraphElement>(null);
+  // Strict Mode replays effects in development. Retain the parsed callback
+  // result before cleaning the URL so the replay cannot make it disappear.
+  const ssoCallbackMessageRef = useRef<string | null | undefined>(undefined);
   const signInAction = useCallback(
     async (input: { email: string; password: string }) => {
       await signInStudent(input);
@@ -118,25 +121,23 @@ export function SignInClient() {
   }, []);
 
   useEffect(() => {
-    const controller = new AbortController();
-    const parameters = new URLSearchParams(window.location.search);
-    const callbackError = parameters.get("sso_error");
-    if (!callbackError) return () => controller.abort();
-
-    parameters.delete("sso_error");
-    const remainingQuery = parameters.toString();
-    window.history.replaceState(
-      window.history.state,
-      "",
-      `${window.location.pathname}${remainingQuery ? `?${remainingQuery}` : ""}${window.location.hash}`,
-    );
-
-    queueMicrotask(() => {
-      if (!controller.signal.aborted) {
-        setSsoCallbackError(callbackErrorMessage(callbackError));
+    if (ssoCallbackMessageRef.current === undefined) {
+      const parameters = new URLSearchParams(window.location.search);
+      const callbackError = parameters.get("sso_error");
+      ssoCallbackMessageRef.current = callbackErrorMessage(callbackError);
+      if (callbackError) {
+        parameters.delete("sso_error");
+        const remainingQuery = parameters.toString();
+        window.history.replaceState(
+          window.history.state,
+          "",
+          `${window.location.pathname}${remainingQuery ? `?${remainingQuery}` : ""}${window.location.hash}`,
+        );
       }
-    });
-    return () => controller.abort();
+    }
+
+    const message = ssoCallbackMessageRef.current;
+    if (message) queueMicrotask(() => setSsoCallbackError(message));
   }, []);
 
   useEffect(() => {

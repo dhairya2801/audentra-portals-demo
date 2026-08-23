@@ -62,6 +62,8 @@ test("student SSO callback errors stay bounded and are removed from the URL", as
   }
   assert.match(signIn, /parameters\.get\("sso_error"\)/);
   assert.match(signIn, /parameters\.delete\("sso_error"\)/);
+  assert.match(signIn, /ssoCallbackMessageRef\.current === undefined/);
+  assert.match(signIn, /ssoCallbackMessageRef\.current = callbackErrorMessage\(callbackError\)/);
   assert.match(signIn, /Object\.prototype\.hasOwnProperty\.call/);
   assert.match(
     signIn,
