@@ -252,13 +252,17 @@ test("tenant regressions fail closed for legal documents, stale drafts, and staf
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
 
+  // Every institution reaches the signing step: a tenant without its own
+  // artwork falls back to the standard templates rather than losing the fields.
   assert.match(
     onboarding,
-    /tenantSlug === "harvard" \|\| tenantSlug === "aster" \? tenantSlug : null/,
+    /TENANT_DOCUMENT_ASSET_PREFIXES\.has\(tenantSlug\)\s*\?\s*tenantSlug\s*:\s*DEFAULT_DOCUMENT_ASSET_PREFIX/,
   );
-  assert.match(onboarding, /if \(!assetPrefix\) return \[\]/);
-  assert.match(onboarding, /Signing documents are not configured for this institution/);
-  assert.doesNotMatch(onboarding, /tenantSlug === "harvard" \? "harvard" : "aster"/);
+  assert.doesNotMatch(onboarding, /if \(!assetPrefix\) return \[\]/);
+  assert.doesNotMatch(
+    onboarding,
+    /Signing documents are not configured for this institution/,
+  );
 
   assert.match(staffPortal, /setDraftVersion\(draft\.expectedVersion\)/);
   assert.match(staffPortal, /expectedVersion: draftVersion/);
