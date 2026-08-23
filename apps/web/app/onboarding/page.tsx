@@ -5,7 +5,6 @@ import type {
   AdmissionOfferSummary,
   CampusLifeFeed,
   OnboardingEmergencyContact,
-  OnboardingFamilyPermission,
   OnboardingStep,
   StudentDashboard,
   StudentDocument,
@@ -15,12 +14,14 @@ import type {
   StudentOnboardingScreenConfiguration,
   StudentPaymentList,
   StudentProfile,
+  StudentBootstrap,
   StudentHousingPlan,
   StudentRequirementInputField,
   UpdateStudentOnboardingInput,
 } from "@vv/contracts";
 import { DocumentExtractionReview } from "../components/document-extraction-review";
 import { DocumentUpload } from "../components/document-upload";
+import { FerpaAccessCenter } from "../components/ferpa-access-center";
 import { TenantLink as Link } from "../components/tenant-link";
 import {
   type FormEvent,
@@ -51,6 +52,7 @@ import {
   getStudentPayments,
   getStudentProfile,
   getStudentHousingPlan,
+  signOutFerpaDelegate,
   updateStudentOnboarding,
 } from "../lib/api-client";
 import {
@@ -155,16 +157,6 @@ const firstMonthGoalOptions = [
   ["something_new", "Something new"],
 ] as const;
 
-const ferpaScopeOptions = [
-  ["academic_records", "Academic records & advising"],
-  ["registration", "Registration & enrollment"],
-  ["billing", "Student account & billing"],
-  ["financial_aid", "Financial aid"],
-  ["housing", "Housing & dining"],
-  ["conduct", "Student conduct records"],
-  ["accessibility", "Accessibility services"],
-] as const;
-
 /**
  * `skippedSteps` is server-managed progress metadata. It is returned with the
  * onboarding resource so the UI can label optional steps, but must never be
@@ -205,6 +197,17 @@ type OnboardingPageData = {
   campusLife: CampusLifeFeed;
   documents: StudentDocumentList;
 };
+
+type DelegateBootstrapActor = Extract<
+  NonNullable<StudentBootstrap["actor"]>,
+  { type: "delegate" }
+>;
+
+function delegateRelationshipLabel(value: string) {
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
 
 function OnboardingProgress({
   steps,
@@ -328,15 +331,7 @@ const emptyEmergencyContact: OnboardingEmergencyContact = {
   fullName: "",
   relationship: "parent",
   mobilePhone: "",
-};
-
-const emptyFamilyPermission: OnboardingFamilyPermission = {
-  fullName: "",
-  relationship: "parent",
   email: "",
-  scopes: [],
-  purpose: "education_and_expenses",
-  expires: "end_first_year",
 };
 
 function HousingFields({
@@ -1090,6 +1085,20 @@ function EmergencyContactFields({ data }: { data: StudentOnboardingData }) {
                 required
               />
             </label>
+            <label className="field">
+              <span>Email address <small>For optional FERPA portal access</small></span>
+              <input
+                name={`emergencyContacts.${index}.email`}
+                defaultValue={value.email ?? ""}
+                placeholder="parent@example.com"
+                type="email"
+                autoComplete="email"
+                maxLength={254}
+              />
+              <small>
+                This never grants access by itself. It lets you reuse a parent or guardian later when you make your FERPA choice.
+              </small>
+            </label>
           </div>
         </fieldset>
       ))}
@@ -1112,142 +1121,10 @@ function EmergencyContactFields({ data }: { data: StudentOnboardingData }) {
         <h3>Emergency use only</h3>
         <p>
           These contacts are not invited to your portal and cannot discuss
-          your record unless you separately authorize them.
+          your record unless you separately select them and authorize specific
+          FERPA pages.
         </p>
       </div>
-    </>
-  );
-}
-
-function FamilyPermissionFields({ data }: { data: StudentOnboardingData }) {
-  const { tenant } = useTenant();
-  const nextKey = useRef(1);
-  const [permissions, setPermissions] = useState(() =>
-    (data.familyPermissions ?? []).map((value, index) => ({
-      key: `permission-${index}`,
-      value,
-    })),
-  );
-
-  return (
-    <>
-      <input type="hidden" name="familyPermissionCount" value={permissions.length} />
-      {permissions.length === 0 ? (
-        <div className="review-summary">
-          <h3>No one else has record access</h3>
-          <p>
-            Your record is private by default. You can continue this way or
-            authorize a specific person and exact record categories.
-          </p>
-        </div>
-      ) : null}
-      {permissions.map(({ key, value }, index) => (
-        <fieldset className="form-section" key={key}>
-          <legend>Authorized person {index + 1}</legend>
-          <button
-            className="text-button"
-            type="button"
-            onClick={() =>
-              setPermissions((current) =>
-                current.filter((permission) => permission.key !== key),
-              )
-            }
-          >
-            Remove
-          </button>
-          <div className="form-grid">
-            <label className="field">
-              <span>Full name</span>
-              <input
-                name={`familyPermissions.${index}.fullName`}
-                defaultValue={value.fullName}
-                maxLength={160}
-                required
-              />
-            </label>
-            <label className="field">
-              <span>Relationship</span>
-              <select
-                name={`familyPermissions.${index}.relationship`}
-                defaultValue={value.relationship}
-                required
-              >
-                <option value="parent">Parent</option>
-                <option value="guardian">Guardian</option>
-                <option value="partner">Spouse or partner</option>
-                <option value="sponsor">Sponsor</option>
-                <option value="other">Other trusted person</option>
-              </select>
-            </label>
-            <label className="field">
-              <span>Email</span>
-              <input
-                name={`familyPermissions.${index}.email`}
-                defaultValue={value.email}
-                type="email"
-                maxLength={254}
-                required
-              />
-            </label>
-          </div>
-          <h3>What may {tenant.shortName} discuss with this person?</h3>
-          <div className="choice-grid choice-grid--multi">
-            {ferpaScopeOptions.map(([scope, label]) => (
-              <Choice
-                name={`familyPermissions.${index}.scopes`}
-                value={scope}
-                label={label}
-                defaultChecked={value.scopes.includes(scope)}
-                key={scope}
-              />
-            ))}
-          </div>
-          <div className="form-grid">
-            <label className="field">
-              <span>Purpose of this disclosure</span>
-              <select
-                name={`familyPermissions.${index}.purpose`}
-                defaultValue={value.purpose}
-                required
-              >
-                <option value="education_and_expenses">Coordinate my education and expenses</option>
-                <option value="academic_planning">Help me manage academic planning</option>
-                <option value="billing_and_aid">Help me manage billing and aid</option>
-                <option value="other">Another purpose stated in my signed form</option>
-              </select>
-            </label>
-            <label className="field">
-              <span>Permission ends</span>
-              <select
-                name={`familyPermissions.${index}.expires`}
-                defaultValue={value.expires}
-                required
-              >
-                <option value="end_first_year">End of first academic year</option>
-                <option value="end_enrollment">
-                  End of my enrollment at {tenant.shortName}
-                </option>
-                <option value="registrar_date">On a date I provide to the Registrar</option>
-              </select>
-            </label>
-          </div>
-        </fieldset>
-      ))}
-      {permissions.length < 4 ? (
-        <button
-          className="button button--secondary"
-          type="button"
-          onClick={() => {
-            const key = `new-permission-${nextKey.current++}`;
-            setPermissions((current) => [
-              ...current,
-              { key, value: emptyFamilyPermission },
-            ]);
-          }}
-        >
-          + Add a parent, guardian or supporter
-        </button>
-      ) : null}
     </>
   );
 }
@@ -1263,14 +1140,6 @@ function onboardingDocumentsForTenant(tenantSlug: string) {
     ? tenantSlug
     : DEFAULT_DOCUMENT_ASSET_PREFIX;
   return [
-    {
-      id: "ferpa_release",
-      name: "FERPA Information Release",
-      pdf: `/documents/onboarding/${assetPrefix}-ferpa-release.pdf`,
-      preview:
-        `/documents/onboarding/${assetPrefix}-ferpa-release-page-1.png`,
-      signatureBox: { x: 9.8, y: 48.8, width: 53, height: 5.4 },
-    },
     {
       id: "enrollment_acknowledgment",
       name: "Enrollment Information Acknowledgment",
@@ -1865,6 +1734,8 @@ function StepFields({
   screenConfiguration,
   identityDocument,
   onIdentityDocumentChanged,
+  onFerpaCompletionChange,
+  onFerpaSaved,
 }: {
   step: OnboardingStep;
   data: StudentOnboardingData;
@@ -1875,6 +1746,8 @@ function StepFields({
   screenConfiguration?: StudentOnboardingScreenConfiguration;
   identityDocument: StudentDocument | null;
   onIdentityDocumentChanged: (document: StudentDocument) => void;
+  onFerpaCompletionChange: (complete: boolean) => void;
+  onFerpaSaved: () => void;
 }) {
   const { tenant } = useTenant();
   const formatMoney = (cents: number) => formatTenantMoney(cents, tenant);
@@ -1884,11 +1757,25 @@ function StepFields({
   const restoredPrefill = identityQuickUploadEnabled
     ? identityPrefillCandidates(identityDocument)
     : {};
+  // Account creation intentionally does not collect a legal name. The
+  // credential bootstrap uses this harmless internal placeholder until the
+  // required About you step supplies the real identity; never show it as a
+  // student-entered value.
+  const hasProvisionalAccountName =
+    data.firstName === "Student" &&
+    data.lastName === "Account" &&
+    data.preferredName === "Student";
   const prefilledData: StudentOnboardingData = {
     ...data,
-    firstName: data.firstName || restoredPrefill.firstName,
-    lastName: data.lastName || restoredPrefill.lastName,
-    preferredName: data.preferredName || restoredPrefill.preferredName,
+    firstName: hasProvisionalAccountName
+      ? restoredPrefill.firstName
+      : data.firstName || restoredPrefill.firstName,
+    lastName: hasProvisionalAccountName
+      ? restoredPrefill.lastName
+      : data.lastName || restoredPrefill.lastName,
+    preferredName: hasProvisionalAccountName
+      ? restoredPrefill.preferredName
+      : data.preferredName || restoredPrefill.preferredName,
     mobilePhone: data.mobilePhone || restoredPrefill.mobilePhone,
     streetAddress: data.streetAddress || restoredPrefill.streetAddress,
     city: data.city || restoredPrefill.city,
@@ -2247,7 +2134,14 @@ function StepFields({
     case "emergency_contacts":
       return <EmergencyContactFields data={data} />;
     case "family_permissions":
-      return <FamilyPermissionFields data={data} />;
+      return (
+        <FerpaAccessCenter
+          mode="task"
+          context="onboarding"
+          onCompletionChange={onFerpaCompletionChange}
+          onSaved={onFerpaSaved}
+        />
+      );
     case "review_and_sign":
       return <ReviewAndSignFields data={data} />;
     case "deposit":
@@ -2484,47 +2378,18 @@ function dataFromForm(
               values,
               `emergencyContacts.${index}.mobilePhone`,
             ),
+            email: optionalFormString(
+              values,
+              `emergencyContacts.${index}.email`,
+            )?.toLowerCase(),
           }),
         ),
       };
       }
     case "family_permissions":
-      {
-        const permissionCount = Number(
-          values.get("familyPermissionCount") ?? 0,
-        );
-      return {
-        ...next,
-        familyPermissions: Array.from(
-          { length: permissionCount },
-          (_, index) => ({
-            fullName: String(
-              values.get(`familyPermissions.${index}.fullName`) ?? "",
-            ).trim(),
-            relationship: String(
-              values.get(`familyPermissions.${index}.relationship`) ??
-                "other",
-            ) as OnboardingFamilyPermission["relationship"],
-            email: String(
-              values.get(`familyPermissions.${index}.email`) ?? "",
-            )
-              .trim()
-              .toLowerCase(),
-            scopes: values
-              .getAll(`familyPermissions.${index}.scopes`)
-              .map(String),
-            purpose: String(
-              values.get(`familyPermissions.${index}.purpose`) ??
-                "education_and_expenses",
-            ) as OnboardingFamilyPermission["purpose"],
-            expires: String(
-              values.get(`familyPermissions.${index}.expires`) ??
-                "end_first_year",
-            ) as OnboardingFamilyPermission["expires"],
-          }),
-        ),
-      };
-      }
+      // FERPA contacts and page scopes are saved by the canonical FERPA API.
+      // Never overwrite that aggregate with the legacy onboarding projection.
+      return next;
     case "review_and_sign":
       return {
         ...next,
@@ -2559,6 +2424,8 @@ function OnboardingFlow({
   campusLife,
   initialDocuments,
   reload,
+  readOnly,
+  delegateActor,
 }: {
   initial: StudentOnboarding;
   dashboard: StudentDashboard;
@@ -2567,14 +2434,18 @@ function OnboardingFlow({
   campusLife: CampusLifeFeed;
   initialDocuments: StudentDocumentList;
   reload: () => void;
+  readOnly: boolean;
+  delegateActor: DelegateBootstrapActor | null;
 }) {
   const tenantRuntime = useTenant();
   const { tenant } = tenantRuntime;
   const admissionsContact = tenant.contacts.admissions ?? tenant.contacts.support;
+  const delegateSignOut = useApiAction(signOutFerpaDelegate);
   const [onboarding, setOnboarding] = useState(initial);
   const [viewingStep, setViewingStep] = useState<OnboardingStep>(
     initial.currentStep,
   );
+  const [ferpaComplete, setFerpaComplete] = useState(false);
   const [offer, setOffer] = useState(dashboard.offer);
   const [depositPaid, setDepositPaid] = useState(
     initialPayments.items.some((payment) => payment.status === "succeeded"),
@@ -2657,10 +2528,10 @@ function OnboardingFlow({
     offer.status !== "accepted";
 
   useEffect(() => {
-    if (onboarding.status === "completed") {
+    if (!readOnly && onboarding.status === "completed") {
       window.location.replace(tenantRuntime.href("/dashboard"));
     }
-  }, [onboarding.status, tenantRuntime]);
+  }, [onboarding.status, readOnly, tenantRuntime]);
 
   const submitStep = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -2761,6 +2632,35 @@ function OnboardingFlow({
         onNavigate={setViewingStep}
       />
       <main className="onboarding-main">
+        {delegateActor ? (
+          <section
+            className="delegate-session-banner delegate-session-banner--onboarding"
+            aria-label="Delegated portal session"
+          >
+            <span aria-hidden="true">&#9670;</span>
+            <div>
+              <strong>
+                Viewing {delegateActor.studentName} as {delegateRelationshipLabel(delegateActor.relationship)}
+              </strong>
+              <small>
+                Managed by the student. This onboarding view is read-only.
+              </small>
+            </div>
+            <button
+              type="button"
+              disabled={delegateSignOut.status === "loading"}
+              onClick={() => {
+                void delegateSignOut.run().then(() => {
+                  window.location.replace(tenantRuntime.href("/sign-in"));
+                }).catch(() => undefined);
+              }}
+            >
+              {delegateSignOut.status === "loading"
+                ? "Signing out…"
+                : "End delegated session"}
+            </button>
+          </section>
+        ) : null}
         <header className="onboarding-mobile-header">
           <Link className="brand" href="/onboarding">
             <PortalMark />
@@ -2788,25 +2688,43 @@ function OnboardingFlow({
           <form
             className="onboarding-form"
             key={`${viewingStep}-${onboarding.version}`}
-            onSubmit={submitStep}
+            onSubmit={readOnly ? (event) => event.preventDefault() : submitStep}
           >
-            <StepFields
-              step={viewingStep}
-              data={onboarding.data}
-              offer={offer}
-              depositPaid={depositPaid}
-              housingPlan={housingPlan}
-              campusLife={campusLife}
-              identityDocument={identityDocument}
-              onIdentityDocumentChanged={rememberIdentityDocument}
-              screenConfiguration={onboarding.screenConfigurations?.[viewingStep]}
-            />
+            {readOnly ? (
+              <section className="delegate-onboarding-notice" role="note">
+                <span aria-hidden="true">◇</span>
+                <div>
+                  <p className="eyebrow">Read-only onboarding</p>
+                  <h2>Managed and completed by the student</h2>
+                  <p>
+                    You can review saved progress, answers, and document status.
+                    Only the student can continue, skip, upload, sign, accept an
+                    offer, submit a payment, or change onboarding answers.
+                  </p>
+                </div>
+              </section>
+            ) : null}
+            <fieldset className="onboarding-read-only-fields" disabled={readOnly}>
+              <StepFields
+                step={viewingStep}
+                data={onboarding.data}
+                offer={offer}
+                depositPaid={depositPaid}
+                housingPlan={housingPlan}
+                campusLife={campusLife}
+                identityDocument={identityDocument}
+                onIdentityDocumentChanged={rememberIdentityDocument}
+                onFerpaCompletionChange={setFerpaComplete}
+                onFerpaSaved={reload}
+                screenConfiguration={onboarding.screenConfigurations?.[viewingStep]}
+              />
+            </fieldset>
             {error || save.message || complete.message ? (
               <p className="field-error" role="alert">
                 {error || save.message || complete.message}
               </p>
             ) : null}
-            <div className="onboarding-actions">
+            {!readOnly ? <div className="onboarding-actions">
               <p>
                 <span aria-hidden="true">✓</span>
                 Saved progress is available on any signed-in device.
@@ -2853,9 +2771,14 @@ function OnboardingFlow({
                   <button
                     className="button button--primary"
                     type="submit"
-                    disabled={save.status === "loading"}
+                    disabled={
+                      save.status === "loading" ||
+                      (viewingStep === "family_permissions" && !ferpaComplete)
+                    }
                   >
-                    {save.status === "loading"
+                    {viewingStep === "family_permissions" && !ferpaComplete
+                      ? "Complete FERPA above"
+                      : save.status === "loading"
                       ? viewingStep === "offer" &&
                         offer.status === "offered"
                         ? "Accepting offer…"
@@ -2872,7 +2795,7 @@ function OnboardingFlow({
                   </button>
                 </div>
               )}
-            </div>
+            </div> : null}
             {save.status === "error" || complete.status === "error" ? (
               <button
                 className="text-button"
@@ -2901,7 +2824,13 @@ function OnboardingFlow({
   );
 }
 
-function OnboardingResource() {
+function OnboardingResource({
+  readOnly,
+  delegateActor,
+}: {
+  readOnly: boolean;
+  delegateActor: DelegateBootstrapActor | null;
+}) {
   const tenantRuntime = useTenant();
   const { tenant } = tenantRuntime;
   const loadOnboarding = useCallback(
@@ -3010,6 +2939,8 @@ function OnboardingResource() {
       campusLife={onboarding.data.campusLife}
       initialDocuments={onboarding.data.documents}
       reload={onboarding.reload}
+      readOnly={readOnly}
+      delegateActor={delegateActor}
       key={onboarding.data.onboarding.version}
     />
   );
@@ -3023,8 +2954,11 @@ export default function OnboardingPage() {
     [],
   );
   const bootstrap = useApiResource(loadBootstrap);
+  const onboardingSummary = bootstrap.data?.onboarding;
+  const isDelegate = bootstrap.data?.actor?.type === "delegate";
   const alreadyComplete =
-    bootstrap.data?.onboarding.status === "completed";
+    !isDelegate &&
+    onboardingSummary?.status === "completed";
   const needsSignIn =
     bootstrap.status === "error" &&
     (bootstrap.errorStatus === 401 || bootstrap.errorStatus === 403);
@@ -3032,12 +2966,16 @@ export default function OnboardingPage() {
   useEffect(() => {
     if (needsSignIn) {
       window.location.replace(tenantRuntime.href("/sign-in"));
+    } else if (isDelegate) {
+      // Parent and guardian access always uses the normal student portal. The
+      // onboarding data, when shared, is shown within My Enrollment instead.
+      window.location.replace(tenantRuntime.href("/enrollment"));
     } else if (alreadyComplete) {
       window.location.replace(tenantRuntime.href("/dashboard"));
     }
-  }, [alreadyComplete, needsSignIn, tenantRuntime]);
+  }, [alreadyComplete, isDelegate, needsSignIn, tenantRuntime]);
 
-  if (bootstrap.status === "loading" || needsSignIn || alreadyComplete) {
+  if (bootstrap.status === "loading" || needsSignIn || isDelegate || alreadyComplete) {
     return (
       <main className="load-state" aria-busy="true" aria-live="polite">
         <div className="load-state__card">
@@ -3071,5 +3009,10 @@ export default function OnboardingPage() {
     );
   }
 
-  return <OnboardingResource />;
+  return (
+    <OnboardingResource
+      readOnly={false}
+      delegateActor={null}
+    />
+  );
 }

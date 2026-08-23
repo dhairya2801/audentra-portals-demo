@@ -24,7 +24,40 @@ export async function signInDemoStaff(
     .locator('input[name="email"]')
     .fill(`priya.shah@${tenantSlug}.example.edu`);
   await page.locator('input[name="password"]').fill(password);
+  const signInResponse = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/v1/auth/staff/sign-in" &&
+      response.request().method() === "POST",
+  );
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  if ((await signInResponse).ok()) return;
+
+  // A freshly migrated database contains the approved staff identity but no
+  // local credential yet. Claim it once with the environment-only invitation
+  // value, then let the shared browser cookie drive the same staff UI journey.
+  const tenantIds = {
+    aster: "00000000-0000-7000-8000-000000000001",
+    harvard: "00000000-0000-7000-8000-000000000002",
+  } as const;
+  const signUp = await page.request.post(
+    `${demoApiBaseUrl}/v1/auth/staff/sign-up`,
+    {
+      headers: {
+        "X-Demo-Tenant-Id": tenantIds[tenantSlug],
+      },
+      data: {
+        email: `priya.shah@${tenantSlug}.example.edu`,
+        password,
+        institutionAccessCode: password,
+      },
+    },
+  );
+  if (!signUp.ok()) {
+    throw new Error(
+      `Could not claim the deterministic staff identity (${signUp.status()}): ${await signUp.text()}`,
+    );
+  }
+  await page.reload();
 }
 
 export async function resetDemoStudent(request: APIRequestContext) {
@@ -48,6 +81,35 @@ export async function resetDemoStudent(request: APIRequestContext) {
   if (!response.ok()) {
     throw new Error(
       `Could not reset the deterministic student fixture (${response.status()})`,
+    );
+  }
+}
+
+/**
+ * Restore the deterministic student at the first guided-onboarding screen.
+ *
+ * Most portal regressions intentionally use the completed fixture above. Keep
+ * the fresh journey explicit so a focused onboarding test cannot silently
+ * inherit whichever state a previous browser scenario left behind.
+ */
+export async function resetDemoStudentForOnboarding(
+  request: APIRequestContext,
+) {
+  let response = await request.post(
+    `${demoApiBaseUrl}/v1/auth/demo/start-guided-onboarding`,
+    { data: { completedOnboarding: false } },
+  );
+  // Older development adapters model only the fresh journey and accept an
+  // empty body. The FastAPI adapter accepts the explicit flag above.
+  if (response.status() === 400) {
+    response = await request.post(
+      `${demoApiBaseUrl}/v1/auth/demo/start-guided-onboarding`,
+      { data: {} },
+    );
+  }
+  if (!response.ok()) {
+    throw new Error(
+      `Could not reset the fresh onboarding fixture (${response.status()})`,
     );
   }
 }

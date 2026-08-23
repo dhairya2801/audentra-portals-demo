@@ -17,6 +17,7 @@ import {
   signInDemoStudent,
   signInStudent,
   signUpStudent,
+  selectStudentPortalSession,
   studentSsoStartUrl,
 } from "../lib/api-client";
 import {
@@ -66,6 +67,11 @@ const signInErrorMessage = (error: unknown) =>
     ? error.message
     : "We couldn’t sign you in. Check your connection and try again.";
 
+const signUpErrorMessage = (error: unknown) =>
+  error instanceof ApiClientError
+    ? error.message
+    : "Couldn't create your account. Check your connection and try again.";
+
 export function SignInClient() {
   const tenantRuntime = useTenant();
   const { tenant } = tenantRuntime;
@@ -93,7 +99,7 @@ export function SignInClient() {
     [],
   );
   const signIn = useApiAction(signInAction, signInErrorMessage);
-  const signUp = useApiAction(signUpAction);
+  const signUp = useApiAction(signUpAction, signUpErrorMessage);
   const activeAction = mode === "sign_in" ? signIn : signUp;
   const isBusy = signIn.status === "loading" || signUp.status === "loading";
   const passwordEnabled = ssoConfiguration?.passwordEnabled !== false;
@@ -216,7 +222,7 @@ export function SignInClient() {
           </h1>
           <p>
             {mode === "sign_up"
-              ? "Start with secure contact credentials. Your name, program details, and supporting records are collected during onboarding."
+              ? "Start with secure contact details. We’ll collect your legal name and supporting records during onboarding."
               : "Sign in to continue onboarding or return to your student dashboard."}
           </p>
         </div>
@@ -230,6 +236,7 @@ export function SignInClient() {
                   className="button button--secondary auth-sso-link"
                   href={studentSsoStartUrl(provider.id)}
                   key={provider.id}
+                  onClick={selectStudentPortalSession}
                 >
                   Continue with {provider.label}
                 </a>

@@ -325,10 +325,13 @@ export interface EdwardTurnEvent {
 export function EdwardAssistant({
   studentName,
   variant = "floating",
+  allowLiveVoice = true,
   onTurn,
 }: {
   studentName: string;
   variant?: "floating" | "embedded";
+  /** Delegates may use browser-local dictation, but never platform live voice. */
+  allowLiveVoice?: boolean;
   /**
    * Development-only observer (Edward Lab). Called after every send with the
    * raw response (including requestId) or the error. Never used on student
@@ -383,7 +386,9 @@ export function EdwardAssistant({
    * Whether the platform offers LiveKit voice sessions. Like conversation
    * persistence, a 404 settles it; browser speech remains the fallback.
    */
-  const [liveVoiceUnavailable, setLiveVoiceUnavailable] = useState(false);
+  const [liveVoiceUnavailable, setLiveVoiceUnavailable] = useState(
+    () => !allowLiveVoice,
+  );
   const activeServerConversationId = activeConversation?.serverId ?? null;
 
   /** Re-read the persisted thread and merge it under the local welcome. */
@@ -526,10 +531,15 @@ export function EdwardAssistant({
   // Warm the LiveKit client bundle while the student is looking at the panel
   // so the first voice start does not pay the module download.
   useEffect(() => {
-    if (open && !liveVoiceUnavailable && persistence !== "unavailable") {
+    if (
+      allowLiveVoice &&
+      open &&
+      !liveVoiceUnavailable &&
+      persistence !== "unavailable"
+    ) {
       prepareVoice();
     }
-  }, [liveVoiceUnavailable, open, persistence, prepareVoice]);
+  }, [allowLiveVoice, liveVoiceUnavailable, open, persistence, prepareVoice]);
 
   useEffect(() => {
     if (voice.state === "recoverable_error") {
@@ -773,6 +783,10 @@ export function EdwardAssistant({
   };
 
   const startOrEndLiveVoice = async () => {
+    if (!allowLiveVoice) {
+      toggleVoiceInput();
+      return;
+    }
     if (voice.microphoneActive || voiceSessionOpen) {
       await voice.endVoice();
       (variant === "embedded"
@@ -801,7 +815,11 @@ export function EdwardAssistant({
   };
 
   const handleVoiceButton = () => {
-    if (liveVoiceUnavailable || persistence === "unavailable") {
+    if (
+      !allowLiveVoice ||
+      liveVoiceUnavailable ||
+      persistence === "unavailable"
+    ) {
       toggleVoiceInput();
       return;
     }
@@ -1019,7 +1037,7 @@ export function EdwardAssistant({
         ) : null}
       </div>
 
-      {voiceSessionOpen || voice.problem ? (
+      {allowLiveVoice && (voiceSessionOpen || voice.problem) ? (
         <section
           className="edward-live-voice"
           data-state={voice.state}
@@ -1150,7 +1168,7 @@ export function EdwardAssistant({
             type="button"
             disabled={
               sending ||
-              ((liveVoiceUnavailable || persistence === "unavailable") &&
+              ((!allowLiveVoice || liveVoiceUnavailable || persistence === "unavailable") &&
                 !voiceSupported)
             }
             aria-label={
@@ -1158,7 +1176,7 @@ export function EdwardAssistant({
                 ? "End Edward voice session"
                 : listening
                   ? "Stop listening"
-                  : liveVoiceUnavailable || persistence === "unavailable"
+                  : !allowLiveVoice || liveVoiceUnavailable || persistence === "unavailable"
                     ? voiceSupported
                       ? "Ask Edward by voice"
                       : "Voice input is unavailable"
@@ -1166,7 +1184,7 @@ export function EdwardAssistant({
             }
             aria-pressed={listening || voice.microphoneActive}
             title={
-              liveVoiceUnavailable || persistence === "unavailable"
+              !allowLiveVoice || liveVoiceUnavailable || persistence === "unavailable"
                 ? voiceSupported
                   ? "Ask Edward by voice"
                   : "Voice input is not supported by this browser"

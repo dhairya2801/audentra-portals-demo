@@ -12,6 +12,7 @@ import {
   useState,
 } from "react";
 import { ApiClientError, getTenantBootstrap } from "../lib/api-client";
+import { isParentPortalPath, parentPortalHref } from "../lib/parent-portal-routes";
 import {
   neutralTenant,
   tenantConfigFromBootstrap,
@@ -45,6 +46,7 @@ function tenantErrorMessage(error: unknown) {
 
 export function TenantProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/";
+  const parentPortal = isParentPortalPath(pathname);
   const isUnscopedLanding = pathname === "/";
   const bypassesTenantBootstrap = isUnscopedLanding || pathname.startsWith("/dev/");
   const [requestVersion, setRequestVersion] = useState(0);
@@ -95,11 +97,11 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       error: bypassesTenantBootstrap
         ? null
         : state.error,
-      href: (value) => value,
+      href: (value) => (parentPortal ? parentPortalHref(value) : value),
       copy: (value) => tenantCopy(value, tenant),
       reload,
     }),
-    [bypassesTenantBootstrap, reload, state.error, state.status, tenant],
+    [bypassesTenantBootstrap, parentPortal, reload, state.error, state.status, tenant],
   );
 
   useEffect(() => {

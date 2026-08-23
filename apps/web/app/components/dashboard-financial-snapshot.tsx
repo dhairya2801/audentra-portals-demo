@@ -21,8 +21,18 @@ const segmentColors = {
 
 export function DashboardFinancialSnapshot({
   financials,
+  canOpen = true,
 }: {
-  financials: StudentFinancials;
+  financials: Pick<
+    StudentFinancials,
+    | "academicYear"
+    | "acceptedAidCents"
+    | "paymentsCents"
+    | "remainingBalanceCents"
+    | "requiredDocuments"
+    | "paymentPlans"
+  >;
+  canOpen?: boolean;
 }) {
   const segments = [
     {
@@ -56,12 +66,9 @@ export function DashboardFinancialSnapshot({
   );
   let offset = 0;
 
-  return (
-    <Link
-      className={`aster-domain-card aster-domain-card--financial ${styles.financialCard}`}
-      href="/financials"
-      aria-labelledby="financial-snapshot-title"
-    >
+  const className = `aster-domain-card aster-domain-card--financial ${styles.financialCard}`;
+  const content = (
+    <>
       <span>My Financials · {financials.academicYear}</span>
       <div className={styles.financialCardBody}>
         <div className={styles.compactDonutWrap}>
@@ -115,8 +122,26 @@ export function DashboardFinancialSnapshot({
         <small>
           {actionDocuments} document{actionDocuments === 1 ? "" : "s"} needing action
         </small>
-        <strong>{enrolledPlan?.name ?? "Choose a payment plan"} →</strong>
+        <strong>
+          {enrolledPlan?.name ??
+            (canOpen ? "Choose a payment plan" : "Shared account summary")}
+          {canOpen ? " →" : ""}
+        </strong>
       </div>
+    </>
+  );
+
+  return canOpen ? (
+    <Link
+      className={className}
+      href="/financials"
+      aria-labelledby="financial-snapshot-title"
+    >
+      {content}
     </Link>
+  ) : (
+    <section className={className} aria-labelledby="financial-snapshot-title">
+      {content}
+    </section>
   );
 }

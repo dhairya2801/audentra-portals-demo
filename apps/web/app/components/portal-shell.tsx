@@ -1,6 +1,7 @@
 "use client";
 
-import type { StudentExperienceUpdate } from "@vv/contracts";
+import type { FerpaPortalScope, StudentExperienceUpdate } from "@vv/contracts";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useActivityTracking } from "../hooks/use-activity-tracking";
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
@@ -8,6 +9,7 @@ import {
   decideStudentExperienceUpdate,
   deferStudentExperienceUpdates,
   getStudentBootstrap,
+  signOutFerpaDelegate,
 } from "../lib/api-client";
 import {
   beginExperienceUpdateVisit,
@@ -22,6 +24,7 @@ import { connectStudentRealtime } from "./student-realtime";
 import { TenantLink as Link } from "./tenant-link";
 import { useTenant } from "./tenant-provider";
 import { formatTenantMoney } from "../lib/tenant";
+import { isParentPortalPath, parentPortalHref } from "../lib/parent-portal-routes";
 
 export type PortalSection =
   | "dashboard"
@@ -43,6 +46,7 @@ const navigation: {
   shortLabel: string;
   href: string;
   symbol: string;
+  delegateOnly?: boolean;
 }[] = [
   {
     key: "dashboard",
@@ -107,6 +111,30 @@ const navigation: {
     href: "/profile",
     symbol: "○",
   },
+  {
+    key: "appointments",
+    label: "Appointments",
+    shortLabel: "Meet",
+    href: "/appointments",
+    symbol: "◷",
+    delegateOnly: true,
+  },
+  {
+    key: "payments",
+    label: "Payments",
+    shortLabel: "Pay",
+    href: "/payments",
+    symbol: "◇",
+    delegateOnly: true,
+  },
+  {
+    key: "help",
+    label: "Help",
+    shortLabel: "Help",
+    href: "/help",
+    symbol: "?",
+    delegateOnly: true,
+  },
 ];
 
 function initials(fullName: string) {
@@ -116,6 +144,12 @@ function initials(fullName: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("");
+}
+
+function relationshipLabel(value: string) {
+  return value === "partner"
+    ? "Partner"
+    : value.charAt(0).toUpperCase() + value.slice(1).replaceAll("_", " ");
 }
 
 const experienceKindLabels: Record<StudentExperienceUpdate["kind"], string> = {
@@ -312,18 +346,20 @@ export function PortalShell({
   children: React.ReactNode;
 }) {
   const tenantRuntime = useTenant();
+  const pathname = usePathname() || "/";
   const { tenant } = tenantRuntime;
   const advisorContact =
     tenant.contacts.admissions ??
     tenant.contacts.financialAid ??
     tenant.contacts.support;
-  const visibleNavigation = navigation.filter((item) => {
+  const tenantNavigation = navigation.filter((item) => {
     if (item.key === "campus_life") {
       return tenant.capabilities.campusLife !== false;
     }
     if (item.key === "edward") {
       return tenant.capabilities.assistant !== false;
     }
+    if (item.delegateOnly) return false;
     return true;
   });
   const publicFooterLinks: { label: string; href: string }[] = [];
@@ -351,6 +387,7 @@ export function PortalShell({
   const { track } = useActivityTracking();
   const experienceDecision = useApiAction(decideStudentExperienceUpdate);
   const experienceDeferral = useApiAction(deferStudentExperienceUpdates);
+  const delegateSignOut = useApiAction(signOutFerpaDelegate);
   const runExperienceDecision = experienceDecision.run;
   const runExperienceDeferral = experienceDeferral.run;
   const loadBootstrap = useCallback(
@@ -359,14 +396,27 @@ export function PortalShell({
   );
   const identity = useApiResource(loadBootstrap);
   const refreshIdentity = identity.refresh;
+  const delegateActor =
+    identity.status === "ready" && identity.data.actor?.type === "delegate"
+      ? identity.data.actor
+      : null;
+  const visibleNavigation = navigation.filter((item) => {
+    if (delegateActor) {
+      return delegateActor.scopes.includes(item.key as FerpaPortalScope);
+    }
+    return tenantNavigation.some((candidate) => candidate.key === item.key);
+  });
+  const portalHome = visibleNavigation[0]?.href ?? "/help";
+  const activeAllowed =
+    !delegateActor || delegateActor.scopes.includes(active as FerpaPortalScope);
   const needsOnboarding =
-    identity.data?.onboarding.required &&
+    !delegateActor && identity.data?.onboarding?.required &&
     identity.data.onboarding.status !== "completed";
   const needsSignIn =
     identity.status === "error" &&
     (identity.errorStatus === 401 || identity.errorStatus === 403);
   const experienceSessionKey =
-    identity.status === "ready"
+    identity.status === "ready" && !delegateActor
       ? studentExperienceUpdateSessionKey(tenant.id, identity.data.student.id)
       : null;
 
@@ -377,6 +427,20 @@ export function PortalShell({
       window.location.replace(tenantRuntime.href("/onboarding"));
     }
   }, [needsOnboarding, needsSignIn, tenantRuntime]);
+
+  useEffect(() => {
+    if (!delegateActor || isParentPortalPath(pathname)) return;
+
+    // Upgrade old parent bookmarks and a manually entered bare student route
+    // before the parent continues navigating. If the route is student-only
+    // (for example FERPA administration), return to the parent's first
+    // allowed page instead of exposing a student-context destination.
+    const current = `${pathname}${window.location.search}${window.location.hash}`;
+    const destination = parentPortalHref(current);
+    window.location.replace(
+      destination === current ? parentPortalHref(portalHome) : destination,
+    );
+  }, [delegateActor, pathname, portalHome]);
 
   useEffect(() => {
     if (
@@ -530,14 +594,19 @@ export function PortalShell({
   }, [refreshIdentity]);
 
   useEffect(() => {
-    if (identity.status !== "ready" || needsOnboarding || needsSignIn) return;
+    if (
+      identity.status !== "ready" ||
+      identity.data.actor?.type === "delegate" ||
+      needsOnboarding ||
+      needsSignIn
+    ) return;
     return connectStudentRealtime((event) => {
       refreshIdentity();
       window.dispatchEvent(
         new CustomEvent("vv:student-realtime", { detail: event }),
       );
     });
-  }, [identity.status, needsOnboarding, needsSignIn, refreshIdentity]);
+  }, [identity.data, identity.status, needsOnboarding, needsSignIn, refreshIdentity]);
 
   if (identity.status === "loading" || needsSignIn || needsOnboarding) {
     return (
@@ -576,7 +645,7 @@ export function PortalShell({
         </button>
         <Link
           className="aster-brand"
-          href="/dashboard"
+          href={portalHome}
           aria-label={`${tenant.name} student portal`}
         >
           <PortalMark />
@@ -586,7 +655,7 @@ export function PortalShell({
           </span>
         </Link>
         <div className="aster-topbar__right">
-          {identity.data.rewards ? (
+          {!delegateActor && identity.data.rewards ? (
             <div
               className="aster-points-balance"
               title={`${formatTenantMoney(identity.data.rewards.bookstoreCreditCents, tenant)} in bookstore credit`}
@@ -598,14 +667,16 @@ export function PortalShell({
               </div>
             </div>
           ) : null}
-          <Link className="aster-help-link" href="/help">
-            Student support
-          </Link>
-          <StudentNotificationCenter
-            fallbackUnreadCount={identity.data.unreadMessageCount}
-            suppressTransient={experienceUpdates.length > 0}
-          />
-          <Link
+          {!delegateActor || delegateActor.scopes.includes("help") ? (
+            <Link className="aster-help-link" href="/help">Student support</Link>
+          ) : null}
+          {!delegateActor || delegateActor.scopes.includes("messages") ? (
+            <StudentNotificationCenter
+              fallbackUnreadCount={identity.data.unreadMessageCount}
+              suppressTransient={experienceUpdates.length > 0}
+            />
+          ) : null}
+          {(!delegateActor || delegateActor.scopes.includes("profile")) ? <Link
             className="aster-student"
             href="/profile"
             aria-label={`Open profile for ${identity.data.student.fullName}`}
@@ -615,11 +686,41 @@ export function PortalShell({
             </span>
             <div>
               <strong>{identity.data.student.preferredName}</strong>
-              <small>Student</small>
+                <small>{delegateActor ? relationshipLabel(delegateActor.relationship) : "Student"}</small>
             </div>
-          </Link>
+          </Link> : (
+            <div className="aster-student" aria-label={`Viewing ${identity.data.student.fullName}`}>
+              <span aria-hidden="true">{initials(identity.data.student.fullName)}</span>
+              <div><strong>{identity.data.student.preferredName}</strong><small>{relationshipLabel(delegateActor!.relationship)}</small></div>
+            </div>
+          )}
         </div>
       </header>
+
+      {delegateActor ? (
+        <section className="delegate-session-banner" aria-label="Delegated portal session">
+          <span aria-hidden="true">◆</span>
+          <div>
+            <strong>
+              Viewing {delegateActor.studentName} as {relationshipLabel(delegateActor.relationship)}
+            </strong>
+            <small>
+              You can use only the pages the student shared. FERPA settings remain student-controlled.
+            </small>
+          </div>
+          <button
+            type="button"
+            disabled={delegateSignOut.status === "loading"}
+            onClick={() => {
+              void delegateSignOut.run().then(() => {
+                window.location.replace(tenantRuntime.href("/sign-in"));
+              }).catch(() => undefined);
+            }}
+          >
+            {delegateSignOut.status === "loading" ? "Signing out…" : "End delegated session"}
+          </button>
+        </section>
+      ) : null}
 
       {menuOpen ? (
         <button
@@ -649,7 +750,7 @@ export function PortalShell({
             </Link>
           ))}
         </nav>
-        {identity.data.rewards ? (
+        {!delegateActor && identity.data.rewards ? (
           <section
             className="aster-sidebar__rewards"
             aria-label={`${identity.data.rewards.pointName} balance`}
@@ -668,7 +769,7 @@ export function PortalShell({
             </div>
           </section>
         ) : null}
-        <div className="aster-sidebar__support">
+        {(!delegateActor || delegateActor.scopes.includes("help") || delegateActor.scopes.includes("appointments")) ? <div className="aster-sidebar__support">
           <span aria-hidden="true">?</span>
           <div>
             <strong>Your student support team</strong>
@@ -676,17 +777,19 @@ export function PortalShell({
               {advisorContact.hours || `${tenant.shortName} advisors are available to help.`}
             </p>
             <div className="aster-sidebar__support-links">
-              {advisorContact.email ? (
-                <a href={`mailto:${advisorContact.email}`}>
-                  {advisorContact.email}
-                </a>
-              ) : advisorContact.url ? (
-                <a href={tenantRuntime.href(advisorContact.url)}>{advisorContact.label}</a>
+              {!delegateActor || delegateActor.scopes.includes("help")
+                ? advisorContact.email
+                  ? <a href={`mailto:${advisorContact.email}`}>{advisorContact.email}</a>
+                  : advisorContact.url
+                    ? <a href={tenantRuntime.href(advisorContact.url)}>{advisorContact.label}</a>
+                    : null
+                : null}
+              {!delegateActor || delegateActor.scopes.includes("appointments") ? (
+                <Link href="/appointments">Book an advisor</Link>
               ) : null}
-              <Link href="/appointments">Book an advisor</Link>
             </div>
           </div>
-        </div>
+        </div> : null}
       </aside>
 
       <main id="main-content" className="aster-main">
@@ -698,7 +801,20 @@ export function PortalShell({
           </div>
           {actions ? <div className="aster-page-actions">{actions}</div> : null}
         </header>
-        {children}
+        {activeAllowed ? children : (
+          <section className="delegate-restricted-state" role="alert">
+            <span aria-hidden="true">◇</span>
+            <p className="eyebrow">Restricted page</p>
+            <h2>This page is not shared</h2>
+            <p>
+              {delegateActor?.studentName || "The student"} has not granted this
+              section to your delegated session. FERPA access can only be changed by the student.
+            </p>
+            <Link className="button button--primary" href={portalHome}>
+              Open an available page
+            </Link>
+          </section>
+        )}
         <footer className="aster-footer">
           <p>© {new Date().getFullYear()} {tenant.legalName}</p>
           <nav aria-label="Portal policies">
@@ -709,7 +825,9 @@ export function PortalShell({
                 <a href={link.href} key={link.label}>{link.label}</a>
               ),
             )}
-            <Link href="/help">Student support</Link>
+            {!delegateActor || delegateActor.scopes.includes("help") ? (
+              <Link href="/help">Student support</Link>
+            ) : null}
           </nav>
         </footer>
       </main>
@@ -728,10 +846,12 @@ export function PortalShell({
         ))}
       </nav>
 
-      {active !== "edward" && tenant.capabilities.assistant !== false ? (
+      {active !== "edward" && tenant.capabilities.assistant !== false &&
+      (!delegateActor || delegateActor.scopes.includes("edward")) ? (
         <EdwardAssistant
           studentName={identity.data.student.preferredName}
           variant="floating"
+          allowLiveVoice={!delegateActor}
         />
       ) : null}
 
@@ -746,7 +866,7 @@ export function PortalShell({
         />
       ) : null}
 
-      {experienceUpdates.length === 0 && identity.data.rewards ? (
+      {experienceUpdates.length === 0 && identity.data.rewards && !delegateActor ? (
         <RewardCelebration
           tenantSlug={tenant.slug}
           studentId={identity.data.student.id}

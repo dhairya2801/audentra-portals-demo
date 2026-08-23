@@ -16,22 +16,30 @@ import {
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
 import {
   createDepositPayment,
+  getStudentBootstrap,
   getStudentDashboard,
   getStudentPayments,
 } from "../lib/api-client";
 import { useTenant } from "../components/tenant-provider";
 import { formatTenantDate, formatTenantMoney } from "../lib/tenant";
 
-type PaymentPageData = {
-  payments: StudentPaymentList;
-  dashboard: StudentDashboard;
+type PaymentDashboard = Omit<StudentDashboard, "offer"> & {
+  offer?: StudentDashboard["offer"];
 };
+
+type ReadyPaymentPageData = {
+  restricted: false;
+  payments: StudentPaymentList;
+  dashboard: PaymentDashboard;
+};
+
+type PaymentPageData = ReadyPaymentPageData | { restricted: true };
 
 function PaymentWorkspace({
   data,
   reload,
 }: {
-  data: PaymentPageData;
+  data: ReadyPaymentPageData;
   reload: () => void;
 }) {
   const { tenant } = useTenant();
@@ -46,11 +54,13 @@ function PaymentWorkspace({
   const successfulDeposit = data.payments.items.find(
     (payment) => payment.status === "succeeded",
   );
+  const offer = data.dashboard.offer;
 
   const submitDeposit = async () => {
+    if (!offer) return;
     const key = intentKey.current ?? (intentKey.current = crypto.randomUUID());
     try {
-      await payDeposit.run(data.dashboard.offer.id, key);
+      await payDeposit.run(offer.id, key);
       intentKey.current = null;
       reload();
     } catch {
@@ -58,11 +68,25 @@ function PaymentWorkspace({
     }
   };
 
+  if (!offer) {
+    return (
+      <PageCard
+        eyebrow="Enrollment deposit"
+        title="Payment details are unavailable"
+      >
+        <p>
+          This delegated session does not include the offer details needed to
+          review or submit an enrollment deposit.
+        </p>
+      </PageCard>
+    );
+  }
+
   return (
     <div className="resource-layout">
       <PageCard
         eyebrow="Enrollment deposit"
-        title={formatMoney(data.dashboard.offer.depositAmountCents)}
+        title={formatMoney(offer.depositAmountCents)}
         action={
           <StatusPill value={successfulDeposit ? "succeeded" : "due"} />
         }
@@ -70,17 +94,17 @@ function PaymentWorkspace({
         <div className="payment-summary">
           <p>
             The enrollment deposit secures your place in{" "}
-            <strong>{data.dashboard.offer.programName}</strong>. The amount is
+            <strong>{offer.programName}</strong>. The amount is
             confirmed by {tenant.shortName} and cannot be edited in the portal.
           </p>
           <dl className="detail-grid">
             <div>
               <dt>Offer</dt>
-              <dd>{data.dashboard.offer.termName}</dd>
+              <dd>{offer.termName}</dd>
             </div>
             <div>
               <dt>Campus</dt>
-              <dd>{data.dashboard.offer.campusName}</dd>
+              <dd>{offer.campusName}</dd>
             </div>
             {successfulDeposit ? (
               <>
@@ -120,7 +144,7 @@ function PaymentWorkspace({
                 ? "Processing deposit…"
                 : payDeposit.status === "error"
                   ? "Retry deposit"
-                  : `Pay ${formatMoney(data.dashboard.offer.depositAmountCents)} deposit`}
+                  : `Pay ${formatMoney(offer.depositAmountCents)} deposit`}
             </button>
           )}
         </div>
@@ -159,11 +183,22 @@ function PaymentWorkspace({
 export default function PaymentsPage() {
   const loadPayments = useCallback(
     async (signal: AbortSignal): Promise<PaymentPageData> => {
+      const bootstrap = await getStudentBootstrap(signal);
+      if (
+        bootstrap.actor?.type === "delegate" &&
+        !bootstrap.actor.scopes.includes("payments")
+      ) {
+        return { restricted: true };
+      }
       const [payments, dashboard] = await Promise.all([
         getStudentPayments(signal),
         getStudentDashboard(signal),
       ]);
-      return { payments, dashboard };
+      return {
+        restricted: false,
+        payments,
+        dashboard: dashboard as PaymentDashboard,
+      };
     },
     [],
   );
@@ -180,6 +215,8 @@ export default function PaymentsPage() {
         <LoadingState label="Loading your payment details" />
       ) : paymentData.status === "error" ? (
         <ErrorState message={paymentData.error} onRetry={paymentData.reload} />
+      ) : paymentData.data.restricted ? (
+        <div aria-hidden="true" />
       ) : (
         <PaymentWorkspace data={paymentData.data} reload={paymentData.refresh} />
       )}

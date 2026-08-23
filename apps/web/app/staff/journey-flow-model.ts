@@ -18,6 +18,7 @@ const submissionTypes: Record<JourneyTaskType, JourneySubmissionType> = {
   multiple_select: "form",
   selection_flow: "form",
   signature: "form",
+  ferpa: "form",
   payment: "payment",
   scheduling: "appointment",
 };

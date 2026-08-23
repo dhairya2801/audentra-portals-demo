@@ -12,10 +12,7 @@ import type { NextConfig } from "next";
 const apiProxyOrigin = process.env.API_PROXY_ORIGIN?.trim().replace(/\/+$/, "");
 
 const nextConfig: NextConfig = {
-  // Use the installed TypeScript compiler API. Next 16.3's CLI config parser
-  // can receive non-JSON process output in workspace builds on Vercel.
   experimental: {
-    useTypeScriptCli: false,
     // Vinext inspects multipart POSTs as possible progressive Server Actions
     // before applying external rewrites. Keep that transport ceiling above the
     // platform's 10 MiB per-document contract so the API, rather than the

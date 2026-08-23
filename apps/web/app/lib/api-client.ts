@@ -16,6 +16,7 @@ import type {
   CatalogCourse,
   ApiErrorResponse,
   CompleteStudentOnboardingInput,
+  CompleteStudentFerpaInput,
   CompleteStaffInteractionInput,
   ConfirmStudentDocumentExtractionInput,
   CreateStaffActionRuleInput,
@@ -44,6 +45,7 @@ import type {
   StudentHelpRequest,
   StudentHousingPlan,
   StudentFinancials,
+  StudentFerpaAuthorizationEnvelope,
   StudentMessage,
   StudentMessageList,
   StudentOnboarding,
@@ -101,9 +103,13 @@ import type {
   UpdateStaffWorkItemInput,
   UpdateStudentOnboardingInput,
   UpdateStudentHousingPlanInput,
+  UpdateStudentFerpaAccessInput,
   UpdateStudentProfileInput,
+  FerpaDelegateLinkIssueResult,
+  DelegateSession,
 } from "@vv/contracts";
 import type { EdwardExecutionMode } from "./edward-lab";
+import { isParentPortalPath } from "./parent-portal-routes";
 
 const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
 
@@ -115,6 +121,83 @@ export const API_BASE_URL = (configuredApiBaseUrl || "").replace(/\/+$/, "");
 // so this module carries no runtime dependency on Lab code; `edward-lab.ts`
 // exports the same constant and a test pins the two together.
 const EDWARD_EXECUTION_MODE_HEADER = "X-Edward-Mode";
+const PORTAL_SESSION_MODE_HEADER = "X-Audentra-Session-Mode";
+const DELEGATE_SESSION_MODE_KEY = "vv:delegate-session-mode";
+
+/**
+ * Browser storage contains no bearer credential. It only chooses which of
+ * the separately HTTP-only student/delegate cookies this tab should use.
+ * A /parent route is the stronger, visible signal. Storage remains a fallback
+ * for an older bare URL long enough for the shell to canonicalize it, so a
+ * parent tab cannot silently fall back to the student's cookie mid-visit.
+ */
+function portalSessionMode(): "student" | "delegate" {
+  if (typeof window === "undefined") return "student";
+  if (isParentPortalPath(window.location.pathname)) return "delegate";
+  try {
+    return window.sessionStorage.getItem(DELEGATE_SESSION_MODE_KEY) === "delegate"
+      ? "delegate"
+      : "student";
+  } catch {
+    return "student";
+  }
+}
+
+function selectPortalSession(mode: "student" | "delegate") {
+  if (typeof window === "undefined") return;
+  try {
+    if (mode === "delegate") {
+      window.sessionStorage.setItem(DELEGATE_SESSION_MODE_KEY, "delegate");
+    } else {
+      window.sessionStorage.removeItem(DELEGATE_SESSION_MODE_KEY);
+    }
+  } catch {
+    // Safe default: the server will use the student session if browser storage
+    // is unavailable, rather than letting a delegate cookie take over a tab.
+  }
+}
+
+/**
+ * Select the student's HTTP-only session for the current browser tab before
+ * starting an external student sign-in flow. The server intentionally retains
+ * a delegate cookie so a parent tab can remain open; this removes the
+ * tab-local delegate selector so the SSO return path uses the student cookie.
+ */
+export function selectStudentPortalSession() {
+  selectPortalSession("student");
+}
+
+function portalSessionHeaders(
+  includePortalSessionMode = true,
+): Record<string, string> {
+  // The platform already defaults to the student cookie. Only a delegate tab
+  // needs an explicit selector, which also keeps ordinary student and public
+  // reads simple CORS requests.
+  if (includePortalSessionMode && portalSessionMode() === "delegate") {
+    return { [PORTAL_SESSION_MODE_HEADER]: "delegate" };
+  }
+  return {};
+}
+
+function requestHeaders(
+  accept: string,
+  initHeaders: HeadersInit | undefined,
+  includePortalSessionMode = true,
+): Record<string, string> {
+  const headers: Record<string, string> = { Accept: accept };
+  const entries = initHeaders instanceof Headers
+    ? [...initHeaders.entries()]
+    : Array.isArray(initHeaders)
+      ? initHeaders
+      : Object.entries(initHeaders ?? {});
+  for (const [name, value] of entries) {
+    headers[name] = value;
+  }
+  return {
+    ...headers,
+    ...portalSessionHeaders(includePortalSessionMode),
+  };
+}
 
 export class ApiClientError extends Error {
   readonly status: number;
@@ -175,15 +258,17 @@ async function request<T>(
   init: RequestInit = {},
   options: {
     notifyStudentRecordChanged?: boolean;
+    includePortalSessionMode?: boolean;
   } = {},
 ): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     credentials: "include",
-    headers: {
-      Accept: "application/json",
-      ...init.headers,
-    },
+    headers: requestHeaders(
+      "application/json",
+      init.headers,
+      options.includePortalSessionMode,
+    ),
   });
 
   if (!response.ok) {
@@ -201,15 +286,82 @@ async function request<T>(
   return result;
 }
 
+/**
+ * Fetches protected binary content through the same credentialed, tab-aware
+ * transport as JSON requests. Do not turn these paths into href/src values:
+ * browser navigation and Next's image loader cannot send a delegate selector.
+ */
+async function requestBlob(
+  path: string,
+  init: RequestInit = {},
+  options: { includePortalSessionMode?: boolean } = {},
+): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    credentials: "include",
+    headers: requestHeaders("*/*", init.headers, options.includePortalSessionMode),
+  });
+
+  if (!response.ok) {
+    throw await parseError(response);
+  }
+
+  return response.blob();
+}
+
 export function getTenantBootstrap(signal?: AbortSignal) {
-  return request<TenantBootstrap>("/v1/tenant/bootstrap", { signal });
+  // This endpoint is public configuration. Do not make its availability
+  // depend on which tab-local portal identity happens to be active.
+  return requestWithTimeout<TenantBootstrap>(
+    "/v1/tenant/bootstrap",
+    { method: "GET" },
+    signal,
+    "Your institution portal took too long to respond. Please try again.",
+    { includePortalSessionMode: false },
+  );
+}
+
+async function requestWithTimeout<T>(
+  path: string,
+  init: RequestInit,
+  signal: AbortSignal | undefined,
+  timeoutMessage: string,
+  options: {
+    notifyStudentRecordChanged?: boolean;
+    includePortalSessionMode?: boolean;
+  } = {},
+) {
+  // A portal shell should never leave a student or parent on an indefinite
+  // loading screen if a browser/network request becomes stalled. Preserve a
+  // caller cancellation, but surface a retryable error after a bounded wait.
+  const controller = new AbortController();
+  const forwardAbort = () => controller.abort();
+  if (signal?.aborted) {
+    controller.abort();
+  } else {
+    signal?.addEventListener("abort", forwardAbort, { once: true });
+  }
+  const timeout = globalThis.setTimeout(() => controller.abort(), 15_000);
+  try {
+    return await request<T>(path, { ...init, signal: controller.signal }, options);
+  } catch (error) {
+    if (controller.signal.aborted && !signal?.aborted) {
+      throw new ApiClientError(timeoutMessage, { status: 504, code: "portal_access_timeout" });
+    }
+    throw error;
+  } finally {
+    globalThis.clearTimeout(timeout);
+    signal?.removeEventListener("abort", forwardAbort);
+  }
 }
 
 export function getStudentBootstrap(signal?: AbortSignal) {
-  return request<StudentBootstrap>("/v1/student/bootstrap", {
-    method: "GET",
+  return requestWithTimeout<StudentBootstrap>(
+    "/v1/student/bootstrap",
+    { method: "GET" },
     signal,
-  });
+    "Your portal took too long to respond. Please try again.",
+  );
 }
 
 export function decideStudentExperienceUpdate(
@@ -235,6 +387,9 @@ export function signUpStudent(input: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
+  }).then((session) => {
+    selectPortalSession("student");
+    return session;
   });
 }
 
@@ -246,6 +401,9 @@ export function signInStudent(input: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
+  }).then((session) => {
+    selectPortalSession("student");
+    return session;
   });
 }
 
@@ -265,7 +423,10 @@ export function signOutStudent() {
   return request<{ authenticated: false; mode: "credentials" | "oidc" }>(
     "/v1/auth/sign-out",
     { method: "POST" },
-  );
+  ).then((result) => {
+    selectPortalSession("student");
+    return result;
+  });
 }
 
 export interface DemoAuthSession {
@@ -293,6 +454,9 @@ export function signInDemoStudent(input: { studentRef: string }) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
+  }).then((session) => {
+    selectPortalSession("student");
+    return session;
   });
 }
 
@@ -300,7 +464,10 @@ export function signOutDemoStudent() {
   return request<{ authenticated: false; mode: "demo" }>(
     "/v1/auth/demo/sign-out",
     { method: "POST" },
-  );
+  ).then((result) => {
+    selectPortalSession("student");
+    return result;
+  });
 }
 
 export function getStudentDashboard(signal?: AbortSignal) {
@@ -435,6 +602,107 @@ export function submitStudentRequirementResponse(
       body: JSON.stringify(input),
     },
   );
+}
+
+export function getStudentFerpaAuthorization(signal?: AbortSignal) {
+  return request<StudentFerpaAuthorizationEnvelope>(
+    "/v1/student/ferpa-authorizations/current",
+    { method: "GET", signal },
+  );
+}
+
+export function completeStudentFerpaAuthorization(
+  requirementId: string,
+  input: CompleteStudentFerpaInput,
+  idempotencyKey: string,
+) {
+  return request<StudentFerpaAuthorizationEnvelope>(
+    `/v1/student/requirements/${encodeURIComponent(requirementId)}/ferpa/complete`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function updateStudentFerpaAccess(
+  authorizationId: string,
+  input: UpdateStudentFerpaAccessInput,
+) {
+  return request<StudentFerpaAuthorizationEnvelope>(
+    `/v1/student/ferpa-authorizations/${encodeURIComponent(authorizationId)}/access`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function issueStudentFerpaDelegateLink(
+  authorizationId: string,
+  delegateId: string,
+  expectedVersion: number,
+  idempotencyKey: string,
+) {
+  return request<FerpaDelegateLinkIssueResult>(
+    `/v1/student/ferpa-authorizations/${encodeURIComponent(authorizationId)}/delegates/${encodeURIComponent(delegateId)}/link`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify({ expectedVersion }),
+    },
+  );
+}
+
+export function revokeStudentFerpaDelegateLink(
+  authorizationId: string,
+  delegateId: string,
+  expectedVersion: number,
+) {
+  return request<StudentFerpaAuthorizationEnvelope>(
+    `/v1/student/ferpa-authorizations/${encodeURIComponent(authorizationId)}/delegates/${encodeURIComponent(delegateId)}/link/revoke`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expectedVersion }),
+    },
+  );
+}
+
+export function exchangeFerpaDelegateLink(token: string) {
+  return requestWithTimeout<DelegateSession>(
+    "/v1/auth/delegate/exchange",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    },
+    undefined,
+    "This secure link took too long to open. Please try the link again.",
+    { notifyStudentRecordChanged: false, includePortalSessionMode: false },
+  ).then((session) => {
+    selectPortalSession("delegate");
+    return session;
+  });
+}
+
+export function signOutFerpaDelegate() {
+  return request<{ authenticated: false; mode: "delegate" }>(
+    "/v1/auth/delegate/sign-out",
+    { method: "POST" },
+    { notifyStudentRecordChanged: false },
+  ).then((result) => {
+    selectPortalSession("student");
+    return result;
+  });
 }
 
 export function getStudentMessages(signal?: AbortSignal) {
@@ -615,14 +883,28 @@ export function retryStudentDocumentExtraction(
   );
 }
 
-export function getStudentDocumentContentUrl(document: StudentDocument) {
-  if (!document.contentUrl) return null;
-  return tenantAwareDocumentUrl(document.contentUrl);
+export function getStudentDocumentContent(
+  document: Pick<StudentDocument, "contentUrl">,
+  signal?: AbortSignal,
+) {
+  if (!document.contentUrl) {
+    return Promise.reject(
+      new ApiClientError("This document is no longer available.", {
+        status: 404,
+        code: "document_content_unavailable",
+      }),
+    );
+  }
+  return requestBlob(document.contentUrl, { method: "GET", signal });
 }
 
-export function getStudentDocumentProfilePhotoUrl(documentId: string) {
-  return tenantAwareDocumentUrl(
+export function getStudentDocumentProfilePhoto(
+  documentId: string,
+  signal?: AbortSignal,
+) {
+  return requestBlob(
     `/v1/student/documents/${encodeURIComponent(documentId)}/profile-photo`,
+    { method: "GET", signal },
   );
 }
 
@@ -1399,6 +1681,34 @@ export function createStudentAppointment(
   });
 }
 
+export function getStudentRequirementAppointments(
+  requirementId: string,
+  signal?: AbortSignal,
+) {
+  return request<StudentAppointmentList>(
+    `/v1/student/requirements/${encodeURIComponent(requirementId)}/appointments`,
+    { method: "GET", signal },
+  );
+}
+
+export function createStudentRequirementAppointment(
+  requirementId: string,
+  input: CreateStudentAppointmentInput,
+  idempotencyKey: string,
+) {
+  return request<StudentAppointment>(
+    `/v1/student/requirements/${encodeURIComponent(requirementId)}/appointments`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
 export function getStudentPayments(signal?: AbortSignal) {
   return request<StudentPaymentList>("/v1/student/payments", {
     method: "GET",
@@ -1433,6 +1743,20 @@ export function updateStudentProfile(input: UpdateStudentProfileInput) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
+}
+
+export function updateStudentRequirementProfile(
+  requirementId: string,
+  input: UpdateStudentProfileInput,
+) {
+  return request<StudentProfile>(
+    `/v1/student/requirements/${encodeURIComponent(requirementId)}/profile`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export function getStudentHelp(signal?: AbortSignal) {
