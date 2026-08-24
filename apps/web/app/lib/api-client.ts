@@ -606,11 +606,25 @@ export function submitStudentRequirementResponse(
   );
 }
 
+/**
+ * The student's current FERPA authorization, or `null` when none is on file.
+ *
+ * A platform that predates FERPA delegation has no route here at all and
+ * answers 404. That is the same fact as "nothing on file" for every page that
+ * reads it, so it resolves rather than rejects — My Enrollment and Profile
+ * still render, and the FERPA step itself reports the missing capability when
+ * it is attempted.
+ */
 export function getStudentFerpaAuthorization(signal?: AbortSignal) {
   return request<StudentFerpaAuthorizationEnvelope>(
     "/v1/student/ferpa-authorizations/current",
     { method: "GET", signal },
-  );
+  ).catch((error: unknown) => {
+    if (error instanceof ApiClientError && error.status === 404) {
+      return { authorization: null } as StudentFerpaAuthorizationEnvelope;
+    }
+    throw error;
+  });
 }
 
 export function completeStudentFerpaAuthorization(
