@@ -1,403 +1,58 @@
 "use client";
 
+import type { CampusEvent } from "@vv/contracts";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 import { PortalShell } from "../components/portal-shell";
+import { StudentPortalIcon } from "../components/student-portal-icon";
+import { TenantLink as Link } from "../components/tenant-link";
 import { ErrorState, LoadingState } from "../components/portal-ui";
 import { useActivityTracking } from "../hooks/use-activity-tracking";
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
 import { getCampusLife, registerCampusEvent } from "../lib/api-client";
-import { safePortalDestination } from "../lib/safe-destination";
 import { useTenant } from "../components/tenant-provider";
-import { TenantLink as Link } from "../components/tenant-link";
 
-function eventDate(value: string) {
-  return {
-    month: new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      timeZone: "UTC",
-    }).format(new Date(value)),
-    day: new Intl.DateTimeFormat("en-US", {
-      day: "numeric",
-      timeZone: "UTC",
-    }).format(new Date(value)),
-    time: new Intl.DateTimeFormat("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      timeZone: "UTC",
-    }).format(new Date(value)),
-  };
+function dateParts(value: string) {
+  return { month: new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" }).format(new Date(value)), day: new Intl.DateTimeFormat("en-US", { day: "numeric", timeZone: "UTC" }).format(new Date(value)), time: new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" }).format(new Date(value)) };
 }
 
 export default function CampusLifePage() {
   const { tenant } = useTenant();
-  const load = useCallback((signal: AbortSignal) => getCampusLife(signal), []);
-  const campus = useApiResource(load);
+  const params = useSearchParams();
+  const clubsView = params.get("view") === "clubs";
+  const campus = useApiResource(useCallback((signal: AbortSignal) => getCampusLife(signal), []));
+  const registration = useApiAction(registerCampusEvent);
   const { track } = useActivityTracking();
-  const [eventIndex, setEventIndex] = useState(0);
-  const [clubQuery, setClubQuery] = useState("");
-  const [clubCategory, setClubCategory] = useState("all");
   const [registrationEventId, setRegistrationEventId] = useState<string | null>(null);
-  const registrationAction = useApiAction(registerCampusEvent);
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("all");
 
-  const clubCategories = useMemo(() => {
-    if (!campus.data) return [];
-    return Array.from(
-      new Set(campus.data.clubs.map((club) => club.category)),
-    ).sort((left, right) => left.localeCompare(right));
-  }, [campus.data]);
+  const categories = useMemo(() => campus.data ? Array.from(new Set(campus.data.clubs.map((club) => club.category))).sort() : [], [campus.data]);
+  const clubs = useMemo(() => campus.data ? campus.data.clubs.filter((club) => (category === "all" || club.category === category) && (!query.trim() || `${club.name} ${club.category} ${club.description}`.toLowerCase().includes(query.trim().toLowerCase()))) : [], [campus.data, category, query]);
 
-  const filteredClubs = useMemo(() => {
-    if (!campus.data) return [];
-    const query = clubQuery.trim().toLowerCase();
-    return campus.data.clubs.filter((club) => {
-      const matchesCategory =
-        clubCategory === "all" || club.category === clubCategory;
-      const matchesQuery =
-        !query ||
-        `${club.name} ${club.category} ${club.description}`
-          .toLowerCase()
-          .includes(query);
-      return matchesCategory && matchesQuery;
-    });
-  }, [campus.data, clubCategory, clubQuery]);
-
-  if (campus.status === "loading") {
-    return (
-      <PortalShell
-        active="campus_life"
-        eyebrow="My campus life"
-        title="Find your people"
-        description={`Events, clubs, and communities published for ${tenant.shortName} students.`}
-      >
-        <LoadingState label="Loading campus life" />
-      </PortalShell>
-    );
-  }
-
-  if (campus.status === "error") {
-    return (
-      <PortalShell
-        active="campus_life"
-        eyebrow="My campus life"
-        title="Find your people"
-        description={`Events, clubs, and communities published for ${tenant.shortName} students.`}
-      >
-        <ErrorState message={campus.error} onRetry={campus.reload} />
-      </PortalShell>
-    );
-  }
-
-  const events = campus.data.events;
-  const activeEvent = events[eventIndex] ?? events[0];
-  const date = activeEvent ? eventDate(activeEvent.startsAt) : null;
-  const activeRegistration = safePortalDestination(
-    activeEvent?.registrationUrl,
-    "/campus-life",
-  );
-  const hasActiveRegistration =
-    Boolean(activeEvent?.registrationUrl) &&
-    activeRegistration.href !== "/campus-life";
-  const activeSource = safePortalDestination(
-    activeEvent?.source?.url,
-    "/campus-life",
-  );
-  const activeImageSource = safePortalDestination(
-    activeEvent?.imageSourceUrl,
-    "/campus-life",
-  );
-
-  const showEvent = (index: number) => {
-    const normalized = (index + events.length) % events.length;
-    setEventIndex(normalized);
-    const event = events[normalized];
-    if (event) {
-      track("ui.campus_event_viewed.v1", {
-        event_id: event.id,
-        surface: "featured_carousel",
-      });
-    }
-  };
-
-  const registerForEvent = async () => {
-    if (!activeEvent || activeEvent.registrationStatus === "registered") return;
-    setRegistrationEventId(activeEvent.id);
+  const register = async (event: CampusEvent) => {
+    if (event.registrationStatus === "registered") return;
+    setRegistrationEventId(event.id);
     try {
-      await registrationAction.run(
-        activeEvent.id,
-        { expectedVersion: activeEvent.version },
-        crypto.randomUUID(),
-      );
+      await registration.run(event.id, { expectedVersion: event.version }, crypto.randomUUID());
       campus.refresh();
     } catch {
-      // The action hook exposes the tenant-safe API message beside the button.
+      // Keep the API's canonical conflict or stale-event message visible.
     }
   };
 
   return (
-    <PortalShell
-      active="campus_life"
-      eyebrow="My campus life"
-      title="Find your people"
-      description={`Events, clubs, and communities published for ${tenant.shortName} students.`}
-    >
-      <section className="campus-overview" aria-label="Campus life overview">
-        <article>
-          <strong>{events.length}</strong>
-          <span>Upcoming experiences</span>
-          <small>Events published for this tenant</small>
-        </article>
-        <article>
-          <strong>{campus.data.clubs.length}</strong>
-          <span>Student organizations</span>
-          <small>Search by interest or community</small>
-        </article>
-        <article>
-          <strong>{new Set(campus.data.clubs.map((club) => club.category)).size}</strong>
-          <span>Interest areas</span>
-          <small>Technology, service, culture, and more</small>
-        </article>
-      </section>
-
-      {activeEvent && date ? (
-        <section
-          className={`campus-carousel campus-carousel--${activeEvent.accent} campus-carousel--theme-${activeEvent.visualTheme ?? "community"}`}
-          data-visual-theme={activeEvent.visualTheme ?? "community"}
-          aria-roledescription="carousel"
-          aria-label="Featured campus events"
-        >
-          <div className="campus-carousel__art" aria-hidden="true">
-            <span>{activeEvent.category}</span>
-            <b>{date.day}</b>
-            <strong>{date.month}</strong>
-          </div>
-          <div className="campus-carousel__content">
-            {activeEvent.imageUrl ? (
-              <img
-                className="campus-carousel__background"
-                src={activeEvent.imageUrl}
-                alt={activeEvent.imageAlt ?? ""}
-              />
-            ) : null}
-            <span className="campus-carousel__backdrop" aria-hidden="true" />
-            <span className="campus-carousel__live">
-              <i aria-hidden="true" /> Live campus calendar
-            </span>
-            <p className="eyebrow">Featured this month · {activeEvent.category}</p>
-            <h2>{activeEvent.title}</h2>
-            <p>{activeEvent.description}</p>
-            {activeEvent.source && activeSource.external ? (
-              <a
-                className="campus-source-link"
-                href={activeSource.href}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {activeEvent.source.dataStatus === "synthetic_preview"
-                  ? "Preview inspired by"
-                  : "Event source"}
-                {" · "}
-                {activeEvent.source.label}
-                <span aria-hidden="true"> ↗</span>
-              </a>
-            ) : null}
-            <div className="campus-carousel__meta">
-              <span>◷ {date.time}</span>
-              <span>⌖ {activeEvent.location}</span>
-              {hasActiveRegistration && activeRegistration.external ? (
-                <a
-                  href={activeRegistration.href}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Registration details ↗
-                </a>
-              ) : hasActiveRegistration ? (
-                <Link href={activeRegistration.href}>Registration details →</Link>
-              ) : null}
-            </div>
-            <div className="campus-event-registration">
-              <button
-                className="button button--primary"
-                type="button"
-                disabled={
-                  activeEvent.registrationStatus === "registered" ||
-                  (registrationAction.status === "loading" &&
-                    registrationEventId === activeEvent.id)
-                }
-                onClick={() => void registerForEvent()}
-              >
-                {activeEvent.registrationStatus === "registered"
-                  ? "Registered"
-                  : registrationAction.status === "loading" &&
-                      registrationEventId === activeEvent.id
-                    ? "Registering..."
-                    : "Register for this event"}
-              </button>
-              <small>
-                {activeEvent.registrationStatus === "registered"
-                  ? "You will be notified if the date, location, or event details change."
-                  : "Registration is saved to your student record."}
-              </small>
-              {registrationAction.status === "error" &&
-              registrationEventId === activeEvent.id ? (
-                <span className="campus-event-registration__stale" role="alert">
-                  <span>{registrationAction.message}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRegistrationEventId(null);
-                      campus.refresh();
-                    }}
-                  >
-                    Refresh current events
-                  </button>
-                </span>
-              ) : null}
-            </div>
-            {activeEvent.imageAttribution ? (
-              activeImageSource.external ? (
-                <a
-                  className="campus-carousel__credit"
-                  href={activeImageSource.href}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {activeEvent.imageAttribution} <span aria-hidden="true">↗</span>
-                </a>
-              ) : (
-                <span className="campus-carousel__credit">
-                  {activeEvent.imageAttribution}
-                </span>
-              )
-            ) : null}
-            <span className="campus-carousel__feature-number" aria-hidden="true">
-              0{eventIndex + 1}
-            </span>
-          </div>
-          <div className="campus-carousel__controls">
-            <button
-              type="button"
-              aria-label="Previous featured event"
-              onClick={() => showEvent(eventIndex - 1)}
-            >
-              ←
-            </button>
-            <span>{eventIndex + 1} / {events.length}</span>
-            <button
-              type="button"
-              aria-label="Next featured event"
-              onClick={() => showEvent(eventIndex + 1)}
-            >
-              →
-            </button>
-          </div>
-          <div className="campus-carousel__dots" aria-label="Choose featured event">
-            {events.map((event, index) => (
-              <button
-                className={index === eventIndex ? "is-active" : undefined}
-                type="button"
-                aria-label={`Show ${event.title}`}
-                aria-current={index === eventIndex ? "true" : undefined}
-                onClick={() => showEvent(index)}
-                key={event.id}
-              />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      <section className="aster-section campus-clubs">
-        <div className="aster-section__heading">
-          <div>
-            <p className="eyebrow">Student organizations</p>
-            <h2>Clubs at {tenant.shortName}</h2>
-          </div>
-          <p>Open a club to see its contact and next activity.</p>
-        </div>
-        <div className="club-directory-tools">
-          <label className="club-search">
-            <span>Search clubs</span>
-            <input
-              value={clubQuery}
-              placeholder="Technology, business, outdoors…"
-              onChange={(event) => setClubQuery(event.target.value)}
-            />
-          </label>
-          <div className="club-category-filters" aria-label="Filter clubs by category">
-            <button
-              className={clubCategory === "all" ? "is-active" : undefined}
-              type="button"
-              aria-pressed={clubCategory === "all"}
-              onClick={() => setClubCategory("all")}
-            >
-              All clubs
-              <span>{campus.data.clubs.length}</span>
-            </button>
-            {clubCategories.map((category) => {
-              const count = campus.data.clubs.filter(
-                (club) => club.category === category,
-              ).length;
-              return (
-                <button
-                  className={clubCategory === category ? "is-active" : undefined}
-                  type="button"
-                  aria-pressed={clubCategory === category}
-                  onClick={() => setClubCategory(category)}
-                  key={category}
-                >
-                  {category}
-                  <span>{count}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div className="club-grid">
-          {filteredClubs.map((club, index) => (
-              <Link
-                className="club-directory-card"
-                href={`/campus-life/clubs/${club.id}`}
-                key={club.id}
-                onClick={() => {
-                  track("ui.club_viewed.v1", {
-                    club_id: club.id,
-                    surface: "club_directory",
-                  });
-                }}
-              >
-                <div className={`club-monogram club-monogram--${index % 4}`}>
-                  <img src={club.imageUrl} alt={club.imageAlt} />
-                </div>
-                <small>{club.category}</small>
-                <h3>{club.name}</h3>
-                <p>{club.description}</p>
-                <div className="club-update">
-                  <span>Latest</span>
-                  <p>{club.latestUpdate}</p>
-                </div>
-                <span className="club-directory-card__action">
-                  Explore club, events & calendar <b aria-hidden="true">→</b>
-                </span>
-              </Link>
-          ))}
-        </div>
-        {filteredClubs.length === 0 ? (
-          <div className="campus-empty-state">
-            <span aria-hidden="true">⌕</span>
-            <div>
-              <strong>No clubs match “{clubQuery}”</strong>
-              <p>
-                Try another interest, organization name, or category.
-                {clubCategory !== "all" ? (
-                  <button type="button" onClick={() => setClubCategory("all")}>
-                    Show all clubs
-                  </button>
-                ) : null}
-              </p>
-            </div>
-          </div>
-        ) : null}
-      </section>
+    <PortalShell active="campus_life" eyebrow="My Campus Life · Published by Aster Student Life" title="Find your people" description={`Events, clubs, and the people who run them, published for ${tenant.shortName} students.`}>
+      {campus.status === "loading" ? <LoadingState label="Loading campus life" /> : campus.status === "error" ? <ErrorState message={campus.error} onRetry={campus.reload} /> : (
+        <>
+          <div className="page-notice"><div className="notice quiet"><span className="notice-mark"><StudentPortalIcon name="campus" size={14} /></span><span className="notice-copy"><strong>{campus.data.events.length} events and {campus.data.clubs.length} clubs are currently published.</strong> Optional campus life never changes your enrollment progress.</span></div></div>
+          <nav className="group-tabs" aria-label="My Campus Life sections"><Link className={!clubsView ? "active" : undefined} href="/campus-life" aria-current={!clubsView ? "page" : undefined}><StudentPortalIcon name="ticket" size={16} /> Events</Link><Link className={clubsView ? "active" : undefined} href="/campus-life?view=clubs" aria-current={clubsView ? "page" : undefined}><StudentPortalIcon name="users" size={16} /> Clubs</Link></nav>
+          <div className="page-body"><div className="page-main">
+            {!clubsView ? <section className="section-card" aria-labelledby="events-heading"><div className="status-heading"><span className="status-icon accent"><StudentPortalIcon name="ticket" size={20} /></span><div><h2 id="events-heading">Events</h2><p>What’s happening</p></div><div className="sort-group"><button className="selected" aria-pressed="true"><StudentPortalIcon name="spark" size={15} /> For you</button><button aria-pressed="false">Everything</button><button aria-pressed="false">Past</button></div></div>{campus.data.events.length ? <div className="card-rows campus-list">{campus.data.events.map((event) => { const date = dateParts(event.startsAt); const pending = registration.status === "loading" && registrationEventId === event.id; return <article className="campus-row" key={event.id}><span className="date-tile" aria-hidden="true"><small>{date.month}</small><strong>{date.day}</strong></span><span className="campus-row-copy"><span className="campus-row-when">{date.time}<i>·</i>{event.location}</span><span className="campus-row-title"><button type="button" className="row-title-button" onClick={() => track("ui.campus_event_viewed.v1", { event_id: event.id, surface: "event_list" })}>{event.title}</button><span className="category-chip">{event.category}</span></span><span className="campus-row-meta"><span>{event.description}</span></span></span><span className="campus-row-actions"><button className="secondary-button" type="button" disabled={pending || event.registrationStatus === "registered"} onClick={() => void register(event)}>{event.registrationStatus === "registered" ? "Registered" : pending ? "Registering…" : "Register"}</button><button className="text-button follow" type="button"><StudentPortalIcon name="spark" size={14} /> Follow</button></span>{registration.status === "error" && registrationEventId === event.id ? <p className="action-feedback" role="alert">{registration.message} <button type="button" onClick={() => campus.refresh()}>Refresh current events</button></p> : null}</article>; })}</div> : <div className="state-card empty"><h3>No events published yet</h3><p>Student Life’s first published event appears here automatically.</p></div>}</section> :
+            <section className="section-card" aria-labelledby="clubs-heading"><div className="status-heading"><span className="status-icon accent"><StudentPortalIcon name="users" size={20} /></span><div><h2 id="clubs-heading">Clubs</h2><p>Who you could join</p></div><span className="result-count">{clubs.length} clubs</span></div><div className="filter-row"><label className="club-search"><span className="sr-only">Search clubs</span><input value={query} placeholder="Technology, business, outdoors…" onChange={(event) => setQuery(event.target.value)} /></label><div className="filter-chips" role="group" aria-label="Filter clubs by category"><button className={category === "all" ? "selected" : ""} aria-pressed={category === "all"} onClick={() => setCategory("all")}>All</button>{categories.map((value) => <button className={category === value ? "selected" : ""} aria-pressed={category === value} onClick={() => setCategory(value)} key={value}>{value}</button>)}</div></div>{clubs.length ? <div className="card-rows campus-list">{clubs.map((club) => <article className="org-row campus-row" key={club.id}><span className="org-tile"><img src={club.imageUrl} alt="" /></span><span className="campus-row-copy"><span className="campus-row-title"><Link href={`/campus-life/clubs/${club.id}`} onClick={() => track("ui.club_viewed.v1", { club_id: club.id, surface: "club_directory" })}>{club.name}</Link><span className="category-chip">{club.category}</span></span><span className="campus-row-meta">{club.description}</span><span className="campus-row-when">Latest · {club.latestUpdate}</span></span><span className="campus-row-actions"><Link className="secondary-button" href={`/campus-life/clubs/${club.id}`}>Open club <StudentPortalIcon name="chevron" size={14} /></Link><Link className="edward-ask" href={`/edward?club=${encodeURIComponent(club.id)}`}><span className="edward-ask-mark">E</span> Ask Edward</Link></span></article>)}</div> : <div className="state-card empty"><h3>No clubs match this view</h3><p>Clear the filters or try another interest.</p></div>}</section>}
+          </div><aside className="page-rail"><div className="anchor-card interests-card"><div className="interests-header"><span className="points-icon large"><StudentPortalIcon name="spark" size={20} /></span><div><span>Your interests</span><strong>Technology · Community · Wellness</strong></div></div><div className="interest-chips"><span>Technology</span><span>Community</span><span>Wellness</span></div><p>These are presentational until the platform exposes student interest preferences. They do not change progress or points.</p><Link className="learn-link" href="/profile">Change them in your profile <StudentPortalIcon name="chevron" size={14} /></Link></div><div className="provenance-card"><span className="panel-label">Where this comes from</span><p><strong>Student Life</strong> publishes every event and club shown here. Cancelled or retired content disappears on the next canonical read.</p><Link className="edward-ask" href="/edward"><span className="edward-ask-mark">E</span> Ask Student Life</Link></div></aside></div>
+        </>
+      )}
     </PortalShell>
   );
 }

@@ -403,7 +403,7 @@ export function StudentDashboardPage() {
                   item={item}
                   pointName={tenant.shortName}
                   canOpen={canRead("enrollment")}
-                  key={item.id}
+                  key={item.id || `${item.code}-${item.title}`}
                 />
               ))}
               {actionDocuments
@@ -412,7 +412,7 @@ export function StudentDashboardPage() {
                   <DashboardProgressDocument
                     document={document}
                     canOpen={canRead(dashboardDocumentScope(document))}
-                    key={document.id}
+                    key={document.id || `${document.code}-${document.title}`}
                   />
                 ))}
             </ul>

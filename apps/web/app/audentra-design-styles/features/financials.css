@@ -1,0 +1,1108 @@
+/* ==========================================================================
+ * My Financials — ENR-166.
+ * ==========================================================================*/
+
+/* ── My Financials — ENR-166 ─────────────────────────────────────────────────
+   Semantic colour rule this screen forces, kept in one place:
+     estimate  = muted on canvas  (not settled, but nobody has to act)
+     pending   = amber            (someone still has to act)
+     covered   = green            (Aster has it)
+     escalated = crimson          (a deadline is close, or a panel failed)
+   An estimate is deliberately not amber.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* The escalation strip — ENR-160 AC 6, at the top and again on the row. */
+/* The money figure carries a chip beside it, so it is a row. Its size comes
+   from `.summary-figure.money`, with the rest of the scale. */
+.balance-figure {
+  align-items: center;
+  gap: var(--space-5);
+  display: flex;
+}
+
+.summary-figure.money .balance-figure.unknown {
+  color: var(--muted);
+  font-size: var(--fs-display);
+}
+
+.estimate-chip {
+  color: var(--muted);
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-4);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  display: inline-flex;
+}
+
+.estimate-chip.small {
+  font-size: var(--fs-small);
+  padding: var(--space-1) var(--space-3);
+}
+
+.balance-mini {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-row);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-7);
+  margin: 0 0 var(--space-9);
+  padding: var(--space-7) var(--space-9);
+  display: flex;
+}
+
+.balance-mini .panel-label {
+  flex: 1 0 100%;
+}
+
+.balance-mini strong {
+  letter-spacing: var(--ls-tight);
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--fs-display);
+  display: flex;
+}
+
+.balance-mini-year {
+  color: var(--muted);
+  flex: 1;
+  font-size: var(--fs-meta);
+}
+
+/* Coverage as a stacked bar: a ring cannot draw a segment of unknown size. */
+.coverage {
+  margin-bottom: var(--space-9);
+}
+
+.coverage-bar {
+  background: var(--canvas);
+  border-radius: var(--radius-pill);
+  gap: var(--space-1);
+  height: 12px;
+  display: flex;
+  overflow: hidden;
+}
+
+.coverage-segment {
+  border-radius: var(--radius-pill);
+  min-width: 3px;
+}
+
+.coverage-segment.aid, .coverage-key.aid {
+  background: var(--green);
+}
+
+.coverage-segment.paid, .coverage-key.paid {
+  background: var(--purple);
+}
+
+.coverage-segment.open, .coverage-key.open {
+  background: var(--line-strong);
+}
+
+.coverage-segment.open.pending, .coverage-key.open.pending {
+  background: repeating-linear-gradient(-45deg, var(--line-strong) 0 5px, var(--canvas) 5px 10px);
+}
+
+.coverage-legend {
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-10);
+  margin: var(--space-6) 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+}
+
+.coverage-legend li {
+  align-items: center;
+  gap: var(--space-4);
+  display: flex;
+}
+
+.coverage-key {
+  border-radius: var(--radius-xs);
+  flex: none;
+  width: 11px;
+  height: 11px;
+  display: block;
+}
+
+.coverage-legend span {
+  color: var(--muted);
+  flex-direction: column;
+  font-size: var(--fs-small);
+  display: flex;
+}
+
+.coverage-legend strong {
+  color: var(--ink);
+  font-family: var(--font-geist-mono);
+  font-size: var(--fs-display);
+  font-weight: var(--fw-bold);
+}
+
+/* The ledger is a table so a screen reader pairs label with amount. */
+.ledger {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.ledger th {
+  text-align: left;
+  font-weight: inherit;
+}
+
+.ledger-group th, .ledger-total th {
+  color: var(--ink);
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) 0 var(--space-4);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-bold);
+  display: flex;
+}
+
+.ledger-group td, .ledger-total td {
+  padding: var(--space-6) 0 var(--space-4);
+}
+
+.ledger-group.soft th, .ledger-group.soft td {
+  color: var(--muted);
+  font-weight: var(--fw-semi);
+}
+
+.ledger-sub th {
+  color: var(--muted);
+  padding: var(--space-2) 0 var(--space-2) var(--space-7);
+  font-size: var(--fs-copy);
+}
+
+.ledger-sub td {
+  padding: var(--space-2) 0;
+}
+
+.ledger-sub th small {
+  color: var(--muted);
+  margin-top: var(--space-1);
+  font-size: var(--fs-small);
+  line-height: var(--lh-heading);
+  display: block;
+}
+
+.ledger-sub.split th {
+  padding-left: var(--space-7);
+}
+
+.ledger-sub.split th, .ledger-sub.split td {
+  color: var(--muted);
+  padding-top: var(--space-1);
+  padding-bottom: var(--space-1);
+}
+
+.ledger-amount {
+  color: var(--ink);
+  text-align: right;
+  white-space: nowrap;
+  font-family: var(--font-geist-mono);
+  font-size: var(--fs-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.ledger-sub .ledger-amount {
+  color: var(--muted);
+  font-size: var(--fs-copy);
+}
+
+.ledger-group .ledger-amount, .ledger-total .ledger-amount {
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-semi);
+}
+
+.ledger-amount.credit {
+  color: var(--green);
+}
+
+.ledger-amount.soft {
+  color: var(--muted);
+  font-weight: var(--fw-semi);
+}
+
+/* Pending keeps a row, a reason and the word — never a zero. */
+.ledger-amount.pending, .ledger-sub .ledger-amount.pending {
+  color: var(--amber);
+  font-weight: var(--fw-bold);
+}
+
+.pending-row th {
+  color: var(--ink);
+}
+
+.ledger-total {
+  border-top: 1.5px solid var(--line);
+}
+
+/* The total's label is the ledger's lead line — the section step, like every
+   row title in the column; 13.5px is the navigation step and appears on no
+   content (the sweep of 2026-08-22, 9.4). */
+.ledger-total th {
+  font-size: var(--fs-h2);
+}
+
+.ledger-link {
+  color: var(--purple-dark);
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-bold);
+  text-decoration: none;
+  display: inline-flex;
+}
+
+.ledger-link:hover {
+  text-decoration: underline;
+}
+
+.ledger-hint {
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+.ledger-foot {
+  color: var(--muted);
+  background: var(--canvas);
+  border-radius: var(--radius-tile);
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin: var(--space-9) 0 0;
+  padding: var(--space-6) var(--space-7);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.ledger-foot svg {
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+.aid-status {
+  border-radius: var(--radius-pill);
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-4);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  display: inline-flex;
+}
+
+.aid-status:before {
+  border-radius: var(--radius-round);
+  width: 5px;
+  height: 5px;
+  content: "";
+}
+
+.aid-status.accepted {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.aid-status.accepted:before {
+  background: var(--green);
+}
+
+.aid-status.pending {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.aid-status.pending:before {
+  background: var(--amber);
+}
+
+.aid-status.offered {
+  color: var(--purple-dark);
+  background: var(--purple-soft);
+}
+
+.aid-status.offered:before {
+  background: var(--purple);
+}
+
+/* Documents that need you — the same tasks the checklist renders. */
+.status-icon.docs {
+  color: var(--purple-dark);
+}
+
+.doc-list {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-row);
+  overflow: hidden;
+}
+
+.doc-task {
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
+}
+
+.doc-task + .doc-task {
+  border-top: 1px solid var(--line);
+}
+
+.doc-meta {
+  color: var(--muted);
+  margin: var(--space-1) 0 0;
+  font-size: var(--fs-meta);
+}
+
+.doc-consequence {
+  color: var(--amber);
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-3) 0 0;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-semi);
+  display: flex;
+}
+
+.doc-action {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-4);
+  display: flex;
+}
+
+.deadline-chip {
+  color: var(--muted);
+  background: var(--canvas);
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-bold);
+  white-space: nowrap;
+}
+
+.deadline-chip.soon {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.deadline-chip.urgent {
+  color: var(--crimson);
+  background: color-mix(in srgb, var(--crimson) 9%, var(--surface));
+}
+
+/* Payment schedule — one list, the mark carries status. */
+.plan-row {
+  background: var(--canvas);
+  border-radius: var(--radius-row);
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-6);
+  margin-bottom: var(--space-8);
+  padding: var(--space-7) var(--space-8);
+  display: flex;
+}
+
+.plan-row strong {
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--fs-body);
+  display: flex;
+}
+
+.plan-row span {
+  color: var(--muted);
+  margin-top: var(--space-1);
+  font-size: var(--fs-meta);
+  display: block;
+}
+
+.installment-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.installment-row {
+  border-top: 1px solid var(--line);
+  grid-template-columns: 24px 62px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-1);
+  display: grid;
+}
+
+.installment-row:first-child {
+  border-top: 0;
+}
+
+.installment-mark {
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-round);
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  display: grid;
+}
+
+.installment-row.received .installment-mark {
+  color: var(--green);
+  border-color: transparent;
+  background: var(--green-soft);
+}
+
+.installment-row.due .installment-mark {
+  color: var(--purple-dark);
+  border-color: color-mix(in srgb, var(--purple) 45%, var(--surface));
+  background: var(--purple-soft);
+}
+
+.installment-date {
+  color: var(--muted);
+  font-family: var(--font-geist-mono);
+  font-size: var(--fs-meta);
+}
+
+.installment-label {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semi);
+}
+
+.installment-status {
+  color: var(--muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+}
+
+.installment-row.due .installment-status {
+  color: var(--purple-dark);
+}
+
+.installment-row.received .installment-status {
+  color: var(--green);
+}
+
+.installment-amount {
+  text-align: right;
+  font-family: var(--font-geist-mono);
+  font-size: var(--fs-body);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-semi);
+}
+
+/* Academic progress — every row reports, none judges. */
+.preview-intro {
+  color: var(--muted);
+  max-width: 62ch;
+  margin: 0 0 var(--space-5);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.preview-check {
+  color: var(--ink);
+  background: var(--canvas);
+  border-radius: var(--radius-chip);
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-9);
+  padding: var(--space-4) var(--space-6);
+  font-size: var(--fs-copy);
+  font-weight: var(--fw-semi);
+  display: inline-flex;
+}
+
+.metric-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.metric-row + .metric-row {
+  border-top: 1px solid var(--line);
+  margin-top: var(--space-8);
+  padding-top: var(--space-8);
+}
+
+.metric-head {
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-5);
+  margin-bottom: var(--space-4);
+  display: flex;
+}
+
+.metric-label {
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semi);
+  display: flex;
+}
+
+.metric-chip {
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-4);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.metric-chip.idle {
+  color: var(--muted);
+  background: var(--canvas);
+}
+
+.metric-chip.ok {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+/* "Below the minimum today" is a reading, not a verdict — amber, never crimson. */
+.metric-chip.watch {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.metric-bar {
+  background: var(--canvas);
+  border-radius: var(--radius-pill);
+  height: 8px;
+  overflow: hidden;
+}
+
+.metric-bar span {
+  background: linear-gradient(90deg, var(--purple), var(--purple-dark));
+  border-radius: var(--radius-pill);
+  height: 100%;
+  display: block;
+}
+
+.metric-bar.idle {
+  background: repeating-linear-gradient(-45deg, var(--line) 0 4px, var(--canvas) 4px 8px);
+}
+
+.metric-scale {
+  color: var(--muted);
+  justify-content: space-between;
+  margin-top: var(--space-3);
+  font-size: var(--fs-small);
+  display: flex;
+}
+
+.metric-scale span:first-child {
+  color: var(--ink);
+  font-family: var(--font-geist-mono);
+  font-weight: var(--fw-semi);
+}
+
+.preview-disclaimer {
+  color: var(--muted);
+  background: var(--purple-soft);
+  border-radius: var(--radius-tile);
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin: var(--space-9) 0 0;
+  padding: var(--space-6) var(--space-7);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.preview-disclaimer svg {
+  color: var(--purple-dark);
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+.progress-preview .learn-link {
+  margin-top: var(--space-7);
+}
+
+/* Rail — the dark number on top, the offer below, as on My Enrollment. */
+.next-payment-figure {
+  letter-spacing: var(--ls-tight);
+  margin: var(--space-3) 0 var(--space-1);
+  font-family: var(--font-geist-mono);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-bold);
+  display: block;
+}
+
+.next-payment-meta {
+  color: var(--on-ink-muted);
+  margin: 0 0 var(--space-7);
+  font-size: var(--fs-meta);
+}
+
+.payment-track {
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+  display: flex;
+}
+
+.payment-track li {
+  background: #ffffff26;
+  border-radius: var(--radius-pill);
+  flex: 1;
+  height: 6px;
+}
+
+.payment-track li.done {
+  background: #7ee0b8;
+}
+
+.payment-track li.next {
+  background: #b9aaff;
+}
+
+.payment-track-label {
+  color: var(--on-ink-muted);
+  margin: 0 0 var(--space-7);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semi);
+}
+
+.next-payment-card .primary-button {
+  background: var(--surface);
+  color: var(--purple-deep);
+}
+
+.next-payment-card .primary-button:hover {
+  background: var(--purple-soft);
+}
+
+.next-payment-note {
+  color: var(--on-ink-muted);
+  margin: var(--space-6) 0 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+}
+
+.aid-opportunity-card {
+  border: 1px solid var(--purple-line);
+  background: linear-gradient(145deg, var(--surface), var(--card-zone));
+  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-card);
+  padding: var(--space-9);
+}
+
+.aid-opportunity-top {
+  justify-content: space-between;
+  align-items: center;
+  display: flex;
+}
+
+.aid-opportunity-card h3 {
+  letter-spacing: var(--ls-snug);
+  margin: var(--space-7) 0 var(--space-3);
+  font-size: var(--fs-h2);
+  line-height: var(--lh-heading);
+  font-weight: var(--fw-regular);
+}
+
+.aid-opportunity-card > p {
+  color: var(--muted);
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+}
+
+.aid-opportunity-list {
+  margin: var(--space-6) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.aid-opportunity-list li {
+  border-top: 1px solid var(--purple-tint);
+  padding: var(--space-4) 0;
+}
+
+.aid-opportunity-list strong {
+  font-size: var(--fs-copy);
+  display: block;
+}
+
+.aid-opportunity-list span {
+  color: var(--muted);
+  margin-top: var(--space-1);
+  font-size: var(--fs-small);
+  display: block;
+}
+
+.opportunity-section {
+  max-width: 420px;
+  margin-bottom: var(--space-9);
+}
+
+/* Aid by source. */
+.aid-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.aid-row {
+  border-top: 1px solid var(--line);
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-4) var(--space-7);
+  padding: var(--space-7) var(--space-1);
+  display: grid;
+}
+
+.aid-row:first-child {
+  border-top: 0;
+}
+
+.aid-row-main strong {
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--fs-h2);
+  display: flex;
+  font-weight: var(--fw-regular);
+}
+
+.aid-source {
+  color: var(--muted);
+  margin-top: var(--space-1);
+  font-size: var(--fs-meta);
+  display: block;
+}
+
+.aid-kind {
+  color: var(--muted);
+  margin-top: var(--space-1);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semi);
+  display: block;
+}
+
+.aid-amount {
+  color: var(--green);
+  text-align: right;
+  white-space: nowrap;
+  font-family: var(--font-geist-mono);
+  font-size: var(--fs-h2);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-semi);
+}
+
+.aid-amount.pending {
+  color: var(--amber);
+  font-size: var(--fs-body);
+}
+
+.aid-blocked {
+  color: var(--muted);
+  background: var(--amber-soft);
+  border-radius: var(--radius-chip);
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-1) 0 0;
+  padding: var(--space-4) var(--space-6);
+  font-size: var(--fs-meta);
+  display: flex;
+}
+
+.aid-blocked svg {
+  color: var(--amber);
+  flex: none;
+}
+
+.aid-blocked .text-button {
+  margin-left: auto;
+}
+
+.aid-total {
+  border-top: 1.5px solid var(--line);
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--space-2);
+  padding-top: var(--space-7);
+  display: flex;
+}
+
+.aid-total span {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semi);
+}
+
+.aid-total strong {
+  font-family: var(--font-geist-mono);
+  font-size: var(--fs-h2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* What is a bill and what is not. */
+.split-grid {
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+  display: grid;
+}
+
+.split-cell {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-row);
+  padding: var(--space-7);
+}
+
+.split-cell.billed {
+  border-color: color-mix(in srgb, var(--purple) 28%, var(--line));
+  background: var(--purple-soft);
+}
+
+.split-cell.elsewhere {
+  background: var(--canvas);
+}
+
+.split-cell strong {
+  letter-spacing: var(--ls-tight);
+  margin: var(--space-3) 0 var(--space-3);
+  font-family: var(--font-geist-mono);
+  font-size: var(--fs-display);
+  display: block;
+}
+
+.split-cell p {
+  color: var(--muted);
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+}
+
+.pay-cta {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-row);
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-7);
+  margin-bottom: var(--space-9);
+  padding: var(--space-8) var(--space-9);
+  display: flex;
+}
+
+.pay-cta strong {
+  font-size: var(--fs-h4);
+  display: block;
+}
+
+.pay-cta span {
+  color: var(--muted);
+  margin-top: var(--space-1);
+  font-size: var(--fs-meta);
+  display: block;
+}
+
+.modal-kicker.progress {
+  color: var(--purple-dark);
+  background: var(--purple-soft);
+}
+
+@media (width<=1060px) {
+  .opportunity-section {
+    max-width: none;
+  }
+}
+
+@media (width<=820px) {
+  .balance-figure {
+    font-size: var(--fs-display);
+  }
+  .doc-task {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+  .doc-action {
+    flex-direction: row;
+    grid-column: 2;
+    align-items: center;
+    justify-content: flex-start;
+  }
+  .installment-row {
+    grid-template-columns: 24px 58px minmax(0, 1fr) auto;
+  }
+  .installment-status {
+    display: none;
+  }
+}
+
+@media (width<=620px) {
+  /* Bleeds exactly to the column's edge: the outdent must equal `.content-wrap`'s
+     side padding at this width, or the row is wider than the page — it was 13
+     against 12, and the page scrolled sideways by 2px. */
+  .group-tabs {
+    margin-inline: calc(-1 * var(--space-6));
+    padding-inline: var(--space-6);
+  }
+  .summary-figure.money .summary-figure-copy strong {
+    font-size: var(--fs-display);
+  }
+  .ledger-group th, .ledger-total th {
+    font-size: var(--fs-copy);
+  }
+  .ledger-group .ledger-amount, .ledger-total .ledger-amount {
+    font-size: var(--fs-body);
+  }
+  .coverage-legend {
+    gap: var(--space-4) var(--space-8);
+  }
+  .aid-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .aid-row .aid-status {
+    grid-row: 2;
+    grid-column: 1;
+    justify-self: start;
+  }
+  .aid-blocked .text-button {
+    margin-left: 0;
+  }
+  .split-grid {
+    grid-template-columns: 1fr;
+  }
+  .installment-row {
+    grid-template-columns: 22px 52px minmax(0, 1fr) auto;
+    gap: var(--space-4);
+  }
+  .installment-label {
+    font-size: var(--fs-copy);
+  }
+  .pay-cta .primary-button {
+    flex: 1 0 100%;
+    justify-content: center;
+  }
+}
+
+.program-card .program-pending {
+  color: var(--muted);
+  margin: var(--space-4) 0 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+/* ── UX writing 2026-08-21: a term glossed in the same sentence, as a caption under the
+   row title or as a muted continuation of the label (UX writing §4). ── */
+.ledger-group th small,
+.aid-gloss {
+  color: var(--muted);
+  margin-top: var(--space-1);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-heading);
+  display: block;
+}
+.metric-gloss {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-regular);
+}
+
+/* --- the review of 2026-08-21 ----------------------------------------------- */
+
+/* F12: a row with a due date is something she can act on, and it takes the
+   actionable row's title — the same as a task on the checklist — not the
+   demoted tier the reviewing rows use. */
+.doc-task .compact-copy h3 {
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-regular);
+}
+
+/* F8: the two lines that follow her housing plan are marked the way an estimate
+   is marked — the same chip, a different word. */
+.estimate-chip.conditional {
+  color: var(--amber-ink);
+  background: var(--amber-soft);
+  border-color: var(--amber-line);
+}
+
+/* F6: before the first check the three rules are three lines, not three rows
+   of dashes in a table shaped like a report. */
+.rule-list {
+  color: var(--ink);
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: var(--space-7) 0 0;
+  padding: 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  list-style: none;
+  display: flex;
+}
+
+.rule-list li {
+  align-items: center;
+  gap: var(--space-3);
+  display: flex;
+}
+
+.rule-list svg {
+  color: var(--green);
+  flex: none;
+}
+/* Production-only payment-plan and SAP adapters. Their data and mutations are
+   canonical; these overrides remove the legacy serif/Hanken type island. */
+.aster-shell .payment-plan-grid article > strong,
+.aster-shell .payment-plan-grid article > strong small,
+.aster-shell .sap-card h2,
+.aster-shell .sap-metrics strong {
+  font-family: var(--font-geist-sans);
+}
+
+.aster-shell .payment-plan-grid article > strong,
+.aster-shell .sap-metrics strong {
+  letter-spacing: var(--ls-tight);
+  font-size: var(--fs-display);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+}
+
+.aster-shell .payment-plan-grid article > strong small,
+.aster-shell .payment-plan-grid article > span,
+.aster-shell .payment-plan-grid p,
+.aster-shell .sap-metrics :is(span, small) {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+}
+
+.aster-shell .sap-card {
+  gap: var(--space-10);
+  margin-top: 0 !important;
+  padding: var(--panel-pad);
+  border-radius: var(--radius-card);
+  background: var(--green-soft);
+}
+
+.aster-shell .sap-card h2 {
+  letter-spacing: var(--ls-snug);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-semi);
+  line-height: var(--lh-heading);
+}

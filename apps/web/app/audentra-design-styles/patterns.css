@@ -1,0 +1,4391 @@
+/* ==========================================================================
+ * The shared vocabulary: the page shell and its bands, the summary panel and
+ * the advisor, the card and its three zones, the rows inside it, the anchor
+ * card, the buttons, the chips, the overlays.
+ *
+ * It used to hold My Enrollment as well. That section was built first and every
+ * shared shape in the product was lifted out of it in place, so the two lived
+ * interleaved here rule by rule — a run of shared, a run of enrollment, sixty
+ * runs deep. They are separated now, into `features/enrollment.css`, and what
+ * decided which rule went where was not the name but who renders it: a rule
+ * moved only when every jsx file mentioning every class in its selector lived
+ * under one feature. Anything the design system, the shell, or two features
+ * touch stayed here.
+ *
+ * What that cost, and it is worth knowing before the next such move: at equal
+ * specificity the cascade is decided by position, so a rule that had been
+ * quietly losing for years started winning the moment it changed file. Two did.
+ * `.task-card` took back the border, radius and shadow that `.card-rows` is
+ * supposed to strip from a row, and `.locked-task` drew a tint that had never
+ * once appeared. Neither would have failed a build. Both were found by
+ * capturing the computed style of every element on every route before and
+ * after and diffing the two — which is the only way to move CSS and be able to
+ * say nothing moved.
+ * ==========================================================================*/
+
+.page-hero {
+  color: var(--on-ink);
+  isolation: isolate;
+  background: linear-gradient(118deg,var(--ink) 0%,var(--purple-deep) 56%,var(--purple-ink) 100%);
+  border-radius: var(--radius-panel);
+  align-items: center;
+  /* One height on every route. A section whose lede runs to two lines used to
+     make its own band taller than the next section's, so moving between them
+     shifted everything below by the difference — Jam of 2026-08-21. */
+  min-height: var(--hero-min);
+  padding: 32px calc(var(--panel-pad) + var(--band-outdent));
+  display: flex;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 18px 44px #1e20432b;
+  margin: 0 calc(-1 * var(--band-outdent)) var(--hero-gap);
+}
+
+.page-hero:before {
+  content: "";
+  z-index: -1;
+  background: radial-gradient(circle,#9f8bff61,#0000 65%);
+  border-radius: var(--radius-round);
+  width: 430px;
+  height: 430px;
+  position: absolute;
+  inset: auto -7% -105% auto;
+}
+
+.hero-copy {
+  max-width: 660px;
+}
+
+.eyebrow {
+  color: var(--purple-line);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  margin: 0 0 var(--space-6);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+}
+
+.page-hero .eyebrow {
+  font-family: var(--font-geist-mono);
+  letter-spacing: var(--ls-wide);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+}
+
+.eyebrow span {
+  color: var(--green-line);
+}
+
+.eyebrow.muted {
+  color: var(--faint);
+  margin-bottom: var(--space-3);
+}
+
+.page-hero h1 {
+  letter-spacing: var(--ls-hero);
+  text-wrap: balance;
+  margin: 0;
+  font-size: var(--fs-hero);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+}
+
+/* The lede. It is not padded to a fixed number of lines: `--hero-min` holds the
+   band itself at one height on every route, the copy is centred in it, and a
+   section with one line's worth to say says one line. Reserving the second line
+   inside the copy put a blank line under every short lede — standardising the
+   frame is the point, filling it is not (Jam of 2026-08-21).
+
+   A lede that needs three lines is still too long, and `navigation.js` is where
+   that gets shortened rather than here.
+
+   `pretty` keeps the last line from orphaning a word — "…can change / it." */
+.hero-lede {
+  color: var(--line-strong);
+  text-wrap: pretty;
+  max-width: 620px;
+  margin: var(--space-6) 0 0;
+  font-size: var(--fs-h4);
+  line-height: var(--lh-body);
+}
+
+/* The section's own icon, held in the band's right edge. It is the section's
+   mark, not decoration: My Financials shows a wallet, My Documents a file. */
+.hero-motif {
+  width: 148px;
+  height: 148px;
+  position: absolute;
+  top: 12px;
+  right: 40px;
+}
+
+.orbit-ring {
+  border: 1px solid var(--on-ink-line);
+  border-radius: var(--radius-round);
+  position: absolute;
+  inset: 20px;
+}
+
+.orbit-ring.ring-two {
+  opacity: .55;
+  border-style: dashed;
+  inset: 0;
+  transform: rotate(12deg);
+}
+
+.orbit-core {
+  color: var(--purple-deep);
+  background: linear-gradient(145deg,var(--purple-tint),#9f8bff);
+  border-radius: var(--radius-round);
+  place-items: center;
+  display: grid;
+  position: absolute;
+  inset: 54px;
+  box-shadow: 0 12px 28px #0d0c2357,inset 0 1px #fffc;
+}
+
+.spark-dot {
+  background: var(--green-line);
+  border-radius: var(--radius-round);
+  width: 8px;
+  height: 8px;
+  position: absolute;
+  box-shadow: 0 0 18px var(--green-line);
+}
+
+.spark-dot.one {
+  top: 22px;
+  right: 32px;
+}
+
+.spark-dot.two {
+  width: 5px;
+  height: 5px;
+  bottom: 27px;
+  left: 25px;
+}
+
+.spark-dot.three {
+  background: #f3c995;
+  top: 76px;
+  left: 2px;
+}
+
+/* The section's one figure, and beside it the person who owns the subject. It
+   sits flush with everything else on the page by default; the tuck below is the
+   only place the inset and the overlap are correct. */
+.page-summary {
+  z-index: 2;
+  box-shadow: var(--shadow-soft);
+  background: #fffffff7;
+  border: 1px solid #e2e2ebe6;
+  border-radius: var(--radius-card);
+  container: page-summary / inline-size;
+  flex-direction: column;
+  margin: 0 0 var(--hero-gap);
+  display: flex;
+  position: relative;
+}
+
+/* Two cells, and it is a grid rather than a wrapping flex on purpose.
+ *
+ * As a flex row with `justify-content: space-between` it held together only
+ * while both cells fit. Below about 1200px they wrapped, and because neither
+ * cell was ever told to fill the row the advisor came to rest as a 576px box
+ * with 150px of dead space beside it, while on three of the five sections the
+ * figure stretched the full width above it. Two cells, two different answers
+ * to the same wrap.
+ *
+ * A grid cannot do that: two columns while there is room, one full-width
+ * column each when there is not, and `minmax(0, …)` on both so a long figure
+ * shrinks instead of pushing the panel open. */
+.summary-main {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+  align-items: stretch;
+  gap: var(--space-8) var(--space-11);
+  /* Same rule as the band, and measured on this cell alone: the panel's foot
+     is a notice, which is there on some sections and not on others, so folding
+     it into the minimum would make the sections that have one *shorter* than
+     the sections that do not.
+   *
+     With the label, the figure's line and the two reserved copy lines all fixed
+     above, the four sections that carry a panel come to this height by
+     construction. It stays a floor rather than a `height` so that a container
+     query narrowing the grid to one column can still stack the two cells. */
+  min-height: var(--panel-min);
+  padding: var(--space-9) var(--panel-pad);
+  display: grid;
+}
+
+/* Measured on the panel, not the window: on the sections that carry a rail the
+   panel is already narrow at a wide window, and the window cannot tell. */
+@container page-summary (width < 880px) {
+  .summary-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* --- the notice, and the four zones it docks into ---------------------------
+ *
+ * A sentence the section has to say. It has no shape of its own — no border, no
+ * radius, no shadow, no margin — and takes all four from whichever zone it is
+ * docked into. `Notice.jsx` has the reasoning; this is the drawing.
+ *
+ * That is the whole fix for the band the Jam of 2026-08-21 circled. The band
+ * was not too loud, and it was not the wrong amber: it was a card on the canvas
+ * holding one sentence, and a card on the canvas is a thing in its own right. A
+ * footnote is not a thing in its own right, so it stops being drawn as one.
+ *
+ * `--notice-wash` and `--notice-ink` are the tone; the zone decides whether the
+ * wash is spent. Written the other way round — a background on `.notice.soon` —
+ * the line above the tab row came out as an amber band again, which is the
+ * thing this is here to stop.
+ */
+.notice {
+  /* The mark's own width, published so the wrapped action can line up under the
+     sentence rather than under the icon. `Notice.jsx` draws it at this size. */
+  --notice-mark: 16px;
+  color: var(--muted);
+  background: var(--notice-wash, none);
+  align-items: baseline;
+  gap: var(--space-5);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+/* Bare, and never the 34px disc `.alert-strip` used. A mark sized to be a shape
+   sets the height of everything beside it: that disc is why one 18px line of
+   type cost a 62px strip. */
+.notice-mark {
+  color: var(--notice-ink, var(--muted));
+  flex: none;
+  align-self: flex-start;
+  /* A 16px glyph rides in a 24px box; this drops it onto the first baseline
+     rather than floating it above the line. */
+  margin-top: 1px;
+}
+
+.notice-copy {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+/* What happened, then why it matters — one sentence, two weights. `.alert-strip`
+   set the lead as `display: block` at full ink, so every notice was two lines
+   whether or not it had two lines' worth to say, and both of them shouted. */
+.notice-copy strong {
+  color: var(--ink);
+  font-weight: var(--fw-semi);
+}
+
+.notice-title:after {
+  content: " · ";
+  color: var(--ink-300);
+  font-weight: var(--fw-regular);
+}
+
+/* The exception inside the sentence — *verification couldn't be checked just
+   now*, *one requirement's credits haven't synced*. Colour is spent once, here,
+   and it is amber wherever the notice's own tone sits, because the clause is
+   the part of the line that is not settled. */
+.notice-copy em {
+  color: var(--amber);
+  font-style: normal;
+}
+
+/* One way to act, in the notice's own ink, and it is the end of the sentence
+   rather than a control beside it. `.alert-strip` closed with a filled
+   `secondary-button` that competed for the same click as the row it pointed at
+   — two purple buttons, one of them a shortcut to the other. */
+.notice-action {
+  color: var(--notice-ink, var(--purple));
+  flex: none;
+  align-self: center;
+  font-weight: var(--fw-semi);
+}
+
+/* The tones. `urgent` and `soon` are `escalation()`'s two levels, so a deadline
+   arrives here already carrying one. `working` is Aster holding something and
+   `quiet` is everything true but not hers to act on — neither is given a colour
+   that asks her to act, because she cannot. */
+.notice.urgent {
+  --notice-ink: var(--crimson);
+  --notice-wash: var(--crimson-soft);
+}
+
+.notice.soon {
+  --notice-ink: var(--amber);
+  --notice-wash: var(--amber-soft);
+}
+
+.notice.working {
+  --notice-ink: var(--purple);
+  --notice-wash: var(--purple-wash);
+}
+
+.notice.quiet {
+  --notice-ink: var(--muted);
+  --notice-wash: var(--canvas);
+}
+
+/* Something is settled. Rare on purpose — a gate that is open is not news, and
+   this product does not draw a green bar to say nothing is wrong. It earns its
+   place only where the sentence is the outcome of a step the student just took,
+   which is the onboarding frame and nowhere else so far. */
+.notice.done {
+  --notice-ink: var(--green);
+  --notice-wash: var(--green-wash);
+}
+
+/* --- zone: the panel's foot ------------------------------------------------
+ *
+ * An escalation is a footnote to the figure above it, not another band in the
+ * stack: the balance says "estimate — this will go down", and this is the one
+ * thing that would settle it. Attached, it cannot be scrolled past separately
+ * from the number it qualifies — ENR-160 AC 6. Every section but My Campus Life
+ * opens with this panel, so this is where a page-wide notice lands by default,
+ * and it costs the page no height of its own at all.
+ *
+ * The panel used to clip, which is all this needed. It stopped clipping when
+ * the advisor's tooltip started hanging below its button, so the one child that
+ * meets the panel's bottom edge takes the corners itself. */
+.summary-alert {
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+  overflow: hidden;
+}
+
+/* The zone owns the inset, because the panel's padding is the panel's fact and
+   a notice cannot know it — the same reason `.card-rows` reads `--card-pad`. */
+.summary-alert .notice {
+  padding: var(--space-6) var(--panel-pad);
+}
+
+/* --- zone: a card's head ---------------------------------------------------
+ *
+ * One list, not the whole section. It goes under that list's heading and above
+ * its rows, inside the card, run out to the card's edges the way `.card-rows`
+ * runs out to them — Vercel's read-only strip over its chart, Sentry's amber
+ * line over the list of organisations it is about. Docked there it cannot be
+ * read as belonging to anything but the rows under it, which is exactly what a
+ * band floating above the card could not say. */
+.section-card > .notice {
+  border-bottom: 1px solid var(--line);
+  margin: calc(-1 * var(--card-pad)) calc(-1 * var(--card-pad)) var(--card-pad);
+  padding: var(--space-6) var(--card-pad);
+}
+
+/* Under a heading it is the second band of the head, so it keeps square top
+   corners and the heading's hairline separates them. First, it is the head. */
+.section-card > .notice:first-child {
+  border-radius: calc(var(--card-radius) - 1px) calc(var(--card-radius) - 1px) 0 0;
+}
+
+/* --- zone: a card's foot ---------------------------------------------------
+ *
+ * Provenance, and anything else read after the content rather than before it:
+ * which catalogue a record comes from, who holds the official copy. `.card-foot`
+ * already draws the band; the notice only stops adding a second one. */
+.card-foot .notice {
+  background: none;
+  padding: 0;
+}
+
+/* The tuck is a fact about these two being adjacent, not a property of the
+   panel. Written on the panel it followed it everywhere: on My Financials the
+   panel tucked under the escalation strip and sat on top of it — the defect the
+   Jam of 2026-08-20 circled. `PageShell` renders the summary directly after the
+   hero, so this selector matches exactly when the overlap is meant. */
+.page-hero + .page-summary {
+  margin: calc(-1 * (var(--hero-gap) + var(--hero-tuck))) 0 var(--hero-gap);
+}
+
+/* --- zone: a host with no head and no foot ---------------------------------
+ *
+ * A drawer, Edward's thread. There is no card here
+ * to be the head or the foot of — the drawer *is* the card — so the notice sits
+ * in the content flow and takes `--radius-row`, which is the token for a block
+ * nested inside a card. That is still a zone of its host and not a card on the
+ * canvas, which is the distinction the whole pattern turns on.
+ *
+ * It is the one zone that publishes a margin, because in a flow there is no
+ * neighbouring band to meet. */
+.drawer-content > .notice,
+.edward-thread > .notice {
+  border-radius: var(--radius-row);
+  margin: 0 0 var(--space-9);
+  padding: var(--space-6) var(--space-7);
+}
+
+/* --- zone: the one line above the tab row ----------------------------------
+ *
+ * The other dock, and the one that only My Campus Life needs: a section with no
+ * summary panel has no foot to hang a footnote on. It is deliberately not a
+ * card. A card here is the amber band the Jam of 2026-08-21 circled — 1180 wide
+ * and 62 tall, plus an 18px gap, spent on a sentence of sixty characters, and
+ * seventy per cent of it empty. Twingate and Upwork both draw the page-wide
+ * obligation as a rule with a line of type in it, at half the height and none
+ * of the ceremony, and that is what this is.
+ *
+ * The shell draws the gap under it, not the notice. It used to be three
+ * distances for one position: the amber gate strip sat flush on the first card,
+ * the catalogue note on My Classrooms pulled itself 12px up into the panel, and
+ * the tab row kept its own 18. */
+.page-notice {
+  margin: 0 0 var(--space-9);
+}
+
+/* The two rules belong to the notice, not to the slot. My Campus Life passes a
+   whole `section-card` through here — its required sessions are a card with rows
+   in it, not a sentence — and a card that came pre-drawn does not want a second
+   frame around it. Written on `.page-notice` it got one.
+ *
+ * No wash either: on the canvas a tint is a shape, and the two rules already say
+ * where this begins and ends. The mark keeps the tone's colour, which is the
+ * whole escalation a line needs. */
+.page-notice > .notice {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: none;
+  padding: var(--space-6) 0;
+}
+
+/* Which leaf of a group you are reading. It sits directly above what it
+   switches, and never above something true of the whole group — see
+   `PageShell`. My Financials and My Campus Life each had their own row, in
+   their own colour; this is the one row both use now. */
+.group-tabs {
+  gap: var(--space-3);
+  margin: 0 0 var(--space-9);
+  display: flex;
+  overflow-x: auto;
+}
+
+.group-tabs a {
+  color: var(--muted);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--radius-pill);
+  flex: none;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-7);
+  font-size: var(--fs-copy);
+  font-weight: var(--fw-semi);
+  text-decoration: none;
+  transition: color .15s, border-color .15s;
+  display: flex;
+}
+
+.group-tabs a:hover {
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+.group-tabs a.active {
+  color: var(--purple-dark);
+  border-color: color-mix(in srgb, var(--purple) 35%, var(--surface));
+  background: var(--purple-soft);
+}
+
+/* The left cell. Five sections fill this slot and each had invented its own
+   class for it — `.progress-summary`, `.balance-summary`, `.next-appointment`,
+   `.profile-standing` — four names and two different internal structures for
+   one thing. This is the one shape: an optional mark, then the label, the
+   figure, and at most one line under it. What changes between sections is the
+   mark and the number, never the shape.
+ *
+ * `.progress-summary` stays as its old name so My Profile keeps working while
+ * ENR-184 is still in flight; new code uses `SummaryFigure`. */
+.summary-figure, .progress-summary {
+  align-items: center;
+  gap: var(--space-7);
+  min-width: 0;
+  display: flex;
+}
+
+.summary-figure-copy,
+.progress-summary>div:last-child {
+  flex-direction: column;
+  min-width: 0;
+  display: flex;
+}
+
+/* The markless form — a figure with nothing to its left. My Financials is the
+   only section that uses it: money is its own mark. */
+.summary-figure.bare .summary-figure-copy {
+  gap: var(--space-1);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.progress-ring {
+  --progress: 151deg;
+  background: conic-gradient(var(--purple) var(--progress), var(--line) 0);
+  border-radius: var(--radius-round);
+  flex: none;
+  place-items: center;
+  width: 61px;
+  height: 61px;
+  display: grid;
+  position: relative;
+}
+
+.progress-ring:before {
+  content: "";
+  background: var(--surface);
+  border-radius: var(--radius-round);
+  position: absolute;
+  inset: 6px;
+}
+
+.progress-ring span {
+  z-index: 1;
+  font-size: var(--fs-display);
+  font-weight: var(--fw-bold);
+  position: relative;
+}
+
+.panel-label {
+  color: var(--muted);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+}
+
+/* The section's figure — 21px, or 27px when it is money. The scale is in
+   `docs/agents/design-workflow.md` and this is the only place it is set.
+ *
+ * The line it sits on is the *money* line's height whatever the size, which is
+ * the last of the three things that were letting copy decide the panel's height
+ * — measured on 2026-08-21, My Financials' panel came out 129px against My
+ * Enrollment's 119 for no reason other than a six-pixel difference in one word,
+ * and the balance's estimate chip pushed it further. A figure is centred in a
+ * fixed line rather than setting one. */
+.summary-figure-copy strong,
+.progress-summary strong {
+  letter-spacing: var(--ls-tight);
+  align-items: center;
+  min-height: calc(var(--fs-display) * var(--lh-tight));
+  margin-top: var(--space-1);
+  font-size: var(--fs-display);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+  display: flex;
+}
+.summary-figure-copy p,
+.progress-summary p {
+  color: var(--muted);
+  max-width: 46ch;
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+/* `min-width: 340px` was a floor the panel could not honour: inside a grid
+   column narrower than that it overflows, and inside the old wrapping flex it
+   was what forced the wrap in the first place. The bar shrinks now, and there
+   is nothing left in it that can wrap. */
+.advisor-bar {
+  background: linear-gradient(105deg,var(--card-zone),var(--purple-soft));
+  border: 1px solid var(--purple-tint);
+  border-radius: var(--radius-row);
+  align-items: center;
+  gap: var(--space-6);
+  min-width: 0;
+  padding: var(--space-5) var(--space-6);
+  display: flex;
+}
+
+/* The advisor's disc is `Avatar` now (below). The bar only says where it sits. */
+.advisor-avatar {
+  flex: none;
+}
+
+.advisor-bar-copy {
+  flex-direction: column;
+  min-width: 0;
+  display: flex;
+}
+
+.advisor-bar-copy strong {
+  letter-spacing: var(--ls-snug);
+  margin-top: var(--space-1);
+  font-size: var(--fs-h2);
+  line-height: 1.3;
+}
+
+/* The office rides the name line or not at all. Broken across two it turned
+   `Amara Nwosu · Student Financial Services` into a stray `Services` on its own
+   row and cost the bar a whole line — see the column width above, which is set
+   so this always fits. */
+.advisor-bar-copy strong span {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+}
+
+/* Side by side, because the bar is sized by the figure cell beside it and a
+   column of two discs is 73px on its own — taller than the 61px the panel has.
+   Level with each other they are 34px, which the avatar already spends. */
+.advisor-actions {
+  flex: none;
+  gap: var(--space-3);
+  margin-left: auto;
+  display: flex;
+}
+
+/* The two labelled buttons cost 150px of a 400px cell — with the avatar and
+   the gaps that left 140px for copy needing 320, so the bar answered by
+   growing to 153px tall beside a 63px figure. That is the whole of the
+   overflow, and it is why they are icons.
+ *
+ * The word is not lost: it is still the button's accessible name, and `Tooltip`
+ * gives it back as a bubble on hover and on keyboard focus. It used to be drawn
+ * here, as `::after { content: attr(data-tip) }` — no keyboard, no touch, and
+ * clipped by any panel with a corner to protect, which is why `.summary-alert`
+ * had to take the panel's bottom radius itself. They stay side by side rather
+ * than stacking: a column of two would give the width back and take it out of
+ * the height instead, and height is what was breaking the panel. */
+.advisor-action {
+  color: var(--purple-dark);
+  cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--purple-line);
+  border-radius: var(--radius-chip);
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  transition: color .18s, background .18s, border-color .18s;
+  display: grid;
+}
+
+.advisor-action:hover, .advisor-action:focus-visible {
+  color: var(--on-ink);
+  background: var(--purple);
+  border-color: var(--purple);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .advisor-action {
+    transition: none;
+  }
+}
+
+.points-icon {
+  color: var(--purple-hover);
+  background: var(--purple-tint);
+  border-radius: var(--radius-chip);
+  flex: none;
+  place-items: center;
+  width: 35px;
+  height: 35px;
+  display: grid;
+  box-shadow: inset 0 1px #ffffffe6;
+}
+
+.points-icon.large {
+  width: 42px;
+  height: 42px;
+}
+
+.page-body {
+  grid-template-columns: minmax(0,1fr) 292px;
+  align-items: start;
+  gap: var(--space-11);
+  display: grid;
+}
+
+/* One heading for a card, wherever the card is. Three classes were doing this
+   job at three sizes — `.section-heading` at 21px on My Enrollment and Help,
+   `.status-heading` at 17px on My Enrollment, My Classrooms and My Profile,
+   `.card-heading` at 15px on My Financials and Appointments — and My Financials
+   ran two of them side by side. They all name a `.section-card`, so they are
+   all one size. Above this there is only the page band. */
+.status-heading h2,
+.card-heading h2 {
+  letter-spacing: var(--ls-snug);
+  margin: 0;
+  font-size: var(--fs-h2);
+}
+
+/* A status or card head's name sets a step up from regular: with a bare glyph
+   beside it rather than a tile, the name is the head's weight. */
+.status-heading h2,
+.card-heading h2 {
+  font-weight: var(--fw-semi);
+}
+
+.status-heading p,
+.card-heading p {
+  color: var(--muted);
+  margin: var(--space-1) 0 0;
+  font-size: var(--fs-meta);
+}
+
+.sort-group {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--radius-tile);
+  align-items: center;
+  padding: var(--space-1);
+  display: flex;
+  box-shadow: 0 2px 8px #1e233208;
+}
+
+.sort-group button {
+  color: var(--muted);
+  cursor: pointer;
+  background: 0 0;
+  border: 0;
+  border-radius: var(--radius-chip);
+  align-items: center;
+  gap: var(--space-2);
+  height: 30px;
+  padding: 0 var(--space-4);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-bold);
+  display: flex;
+}
+
+.sort-group button.selected {
+  color: var(--purple-dark);
+  background: var(--purple-soft);
+}
+
+.sort-group .sort-info {
+  border-left: 1px solid var(--line);
+  border-radius: 0 var(--radius-chip) var(--radius-chip) 0;
+  justify-content: center;
+  width: 29px;
+  padding: 0;
+}
+
+.task-type-icon, .drawer-icon {
+  color: var(--purple-hover);
+  background: var(--purple-soft);
+  border: 1px solid var(--purple-tint);
+  place-items: center;
+  display: grid;
+  box-shadow: inset 0 1px #ffffffe6;
+}
+
+.task-type-icon.upload, .drawer-icon.upload {
+  color: var(--green);
+  background: var(--green-soft);
+  border-color: var(--green-line);
+}
+
+.task-type-icon.profile, .drawer-icon.profile {
+  color: var(--amber);
+  background: var(--amber-soft);
+  border-color: var(--amber-line);
+}
+
+.task-type-icon.housing, .drawer-icon.housing {
+  color: var(--teal);
+  background: var(--teal-soft);
+  border-color: var(--teal-line);
+}
+
+.priority-badge.soon {
+  color: var(--amber);
+  background: var(--amber-tint);
+}
+
+.primary-button, .secondary-button {
+  cursor: pointer;
+  border: 0;
+  border-radius: var(--radius-chip);
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 36px;
+  padding: 0 var(--space-7);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-heavy);
+  transition: all .17s;
+  display: flex;
+}
+
+.primary-button {
+  color: var(--on-ink);
+  background: var(--grad-purple);
+  box-shadow: var(--shadow-primary);
+}
+
+.primary-button:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-primary-hover);
+}
+
+.primary-button:disabled {
+  cursor: not-allowed;
+  box-shadow: none;
+  background: var(--purple-line);
+  transform: none;
+}
+
+.secondary-button {
+  color: var(--purple-dark);
+  background: var(--purple-wash);
+  border: 1px solid var(--purple-line);
+}
+
+/* A control never wraps its own label; the layout around it wraps instead. A
+   button that breaks in half changes height, and everything in the row with it
+   moves. */
+.primary-button,
+.secondary-button,
+.text-button {
+  white-space: nowrap;
+}
+
+.secondary-button:hover {
+  background: var(--purple-soft);
+}
+
+.text-button {
+  color: var(--muted);
+  cursor: pointer;
+  background: 0 0;
+  border: 0;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semi);
+}
+
+/* --- a control that is working --------------------------------------------
+ *
+ * The label is not removed and not replaced: the button goes transparent and
+ * the spinner is laid over it, so the footprint is exactly what it was and
+ * nothing measures anything. A button that resized itself while it worked
+ * would reflow the card holding it, every time, on every action.
+ */
+/* Scoped to the button kinds: `pending` is also the status class on a financials
+   aid row and a ledger cell, and a bare `.pending` made their text transparent. */
+.primary-button.pending,
+.secondary-button.pending,
+.text-button.pending {
+  cursor: progress;
+  color: transparent;
+  position: relative;
+}
+
+.button-spinner {
+  place-items: center;
+  display: grid;
+  position: absolute;
+  inset: 0;
+}
+
+.button-spinner svg {
+  animation: .9s linear infinite spin;
+}
+
+/* `disabled` is set with `aria-busy`, so the primary button would otherwise
+   take the faded surface it wears when it is refusing. It is not refusing. A
+   control that greys out while it works reads as a control that failed, so
+   this names three classes and wins over `:disabled` by rule. */
+.primary-button.pending:disabled {
+  background: var(--grad-purple);
+  box-shadow: none;
+}
+
+.primary-button.pending .button-spinner {
+  color: var(--on-ink);
+}
+
+.secondary-button.pending .button-spinner {
+  color: var(--purple-dark);
+}
+
+.text-button.pending .button-spinner {
+  color: var(--muted);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+/* The one animation this product keeps under reduced motion. Everything else
+   here decorates; this one *is* the message. Frozen at 360°, a spinner does
+   not read as "still working", it reads as "stopped working" — so it steps
+   instead of sweeping, and it has to out-shout the blanket rule further down
+   this file to do it. */
+@media (prefers-reduced-motion: reduce) {
+  .button-spinner svg {
+    animation-duration: 1.2s !important;
+    animation-timing-function: steps(8, end) !important;
+    animation-iteration-count: infinite !important;
+  }
+}
+
+/* --- a field, and the only way this product says one is wrong --------------
+ *
+ * Lifted out of `features/onboarding.css`, where a shape used by four steps, a
+ * drawer and now the styleguide had been written as if it belonged to one
+ * section. It did not, and the proof is that `features/profile.css` had grown
+ * its own `.field-label` meaning something else entirely — different size,
+ * different weight, `display: flex` so a verification glyph could sit beside
+ * it. Both were bare `.field-label`, and `onboarding.css` imports after
+ * `profile.css`, so on My Profile the onboarding rule was quietly winning:
+ * every record label there rendered 9.5px uppercase and `display: block`,
+ * which is not what either file asked for.
+ *
+ * That is the tie this repo has been bitten by twice. It is fixed the way the
+ * contract says to fix one — by rule, not by position: the record row's label
+ * is now `.field-row-label`, which is its own name for its own thing, and
+ * `.field-label` is defined exactly once, here.
+ */
+.field {
+  margin-bottom: var(--space-8);
+  display: block;
+}
+
+.field:last-child {
+  margin-bottom: 0;
+}
+
+.field-label {
+  color: var(--muted);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  margin: 0 0 var(--space-4);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+  display: block;
+}
+
+.field-label.spaced {
+  margin-top: var(--space-9);
+}
+
+.field-control {
+  display: block;
+  position: relative;
+}
+
+/* Filled, and it lifts to white on focus — the approved surface (2026-08-21):
+   a field at rest is a sunk slab, so a form reads as a set of places to write
+   rather than a set of boxes, and the one being written in is the one that is
+   white. Product-wide, deliberately: two input surfaces would be two products. */
+.field input {
+  color: var(--ink);
+  background: var(--surface-sunk);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-tile);
+  width: 100%;
+  padding: var(--space-6) var(--space-7);
+  font-family: var(--font-geist-sans);
+  font-size: var(--fs-body);
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+
+.field input:focus-visible {
+  background: var(--surface);
+  border-color: var(--purple);
+  outline: 0;
+  box-shadow: 0 0 0 3px var(--purple-tint);
+}
+
+/* The label turns with the edge. It is the cheapest way to make an error
+   findable on a form that has been scrolled past its own message. */
+.field.invalid .field-label {
+  color: var(--crimson-ink);
+}
+
+.field.invalid input {
+  border-color: var(--crimson);
+  padding-right: var(--space-10);
+  box-shadow: 0 0 0 3px var(--crimson-soft);
+}
+
+.field.invalid .field-control > svg {
+  color: var(--crimson);
+  position: absolute;
+  top: 50%;
+  right: var(--space-6);
+  transform: translateY(-50%);
+}
+
+/* Led by a glyph, because crimson on its own is not a signal on a screen that
+   is not being read in colour. */
+.field-error {
+  color: var(--crimson-ink);
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semi);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.field-error svg {
+  flex: none;
+}
+
+.field-hint {
+  color: var(--muted);
+  margin-top: var(--space-4);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+  display: block;
+}
+
+/* --- a fact, stated — `primitives/StatedField`, the pair to the field -------
+ *
+ * The label small and muted above, the value carrying the weight, so the eye
+ * runs down a column of values and never reads a label. With `office` the
+ * value sits in a dashed, sunk box behind a lock — a fact Aster holds, and the
+ * line under it names whose desk the change happens on. The box is the
+ * approved surface's; the lock says "held", not "disabled", which is why this
+ * is not a disabled input: a read-only control is a control that refuses, and
+ * this product keeps deciding not to ship one. */
+.stated-field {
+  display: block;
+}
+
+.stated-field .field-label {
+  margin-bottom: var(--space-3);
+}
+
+.stated-value {
+  color: var(--ink);
+  letter-spacing: var(--ls-snug);
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semi);
+  line-height: var(--lh-heading);
+  display: flex;
+}
+
+/* A value that is not there yet, in the second voice. */
+.stated-field.quiet .stated-value {
+  color: var(--muted);
+  font-weight: var(--fw-regular);
+}
+
+.stated-field.locked .stated-value {
+  background: var(--surface-sunk);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-tile);
+  padding: var(--space-5) var(--space-7);
+}
+
+.stated-field.locked .stated-value svg {
+  color: var(--faint);
+  flex: none;
+}
+
+.stated-note {
+  color: var(--muted);
+  margin-top: var(--space-3);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+  display: block;
+}
+
+/* As a row in a card, it brings the row's own vertical padding; the card's
+   `.card-rows` brings the horizontal and the hairline. */
+.card-rows > .stated-field {
+  padding-top: var(--space-6);
+  padding-bottom: var(--space-6);
+}
+
+/* --- a dropzone — `patterns/Dropzone` -------------------------------------
+ *
+ * A dashed, sunk area with a tinted tile in it; the tile wears the duotone
+ * glyph, because a tile is content's shape. `filed` is the other drawing: the
+ * same area turned green, because green means one thing here — done — and a
+ * file that is in is done. */
+.dropzone {
+  background: var(--surface-sunk);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-row);
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-12) var(--space-9);
+  text-align: center;
+  display: flex;
+}
+
+.dropzone.filed {
+  background: var(--green-wash);
+  border-style: solid;
+  border-color: var(--green-line);
+}
+
+.dropzone-mark {
+  color: var(--purple-dark);
+  background: var(--purple-tint);
+  border-radius: var(--radius-tile);
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  display: grid;
+}
+
+.dropzone.filed .dropzone-mark {
+  color: var(--green-ink);
+  background: var(--green-tint);
+}
+
+.dropzone-copy {
+  margin: 0;
+}
+
+.dropzone-copy strong {
+  font-size: var(--fs-body);
+  display: block;
+}
+
+.dropzone-copy small {
+  color: var(--muted);
+  margin-top: var(--space-2);
+  font-size: var(--fs-small);
+  display: block;
+}
+
+.dropzone-note {
+  color: var(--faint);
+  font-size: var(--fs-small);
+}
+
+.status-section {
+  margin-top: var(--space-11);
+}
+
+.status-heading {
+  grid-template-columns: 24px minmax(0,1fr) auto;
+  align-items: center;
+  gap: var(--space-5);
+  margin-bottom: var(--space-6);
+  display: grid;
+}
+
+/* A status head without a tile. The type then carries the weight the tile used
+   to: the name heavy, the line under it in the second voice (Marco,
+   2026-08-21: a bare head set like a tiled one read as washed out). */
+.status-heading.bare {
+  grid-template-columns: minmax(0,1fr) auto;
+}
+
+.status-heading.bare h2 {
+  letter-spacing: var(--ls-tight);
+  font-weight: var(--fw-heavy);
+}
+
+.status-heading.bare p {
+  color: var(--ink-2);
+  font-size: var(--fs-copy);
+}
+
+/* A list runs straight into the head's hairline. The head's gap below itself is
+   for content that has no padding of its own; a row brings its padding, and the
+   two together were a double gap (Marco, 2026-08-21). */
+.section-card > .status-heading + .card-rows,
+.section-card > .card-heading + .card-rows {
+  margin-top: calc(-1 * var(--card-pad));
+}
+
+/* The mark a card head opens with: a bare outline glyph in the tone's colour,
+   and no tile — a tinted tile with a duotone glyph is the content's shape (a
+   task's kind, an organisation, a document), and a head that wore the same
+   shape repeated on every row under it (Marco, 2026-08-21). One form for every
+   head in the product; the tone classes below only colour the glyph. */
+.status-icon {
+  color: var(--ink-2);
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  display: grid;
+}
+
+.status-icon.review {
+  color: var(--amber);
+}
+
+.status-icon.locked {
+  color: var(--muted);
+}
+
+/* The two tones every section may need: the section's own content (purple,
+   once), and finished (green, once). `done` used to live in onboarding.css,
+   which meant My Enrollment's completed group was styled by another feature. */
+.status-icon.accent {
+  color: var(--purple-dark);
+}
+
+.status-icon.done {
+  color: var(--green);
+}
+
+.status-count {
+  color: var(--muted);
+  background: var(--line);
+  border-radius: var(--radius-pill);
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-heavy);
+  display: grid;
+}
+
+/* The kinds that only appear on a step that is with Aster, locked or done.
+   Each takes a family the contract already gives a meaning: review sits with
+   the documents (purple), meeting and preferences with the person (amber),
+   identity with verified (green), decision with the offer (purple). */
+.task-type-icon.meeting, .task-type-icon.preferences {
+  color: var(--amber);
+  background: var(--amber-soft);
+  border-color: var(--amber-line);
+}
+
+.task-type-icon.identity {
+  color: var(--green);
+  background: var(--green-soft);
+  border-color: var(--green-line);
+}
+
+/* A row in one of My Enrollment's groups. It shares the task row's columns —
+   a 40px tile, the copy, the trailing cell — and its horizontal padding, so a
+   step with Aster, a locked step, a completed step and a step to do all put
+   their tile on the same x and their title on the same x (Marco, 2026-08-21:
+   "os itens dos accordions no mesmo alinhamento que os itens do next step"). */
+.compact-task {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  grid-template-columns: 40px minmax(0,1fr) auto;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-7) var(--space-9);
+  display: grid;
+}
+
+/* Inside a card the task row keeps its own 18px inside the card's 20px; these
+   rows match that, so the tiles line up down the page. */
+.card-rows .compact-task {
+  padding-left: calc(var(--card-pad) + var(--space-9));
+  padding-right: calc(var(--card-pad) + var(--space-9));
+}
+
+.review-list .compact-task:first-child {
+  border-radius: var(--radius-row) var(--radius-row) 0 0;
+}
+
+.review-list .compact-task:last-child {
+  border-radius: 0 0 var(--radius-row) var(--radius-row);
+}
+
+.review-list .compact-task:only-child {
+  border-radius: var(--radius-row);
+}
+
+.review-list .compact-task+.compact-task {
+  border-top: 0;
+}
+
+.locked-list .compact-task:first-child {
+  border-radius: var(--radius-row) var(--radius-row) 0 0;
+}
+
+.locked-list .compact-task:last-child {
+  border-top: 0;
+  border-radius: 0 0 var(--radius-row) var(--radius-row);
+}
+
+
+.compact-copy h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-body);
+}
+
+.compact-copy>p {
+  color: var(--muted);
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+}
+
+.pulse {
+  background: currentColor;
+  border-radius: var(--radius-round);
+  width: 6px;
+  height: 6px;
+  box-shadow: 0 0 0 4px #c47b251f;
+}
+
+.prerequisite {
+  color: var(--ink-2);
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semi);
+  display: flex;
+}
+
+.completed-section.expanded .completed-toggle>svg {
+  transform: rotate(180deg);
+}
+
+.compact-task .earned {
+  color: var(--purple-hover);
+  justify-self: end;
+  font-size: var(--fs-meta);
+  align-items: center;
+  gap: var(--space-1);
+  font-weight: var(--fw-bold);
+  display: flex;
+}
+
+.page-rail {
+  flex-direction: column;
+  gap: var(--space-7);
+  display: flex;
+  position: sticky;
+  top: 94px;
+}
+
+.skipped-card, .momentum-card {
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
+  background: var(--surface);
+  border-radius: var(--radius-card);
+}
+
+.skipped-card {
+  background: linear-gradient(145deg,var(--surface),var(--card-zone));
+  border-color: var(--purple-line);
+  padding: var(--space-9);
+}
+
+.resume-badge {
+  color: var(--purple-dark);
+  background: var(--purple-soft);
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+}
+
+.skipped-card h3 {
+  letter-spacing: var(--ls-snug);
+  margin: var(--space-7) 0 var(--space-3);
+  font-size: var(--fs-h2);
+  line-height: var(--lh-heading);
+  font-weight: var(--fw-regular);
+}
+
+.skipped-card p {
+  color: var(--muted);
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+}
+
+.skipped-card button {
+  color: var(--purple-hover);
+  cursor: pointer;
+  background: 0 0;
+  border: 0;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-7);
+  padding: 0;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-heavy);
+  display: flex;
+}
+
+/* Every rail leads with one of these: the section's key secondary figure, on
+   ink, so the eye lands somewhere before it reads the light cards under it.
+   My Financials had it and looked built; the sections without one looked flat. */
+.anchor-card {
+  color: var(--on-ink);
+  background: linear-gradient(145deg,var(--surface-ink),var(--purple-deep));
+  border: 0;
+  border-radius: var(--radius-card);
+  padding: var(--space-9);
+  box-shadow: 0 14px 28px #201e452e;
+}
+
+/* What any card looks like when it sits on ink. Written once here rather than
+   per section, so a rail card can be promoted to the anchor by adding the class
+   and nothing else. */
+.anchor-card .panel-label {
+  color: var(--on-ink-muted);
+}
+
+.anchor-card strong,
+.anchor-card .counts-figure {
+  color: var(--on-ink);
+}
+
+.anchor-card p,
+.anchor-card .counts-figure small {
+  color: var(--on-ink-muted);
+}
+
+.anchor-card .counts-divider {
+  background: #ffffff24;
+}
+
+.anchor-card .interests-header > span:first-child,
+.anchor-card .interest-chips span {
+  color: var(--purple-line);
+  background: #ffffff1f;
+}
+
+.anchor-card .interests-header > div > span {
+  color: var(--on-ink-muted);
+}
+
+.anchor-card .learn-link {
+  color: var(--purple-line);
+}
+
+.momentum-card {
+  color: var(--on-ink);
+  background: linear-gradient(145deg,var(--surface-ink),var(--purple-deep));
+  padding: var(--space-9);
+  box-shadow: 0 14px 28px #201e452e;
+}
+
+.learn-link {
+  color: #ccc5ff;
+  cursor: pointer;
+  background: 0 0;
+  border: 0;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-7);
+  padding: 0;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-bold);
+  display: flex;
+}
+
+/* Every page ends here, so this is where the corner Edward owns is reserved —
+   ENR-175 AC 7 as structure rather than as a rule someone has to remember. */
+footer {
+  /* `--muted`, not `--faint`: at 8.5px the faint voice measured 2.41:1 on the
+     canvas, and the footer links "Accessibility" (appointments changes, C7).
+     4.55:1 now. */
+  color: var(--muted);
+  justify-content: space-between;
+  margin-top: var(--space-12);
+  padding: var(--space-9) var(--space-1) var(--safe-bottom);
+  font-size: var(--fs-micro);
+  display: flex;
+}
+
+footer span:last-child {
+  gap: var(--space-7);
+  display: flex;
+}
+
+footer a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.modal-scrim {
+  z-index: var(--z-scrim);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+  cursor: default;
+  background: #0d122366;
+  border: 0;
+  position: fixed;
+  inset: 0;
+}
+
+.drawer {
+  z-index: var(--z-panel);
+  background: var(--surface);
+  width: min(465px,100vw);
+  height: 100vh;
+  animation: .26s both drawerIn;
+  position: fixed;
+  top: 0;
+  right: 0;
+  overflow: auto;
+  box-shadow: -18px 0 55px #0e12242e;
+}
+
+@keyframes drawerIn {
+  0% {
+    transform: translate(100%);
+  }
+  to {
+    transform: translate(0);
+  }
+}
+
+.drawer-header {
+  z-index: 2;
+  border-bottom: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  background: #fffffff0;
+  justify-content: space-between;
+  align-items: center;
+  height: 67px;
+  padding: 0 var(--space-10);
+  display: flex;
+  position: sticky;
+  top: 0;
+}
+
+.drawer-label {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-caps);
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+  display: flex;
+}
+
+.drawer-label span+span {
+  border-left: 1px solid var(--line);
+  padding-left: var(--space-4);
+}
+
+/* The drawer's own horizontal inset, named once. Anything inside that has to
+   bleed to the panel's edge reads this rather than retyping the step — which is
+   how `.card-rows` works in a card, and it has to keep working here. The sheet
+   below 620 narrows it, and the bleed narrows with it. */
+.drawer-content {
+  --drawer-inset: var(--space-11);
+  padding: var(--drawer-inset) var(--drawer-inset) var(--space-13);
+}
+
+.drawer-icon {
+  border-radius: var(--radius-row);
+  width: 49px;
+  height: 49px;
+}
+
+.drawer-content h2 {
+  letter-spacing: var(--ls-hero);
+  margin: var(--space-8) 0 var(--space-4);
+  font-size: var(--fs-title);
+}
+
+.drawer-description {
+  color: var(--muted);
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.drawer-tabs {
+  border-bottom: 1px solid var(--line);
+  margin-top: var(--space-10);
+  display: flex;
+}
+
+.drawer-tabs button {
+  color: var(--faint);
+  cursor: pointer;
+  background: 0 0;
+  border: 0;
+  border-bottom: 2px solid #0000;
+  flex: 1;
+  height: 42px;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-bold);
+}
+
+.drawer-tabs button.active {
+  color: var(--purple-hover);
+  border-bottom-color: var(--purple-hover);
+}
+
+.action-panel, .how-panel {
+  padding-top: var(--space-9);
+}
+
+.why-card {
+  background: var(--canvas);
+  border-radius: var(--radius-tile);
+  gap: var(--space-5);
+  padding: var(--space-7);
+  display: flex;
+}
+
+.why-card>span {
+  color: var(--purple-hover);
+  background: var(--purple-tint);
+  border-radius: var(--radius-chip);
+  flex: none;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  display: grid;
+}
+
+.why-card strong {
+  font-size: var(--fs-meta);
+  display: block;
+}
+
+.why-card p {
+  color: var(--muted);
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+}
+
+.primary-button.full {
+  width: 100%;
+  min-height: 43px;
+  margin-top: var(--space-8);
+}
+
+.prototype-note {
+  color: var(--faint);
+  text-align: center;
+  margin-top: var(--space-4);
+  font-size: var(--fs-micro);
+  display: block;
+}
+
+.upload-zone {
+  cursor: pointer;
+  background: var(--card-zone);
+  border: 1.5px dashed var(--on-ink-muted);
+  border-radius: var(--radius-row);
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 135px;
+  display: flex;
+}
+
+.upload-zone>span {
+  color: var(--purple-hover);
+  background: var(--purple-soft);
+  border-radius: var(--radius-tile);
+  place-items: center;
+  width: 41px;
+  height: 41px;
+  display: grid;
+}
+
+.upload-zone strong {
+  margin-top: var(--space-1);
+  font-size: var(--fs-copy);
+}
+
+.upload-zone small {
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+.upload-zone.has-file {
+  background: var(--green-wash);
+  border-style: solid;
+  border-color: #b8dfd0;
+}
+
+.upload-zone.has-file>span {
+  color: var(--green);
+  background: var(--green-tint);
+}
+
+.form-panel, .choice-panel {
+  margin-top: var(--space-8);
+}
+
+.form-help {
+  color: var(--muted);
+  margin: 0;
+  font-size: var(--fs-small);
+}
+
+.choice-panel {
+  flex-direction: column;
+  gap: var(--space-4);
+  display: flex;
+}
+
+.choice-panel label {
+  border: 1px solid var(--line);
+  cursor: pointer;
+  border-radius: var(--radius-tile);
+  grid-template-columns: 18px minmax(0,1fr) 25px;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 60px;
+  padding: var(--space-5) var(--space-6);
+  display: grid;
+}
+
+.choice-panel label.chosen {
+  background: var(--purple-wash);
+  border-color: #9f91e6;
+  box-shadow: 0 0 0 1px var(--purple-tint);
+}
+
+.choice-panel input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--purple);
+}
+
+.choice-panel label>span:nth-child(2) {
+  flex-direction: column;
+  display: flex;
+}
+
+.choice-panel strong {
+  font-size: var(--fs-meta);
+}
+
+.choice-panel small {
+  color: var(--muted);
+  margin-top: var(--space-1);
+  font-size: var(--fs-micro);
+}
+
+.radio-mark {
+  color: var(--on-ink);
+  background: var(--purple);
+  border-radius: var(--radius-round);
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  display: none;
+}
+
+.chosen .radio-mark {
+  display: grid;
+}
+
+.how-panel h3 {
+  margin: 0 0 var(--space-8);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-regular);
+}
+
+.how-panel ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.how-panel li {
+  grid-template-columns: 30px minmax(0,1fr);
+  gap: var(--space-5);
+  min-height: 61px;
+  display: grid;
+  position: relative;
+}
+
+.how-panel li:not(:last-child):before {
+  content: "";
+  background: var(--purple-line);
+  width: 1px;
+  position: absolute;
+  top: 31px;
+  bottom: 2px;
+  left: 14px;
+}
+
+.how-panel li>span {
+  z-index: 1;
+  color: var(--purple-hover);
+  background: var(--purple-tint);
+  border-radius: var(--radius-round);
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-bold);
+  display: grid;
+}
+
+.how-panel li p {
+  color: var(--ink-2);
+  margin: var(--space-2) 0 var(--space-9);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+}
+
+.help-note {
+  color: var(--amber-ink);
+  background: var(--amber-wash);
+  border-radius: var(--radius-tile);
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  padding: var(--space-6);
+  display: flex;
+}
+
+.help-note svg {
+  flex: none;
+}
+
+.help-note p {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+}
+
+.help-note strong {
+  margin-bottom: var(--space-1);
+  display: block;
+}
+
+.center-modal-wrap {
+  z-index: var(--z-modal);
+  place-items: center;
+  padding: var(--space-9);
+  display: grid;
+  position: fixed;
+  inset: 0;
+}
+
+.center-modal-wrap .modal-scrim {
+  z-index: 0;
+}
+
+.info-modal {
+  z-index: 1;
+  background: var(--surface);
+  border-radius: var(--radius-panel);
+  width: min(530px,100%);
+  max-height: calc(100vh - 36px);
+  padding: 31px;
+  animation: .22s both modalIn;
+  position: relative;
+  overflow: auto;
+  box-shadow: var(--shadow-float);
+}
+
+@keyframes modalIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px)scale(.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.modal-close {
+  position: absolute;
+  top: 19px;
+  right: 19px;
+}
+
+.modal-kicker {
+  color: var(--purple-hover);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-caps);
+  background: var(--purple-soft);
+  border-radius: var(--radius-pill);
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+  display: inline-flex;
+}
+
+.modal-kicker.points {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.info-modal h2 {
+  letter-spacing: var(--ls-hero);
+  max-width: 410px;
+  margin: var(--space-8) 0 var(--space-4);
+  font-size: var(--fs-title);
+  line-height: var(--lh-tight);
+}
+
+.info-modal>p {
+  max-width: 450px;
+  color: var(--muted);
+  margin: 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.signal-grid {
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+  margin-top: var(--space-10);
+  display: grid;
+}
+
+.signal-grid>div {
+  border: 1px solid var(--line);
+  background: var(--card-zone);
+  border-radius: var(--radius-tile);
+  min-height: 126px;
+  padding: var(--space-7);
+}
+
+.signal-grid span {
+  color: #8d82ce;
+  font-family: var(--font-geist-mono);
+  font-size: var(--fs-small);
+}
+
+.signal-grid strong {
+  margin-top: var(--space-6);
+  font-size: var(--fs-meta);
+  display: block;
+}
+
+.signal-grid p {
+  color: var(--muted);
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+}
+
+.modal-note {
+  color: #6e628f;
+  background: var(--purple-wash);
+  border-radius: var(--radius-tile);
+  gap: var(--space-4);
+  margin-top: var(--space-7);
+  padding: var(--space-6);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.modal-note.safe {
+  color: #4f6e62;
+  background: var(--green-wash);
+}
+
+.modal-note svg {
+  flex: none;
+}
+
+.formula-card {
+  background: linear-gradient(105deg,var(--purple-wash),var(--green-wash));
+  border-radius: var(--radius-row);
+  grid-template-columns: 80px minmax(0,1fr) 80px;
+  align-items: center;
+  gap: var(--space-6);
+  margin-top: var(--space-9);
+  padding: var(--space-9);
+  display: grid;
+}
+
+.formula-card>div:not(.formula-line) {
+  flex-direction: column;
+  display: flex;
+}
+
+.formula-card>div:last-child {
+  text-align: right;
+}
+
+.formula-card span {
+  color: var(--muted);
+  font-size: var(--fs-micro);
+}
+
+.formula-card strong {
+  color: var(--purple-hover);
+  margin-top: var(--space-1);
+  font-size: var(--fs-h2);
+}
+
+.formula-line {
+  background: linear-gradient(90deg,var(--purple),#b9dbca);
+  height: 3px;
+  position: relative;
+}
+
+.formula-line i {
+  background: #7762d5;
+  border: 2px solid var(--surface);
+  border-radius: var(--radius-round);
+  width: 9px;
+  height: 9px;
+  position: absolute;
+  top: -3px;
+}
+
+.formula-line i:first-child {
+  left: 0;
+}
+
+.formula-line i:nth-child(2) {
+  left: 32%;
+}
+
+.formula-line i:nth-child(3) {
+  left: 65%;
+}
+
+.formula-line i:nth-child(4) {
+  background: #76a992;
+  right: 0;
+}
+
+.point-rules {
+  flex-direction: column;
+  gap: var(--space-5);
+  margin: var(--space-9) 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+}
+
+.point-rules li {
+  color: var(--ink-2);
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--fs-meta);
+  display: flex;
+}
+
+.point-rules li>span {
+  color: var(--green);
+  background: var(--green-tint);
+  border-radius: var(--radius-round);
+  flex: none;
+  place-items: center;
+  width: 23px;
+  height: 23px;
+  display: grid;
+}
+
+/* --- the toast, and the two hexes it used to hand-type ----------------------
+ *
+ * The middle rung of the feedback ladder. Three tones, not one — the glyph and
+ * its tint are the tone's, so a sentence that is not good news stops arriving
+ * with a green tick on it.
+ *
+ * The stack is what is positioned, not the toast. The toast used to centre
+ * itself with `translate(-50%)`, which is why its entrance keyframe had to
+ * repeat that transform in both stops: the animation and the layout were
+ * fighting over the same property. With the stack holding the position, the
+ * toast animates on its own axis and a second toast can sit above the first —
+ * which is the whole point, because until now the second one deleted it.
+ */
+.toast-stack {
+  z-index: var(--z-toast);
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  width: min(430px,100vw - 30px);
+  display: flex;
+  position: fixed;
+  bottom: var(--toast-bottom);
+  left: 50%;
+  transform: translate(-50%);
+  /* The gaps between toasts are not a shield laid over the page. */
+  pointer-events: none;
+}
+
+.toast {
+  color: var(--on-ink);
+  background: var(--surface-ink);
+  border-radius: var(--radius-tile);
+  align-items: center;
+  gap: var(--space-5);
+  width: 100%;
+  min-height: 48px;
+  padding: var(--space-5);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-semi);
+  animation: var(--dur-fast) both toastIn;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+  pointer-events: auto;
+  box-shadow: var(--shadow-float);
+}
+
+.toast-glyph {
+  border-radius: var(--radius-chip);
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  display: grid;
+}
+
+.toast.success .toast-glyph {
+  color: var(--green-line);
+  background: color-mix(in srgb, var(--green-line) 14%, transparent);
+}
+
+.toast.info .toast-glyph {
+  color: var(--on-ink-muted);
+  background: color-mix(in srgb, var(--on-ink) 12%, transparent);
+}
+
+.toast.critical .toast-glyph {
+  color: var(--crimson-line);
+  background: color-mix(in srgb, var(--crimson-line) 16%, transparent);
+}
+
+.toast-copy {
+  gap: var(--space-2);
+  min-width: 0;
+  flex: 1;
+  display: grid;
+}
+
+.toast-copy strong {
+  font-weight: var(--fw-heavy);
+}
+
+.toast-copy span {
+  color: var(--on-ink-muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+}
+
+/* At most one, because a second action is a decision and a decision is a
+   modal. It wins over `.text-button` by naming two classes, not by sitting
+   further down the file. */
+.toast .toast-action {
+  color: var(--on-ink);
+  border: 1px solid var(--on-ink-line);
+  border-radius: var(--radius-chip);
+  flex: none;
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-heavy);
+}
+
+.toast .toast-action:hover {
+  background: color-mix(in srgb, var(--on-ink) 10%, transparent);
+}
+
+.toast .toast-close {
+  color: var(--on-ink-muted);
+  flex: none;
+}
+
+.toast .toast-close:hover {
+  color: var(--on-ink);
+  transform: none;
+  box-shadow: none;
+}
+
+/* The picture of the timer, never the timer — the countdown itself is in
+   JavaScript, because a dismissal that lives in a stylesheet is a dismissal a
+   media query can cancel. `animation-duration` and `animation-play-state` are
+   set on the element: the first is the sentence's own reading time, the second
+   is how a pointer or a keyboard on the toast stops the clock. */
+.toast-life {
+  background: var(--on-ink-line);
+  width: 100%;
+  height: 2px;
+  animation-name: toastLife;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0;
+}
+
+.toast.success .toast-life {
+  background: var(--green-line);
+}
+
+@keyframes toastLife {
+  0% {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes toastIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.nav-scrim {
+  display: none;
+}
+
+@media (width<=1060px) {
+  .page-body {
+    grid-template-columns: minmax(0,1fr);
+  }
+  .page-rail {
+    grid-template-columns: 1fr 1fr;
+    display: grid;
+    position: static;
+  }
+  .hero-motif {
+    opacity: .8;
+    right: 15px;
+  }
+  .hero-copy {
+    max-width: calc(100% - 145px);
+  }
+}
+
+@media (width<=820px) {
+  .sidebar {
+    transition: transform .24s;
+    transform: translate(-100%);
+    box-shadow: 15px 0 45px #12172733;
+  }
+  .sidebar.sidebar-open {
+    transform: translate(0);
+  }
+  .nav-scrim {
+    z-index: var(--z-nav-scrim);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+    background: #0f132159;
+    border: 0;
+    display: block;
+    position: fixed;
+    inset: 0;
+  }
+  .workspace {
+    margin-left: 0;
+  }
+  .topbar {
+    height: 62px;
+    padding: 0 var(--space-9);
+  }
+  .mobile-menu, .mobile-school {
+    display: grid!important;
+  }
+  .mobile-school {
+    font-family: Georgia,serif;
+    font-weight: var(--fw-bold);
+  }
+  .topbar-title {
+    align-items: center;
+    gap: var(--space-4);
+    display: flex;
+  }
+  .help-button {
+    display: none;
+  }
+  .mobile-avatar {
+    display: grid;
+  }
+  .content-wrap {
+    padding: var(--space-10) var(--space-9) 40px;
+  }
+  :root {
+    --band-outdent: 12px;
+    --panel-pad: 20px;
+  }
+  .page-hero {
+    padding-top: 31px;
+    padding-bottom: 31px;
+  }
+  .task-action .text-button {
+    display: none;
+  }
+}
+
+@media (width<=620px) {
+  .topbar {
+    padding: 0 var(--space-7);
+  }
+  .concept-pill {
+    display: none;
+  }
+  .content-wrap {
+    padding: var(--space-7) var(--space-6) var(--space-12);
+  }
+  :root {
+    --band-outdent: 8px;
+    --panel-pad: 16px;
+    --hero-tuck: 14px;
+    --hero-min: 220px;
+  }
+  .page-hero {
+    border-radius: var(--radius-card);
+    padding-top: var(--space-11);
+    padding-bottom: var(--space-11);
+  }
+  .hero-copy {
+    max-width: 100%;
+  }
+  .page-hero h1 {
+    max-width: 315px;
+    font-size: var(--fs-title);
+  }
+  .hero-lede {
+    max-width: 315px;
+    font-size: var(--fs-body);
+  }
+  .hero-motif {
+    opacity: .38;
+    width: 110px;
+    height: 110px;
+    top: 4px;
+    right: -22px;
+  }
+  .orbit-core {
+    inset: 38px;
+  }
+  .orbit-ring {
+    inset: 12px;
+  }
+  .summary-main {
+    gap: var(--space-7);
+    padding: var(--space-8);
+  }
+  .progress-summary p {
+    line-height: var(--lh-heading);
+  }
+  .advisor-bar {
+    flex-wrap: wrap;
+  }
+  .advisor-bar-copy {
+    flex: 1 1 150px;
+  }
+  /* Two 36px discs fit beside the copy at 380px, so nothing has to wrap to a
+     second row here any more. */
+  .advisor-action::after {
+    display: none;
+  }
+  .sort-group {
+    width: 100%;
+  }
+  .sort-group button {
+    flex: 1;
+    justify-content: center;
+    padding: 0 var(--space-2);
+  }
+  .sort-group .sort-info {
+    flex: 0 0 30px;
+  }
+  .compact-task {
+    grid-template-columns: 40px minmax(0,1fr);
+  }
+  .compact-task>.status-pill, .compact-task>.locked-due, .compact-task>.earned {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .status-heading {
+    grid-template-columns: 24px minmax(0,1fr) auto;
+  }
+  .status-heading .sort-group {
+    grid-column: 1 / -1;
+  }
+  .status-heading p {
+    line-height: var(--lh-heading);
+  }
+  .page-rail {
+    grid-template-columns: 1fr;
+  }
+  footer {
+    flex-direction: column;
+    gap: var(--space-5);
+  }
+  .drawer {
+    border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+    width: 100%;
+    height: min(88vh,760px);
+    animation-name: sheetIn;
+    top: auto;
+    bottom: 0;
+  }
+  @keyframes sheetIn {
+    0% {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+  .drawer-header {
+    border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+    height: 59px;
+  }
+  .drawer-content {
+    --drawer-inset: var(--space-9);
+    padding: var(--space-10) var(--drawer-inset) var(--space-12);
+  }
+  .drawer-content h2 {
+    font-size: var(--fs-display);
+  }
+  .info-modal {
+    padding: var(--space-11) var(--space-9) var(--space-10);
+  }
+  .signal-grid {
+    grid-template-columns: 1fr;
+  }
+  .signal-grid>div {
+    min-height: 0;
+  }
+  .info-modal h2 {
+    padding-right: var(--space-11);
+    font-size: var(--fs-display);
+  }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  *, :before, :after {
+    scroll-behavior: auto!important;
+    transition-duration: .01ms!important;
+    animation-duration: .01ms!important;
+    animation-iteration-count: 1!important;
+  }
+}
+
+/* ==========================================================================
+ * Lifted out of the feature files they were first written in.
+ *
+ * `.section-card`, `.card-rows`, `.card-heading`, `.card-icon` and
+ * `.card-foot` — the card and its three zones, the construction every page
+ * in the product is made of — lived in `My Financials`. `.state-card`, which
+ * nineteen files render, lived in `My Campus Life`. `.link-button` lived in
+ * `My Documents`.
+ *
+ * That is the same failure as the 436 hand-typed colours, one level up: the
+ * shared thing stays wherever it was first needed, so the next section either
+ * reaches across for it or writes its own. Deleting My Financials would have
+ * taken the card system with it.
+ *
+ * The card selector used to read `.section-card, .ledger-card, .schedule-card,
+ * .progress-preview, .billed-split` — one rule naming five things that were one
+ * thing. `.ledger-card`, `.schedule-card` and `.billed-split` had no rules of
+ * their own at all; they existed only to ride this selector. They are gone, and
+ * the five sections that carried them go through the `Card` primitive now.
+ * `.progress-preview` survives as a modifier because it has exactly one rule of
+ * its own; `.aid-card` was on a section and defined nowhere, so it went too.
+ * ==========================================================================*/
+
+/* --- the state cards --- */
+
+/* ── The state cards, shared with My Classrooms ── */
+
+.state-card {
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: var(--space-12) var(--space-11);
+}
+
+.state-card.error {
+  background: var(--crimson-soft);
+  border-color: color-mix(in srgb, var(--crimson) 22%, var(--line));
+}
+
+.state-icon {
+  color: var(--muted);
+  background: var(--line-soft);
+  border-radius: var(--radius-row);
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  margin: 0 auto var(--space-6);
+  display: grid;
+}
+
+.state-card.error .state-icon {
+  color: var(--crimson);
+  background: color-mix(in srgb, var(--crimson) 12%, var(--surface));
+}
+
+.state-card h3 {
+  letter-spacing: var(--ls-tight);
+  margin: 0 0 var(--space-4);
+  font-size: var(--fs-h2);
+}
+
+.state-card p {
+  color: var(--muted);
+  max-width: 46ch;
+  margin: 0 auto;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.state-card .secondary-button {
+  margin: var(--space-8) auto 0;
+  display: inline-flex;
+}
+
+/* --- the card, and its three zones --- */
+
+/* One heading shape for every card in the section. */
+.card-heading {
+  align-items: center;
+  gap: var(--space-5);
+  margin-bottom: var(--space-8);
+  display: flex;
+}
+
+.card-icon {
+  color: var(--purple-dark);
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  display: grid;
+}
+
+.card-heading h2 {
+  align-items: center;
+  gap: var(--space-2);
+  display: flex;
+}
+
+/* Depth 1 — a card raised off the canvas. Every block of a section's main
+   column is one of these; nothing sits loose on the canvas any more. The two
+   numbers are published as variables because the rows inside have to meet them
+   exactly — see `.card-rows`. */
+.section-card {
+  --card-pad: 20px;
+  --card-radius: 18px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  border-radius: var(--card-radius);
+  margin-bottom: var(--space-9);
+  padding: var(--card-pad);
+}
+
+/* Rows inside a card. They give up their own surface and live on the card's
+   white; a hairline and the type do the separating. `.doc-task` in My
+   Financials already worked this way and was the only block that read as built
+   — this is that rule, named once and applied to every list in the portal.
+ *
+ * The rows run out to the card's own edges rather than sitting inside its
+ * padding: the hairlines then span the whole card, and the first and last rows
+ * take the corner they touch instead of meeting a rounded card with a square
+ * edge. `--card-pad` and `--card-radius` are the card's, so a row never has to
+ * know a number the card decided. */
+/* A closed group keeps its rows in the tree (so `aria-controls` always names
+   something real) and hides them; the attribute must beat `display: block`. */
+.card-rows[hidden] {
+  display: none;
+}
+
+.card-rows {
+  border-radius: 0 0 calc(var(--card-radius) - 1px) calc(var(--card-radius) - 1px);
+  margin: 0 calc(-1 * var(--card-pad)) calc(-1 * var(--card-pad));
+  display: block;
+  overflow: hidden;
+}
+
+.card-rows > * {
+  padding-left: var(--card-pad);
+  padding-right: var(--card-pad);
+}
+
+/* `.campus-row`, `.requirement-card` and `.task-card` are named here, rather
+   than being left to `> *`, because each of them is a card when it stands on
+   the canvas and a row when it sits in this list. At one class each they tie
+   with `.card-rows > *`, so which one won was decided by whichever came later
+   in the stylesheet — and for `.task-card` that held only while My Enrollment's
+   rules happened to sit above this one in the same file. The moment they moved
+   to `features/enrollment.css` every task card in the checklist took back its
+   border, its radius and its shadow. Naming the child makes the container win
+   by rule instead of by position, which is what the two names already here were
+   for. A new row component that paints itself belongs in this list too. */
+.card-rows > *,
+.card-rows .campus-row,
+.card-rows .requirement-card,
+.card-rows .task-card {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  width: 100%;
+}
+
+.card-rows > * + *,
+.card-rows .campus-row + .campus-row,
+.card-rows .requirement-card + .requirement-card,
+.card-rows .task-card + .task-card {
+  border-top: 1px solid var(--line);
+}
+
+/* The marker that survives flattening, because it carries meaning rather than
+   decoration: the one step to do next. An obligation is marked in its own ink —
+   a crimson date tile and a crimson chip — never by painting one edge of a
+   rounded box, which is a bar wearing a card's corners. */
+.card-rows .task-card.recommended {
+  background: color-mix(in srgb, var(--purple) 4%, var(--surface));
+}
+
+/* --- the action band: the one thing to do next ---------------------------
+ *
+ * My Enrollment's *Start here* ribbon, named for what it is rather than for
+ * the row it happened to sit on (`.recommended-banner`, in `enrollment.css`
+ * until the My Degree brief of 2026-08-21 put the same band on a second
+ * screen). A short label with a glyph on the left; on the right either a
+ * consequence in words or one button. It is the product's one saturated strip
+ * below the hero, and it says one thing — `ActionBand.jsx` renders nothing
+ * when there is nothing to point at. */
+.action-band {
+  color: var(--on-ink);
+  letter-spacing: var(--ls-caps);
+  background: linear-gradient(90deg,var(--purple-hover),var(--purple-grad-to));
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-6);
+  height: 31px;
+  padding: 0 var(--space-7);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-bold);
+  display: flex;
+}
+
+.action-band-label,
+.action-band-aside {
+  align-items: center;
+  gap: var(--space-3);
+  white-space: nowrap;
+  display: flex;
+}
+
+.action-band-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.action-band-aside {
+  color: var(--purple-tint);
+  font-weight: var(--fw-semi);
+}
+
+/* The button, when the band is the way to get somewhere: a ghost pill in the
+   band's own ink, so it reads as part of the strip and not as a second primary
+   competing with the row under it. */
+.action-band-action {
+  color: var(--on-ink);
+  cursor: pointer;
+  letter-spacing: var(--ls-caps);
+  text-transform: inherit;
+  white-space: nowrap;
+  background: none;
+  border: 1px solid var(--on-ink-line);
+  border-radius: var(--radius-pill);
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  height: 22px;
+  padding: 0 var(--space-5);
+  font: inherit;
+  font-weight: var(--fw-heavy);
+  transition: background-color var(--dur-fast) var(--ease);
+  display: inline-flex;
+}
+
+.action-band-action:hover {
+  background: var(--on-ink-line);
+}
+
+/* Under a card's head, above the first row: it bleeds to the card's edges the
+   way the head does, and closes the gap the head leaves under itself. The
+   rows that follow start straight under it. */
+.section-card > .action-band {
+  margin: calc(-1 * var(--card-pad)) calc(-1 * var(--card-pad)) 0;
+}
+
+/* The ribbon runs the full width of the card like the row it heads. Left inside
+   the row's padding it was a square bar floating in a rounded card. */
+.card-rows .action-band {
+  margin-left: calc(-1 * var(--card-pad));
+  margin-right: calc(-1 * var(--card-pad));
+}
+
+@media (width<=620px) {
+  .action-band {
+    padding: 0 var(--space-6);
+  }
+  .action-band-aside {
+    font-size: var(--fs-micro);
+  }
+}
+
+/* --- the three zones of a card: head, content, foot --- */
+
+/* Every card in the product opens with one of three heading blocks —
+   `.status-heading` (icon, title, count), `.card-heading` (icon, title) and
+   `.section-heading` (eyebrow, title, control). They arrange different things,
+   which is fine; they should not also *look* like different amounts of card,
+   and they should not look like the content under them.
+   So the head is a band: the card's own paper one shade down, run out to the
+   card's edges, closed with a hairline. It takes the card's top corners the way
+   `.card-rows` takes the bottom ones, and it publishes one gap below itself, so
+   three margins (12px, 14px, 16px) stop being three. */
+.section-card > .status-heading:first-child,
+.section-card > .card-heading:first-child {
+  background: var(--card-zone);
+  border-bottom: 1px solid var(--line);
+  border-radius: calc(var(--card-radius) - 1px) calc(var(--card-radius) - 1px) 0 0;
+  margin: calc(-1 * var(--card-pad)) calc(-1 * var(--card-pad)) var(--card-pad);
+  padding: var(--space-6) var(--card-pad);
+}
+
+/* The other end of the same idea: a note or a control that closes a card rather
+   than being one of its rows. Its top margin cancels the negative margin
+   `.card-rows` uses to reach the card's edge, so a list runs straight into it,
+   and it eats the card's bottom padding the same way. */
+.card-foot {
+  background: var(--card-zone);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 calc(var(--card-radius) - 1px) calc(var(--card-radius) - 1px);
+  margin: var(--card-pad) calc(-1 * var(--card-pad)) calc(-1 * var(--card-pad));
+  padding: var(--space-6) var(--card-pad);
+}
+
+/* --- the door: one thing a page can open, as a row -------------------------
+ *
+ * `EntryRow`. It was `.elsewhere-row` in `features/profile.css`, where a second
+ * page could not find it, and for one afternoon it was `EntryCard` — a card
+ * with a head, a foot and nothing between, which drew the empty band this
+ * stylesheet spends a paragraph in `Notice` warning against. The anatomy below
+ * is Profile's, unchanged; what changed is that it has a name and lives where
+ * the product can reach it.
+ *
+ * Rows go in `.card-rows`, so the surface, the border, the width and the
+ * side padding all come from the card. What is here is the grid and the ink. */
+
+.entry-row {
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-6);
+  padding-top: var(--space-7);
+  padding-bottom: var(--space-7);
+  text-decoration: none;
+  transition: background var(--dur-fast) var(--ease);
+  display: grid;
+}
+
+.entry-row:hover {
+  background: var(--card-zone);
+}
+
+/* The whole row is the control, so the ring is drawn inside it — an outline
+   outside a row that bleeds to the card's edge is clipped by the card. */
+.entry-row:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: -3px;
+}
+
+.entry-icon {
+  color: var(--purple-dark);
+  background: var(--purple-soft);
+  border-radius: var(--radius-chip);
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  display: grid;
+}
+
+.entry-copy strong {
+  font-size: var(--fs-body);
+  display: block;
+}
+
+.entry-copy small {
+  color: var(--muted);
+  margin-top: var(--space-1);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  display: block;
+}
+
+.entry-where {
+  color: var(--purple-dark);
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-heavy);
+  display: flex;
+}
+
+/* The trailing cell drops under the copy: at this width the destination name
+   and the title were sharing 340px and both wrapped.
+
+   This block sits *here*, directly under the rules it overrides, and not in
+   either of the two `width<=620` blocks further up the file — it was in one of
+   them for ten minutes and lost the tie to the base rule above by position, so
+   the row kept three columns and grew an implicit fourth. Two rules of equal
+   specificity are decided by position; a media query does not raise it. */
+@media (width<=620px) {
+  .entry-row {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+  .entry-where {
+    grid-column: 2;
+  }
+}
+
+/* A card whose whole content is one list has no head to close, so the list
+   takes the card's own radius on all four corners and pulls up into the
+   padding the head would have occupied. Without this the first row meets the
+   card's rounded top with a square edge — the tell `Card.jsx` names. */
+.section-card > .card-rows:only-child {
+  border-radius: calc(var(--card-radius) - 1px);
+  margin-top: calc(-1 * var(--card-pad));
+}
+
+/* --- the link button --- */
+
+.link-button {
+  cursor: pointer;
+  color: var(--purple);
+  background: none;
+  border: 0;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  font-family: inherit;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+  display: inline-flex;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+/* --- the state card at narrow widths --- */
+
+@media (width<=620px) {
+  /* The action drops under the sentence rather than squeezing it: at this width
+     `See the 2 steps →` and the line it belongs to cannot both keep their
+     measure, and the sentence is the part that has to stay readable. It is the
+     control that moves, never the control that wraps — see the button rule
+     above.
+
+     So the basis is the row minus the mark, not the whole row. Written as a
+     flat `100%` the *sentence* is what breaks to its own line: nothing fits
+     beside a 16px `flex: none` mark, so the mark is left alone on the first
+     line and `.notice-action`'s indent then lines up under nothing. Taking off
+     the mark and the gap it sits behind leaves the copy where it was and spends
+     the wrap on the control, which is the only part meant to move. */
+  .notice {
+    flex-wrap: wrap;
+  }
+  .notice-copy {
+    flex: 1 0 calc(100% - var(--notice-mark) - var(--space-5));
+  }
+  .notice-action {
+    align-self: flex-start;
+    margin-left: calc(var(--space-5) + var(--notice-mark));
+  }
+  .state-card {
+    padding: var(--space-11) var(--space-9);
+  }
+}
+
+/* ============================================================================
+ * The step rail — `design-system/patterns/StepRail.jsx`.
+ *
+ * The rail a multi-step flow is walked along. It lives in the shared layer
+ * rather than in the section that needed it first, because **what a step set
+ * aside looks like is a decision about the product**, not about one screen: the
+ * moment a second flow copies these classes by hand they drift, which is the
+ * failure `Drawer` was written to end.
+ *
+ * It is the portal's sidebar, continued. The same width (`--sidebar-width`),
+ * the same surface, fixed to the same edge, the brand row at the same height
+ * with the crest at the same place, the vendor line at the same foot — so a
+ * student who leaves the flow for the portal and comes back sees the column
+ * hold still and only its contents change (Marco, 2026-08-21: "mesmo tamanho,
+ * fixo, só mudando o conteúdo"). What makes it this product's rather than any
+ * light rail is the mechanism every portal rail already uses — **it leads with
+ * one `.anchor-card`, the key figure on ink** — composed for a flow: the
+ * institution, the greeting, the figure and its meter on ink, the steps, the
+ * human at the foot. Only the list of steps scrolls; the brand, the figure and
+ * the human hold still, the way the sidebar's brand and profile chip do.
+ * ==========================================================================*/
+
+.step-rail {
+  z-index: var(--z-sidebar);
+  color: var(--ink);
+  /* The sidebar's own surface and edge — `chrome.css`'s `.sidebar`, to the
+     value: the column is the same column. */
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  background: var(--glass);
+  border-right: 1px solid var(--line);
+  flex-direction: column;
+  width: var(--sidebar-width);
+  padding: 0 var(--space-9) var(--space-9);
+  display: flex;
+  position: fixed;
+  inset: 0 auto 0 0;
+  /* The column itself never scrolls: the list of steps does, so the brand, the
+     figure and the human are always where she left them. */
+  overflow: hidden;
+}
+
+/* --- the institution: the sidebar's brand row, to the pixel ----------------- */
+
+.rail-brand {
+  flex: none;
+  align-items: center;
+  gap: var(--space-6);
+  height: var(--topbar-height);
+  padding: 0 var(--space-5);
+  display: flex;
+}
+
+.rail-mark {
+  flex: none;
+  place-items: center;
+  display: grid;
+}
+
+.rail-brand-name {
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  display: flex;
+}
+
+/* The institution's own voice, not the product's — a university writes its name
+   in a serif. The same rule `.brand-name strong` follows in `chrome.css`; it is
+   written here as well because the rail is the design system's and the brand
+   row is the shell's, and neither may reach into the other's file. */
+.rail-brand-name strong {
+  letter-spacing: var(--ls-snug);
+  font-family: Georgia, serif;
+  font-size: var(--fs-h3);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-heading);
+}
+
+.rail-brand-name span {
+  color: var(--muted);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-heading);
+}
+
+/* --- the greeting, then the figure on ink ---------------------------------- */
+
+.rail-band {
+  flex: none;
+  padding: var(--space-4) 0 var(--space-8);
+}
+
+/* The greeting introduces the figure and is set one step under it: the band
+   greets, the figure informs, and the greeting must never dwarf what it
+   introduces. It sits on paper; the figure sits on ink under it. */
+.rail-greeting {
+  letter-spacing: var(--ls-snug);
+  text-wrap: pretty;
+  margin: 0 0 var(--space-5);
+  padding: 0 var(--space-5);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-semi);
+  line-height: var(--lh-heading);
+}
+
+/* The anchor card, the way every rail in the portal opens — the key figure on
+   ink. In a flow the key figure is how far along it is: the figure, the one
+   line under it, the meter — three lines, no label; the greeting above it is
+   the label. */
+.rail-band .anchor-card {
+  flex: none;
+  padding: var(--space-7) var(--space-8);
+}
+
+.rail-band .anchor-card .panel-label {
+  display: block;
+}
+
+.rail-label {
+  color: var(--muted);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  margin: 0;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+}
+
+.rail-count {
+  letter-spacing: var(--ls-tight);
+  margin: 0;
+  font-size: var(--fs-display);
+  font-weight: var(--fw-heavy);
+  line-height: var(--lh-tight);
+  display: block;
+}
+
+/* At most one line under the figure — the fourth line inside a figure cell is
+   what pushed My Classrooms' summary panel 16px taller than everyone else's. */
+.rail-note {
+  color: var(--muted);
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+/* Two runs, not one. Skipped is progress through the flow and is not progress,
+   so it is drawn beside the saved run and never inside it. On ink: the saved
+   run is green, because green means one thing in this product, and the skipped
+   run is the ink plane's own muted light — counted, not done. */
+.rail-meter {
+  background: var(--on-ink-line);
+  border-radius: var(--radius-pill);
+  height: 6px;
+  margin-top: var(--space-5);
+  display: flex;
+  overflow: hidden;
+}
+
+.meter-saved {
+  background: var(--green);
+  transition: width var(--dur-base) var(--ease);
+}
+
+.meter-skipped {
+  background: var(--on-ink-muted);
+  transition: width var(--dur-base) var(--ease);
+}
+
+/* Only below 1060, where the rows fold behind it. */
+.rail-disclosure {
+  display: none;
+}
+
+/* --- the steps: the one part of the rail that scrolls ---------------------- */
+
+.rail-steps {
+  border-top: 1px solid var(--line-soft);
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-top: var(--space-5);
+  overflow-y: auto;
+}
+
+.rail-steps ol {
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  position: relative;
+}
+
+/* The spine. A stepper reads as a *path* because the marks are joined; this is
+   a connector between circles, not an accent painted down the edge of a rounded
+   row, which is a rule bar wearing a card's corners. It runs from the first
+   mark's centre to the last's; the rows are positioned above it, so the current
+   row's wash covers the stretch under it, the way the reference does. */
+.rail-steps ol:before {
+  content: '';
+  background: var(--line);
+  width: 1px;
+  position: absolute;
+  top: var(--space-10);
+  bottom: var(--space-10);
+  left: calc(var(--space-5) + 12px);
+}
+
+/* A row says its name, and a second line only where the second line is
+   information: how long an unreached step takes, why a locked one is not open,
+   that a skipped one can be come back to. A saved row has its check and the
+   current row has the step head under the question — a "Saved" and a "Step 3
+   of 8" on those were the same fact said twice. */
+
+.step-row > button,
+.step-row > span {
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-chip);
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: flex-start;
+  gap: var(--space-6);
+  width: 100%;
+  padding: var(--space-4) var(--space-5);
+  font: inherit;
+  display: grid;
+  position: relative;
+}
+
+/* A reachable row is a button and says so on hover and to a keyboard; it does
+   not wear a chevron, which on six rows was six arrows pointing at nothing. */
+.step-row > button {
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.step-row > button:hover {
+  background: var(--surface-sunk);
+}
+
+/* The step she is on is the one row with a surface: the faintest wash, and the
+   name in the purple ink — colour spent once in the list. */
+.step-row.current > button,
+.step-row.current > span {
+  background: var(--purple-wash);
+}
+
+/* --- the four states, and the two conditions that are not states ---------- */
+
+/* A 24px disc with the step's number in it. Numbers, because a list of eight is
+   a path and a position on a path is a number; the glyph replaces the number
+   only where the state is the fact — a check, a lock, a half. */
+.step-mark {
+  border-radius: var(--radius-round);
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  font-size: var(--fs-copy);
+  font-weight: var(--fw-heavy);
+  line-height: 1;
+  display: grid;
+  position: relative;
+  z-index: 1;
+}
+
+/* Saved. Green means exactly one thing in this product — covered, satisfied,
+   done — and this is that thing. */
+.step-mark.saved {
+  color: var(--on-ink);
+  background: var(--green);
+}
+
+/* In progress. The product's one gradient, the number on it: the only mark
+   that is saturated, because it is the only one that is still happening. */
+.step-mark.current {
+  color: var(--on-ink);
+  background: var(--grad-purple);
+}
+
+/* Skipped. Not amber — amber means someone still has to act, and inside the
+   flow she is walking that is a nag. Not dimmed, not crossed out, not crimson:
+   every one of those reads as failure, and the card is explicit that this one
+   must not. A sunk disc with the half-filled circle on it: started, set down,
+   no alarm. */
+.step-mark.skipped {
+  color: var(--muted);
+  background: var(--surface-sunk);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.step-mark.upcoming,
+.step-mark.locked,
+.step-mark.unknown {
+  color: var(--muted);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+.step-text {
+  flex-direction: column;
+  min-width: 0;
+  /* Sits the first line of the name on the mark's centre line. */
+  padding-top: var(--space-2);
+  display: flex;
+}
+
+.step-name {
+  letter-spacing: var(--ls-snug);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semi);
+  line-height: var(--lh-heading);
+}
+
+.step-meta {
+  color: var(--muted);
+  margin-top: var(--space-1);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+}
+
+.step-meta.faint {
+  color: var(--faint);
+}
+
+/* The name carries the state as much as the mark does. Only the current step is
+   at full weight and in the purple ink; only the two unreached states are quiet. */
+.step-row.current .step-name {
+  color: var(--purple-ink);
+  font-weight: var(--fw-heavy);
+}
+
+.step-row.saved .step-name {
+  color: var(--ink);
+}
+
+.step-row.upcoming .step-name,
+.step-row.locked .step-name,
+.step-row.unknown .step-name {
+  color: var(--muted);
+}
+
+/* Skipped keeps full contrast. That is the whole point of it. */
+.step-row.skipped .step-name {
+  color: var(--ink);
+}
+
+/* --- the advisor, at the foot: Edward is not here, and this keeps his promise
+       that a named human is reachable --- */
+
+/* The foot is the sidebar's foot: a hairline, then the human where the profile
+   chip is, then the vendor where the vendor is. */
+.rail-advisor {
+  border-top: 1px solid var(--line);
+  flex: none;
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+}
+
+.advisor-who {
+  align-items: center;
+  gap: var(--space-5);
+  margin: var(--space-5) 0 0;
+  display: flex;
+}
+
+.advisor-who strong {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semi);
+  display: block;
+}
+
+.advisor-who small {
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+.advisor-reach {
+  margin: var(--space-5) 0 0;
+}
+
+.advisor-reach a {
+  color: var(--muted);
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--fs-copy);
+  text-decoration: none;
+  display: inline-flex;
+}
+
+.advisor-reach a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+/* --- the vendor, under everything: the same line the sidebar ends with,
+       `.powered-by` in `chrome.css`, in the same place. --- */
+
+.rail-vendor {
+  flex: none;
+}
+
+/* ============================================================================
+ * Below 820 — where the portal's sidebar becomes a drawer — the rail is the
+ * compact header the approved surface draws: the institution on the left, the
+ * count and a short meter on the right, and the rows behind a disclosure that
+ * opens the list under the header. Folding the rail never costs the position:
+ * the count stays on the header, and the band under it says "Step n of 8" at
+ * all times (ENR-151 AC 5).
+ * ==========================================================================*/
+
+@media (width<=820px) {
+  .step-rail {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    flex-flow: row wrap;
+    align-items: center;
+    gap: var(--space-6) var(--space-8);
+    width: auto;
+    height: auto;
+    padding: var(--space-5) var(--space-8);
+    /* Fixed to the edge at wide; up here it is the header, in flow, sticky on
+       top of the content it heads. */
+    position: sticky;
+    inset: auto;
+    top: 0;
+    z-index: var(--z-topbar);
+    overflow: visible;
+  }
+
+  .rail-band,
+  .rail-steps,
+  .rail-advisor,
+  .rail-vendor {
+    border-top: 0;
+    margin-top: 0;
+    padding-top: 0;
+  }
+
+  .rail-brand {
+    height: auto;
+    padding: 0;
+  }
+
+  .rail-brand {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .rail-mark svg {
+    width: 32px;
+    height: auto;
+  }
+
+  .rail-brand-name span {
+    display: none;
+  }
+
+  .rail-band {
+    flex: none;
+    align-items: center;
+    gap: var(--space-5);
+    padding: 0;
+    display: flex;
+  }
+
+  /* Up here the figure is a line of the header, not a card on ink. */
+  .rail-band .anchor-card {
+    color: var(--ink);
+    background: none;
+    border-radius: 0;
+    box-shadow: none;
+    align-items: center;
+    gap: var(--space-5);
+    margin: 0;
+    padding: 0;
+    display: flex;
+  }
+
+  .rail-greeting,
+  .rail-band .anchor-card .panel-label,
+  .rail-note {
+    display: none;
+  }
+
+  /* The institution keeps its name; on the narrowest phones it gives up its
+     last letters before the count and the meter give up their place. */
+  .rail-brand-name strong {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .rail-band .anchor-card .rail-count {
+    color: var(--ink);
+    letter-spacing: 0;
+    margin: 0;
+    font-size: var(--fs-copy);
+    font-weight: var(--fw-semi);
+    white-space: nowrap;
+  }
+
+  .rail-meter {
+    background: var(--line-soft);
+    width: 96px;
+    margin: 0;
+  }
+
+  .meter-skipped {
+    background: var(--line-strong);
+  }
+
+  .rail-steps {
+    flex: none;
+    overflow: visible;
+  }
+
+  .rail-disclosure {
+    color: var(--ink);
+    cursor: pointer;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-pill);
+    align-items: center;
+    gap: var(--space-4);
+    height: var(--control-height);
+    padding: 0 var(--space-5) 0 var(--space-7);
+    font-family: inherit;
+    font-size: var(--fs-copy);
+    font-weight: var(--fw-semi);
+    display: flex;
+  }
+
+  .rail-disclosure:hover {
+    background: var(--surface-sunk);
+  }
+
+  .rail-disclosure svg {
+    transition: transform var(--dur-fast) var(--ease);
+  }
+
+  .rail-disclosure[aria-expanded='true'] svg {
+    transform: rotate(180deg);
+  }
+
+  .rail-steps {
+    border-top: 1px solid var(--line-soft);
+    order: 10;
+    flex-basis: 100%;
+    max-height: 60vh;
+    padding-top: var(--space-5);
+    display: none;
+    overflow-y: auto;
+  }
+
+  .rail-steps.open {
+    display: block;
+  }
+
+  /* The human comes with the list. */
+  .rail-advisor {
+    border-top: 1px solid var(--line-soft);
+    order: 11;
+    flex-basis: 100%;
+    padding-top: var(--space-6);
+    display: none;
+  }
+
+  .rail-steps.open ~ .rail-advisor {
+    display: block;
+  }
+
+  .rail-vendor {
+    display: none;
+  }
+}
+
+@media (width<=620px) {
+  .step-rail {
+    gap: var(--space-4) var(--space-5);
+    padding: var(--space-4) var(--space-6);
+  }
+
+  .rail-meter {
+    width: 56px;
+  }
+
+  /* The name folds into the chevron; the button keeps its accessible name. */
+  .rail-disclosure {
+    width: var(--control-height);
+    padding: 0;
+    justify-content: center;
+  }
+
+  .rail-disclosure span {
+    display: none;
+  }
+}
+
+/* ── The tooltip ────────────────────────────────────────────────────────────
+ *
+ * One bubble, two variants, drawn into `document.body` and positioned against
+ * the window by `Tooltip.jsx`. It used to be drawn twice — once as
+ * `.term-tip-bubble` in the financials file and once as `.advisor-action::after`
+ * here — and both were absolutely positioned inside their own parent, so both
+ * were one `overflow: hidden` away from being invisible. That is not a bug that
+ * gets fixed; it is a bug that gets designed out, by taking the bubble out of
+ * the box it was drawn in.
+ *
+ * `hint` names a control and may only repeat its accessible name. `info`
+ * explains a word and carries what is printed nowhere else, which is why it is
+ * bigger, has a title, and is opened by a button rather than by a hover. */
+.tip-bubble {
+  z-index: var(--z-tooltip);
+  background: var(--surface-ink);
+  box-shadow: var(--shadow-float);
+  border-radius: var(--radius-chip);
+  width: max-content;
+  max-width: min(var(--tip-measure), calc(100vw - var(--tip-edge) * 2));
+  position: fixed;
+  top: 0;
+  left: 0;
+}
+
+/* Until it has been measured it is at 0,0, which is not where it belongs. */
+.tip-bubble:not([data-placed]) {
+  visibility: hidden;
+}
+
+.tip-bubble[data-placed] {
+  animation: tip-in var(--dur-fast) var(--ease);
+}
+
+/* The arrow is placed against the control's centre, not the bubble's, so a
+   bubble that had to be pulled in from the window's edge still points at what
+   it belongs to. */
+.tip-bubble:before {
+  content: '';
+  background: var(--surface-ink);
+  border-radius: 1px;
+  width: 8px;
+  height: 8px;
+  position: absolute;
+  left: var(--tip-arrow);
+  rotate: 45deg;
+  translate: -50%;
+}
+
+.tip-bubble[data-side="bottom"] {
+  transform-origin: 50% 0;
+}
+
+.tip-bubble[data-side="bottom"]:before {
+  top: -3px;
+}
+
+.tip-bubble[data-side="top"] {
+  transform-origin: 50% 100%;
+}
+
+.tip-bubble[data-side="top"]:before {
+  bottom: -3px;
+}
+
+.tip-bubble.hint {
+  color: var(--purple-tint);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-semi);
+  pointer-events: none;
+}
+
+.tip-bubble.info {
+  color: var(--purple-tint);
+  border-radius: var(--radius-tile);
+  padding: var(--space-5) var(--space-6);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-body);
+  text-wrap: pretty;
+}
+
+.tip-bubble.info strong {
+  color: var(--on-ink);
+  margin-bottom: var(--space-1);
+  font-size: var(--fs-copy);
+  display: block;
+}
+
+@keyframes tip-in {
+  from {
+    opacity: 0;
+    scale: .97;
+  }
+}
+
+/* The explainer's own control: quiet enough that a heading carrying one is
+   still read as a heading, and `cursor: help` because it is not an action. */
+.info-tip {
+  color: var(--muted);
+  cursor: help;
+  background: 0 0;
+  border: 0;
+  border-radius: var(--radius-round);
+  flex: none;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  display: inline-grid;
+  vertical-align: middle;
+}
+
+.info-tip:hover, .info-tip:focus-visible, .info-tip[aria-expanded="true"] {
+  color: var(--purple-dark);
+}
+
+/* The explainer follows the word it explains, so it owns the space between
+   them rather than depending on a space character surviving in the JSX. */
+.info-tip {
+  margin-inline-start: var(--space-1);
+}
+
+/* On the ink plane — a rail's anchor card. Written once here rather than per
+   rail: eight rails re-deriving what a control looks like on ink is the bug
+   `AnchorCard` exists to close. */
+.anchor-card .info-tip {
+  color: var(--on-ink-muted);
+}
+
+.anchor-card .info-tip:hover,
+.anchor-card .info-tip:focus-visible,
+.anchor-card .info-tip[aria-expanded="true"] {
+  color: var(--on-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tip-bubble[data-placed] {
+    animation: none;
+  }
+}
+
+/* --- People: the one disc — Jam of 2026-08-21 -------------------------------
+ *
+ * `Avatar`. A photo when the record has one, initials when it does not, at four
+ * sizes. Six classes drew this disc before, none of them able to show a face.
+ * The photo is a real `<img>`, so the disc is the clip and nothing else. */
+.avatar {
+  --avatar-size: 40px;
+  color: var(--purple-ink);
+  background: linear-gradient(145deg, var(--purple-soft), var(--purple-line));
+  border-radius: var(--radius-round);
+  flex: none;
+  place-items: center;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+  letter-spacing: var(--ls-snug);
+  display: grid;
+  object-fit: cover;
+  overflow: hidden;
+}
+
+.avatar-xs { --avatar-size: 24px; font-size: var(--fs-micro); }
+.avatar-sm { --avatar-size: 32px; font-size: var(--fs-micro); }
+.avatar-md { --avatar-size: 40px; }
+.avatar-lg { --avatar-size: 56px; font-size: var(--fs-copy); }
+.avatar-xl { --avatar-size: 96px; font-size: var(--fs-title); }
+
+/* A photo sits on the same disc so a slow image and a missing image look the
+   same from the outside; the hairline keeps a pale photo off a pale surface. */
+img.avatar {
+  box-shadow: inset 0 0 0 1px #1f253a14;
+}
+
+/* --- Spot: the one illustration ------------------------------------------------
+ *
+ * The band's orbit motif at card scale — two rings, a core, two sparks, a
+ * duotone glyph — in the colour contract's tones. The size is one variable and
+ * everything inside is a fraction of it. */
+.spot {
+  --spot-size: 84px;
+  --spot-ink: var(--muted);
+  --spot-tint: var(--line-soft);
+  --spot-ring: var(--line-strong);
+  --spot-dot: var(--purple-line);
+  width: var(--spot-size);
+  height: var(--spot-size);
+  margin: 0 auto var(--space-6);
+  display: block;
+  position: relative;
+}
+
+.spot-ring {
+  border: 1px solid var(--spot-ring);
+  border-radius: var(--radius-round);
+  position: absolute;
+  inset: 12%;
+}
+
+.spot-ring.dashed {
+  opacity: .6;
+  border-style: dashed;
+  inset: 0;
+  transform: rotate(12deg);
+}
+
+.spot-core {
+  color: var(--spot-ink);
+  background: var(--spot-tint);
+  border-radius: var(--radius-round);
+  place-items: center;
+  display: grid;
+  position: absolute;
+  inset: 28%;
+  box-shadow: inset 0 1px #fffc;
+}
+
+.spot-dot {
+  background: var(--spot-dot);
+  border-radius: var(--radius-round);
+  position: absolute;
+  box-shadow: 0 0 10px var(--spot-dot);
+}
+
+.spot-dot.one { width: 8%; height: 8%; top: 12%; right: 16%; }
+.spot-dot.two { width: 5%; height: 5%; bottom: 14%; left: 14%; }
+
+.spot-accent  { --spot-ink: var(--purple-dark); --spot-tint: var(--purple-soft); --spot-ring: var(--purple-line); --spot-dot: var(--green-line); }
+.spot-done    { --spot-ink: var(--green);       --spot-tint: var(--green-tint);  --spot-ring: var(--green-line);  --spot-dot: var(--green-line); }
+.spot-working { --spot-ink: var(--amber);       --spot-tint: var(--amber-tint);  --spot-ring: var(--amber-line);  --spot-dot: var(--amber-line); }
+.spot-error   { --spot-ink: var(--crimson);     --spot-tint: var(--crimson-soft); --spot-ring: var(--crimson-line); --spot-dot: var(--crimson-line); }
+.spot-quiet   { --spot-dot: var(--purple-line); }
+
+/* --- The state card, now with a spot, a fourth variant and a page size --- */
+.state-card.done {
+  background: var(--green-wash);
+  border-color: var(--green-tint);
+}
+
+/* Inside a card — the all-caught-up message in My Enrollment's steps card. The
+   card is already the surface; this sits on it without a second border. */
+.state-card.inset {
+  background: var(--green-wash);
+  border-color: var(--green-tint);
+  margin: var(--space-2) 0 0;
+}
+
+/* Standing in for a whole page: centred under the band, wider, taller. */
+.state-card.size-page {
+  max-width: 560px;
+  margin: var(--space-12) auto 0;
+  padding: var(--space-12) var(--space-11);
+}
+
+.state-card.size-page h3 {
+  font-size: var(--fs-h1);
+}
+
+/* --- The status head as the group's handle ----------------------------------
+ *
+ * The same grid as the static head, as a button: the reset, the cursor, the
+ * count before the chevron. The card publishes its padding and radius, so the
+ * head can run out to the card's edges as a hit area without knowing either. */
+.status-heading.collapsible {
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  /* The zone rule above gives the head its band, its corners, its padding and
+     the gap below; a button only has to stop shrinking to its content. */
+  width: calc(100% + 2 * var(--card-pad));
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+/* The handle has to look like one: the chevron sits in a bordered disc — the
+   same furniture as an icon button — the count is a purple chip, and the whole
+   head answers a pointer: the band darkens, the name and the disc go purple. */
+.status-heading.collapsible:hover {
+  background: var(--surface-sunk);
+}
+
+.status-heading.collapsible:hover h2 {
+  color: var(--purple-dark);
+}
+
+.status-heading.collapsible .status-count {
+  color: var(--purple-ink);
+  background: var(--purple-soft);
+}
+
+.status-heading.collapsible:hover .status-chevron {
+  color: var(--purple-dark);
+  background: var(--purple-wash);
+  border-color: var(--purple-line);
+}
+
+.status-trailing {
+  align-items: center;
+  gap: var(--space-4);
+  display: flex;
+}
+
+.status-chevron {
+  color: var(--ink-2);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-round);
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  transition:
+    transform var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.status-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* A closed group is the head and nothing under it: the hairline and the gap
+   below the head go, the band takes all four of the card's corners, and the
+   card's own bottom padding is eaten the way `.card-foot` eats it. */
+.section-card.collapsed > .status-heading.collapsible {
+  border-bottom: 0;
+  border-radius: calc(var(--card-radius) - 1px);
+  margin-bottom: calc(-1 * var(--card-pad));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-chevron,
+  .status-heading.collapsible {
+    transition: none;
+  }
+}
+
+/* Compact: the card inside a narrow column — the sidebar, when its list did not
+   load. Left-aligned, a row's radius, a smaller spot, the same crimson. */
+.state-card.size-compact {
+  text-align: left;
+  border-radius: var(--radius-row);
+  padding: var(--space-7);
+}
+
+.state-card.size-compact .spot {
+  margin: 0 0 var(--space-6);
+}
+
+.state-card.size-compact h3 {
+  margin-bottom: var(--space-2);
+  font-size: var(--fs-body);
+}
+
+.state-card.size-compact p {
+  margin: 0;
+  font-size: var(--fs-copy);
+}
+
+.state-card.size-compact .secondary-button {
+  margin: var(--space-6) 0 0;
+}
+
+/* --- A run of rows, named once ----------------------------------------------
+ *
+ * "Yours to change", then "Aster's record" — My Profile's two labels are its
+ * whole argument, so they are the only type inside a card that is tracked and
+ * coloured, and the break between them carries the distinction a pill on every
+ * row could not. The shape lived in `features/profile.css`, where a second
+ * feature could not find it; the two popovers needed it on 2026-08-21, so the
+ * label is here and each feature keeps only its tones. It is a child of
+ * `.card-rows`, so the card gives it its side padding and its hairline. */
+.rows-label {
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  padding-top: var(--space-7);
+  padding-bottom: var(--space-4);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+  display: flex;
+}
+
+.rows-label svg {
+  flex: none;
+}
+
+.rows-label em {
+  color: var(--muted);
+  letter-spacing: var(--ls-caps);
+  text-transform: none;
+  margin-left: auto;
+  font-size: var(--fs-small);
+  font-style: normal;
+  font-weight: var(--fw-semi);
+}
+
+/* --- Popover: a card that floats ---------------------------------------------
+ *
+ * The anchored panel a topbar control opens — the bell's feed and the points
+ * chip's balance. One shell for both, so they cannot drift on `Esc`, on focus
+ * return or on the scrim, and the same `--z-popover` pair as the preview menu
+ * two chips along, so the three things that corner can open never stack.
+ *
+ * The panel IS a card. `Popover` renders `Card`, so the panel carries
+ * `section-card`, publishes `--card-pad` and `--card-radius`, and what a
+ * feature puts inside — a status head, `.card-rows`, a `.card-foot`, or the
+ * rail's anchor taking the top corners — is drawn by the card's own rules. This
+ * block adds only what floating needs. Before 2026-08-21 the shell was its own
+ * set of rules (`.pop-head`, `.pop-foot`, `.pop-state`), typed by hand in
+ * `features/housing.css` and on no styleguide, and both panels read as a
+ * component from somewhere else (Marco) — because they were. */
+.popover {
+  position: relative;
+}
+
+.pop-scrim {
+  z-index: var(--z-popover-scrim);
+  cursor: default;
+  background: 0 0;
+  border: 0;
+  position: fixed;
+  inset: 0;
+}
+
+/* Named with `.section-card` so the card's own margin, shadow and position are
+   beaten by rule and not by which file the cascade read last. */
+.section-card.pop-panel {
+  z-index: var(--z-popover);
+  width: var(--popover-width);
+  max-height: min(var(--popover-max-height), calc(100vh - var(--topbar-height) - var(--space-11)));
+  margin: 0;
+  position: absolute;
+  top: calc(100% + var(--space-5));
+  right: 0;
+  overflow: hidden auto;
+  box-shadow: var(--shadow-soft);
+}
+
+.section-card.pop-panel.align-start {
+  right: auto;
+  left: 0;
+}
+
+/* The head stays while the rows scroll under it. A sticky element is kept
+   inside its containing block's content box, so a head that reaches the panel's
+   top edge through a negative margin would be pushed 20px down into the padding
+   (measured, 2026-08-21). So the panel has no top padding and its first zone has
+   no negative top margin: the head — or the anchor — starts where the panel does. */
+.section-card.pop-panel {
+  padding-top: 0;
+}
+
+.section-card.pop-panel > .status-heading:first-child,
+.section-card.pop-panel > .card-heading:first-child {
+  z-index: 1;
+  margin-top: 0;
+  position: sticky;
+  top: 0;
+}
+
+/* A popover may open the way a rail opens — with the figure on ink. The anchor
+   takes the card's top corners and the card's bleed, the way a head does, and
+   drops the shadow it wears on the canvas: the panel already floats. */
+.section-card.pop-panel > .anchor-card {
+  border-radius: calc(var(--card-radius) - 1px) calc(var(--card-radius) - 1px) 0 0;
+  margin: 0 calc(-1 * var(--card-pad)) var(--card-pad);
+  position: relative;
+  box-shadow: none;
+}
+
+/* A list runs straight into the anchor the way it runs into a head. */
+.section-card.pop-panel > .anchor-card + .card-rows {
+  margin-top: calc(-1 * var(--card-pad));
+}
+
+/* A row in a popover: the content tile, the copy, the trailing cell — the task
+   row's columns, so a step earned here wears the tile it wore on My Enrollment.
+   Rows go in `.card-rows`, which gives them the card's side padding, the
+   hairline and the bleed; a row that goes somewhere is an `<a>`. */
+.pop-row {
+  color: inherit;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-6);
+  padding-top: var(--space-6);
+  padding-bottom: var(--space-6);
+  text-decoration: none;
+  display: grid;
+}
+
+a.pop-row {
+  transition: background var(--dur-fast) var(--ease);
+}
+
+a.pop-row:hover {
+  background: var(--card-zone);
+}
+
+/* The whole row is the control, so the ring is drawn inside it — an outline
+   outside a row that bleeds to the card's edge is clipped by the card. */
+a.pop-row:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: -3px;
+}
+
+.pop-copy {
+  min-width: 0;
+}
+
+.pop-copy strong {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semi);
+  line-height: var(--lh-heading);
+  display: block;
+}
+
+.pop-copy small {
+  color: var(--muted);
+  margin-top: var(--space-1);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  display: block;
+}
+
+.pop-trail {
+  color: var(--muted);
+  align-items: center;
+  gap: var(--space-4);
+  display: flex;
+}
+
+/* The unread mark: an ink dot in the trailing cell, before the arrow. It never
+   carries the category as well — one surface saying two things in one colour
+   is why the tinted-row pattern was rejected (ENR-161). */
+.pop-dot {
+  background: var(--ink);
+  border-radius: var(--radius-pill);
+  flex: none;
+  width: 7px;
+  height: 7px;
+}
+
+/* The sentence that closes a run longer than the rows shown. */
+.pop-more {
+  color: var(--muted);
+  margin: 0;
+  padding-top: var(--space-4);
+  padding-bottom: var(--space-5);
+  font-size: var(--fs-small);
+}
+
+/* Loading mirrors the row's anatomy — a tile and two lines — so loading → ready
+   is a fade, not a rearrangement. */
+.pop-row.skeleton .skeleton-line.tile {
+  border-radius: var(--radius-tile);
+  width: 40px;
+  height: 40px;
+}
+
+.pop-skeleton-copy {
+  flex-direction: column;
+  gap: var(--space-3);
+  display: flex;
+}
+
+.pop-skeleton-copy .skeleton-line {
+  width: 78%;
+  height: 11px;
+}
+
+.pop-skeleton-copy .skeleton-line.short {
+  width: 44%;
+}
+
+/* A state inside the popover is the product's one state card, compact, sitting
+   between the head and the foot on the card's own padding. */
+.pop-state {
+  margin: 0;
+}
+
+@media (width<=820px) {
+  .section-card.pop-panel {
+    width: min(var(--popover-width), calc(100vw - 2 * var(--space-6)));
+  }
+}
+
+@media (width<=620px) {
+  /* The panel is anchored to a chip that is now near the screen edge; let it
+     use the full width rather than hang off it. */
+  .section-card.pop-panel,
+  .section-card.pop-panel.align-start {
+    width: calc(100vw - 2 * var(--space-5));
+    position: fixed;
+    top: calc(var(--topbar-height) - var(--space-4));
+    right: var(--space-5);
+    left: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  a.pop-row {
+    transition: none;
+  }
+}
+
+/* --- the status pill (StatusPill) ------------------------------------------
+ *
+ * One pill for the whole product — the evening of 2026-08-21, Health changes
+ * H8. The base is the shape My Enrollment's *In review* already had in
+ * `enrollment.css` (amber on amber tint, 27px, small bold), moved here so the
+ * record's head on Health, the answer's door row and the reviewing step all
+ * say a state the same way; uppercase and tracked, as the standings on My
+ * Degree already were. The tones are the colour contract's. `quiet` paints
+ * nothing: a fact that asks nothing wears a hairline and the muted ink. */
+
+.status-pill {
+  color: var(--amber);
+  background: var(--amber-tint);
+  border-radius: var(--radius-pill);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-3);
+  height: 27px;
+  padding: 0 var(--space-5);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-bold);
+  display: inline-flex;
+}
+
+.status-pill.done {
+  color: var(--green-ink);
+  background: var(--green-tint);
+}
+
+.status-pill.wait,
+.status-pill.progress {
+  color: var(--blue-ink);
+  background: var(--blue-tint);
+}
+
+.status-pill.stop {
+  color: var(--crimson-ink);
+  background: var(--crimson-soft);
+}
+
+.status-pill.quiet {
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+}
+
+/* --- the advisor's scope line (AdvisorBar `note`) -------------------------- */
+
+/* With a note the bar is a two-row grid — the same three columns the flex row
+   had (the face, the copy that may shrink, the two controls), and the note
+   across all three under them. A wrapping flex row was tried first and did two
+   things wrong: its line gap was the bar's own 14px, which put the bar at 89px
+   against the figure cell's 78 and grew the whole panel on Health alone; and
+   in a wrapping container the copy column stopped shrinking the way it does on
+   every other section, so the name broke onto two lines at 390. Two pixels of
+   row gap keeps the bar at 77, inside the cell. */
+.advisor-bar:has(.advisor-note) {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  row-gap: var(--space-1);
+  display: grid;
+}
+
+.advisor-bar:has(.advisor-note) .advisor-note {
+  grid-column: 1 / -1;
+}
+
+.advisor-note {
+  color: var(--muted);
+  flex: 1 0 100%;
+  font-size: var(--fs-micro);
+  line-height: var(--lh-body);
+  text-wrap: pretty;
+  display: block;
+}
+
+/* --- a door row's state (EntryRow `status`) --------------------------------
+ *
+ * The pill and its consequence, read together under the note — the same order
+ * the record card and the panel say theirs in. */
+
+.entry-status {
+  color: var(--muted);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  font-size: var(--fs-meta);
+  display: flex;
+}
+
+/* --- the action band under a card's head -----------------------------------
+ *
+ * `.section-card > .action-band` above tucks the band under the head and
+ * runs it to the card's edges. When the band *opens* a card that has no head —
+ * the door row on Health, the changes of 2026-08-21 (H6, case 2) — the same
+ * tuck puts it at the card's top, and it takes the card's top corners the way
+ * `.card-rows:only-child` takes them. */
+
+.section-card > .action-band:first-child {
+  border-radius: calc(var(--card-radius) - 1px) calc(var(--card-radius) - 1px) 0 0;
+  margin-top: calc(-1 * var(--card-pad));
+}
+
+/* Content that follows the band directly — not a run of rows, which sit flush
+   under it — gets the card's breathing room back: the band is a strip, and a
+   chip or a sentence pressed against its underside read as part of it. */
+.section-card > .action-band + :not(.card-rows) {
+  margin-top: var(--space-7);
+}
+
+/* The consequence beside a pill in a summary figure — H8's order (the pill,
+   then the line) said in the panel's figure slot. It is a clause, not the
+   figure, so it drops to copy size and regular tracking beside the pill. */
+.summary-figure-copy strong .figure-consequence {
+  letter-spacing: normal;
+  margin-left: var(--space-4);
+  font-size: var(--fs-copy);
+  font-weight: var(--fw-medium);
+}
+
+/* --- the inline ask (EdwardAsk) — C5 of the walkthrough, 2026-08-22 ---------
+ *
+ * The mark and one word, as a text button: the smallest control on the line
+ * (Workable's "✦ AI", Remote's "Revise with AI"). The mark is drawn here and not
+ * borrowed from Edward's own stylesheet, so the pattern stands on its own. */
+
+.edward-ask {
+  align-items: center;
+  gap: var(--space-2);
+  display: inline-flex;
+}
+
+.edward-ask-mark {
+  color: var(--on-ink);
+  background: var(--grad-purple);
+  border-radius: var(--radius-chip);
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-bold);
+  display: grid;
+}
+
+/* --- zone: the band as the panel's foot ------------------------------------
+ *
+ * My Financials (F7, the review of 2026-08-21): what is true of all three tabs
+ * and points at the one thing to do is the band, docked where the shell docks a
+ * section-wide sentence. It takes the panel's bottom corners, as a notice does. */
+.summary-alert > .action-band {
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+  margin: 0;
+}
+
+/* A photograph of a place in a tile of fixed ratio — `PlaceTile`. One ratio on
+   every size so a catalogue lines up whatever the institution published, the
+   picture cropped to fill; the detail (`full`) is wider and carries its caption.
+   The fallback is the monogram `.org-tile`, unchanged. */
+.place-tile {
+  flex: none;
+  aspect-ratio: 4 / 3;
+  background: var(--purple-soft);
+  border-radius: var(--radius-tile);
+  width: 96px;
+  display: block;
+  overflow: hidden;
+}
+.place-tile.sm {
+  border-radius: var(--radius-chip);
+  width: 64px;
+}
+.place-tile.lg {
+  border-radius: var(--radius-row);
+  width: 128px;
+}
+.place-tile img,
+.place-photo img {
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.place-photo {
+  margin: 0 0 var(--space-7);
+}
+.place-photo img {
+  aspect-ratio: 16 / 10;
+  border-radius: var(--radius-row);
+  background: var(--purple-soft);
+}
+.place-photo figcaption {
+  color: var(--muted);
+  margin-top: var(--space-3);
+  font-size: var(--fs-micro);
+}
+
+/* A person in the hero's motif slot — `PageHero`'s `figure` (Profile, C1.1):
+   the photograph at the avatar's largest, ringed so it sits on the gradient,
+   and the control that changes it under it. Same place the orbit takes. */
+.hero-figure {
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  display: flex;
+  position: absolute;
+  top: 50%;
+  right: 44px;
+  transform: translateY(-50%);
+}
+.hero-figure .avatar {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--on-ink) 26%, transparent), 0 10px 30px #0006;
+}
+.hero-figure-action {
+  color: var(--on-ink);
+  cursor: pointer;
+  background: color-mix(in srgb, var(--on-ink) 12%, transparent);
+  border: 1px solid var(--on-ink-line);
+  border-radius: var(--radius-pill);
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-5);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semi);
+  display: inline-flex;
+  transition: background .17s;
+}
+.hero-figure-action:hover {
+  background: color-mix(in srgb, var(--on-ink) 22%, transparent);
+}
+@media (width<=820px) {
+  .hero-figure {
+    right: 24px;
+  }
+}
+@media (width<=620px) {
+  .hero-figure {
+    top: 28px;
+    right: 18px;
+    transform: none;
+  }
+  .hero-figure .avatar-xl {
+    --avatar-size: 56px;
+    font-size: var(--fs-copy);
+  }
+  .hero-figure-action {
+    font-size: var(--fs-micro);
+    padding: var(--space-1) var(--space-4);
+  }
+}

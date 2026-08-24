@@ -1,0 +1,766 @@
+/* ==========================================================================
+ * Student profile — ENR-184.
+ * ==========================================================================*/
+
+/* ───────────────────────────────────────────────────────────
+   Profile — ENR-184
+
+   The record, read for ownership. The whole screen turns on one distinction —
+   a field the student changes here, and a field an office changes for her — so
+   that distinction is drawn three times on every row: a tag beside the label,
+   the weight of the value, and the affordance at the end. One of the three
+   survives greyscale, one survives a screen reader, and one survives a glance.
+
+   Nothing here paints an edge to mark a row. A pending number is a pill on the
+   label, not a bar down the side: the state belongs to the field, and a rounded
+   row with one painted edge is two shapes arguing.
+   ───────────────────────────────────────────────────────────── */
+
+.status-icon.record {
+  color: var(--purple-dark);
+}
+
+/* Four cards, three kinds. The two record cards are purple; the card holding
+   another person's access is ink, which ties it to the anchor in the rail; the
+   signpost at the foot is grey, because it holds no content of its own. Three
+   identical purple tiles made four different jobs look like one list. */
+.status-icon.private {
+  color: var(--on-ink);
+}
+
+.status-icon.signpost {
+  color: var(--muted);
+}
+
+/* --- one field of the record --- */
+
+.field-row {
+  grid-template-columns: 190px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-2) var(--space-9);
+  padding-top: var(--space-7);
+  padding-bottom: var(--space-7);
+  display: grid;
+}
+
+.field-head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  display: flex;
+}
+
+/* Small and muted, above the value it names: the eye should run down the
+   column of answers, not down a column of headings. */
+.field-row-label {
+  color: var(--muted);
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-semi);
+  display: flex;
+}
+
+.field-row-label svg {
+  color: var(--faint);
+  flex: none;
+}
+
+/* A run of rows, named once — "Yours to change", then "Aster's record". These
+   two labels are the page's whole argument, so they are the only type inside a
+   card that is tracked and coloured, and the break between them carries the
+   distinction a pill on every row could not. The label itself is `.rows-label`
+   in `patterns.css` (the popovers draw it too); these are its two tones here. */
+.rows-label.yours {
+  color: var(--purple-dark);
+}
+
+.rows-label.yours svg {
+  color: var(--purple);
+}
+
+.rows-label.office {
+  color: var(--muted);
+}
+
+
+/* Verification is a state of the field, so it sits with the label. Green is
+   settled; amber is a code in flight that she has to act on; grey is a fact
+   about the record — and grey is also what an unreadable service gets, because
+   nobody could look and nothing may claim it was confirmed. */
+.verify-pill {
+  border-radius: var(--radius-pill);
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-4);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+  display: inline-flex;
+}
+
+.verify-pill.verified {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.verify-pill.pending {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.verify-pill.unverified, .verify-pill.unknown {
+  color: var(--muted);
+  background: var(--line-soft);
+}
+
+.field-value {
+  letter-spacing: var(--ls-snug);
+  margin: 0;
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-heading);
+}
+
+/* A value an office owns is lighter and a size down: read-only reads as
+   read-only before the lock on the label is noticed. */
+.field-row.owned .field-value {
+  color: var(--ink-2);
+  letter-spacing: var(--ls-snug);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-semi);
+}
+
+/* The one row in a card that is waiting on the student. Colour inside these
+   cards is spent here and nowhere else, so it can only mean "this one is asking
+   you for something" — never decoration, never a section identity. */
+.field-row.needs-you {
+  background: color-mix(in srgb, var(--amber) 5%, var(--surface));
+}
+
+.field-value.mono {
+  letter-spacing: var(--ls-snug);
+  font-family: var(--font-geist-mono);
+  font-size: var(--fs-body);
+}
+
+.field-value.blank {
+  color: var(--muted);
+  font-weight: var(--fw-medium);
+}
+
+.field-note {
+  color: var(--muted);
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+}
+
+.field-note.pending {
+  color: var(--amber);
+}
+
+/* "Confirmed Aug 2, 2026" is evidence for a state already stated by the pill,
+   so it sits a step below a note that tells the student something to do. */
+.field-note.evidence {
+  color: var(--faint);
+  font-size: var(--fs-meta);
+}
+
+.field-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-4);
+  display: flex;
+}
+
+.field-action {
+  color: var(--purple-dark);
+  cursor: pointer;
+  background: 0 0;
+  border: 1px solid #0000;
+  border-radius: var(--radius-chip);
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-heavy);
+  transition: background .15s, border-color .15s;
+  display: flex;
+}
+
+.field-action:hover {
+  background: var(--purple-wash);
+  border-color: var(--purple-line);
+}
+
+.field-action.office {
+  color: var(--ink-2);
+}
+
+.field-action.office:hover {
+  background: var(--surface-sunk);
+  border-color: var(--line);
+}
+
+.field-action.quiet {
+  color: var(--muted);
+}
+
+.field-choice {
+  margin-top: var(--space-6);
+}
+
+/* --- the authorization a student granted during onboarding --- */
+
+.permission-grant {
+  padding-top: var(--space-9);
+  padding-bottom: var(--space-9);
+}
+
+.grant-head {
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-5);
+  display: grid;
+}
+
+.grant-avatar {
+  flex: none;
+}
+
+.grant-who strong {
+  letter-spacing: var(--ls-tight);
+  font-size: var(--fs-h2);
+  display: block;
+  font-weight: var(--fw-regular);
+}
+
+.grant-who p {
+  color: var(--muted);
+  margin: var(--space-1) 0 0;
+  font-size: var(--fs-meta);
+}
+
+.grant-window {
+  color: var(--ink-2);
+  background: var(--canvas);
+  border-radius: var(--radius-pill);
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-5);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-bold);
+  display: flex;
+}
+
+.grant-purpose {
+  color: var(--ink-2);
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin: var(--space-6) 0 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.grant-purpose svg {
+  color: var(--purple);
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+.grant-purpose em {
+  color: var(--ink);
+  font-style: normal;
+  font-weight: var(--fw-semi);
+}
+
+.permission-set {
+  border: 0;
+  margin: var(--space-7) 0 0;
+  padding: 0;
+}
+
+.permission-set legend {
+  color: var(--muted);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  margin-bottom: var(--space-5);
+  padding: 0;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+}
+
+.permission-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  display: grid;
+}
+
+.permission-grid label {
+  cursor: pointer;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-tile);
+  grid-template-columns: 15px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-5);
+  transition: background .15s, border-color .15s;
+  display: grid;
+}
+
+.permission-grid label:hover {
+  border-color: var(--line-strong);
+}
+
+.permission-grid label.granted {
+  background: var(--purple-wash);
+  border-color: #c9beff;
+}
+
+.permission-grid input {
+  width: 15px;
+  height: 15px;
+  margin: var(--space-1) 0 0;
+}
+
+.permission-copy strong {
+  font-size: var(--fs-copy);
+  display: block;
+}
+
+.permission-grid label.granted .permission-copy strong {
+  color: var(--purple-dark);
+}
+
+/* Not shared is the quiet half of the grid. Seven categories at one weight made
+   the three she granted impossible to count at a glance. */
+.permission-grid label:not(.granted) .permission-copy strong {
+  color: var(--ink-2);
+}
+
+.permission-grid label:not(.granted) .permission-copy small {
+  color: var(--faint);
+}
+
+.permission-copy small {
+  color: var(--muted);
+  margin-top: var(--space-1);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+  display: block;
+}
+
+.grant-foot {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-6);
+  margin-top: var(--space-7);
+  display: flex;
+}
+
+.grant-foot p {
+  color: var(--muted);
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: 430px;
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.grant-foot svg {
+  color: var(--purple);
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+/* Nothing stands between a student and withdrawing consent: no confirm step,
+   no second thought offered on Aster's behalf. */
+.revoke-button {
+  color: var(--crimson);
+  cursor: pointer;
+  background: var(--crimson-soft);
+  border: 1px solid color-mix(in srgb, var(--crimson) 20%, var(--surface));
+  border-radius: var(--radius-chip);
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 34px;
+  padding: 0 var(--space-6);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-heavy);
+  transition: background .15s;
+  display: flex;
+}
+
+.revoke-button:hover {
+  background: color-mix(in srgb, var(--crimson) 12%, var(--surface));
+}
+
+/* `.card-foot` carries the band; this carries the icon and the type. */
+.grant-aside {
+  color: var(--muted);
+  align-items: flex-start;
+  gap: var(--space-4);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.grant-aside svg {
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+/* --- the profile rail --- */
+
+.access-note {
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin: 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.access-note svg {
+  color: var(--on-ink-muted);
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+.session-card, .offices-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-card);
+  padding: var(--space-9);
+}
+
+.session-icon {
+  color: var(--purple-dark);
+  background: var(--purple-soft);
+  border-radius: var(--radius-tile);
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-bottom: var(--space-5);
+  display: grid;
+}
+
+.session-card p {
+  color: var(--muted);
+  margin: var(--space-4) 0 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.session-card p.session-meta {
+  color: var(--ink);
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-semi);
+  display: flex;
+}
+
+.session-card .secondary-button {
+  width: 100%;
+  min-height: 40px;
+  margin-top: var(--space-7);
+}
+
+.office-row {
+  border-top: 1px solid var(--line);
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+}
+
+.office-row:first-of-type {
+  border-top: 0;
+  margin-top: var(--space-5);
+  padding-top: 0;
+}
+
+.office-row strong {
+  font-size: var(--fs-body);
+  display: block;
+}
+
+.office-row p {
+  color: var(--muted);
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+}
+
+.office-row p.office-meta {
+  flex-direction: column;
+  gap: var(--space-1);
+  display: flex;
+}
+
+.office-meta span {
+  align-items: center;
+  gap: var(--space-2);
+  display: flex;
+}
+
+.office-meta svg {
+  flex: none;
+}
+
+.offices-card .learn-link {
+  color: var(--purple-dark);
+  margin-top: var(--space-4);
+}
+
+/* The variant `StateCard` has always accepted and never had: a caveat is not an
+   error. My Classrooms asks for it too, for a transcript it could not read. */
+.state-card.warn {
+  background: var(--amber-soft);
+  border-color: color-mix(in srgb, var(--amber) 22%, var(--line));
+}
+
+.state-card.warn .state-icon {
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 12%, var(--surface));
+}
+
+@media (width<=820px) {
+  /* The label column stops being a column: it stacks over the value, and the
+     row keeps one action rail on the right. */
+  .field-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .field-head, .field-body {
+    grid-column: 1;
+  }
+  .field-body {
+    margin-top: var(--space-3);
+  }
+  .field-actions {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-items: flex-start;
+  }
+  .permission-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (width<=620px) {
+  .field-row {
+    grid-template-columns: 1fr;
+  }
+  .field-actions {
+    grid-column: 1;
+    grid-row: auto;
+    justify-content: flex-start;
+    margin-top: var(--space-5);
+  }
+  .grant-head {
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+  .grant-window {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .grant-foot .revoke-button {
+    flex: 1 0 100%;
+    justify-content: center;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * The review of 2026-08-21 — whose right it is (C10.1), the channel per kind
+ * (C1.6), where she came from (C1.8), the confirmation (C1.5)
+ * ------------------------------------------------------------------ */
+
+.access-right {
+  color: var(--muted);
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-7);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  display: flex;
+}
+.access-right svg {
+  color: var(--purple-dark);
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+/* One default, per-category overrides, behind a closed disclosure. */
+.channel-overrides {
+  border-top: 1px solid var(--line);
+  margin: 0 calc(-1 * var(--card-pad)) calc(-1 * var(--card-pad));
+  padding: 0 var(--card-pad);
+}
+.channel-overrides-toggle {
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  padding: var(--space-6) 0;
+  display: flex;
+}
+.channel-overrides-chevron {
+  color: var(--muted);
+  align-items: center;
+  transition: transform .17s;
+  display: inline-flex;
+}
+.channel-overrides-chevron.open {
+  transform: rotate(180deg);
+}
+.channel-overrides-copy {
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  display: flex;
+}
+.channel-overrides-copy strong {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-medium);
+}
+.channel-overrides-copy small {
+  color: var(--muted);
+  font-size: var(--fs-micro);
+}
+.channel-rows {
+  padding: 0 0 var(--space-7);
+}
+.channel-row {
+  border-top: 1px solid var(--line);
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3) var(--space-6);
+  padding: var(--space-5) 0;
+  display: flex;
+}
+.channel-row-label {
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--fs-body);
+  display: inline-flex;
+}
+.channel-row-label small {
+  color: var(--muted);
+  background: var(--line-soft);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semi);
+}
+.channel-rows-note {
+  color: var(--muted);
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: var(--space-5) 0 0;
+  font-size: var(--fs-micro);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+/* Where she came from — a record, not a form: the transcript's reading at the
+   head, the coursework as a table, the cited line drawn. */
+.origin-standing {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+  margin-left: auto;
+  display: flex;
+}
+.origin-standing small {
+  color: var(--muted);
+  text-align: right;
+  font-size: var(--fs-micro);
+}
+.origin-table-wrap {
+  contain: inline-size;
+  margin: 0 calc(-1 * var(--card-pad));
+  padding: 0 var(--card-pad);
+  overflow-x: auto;
+}
+.origin-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 520px;
+}
+.origin-table th {
+  color: var(--muted);
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  padding: 0 var(--space-4) var(--space-4) 0;
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+}
+.origin-table td {
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+  padding: var(--space-5) var(--space-4) var(--space-5) 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+.origin-table tr:last-child td {
+  border-bottom: 0;
+}
+.origin-table td small {
+  color: var(--muted);
+  margin-top: var(--space-1);
+  font-size: var(--fs-micro);
+  display: block;
+}
+.origin-table th.numeric,
+.origin-table td.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  padding-right: 0;
+}
+.origin-table tr.cited td {
+  background: var(--purple-soft);
+}
+.origin-table tr.cited td:first-child {
+  border-radius: var(--radius-chip) 0 0 var(--radius-chip);
+  padding-left: var(--space-4);
+}
+.origin-table tr.cited td:last-child {
+  border-radius: 0 var(--radius-chip) var(--radius-chip) 0;
+  padding-right: var(--space-4);
+}
+.origin-foot {
+  color: var(--muted);
+  align-items: flex-start;
+  gap: var(--space-3);
+  font-size: var(--fs-micro);
+  line-height: var(--lh-body);
+  display: flex;
+}
+.origin-foot svg {
+  flex: none;
+  margin-top: var(--space-1);
+}
+.origin-foot a {
+  color: var(--purple-dark);
+}
+
+/* The confirmation's two buttons, in the modal. */
+.modal-actions {
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-8);
+  display: flex;
+}

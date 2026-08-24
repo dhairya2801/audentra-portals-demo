@@ -1,0 +1,672 @@
+/* ==========================================================================
+ * Appointments — ENR-183, and the changes of 2026-08-21.
+ * ==========================================================================*/
+
+/* ------------------------------------------------------------------ *
+ * The section is a picker over what a team published, so the vocabulary here is
+ * mostly about time: a strip of the days that exist, chips for the times inside
+ * one of them, and a badge on every booked row saying whether the conversation
+ * actually exists.
+ *
+ * The rows reuse the portal's two row anatomies rather than inventing a third.
+ * A topic wears the task row's classes (`.task-card`, `.task-card-body`,
+ * `.task-main`, `.task-facts`, `.task-action`), because the guide's row is the
+ * one anatomy for a row that asks for an action; a conversation wears the
+ * campus row's copy (`.date-tile`, `.campus-row-*`) because the portal has
+ * exactly one shape for a dated thing. What is added here is only what is this
+ * screen's own: the state, in the row's own ink, and the request that waits.
+ * Nothing paints an edge.
+ * ------------------------------------------------------------------ */
+
+/* --- the topic row ---------------------------------------------------- */
+
+/* Every topic row is the same row. T5 of the brief asked for a row with no
+   published times to drop its title to the body size and its tile to the quiet
+   ink; Marco struck it on 2026-08-21 — two title sizes in one card is a
+   font-size error, not a hierarchy, and the row still carries an action
+   (`Ask for a time`). What differs between rows is said by the facts line and
+   by the button's label, never by the type. */
+
+/* The no-times explanation, directly in the row — no click, no accordion. */
+.topic-row .no-slots {
+  max-width: 550px;
+  margin-top: var(--space-4);
+  line-height: var(--lh-body);
+}
+
+/* "Tell me when times open", after the click: the link is the sentence, in
+   the same position. */
+.notify-set {
+  color: var(--muted);
+  text-align: center;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semi);
+  line-height: var(--lh-body);
+}
+
+/* --- the conversation row ---------------------------------------------- */
+
+/* An article, not a button: it carries controls now. The row itself paints
+   nothing — `.card-rows > *` gives it the card's white and the hairline — and
+   the grid lives on the body so the band above it can bleed to the edges. */
+.appointment-row-body {
+  grid-template-columns: 46px minmax(0, 1fr) minmax(142px, auto);
+  align-items: center;
+  gap: var(--space-7);
+  padding: var(--space-7) 0;
+  display: grid;
+}
+
+/* The page's band sits on this row only when it is the booking that never
+   reached its team; the tint is the same the guide gives its "start here" row. */
+.card-rows .appointment-row.recommended {
+  background: color-mix(in srgb, var(--purple) 4%, var(--surface));
+}
+
+/* The title is the way into the detail sheet. It reads as the title it is and
+   answers a pointer the way a link does. */
+.appointment-row .campus-row-title {
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-regular);
+  letter-spacing: var(--ls-tight);
+}
+
+.row-link {
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  background: 0 0;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.row-link:hover {
+  color: var(--purple-dark);
+}
+
+/* What is over is marked the way the campus row marks it — the tile in the
+   quiet ink — and never by a smaller title: one row shape, one title size, on
+   every card of the page (Marco, 2026-08-21). */
+.appointment-row.past .date-tile {
+  color: var(--muted);
+  background: var(--line-soft);
+}
+
+/* A booking that failed is marked in its own ink: the tile and the badge. */
+.appointment-row.failed .date-tile {
+  color: var(--crimson);
+  background: var(--crimson-soft);
+}
+
+/* A request has no date. Its tile is a clock, in the hue that means someone
+   still has to act — here, the team. */
+.date-tile.pending {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.appointment-subject {
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.appointment-support {
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+}
+
+/* The badge leads the action column; the controls under it stretch to the
+   column the way the task row's do. */
+.appointment-row .task-action .appt-state {
+  align-self: flex-end;
+}
+
+.appt-state {
+  border-radius: var(--radius-pill);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex: none;
+  padding: var(--space-2) var(--space-5);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+}
+
+.appt-state.confirmed {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.appt-state.failed {
+  color: var(--crimson);
+  background: var(--crimson-soft);
+}
+
+.appt-state.requested {
+  color: var(--amber-ink);
+  background: var(--amber-tint);
+}
+
+/* `--ink-2`, not `--muted`: at 9.5px the muted voice measured 4.34:1 on the
+   soft line (appointments changes, C7). 4.93:1 now. */
+.appt-state.cancelled, .appt-state.done {
+  color: var(--ink-2);
+  background: var(--line-soft);
+}
+
+/* --- the booking drawer ------------------------------------------------ */
+
+.drawer-lead {
+  color: var(--ink-2);
+  margin: 0 0 var(--space-8);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.day-strip {
+  gap: var(--space-4);
+  padding-bottom: var(--space-2);
+  display: flex;
+  overflow-x: auto;
+}
+
+.day-chip {
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--radius-row);
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  width: 64px;
+  padding: var(--space-4) var(--space-3);
+  transition: all var(--dur-fast) var(--ease);
+  display: flex;
+}
+
+.day-chip small {
+  color: var(--muted);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+}
+
+.day-chip strong {
+  color: var(--ink);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+}
+
+.day-chip span {
+  color: var(--muted);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semi);
+}
+
+.day-chip:hover {
+  border-color: color-mix(in srgb, var(--purple) 35%, var(--line));
+}
+
+.day-chip.selected {
+  border-color: var(--purple);
+  background: var(--purple-soft);
+}
+
+.day-chip.selected small, .day-chip.selected span, .day-chip.selected strong {
+  color: var(--purple-dark);
+}
+
+.day-chip:focus-visible, .slot-chip:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 2px;
+}
+
+.slot-parts {
+  flex-direction: column;
+  gap: var(--space-7);
+  margin-top: var(--space-9);
+  display: flex;
+}
+
+.slot-part .panel-label {
+  margin-bottom: var(--space-4);
+  display: block;
+}
+
+.slot-grid {
+  grid-template-columns: repeat(auto-fill, minmax(94px, 1fr));
+  gap: var(--space-4);
+  display: grid;
+}
+
+/* One published time. Selecting it books nothing; it only marks. */
+.slot-chip {
+  color: var(--ink);
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--radius-tile);
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-5) var(--space-4);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semi);
+  transition: all var(--dur-fast) var(--ease);
+  display: inline-flex;
+}
+
+.slot-chip:hover {
+  border-color: color-mix(in srgb, var(--purple) 35%, var(--line));
+}
+
+.slot-chip.selected {
+  color: var(--on-ink);
+  background: var(--purple);
+  border-color: var(--purple);
+}
+
+/* The absence, stated. A part of the day with nothing in it says so rather than
+   disappearing and leaving the student to work out which gap is which. */
+.no-slots {
+  color: var(--muted);
+  margin: 0;
+  font-size: var(--fs-copy);
+}
+
+.action-panel > .no-slots {
+  margin-bottom: var(--space-8);
+  line-height: var(--lh-body);
+}
+
+/* The format of the marked time, under the list. It reserves its line so the
+   list does not jump when a time is chosen. */
+.picker-note {
+  color: var(--muted);
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: calc(var(--fs-meta) * var(--lh-body));
+  margin: var(--space-8) 0 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.picker-note svg {
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+/* One field in the drawer: the label, the control, the help. */
+.drawer-field {
+  margin-top: var(--space-9);
+  display: block;
+}
+
+.drawer-field-label {
+  color: var(--ink-2);
+  margin-bottom: var(--space-3);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-bold);
+  display: block;
+}
+
+.drawer-field textarea {
+  color: var(--ink);
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-tile);
+  width: 100%;
+  padding: var(--space-6) var(--space-6);
+  font-family: inherit;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  transition: border-color var(--dur-fast) var(--ease);
+  display: block;
+}
+
+.drawer-field textarea:focus {
+  border-color: var(--purple);
+  outline: none;
+}
+
+.drawer-field .form-help {
+  margin-top: var(--space-3);
+  display: block;
+}
+
+/* What is about to be booked, under the thumb. Sticky because the picker is
+   long on a phone and the choice has to stay legible while it scrolls. */
+.booking-foot {
+  z-index: 2;
+  border-top: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  background: #fffffff5;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-7) var(--space-11) var(--space-9);
+  display: flex;
+  position: sticky;
+  bottom: 0;
+}
+
+.booking-foot .drawer-actions {
+  margin-bottom: 0;
+}
+
+.booking-foot .primary-button.full {
+  margin-top: 0;
+}
+
+.booking-chosen {
+  flex-direction: column;
+  gap: var(--space-1);
+  display: flex;
+}
+
+.booking-chosen strong {
+  font-size: var(--fs-h2);
+}
+
+.booking-chosen > span:last-child {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+}
+
+/* The result replaces the sheet's body. A booking that failed is never a layer
+   over a form that still looks fillable. */
+.booking-result {
+  text-align: center;
+}
+
+.result-icon {
+  color: var(--green);
+  background: var(--green-soft);
+  border-radius: var(--radius-card);
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto var(--space-7);
+  display: grid;
+}
+
+.booking-result.failed .result-icon {
+  color: var(--crimson);
+  background: var(--crimson-soft);
+}
+
+/* Sent is neither done nor failed: it is the accent, once. */
+.booking-result.requested .result-icon {
+  color: var(--purple-dark);
+  background: var(--purple-soft);
+}
+
+.booking-result h2 {
+  letter-spacing: var(--ls-tight);
+  margin: 0 0 var(--space-4);
+  font-size: var(--fs-display);
+}
+
+.booking-result > p {
+  color: var(--muted);
+  max-width: 40ch;
+  margin: 0 auto var(--space-9);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.result-facts {
+  text-align: left;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-row);
+  margin-bottom: var(--space-9);
+  padding: var(--space-7) var(--space-8);
+}
+
+.booking-result.failed .result-facts {
+  background: var(--crimson-soft);
+  border-color: color-mix(in srgb, var(--crimson) 20%, var(--line));
+}
+
+.result-facts p {
+  color: var(--muted);
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin: 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.result-facts p + p {
+  border-top: 1px solid var(--line);
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+}
+
+.booking-result.failed .result-facts p {
+  color: var(--crimson-ink);
+}
+
+.result-facts p > svg {
+  color: var(--purple);
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+.booking-result.failed .result-facts p > svg {
+  color: var(--crimson);
+}
+
+.result-actions, .drawer-actions {
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+  display: flex;
+}
+
+.result-actions .secondary-button, .drawer-actions .secondary-button {
+  justify-content: center;
+  width: 100%;
+}
+
+.result-actions .primary-button.full, .drawer-actions .primary-button.full {
+  margin-top: 0;
+}
+
+/* --- the detail sheet --------------------------------------------------- */
+
+.drawer-icon.appointment {
+  color: var(--purple-dark);
+  background: var(--purple-soft);
+}
+
+.drawer-icon.appointment.failed {
+  color: var(--crimson);
+  background: var(--crimson-soft);
+}
+
+.drawer-icon.appointment.requested {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.drawer-icon.appointment.done, .drawer-icon.appointment.cancelled {
+  color: var(--muted);
+  background: var(--line-soft);
+}
+
+.appt-note {
+  border-radius: var(--radius-row);
+  align-items: flex-start;
+  gap: var(--space-5);
+  margin-bottom: var(--space-8);
+  padding: var(--space-7) var(--space-7);
+  display: flex;
+}
+
+.appt-note.ok {
+  background: var(--green-soft);
+}
+
+.appt-note.failed {
+  background: var(--crimson-soft);
+}
+
+.appt-note.quiet {
+  background: var(--canvas);
+}
+
+.appt-note > span {
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+.appt-note strong {
+  font-size: var(--fs-body);
+  display: block;
+}
+
+.appt-note p {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.appt-note.ok > span, .appt-note.ok strong {
+  color: var(--green);
+}
+
+.appt-note.ok p {
+  color: var(--green-ink);
+}
+
+.appt-note.failed > span, .appt-note.failed strong {
+  color: var(--crimson);
+}
+
+.appt-note.failed p {
+  color: var(--crimson-ink);
+}
+
+.appt-note.quiet > span, .appt-note.quiet strong, .appt-note.quiet p {
+  color: var(--muted);
+}
+
+.text-button.danger {
+  color: var(--crimson);
+}
+
+/* Cancelling asks once, here, rather than through a browser dialog. */
+.cancel-confirm {
+  background: var(--crimson-soft);
+  border-radius: var(--radius-row);
+  padding: var(--space-7) var(--space-7);
+}
+
+.cancel-confirm p {
+  color: var(--crimson-ink);
+  margin: 0 0 var(--space-5);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.cancel-confirm > div {
+  gap: var(--space-8);
+  display: flex;
+}
+
+/* --- the rail ----------------------------------------------------------- */
+
+/* The permanent card: the rule, as running text, in the reading voice; the
+   provenance under it in the smallest voice; the link that opens the longer
+   version. */
+.booking-card > p {
+  color: var(--on-ink);
+  margin: var(--space-5) 0 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.booking-provenance {
+  color: var(--on-ink-muted);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-7);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semi);
+  display: flex;
+}
+
+.booking-provenance span {
+  align-items: center;
+  gap: var(--space-2);
+  display: inline-flex;
+}
+
+/* The conditional card: the team in the badge, then what was asked and when. */
+.waiting-card .resume-badge {
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  display: inline-block;
+}
+
+@media (width<=620px) {
+  /* The conversation row stacks the way the task row does at this width: the
+     tile and the copy on one line, the actions under them. */
+  .appointment-row-body {
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: var(--space-5) var(--space-6);
+  }
+  .appointment-row .date-tile {
+    width: 40px;
+    height: 42px;
+  }
+  .appointment-row .date-tile strong {
+    font-size: var(--fs-h3);
+  }
+  .appointment-row .task-action {
+    grid-column: 1 / -1;
+    grid-template-columns: 1fr minmax(145px, auto);
+    align-items: center;
+    display: grid;
+  }
+  .appointment-row .task-action .appt-state {
+    justify-self: start;
+    align-self: center;
+  }
+  .booking-foot {
+    padding: var(--space-6) var(--space-9) var(--space-9);
+  }
+  .slot-grid {
+    grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  }
+}
+
+@media (width<=620px) {
+  /* The guide hides the last fact of a task row at this width ("Verified
+     automatically"); on a topic the last fact is the availability, which is the
+     one fact the row exists to state. It stays. */
+  .topic-row .task-facts span:last-child {
+    display: flex;
+  }
+
+  /* The task row's title steps to --fs-h3 at this width (enrollment.css); the
+     conversation row's title, which sits at the task row's size above it, steps
+     with it — one title size for both row shapes on the page, at every width. */
+  .appointment-row .campus-row-title {
+    font-size: var(--fs-h3);
+  }
+}

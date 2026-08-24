@@ -1,0 +1,45 @@
+/* ============================================================================
+ * The stylesheet, as an index.
+ *
+ * This file holds no rules. It names the layers and the order they cascade in,
+ * which is the one thing about a stylesheet that has to be decided in one
+ * place. A new rule goes in the layer that owns its subject; a new section
+ * gets a file under `features/` and a line here.
+ *
+ * The order is the cascade. Tokens first because everything reads them, then
+ * the reset, then the frame, then the shared vocabulary, then one file per
+ * section — a section may specialise a shared shape, and never the reverse.
+ * ==========================================================================*/
+
+@import './tokens.css';
+@import './base.css';
+@import './chrome.css';
+@import './patterns.css';
+@import './features/enrollment.css';
+@import './navigation.css';
+
+@import './features/campus.css';
+@import './features/classrooms.css';
+@import './features/financials.css';
+@import './features/profile.css';
+@import './features/help.css';
+@import './features/edward.css';
+@import './features/appointments.css';
+@import './features/documents.css';
+@import './features/health.css';
+@import './features/accessibility.css';
+@import './features/housing.css';
+@import './features/onboarding.css';
+@import './features/notifications.css';
+@import './features/rewards.css';
+
+/* The second language. Its rules are last among the product's because a
+   workspace shape may specialise a shared one and never the reverse — but its
+   real separation is the scope, not the position: the values come from `.staff`
+   in `tokens.css`, and no rule in any file above ever names that class. */
+@import './staff.css';
+@import './staff-shell.css';
+@import './staff-queue.css';
+
+/* Not part of the product: the reference page the product is built from. */
+@import './styleguide.css';

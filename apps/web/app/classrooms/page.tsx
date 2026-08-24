@@ -3,11 +3,13 @@
 import type { CatalogCourse, StudentAcademicPlanItem } from "@vv/contracts";
 import { TenantLink as Link } from "../components/tenant-link";
 import {
+  type CSSProperties,
   type FormEvent,
   useCallback,
   useState,
 } from "react";
 import { PortalShell } from "../components/portal-shell";
+import { StudentPortalIcon } from "../components/student-portal-icon";
 import { ErrorState, LoadingState } from "../components/portal-ui";
 import { useActivityTracking } from "../hooks/use-activity-tracking";
 import { useApiResource } from "../hooks/use-api-resource";
@@ -104,8 +106,8 @@ function CourseDetail({
           <strong>Prerequisites</strong>
           {course.prerequisites.length ? (
             <ul>
-              {course.prerequisites.map((prerequisite) => (
-                <li key={prerequisite.courseCode}>
+              {course.prerequisites.map((prerequisite, index) => (
+                <li key={`${prerequisite.courseCode}-${index}`}>
                   {prerequisite.courseCode}
                   {prerequisite.minimumGrade
                     ? ` · minimum grade ${prerequisite.minimumGrade}`
@@ -180,8 +182,8 @@ function CourseDetail({
               </div>
             </div>
             <ul>
-              {course.resources.map((resource) => (
-                <li key={resource.id}>
+              {course.resources.map((resource, index) => (
+                <li key={resource.id || `${resource.url}-${index}`}>
                   <span className="course-resource-preview" aria-hidden="true">
                     PDF
                   </span>
@@ -274,11 +276,6 @@ export default function ClassroomsPage() {
       eyebrow="My classrooms"
       title="See the path through your major"
       description="Required courses, prerequisites, transcript credit matches, and the complete catalog in one place."
-      actions={
-        <Link className="button button--accent" href="/documents">
-          Upload a transcript
-        </Link>
-      }
     >
       {academics.status === "loading" ? (
         <LoadingState label="Building your academic plan" />
@@ -286,55 +283,26 @@ export default function ClassroomsPage() {
         <ErrorState message={academics.error} onRetry={academics.reload} />
       ) : (
         <>
-          <section className="academic-hero">
-            <div>
-              <p className="eyebrow">Your selected program</p>
-              <h2>{academics.data.selectedProgram.name}</h2>
-              <span>{academics.data.selectedProgram.degree}</span>
-              <p>{academics.data.selectedProgram.description}</p>
-              <small>
-                Catalog {academics.data.catalogVersion} ·{" "}
-                {academics.data.selectedProgram.totalCredits} degree credits
-              </small>
-              {academics.data.selectedProgram.source ? (
-                <a
-                  className="academic-source-link"
-                  href={academics.data.selectedProgram.source.url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Program source ·{" "}
-                  {academics.data.selectedProgram.source.label}
-                  <span aria-hidden="true"> ↗</span>
-                </a>
-              ) : null}
-            </div>
-            <div className="academic-progress">
-              <div>
-                <strong>{academics.data.progress.percent}%</strong>
-                <span>Degree credit recognized</span>
+          <section className="page-summary" aria-label="Degree progress">
+            <div className="summary-main">
+              <div className="summary-figure">
+                <div className="progress-ring" style={{ "--progress": `${academics.data.progress.percent * 3.6}deg` } as CSSProperties}><span>{academics.data.progress.percent}%</span></div>
+                <div className="summary-figure-copy"><span className="panel-label">Credits approved</span><strong>{academics.data.progress.completedCredits + academics.data.progress.exemptedCredits} of {academics.data.progress.requiredCredits} credits approved</strong><p>{academics.data.selectedProgram.name} · {academics.data.selectedProgram.degree} · Catalog {academics.data.catalogVersion}</p></div>
               </div>
-              <p>
-                {academics.data.progress.exemptedCredits} exempted ·{" "}
-                {academics.data.progress.completedCredits} completed ·{" "}
-                {academics.data.progress.requiredCredits} required
-              </p>
-              <div className="aster-progress-track">
-                <span style={{ width: `${Math.max(4, academics.data.progress.percent)}%` }} />
-              </div>
+              <div className="advisor-bar"><img className="avatar avatar-md advisor-avatar" src="/people/tomas-okafor.webp" width="40" height="40" alt="" /><div className="advisor-bar-copy"><span className="panel-label">Your course advisor</span><strong>Dr. Elena Ruiz <span>· Academic Advising</span></strong></div><div className="advisor-actions"><a className="advisor-action" href="mailto:advising@aster.edu" aria-label="Email Academic Advising">✉</a><Link className="advisor-action" href="/appointments" aria-label="Book Academic Advising"><StudentPortalIcon name="calendar" size={16} /></Link></div></div>
             </div>
+            {academics.data.exemptionRecommendations.length ? <div className="summary-alert"><div className="notice quiet"><span className="notice-mark"><StudentPortalIcon name="file" size={14} /></span><span className="notice-copy"><strong>{academics.data.exemptionRecommendations.length} potential credit {academics.data.exemptionRecommendations.length === 1 ? "match is" : "matches are"} waiting on the Registrar.</strong></span></div></div> : null}
           </section>
 
-          <section className="aster-section academic-next-term">
-            <div className="aster-section__heading">
+          <div className="page-body">
+            <div className="page-main">
+          <section className="section-card academic-next-term">
+            <div className="status-heading">
+              <span className="status-icon accent"><StudentPortalIcon name="degree" size={20} /></span>
               <div>
-                <p className="eyebrow">Plan at a glance</p>
                 <h2>Your next recommended courses</h2>
+                <p>Plan at a glance</p>
               </div>
-              <p>
-                Recommendations come from the active tenant catalog and can be
-                changed by academic staff.
-              </p>
             </div>
             <div className="academic-next-grid">
               {academics.data.plan
@@ -342,11 +310,11 @@ export default function ClassroomsPage() {
                   ["eligible", "required", "in_progress"].includes(item.status),
                 )
                 .slice(0, 3)
-                .map((item) => (
+                .map((item, index) => (
                   <button
                     type="button"
                     onClick={() => openCourse(item.course, "next_term")}
-                    key={item.course.id}
+                    key={item.course.id || `${item.course.code}-${item.recommendedTerm}-${index}`}
                   >
                     <span>{item.course.code}</span>
                     <strong>{item.course.title}</strong>
@@ -360,13 +328,13 @@ export default function ClassroomsPage() {
             </div>
           </section>
 
-          <section className="aster-section">
-            <div className="aster-section__heading">
+          <section className="section-card">
+            <div className="status-heading">
+              <span className="status-icon advisory"><StudentPortalIcon name="file" size={20} /></span>
               <div>
-                <p className="eyebrow">Transcript intelligence</p>
                 <h2>Potential course exemptions</h2>
+                <p>Advisory transcript matches that require Registrar approval.</p>
               </div>
-              <p>Recommendations require registrar or academic-advisor approval.</p>
             </div>
             <div className="exemption-grid">
               {academics.data.exemptionRecommendations.length === 0 ? (
@@ -380,13 +348,13 @@ export default function ClassroomsPage() {
                     </p>
                   </div>
                 </div>
-              ) : academics.data.exemptionRecommendations.map((recommendation) => {
+              ) : academics.data.exemptionRecommendations.map((recommendation, index) => {
                 const source = academics.data.transcriptCredits.find(
                   (credit) => credit.id === recommendation.transcriptCreditId,
                 );
                 const expanded = reviewRule === recommendation.ruleCode;
                 return (
-                  <article key={recommendation.id}>
+                  <article key={recommendation.id || `${recommendation.ruleCode}-${index}`}>
                     <div className="exemption-match">
                       <div>
                         <small>Transcript evidence</small>
@@ -431,13 +399,13 @@ export default function ClassroomsPage() {
             </div>
           </section>
 
-          <section className="aster-card academic-plan-card">
-            <div className="aster-section__heading">
+          <section className="section-card academic-plan-card">
+            <div className="status-heading">
+              <span className="status-icon requirement"><StudentPortalIcon name="degree" size={20} /></span>
               <div>
-                <p className="eyebrow">Program map</p>
                 <h2>Suggested program path</h2>
+                <p>{academics.data.plan.length} tenant-managed plan items</p>
               </div>
-              <span>{academics.data.plan.length} tenant-managed plan items</span>
             </div>
             <div className="academic-plan-table" role="table" aria-label="Program requirements">
               <div role="row" className="academic-plan-table__header">
@@ -446,12 +414,12 @@ export default function ClassroomsPage() {
                 <span role="columnheader">Prerequisites</span>
                 <span role="columnheader">Status</span>
               </div>
-              {academics.data.plan.map((item) => (
+              {academics.data.plan.map((item, index) => (
                 <button
                   type="button"
                   role="row"
                   onClick={() => openCourse(item.course, "program_plan")}
-                  key={item.course.id}
+                  key={item.course.id || `${item.recommendedTerm}-${item.course.code}-${index}`}
                 >
                   <span role="cell">
                     <strong>{item.course.code}</strong>
@@ -476,16 +444,13 @@ export default function ClassroomsPage() {
             </div>
           </section>
 
-          <section className="aster-section course-catalog">
-            <div className="aster-section__heading">
+          <section className="section-card course-catalog">
+            <div className="status-heading">
+              <span className="status-icon accent"><StudentPortalIcon name="degree" size={20} /></span>
               <div>
-                <p className="eyebrow">{tenant.shortName} catalog</p>
                 <h2>Search classes</h2>
+                <p>{tenant.shortName} catalog · {academics.data.availablePrograms.map((program) => program.name).join(" · ")}</p>
               </div>
-              <p>
-                Seeded programs:{" "}
-                {academics.data.availablePrograms.map((program) => program.name).join(" · ")}
-              </p>
             </div>
             <form onSubmit={search}>
               <label htmlFor="course-search">Search by course code, title, or topic</label>
@@ -512,11 +477,11 @@ export default function ClassroomsPage() {
                   </div>
                 </div>
               ) : (
-                results.map((course) => (
+                results.map((course, index) => (
                   <button
                     type="button"
                     onClick={() => openCourse(course, "catalog_search")}
-                    key={course.id}
+                    key={course.id || `${course.code}-${index}`}
                   >
                     <span>{course.code}</span>
                     <h3>{course.title}</h3>
@@ -535,6 +500,12 @@ export default function ClassroomsPage() {
               )}
             </div>
           </section>
+            </div>
+            <aside className="page-rail">
+              <div className="anchor-card"><span className="panel-label">Official record</span><strong className="anchor-figure">{academics.data.selectedProgram.totalCredits} credits</strong><p>This is Aster’s current reading of your program. The Registrar’s record is authoritative.</p>{academics.data.selectedProgram.source ? <a className="learn-link" href={academics.data.selectedProgram.source.url} target="_blank" rel="noreferrer">Program source ↗</a> : null}</div>
+              <div className="provenance-card"><span className="panel-label">Transcript credit</span><p>Potential matches never count here until the Registrar approves them.</p><Link className="text-button" href="/documents">Send a transcript <StudentPortalIcon name="chevron" size={14} /></Link></div>
+            </aside>
+          </div>
         </>
       )}
       {selectedCourse ? (

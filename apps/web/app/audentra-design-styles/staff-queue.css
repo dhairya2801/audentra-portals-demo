@@ -1,0 +1,276 @@
+/* ============================================================================
+ * My work — the queue page, and what a record holds when it is open.
+ *
+ * One file per screen, the way the portal keeps `styles/features/<name>.css`.
+ * Almost nothing is here, and that is the proof the screen exists to give: the
+ * queue, the row, the state, the two clocks, the log, the outcome and the
+ * overlay are all vocabulary, and a screen built out of vocabulary needs a
+ * stylesheet only for the two or three things that are genuinely its own.
+ * ==========================================================================*/
+
+.queue-page-head { margin-bottom: var(--space-10); }
+
+.queue-page-head h1 {
+  margin: 0 0 var(--space-3);
+  color: var(--ink);
+  font-size: var(--fs-hero);
+  font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-tight);
+}
+
+.queue-page-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-body);
+}
+
+/* The table gets an edge on the page. It is full-bleed inside its own frame —
+   the rows run to the border — which is why the frame is here and not on the
+   rows.
+
+   And it scrolls inside that frame. The floor on the subject column can exceed
+   the work column on a narrow desktop; when it does, the table moves and the
+   page body never does, which is the rule. No column is dropped for the reader:
+   which one they need is not a decision a stylesheet can take for them. */
+.queue-page .queue {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+}
+
+.queue-page .queue-row-item:last-child .queue-row { border-bottom: 0; }
+
+/* --- inside the record ---------------------------------------------------- */
+
+.record-section + .record-section,
+.record-section + .worklog { margin-top: var(--space-10); }
+
+.record-section h3 {
+  margin: 0 0 var(--space-6);
+  color: var(--ink);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-semi);
+}
+
+.record-section p {
+  margin: 0 0 var(--space-6);
+  color: var(--ink-2);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.record-section p:last-child { margin-bottom: 0; }
+
+.record-absent { color: var(--muted); }
+
+.record-checks {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+}
+
+.record-checks li {
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-5) var(--space-7);
+  min-height: var(--row-height);
+  display: flex;
+}
+
+.record-checks li + li { border-top: 1px solid var(--line-soft); }
+
+.record-check-label {
+  color: var(--ink);
+  font-size: var(--fs-meta);
+}
+
+/* --- what Edward drafted, and what makes sending it a person's act -------- */
+
+/* The draft wears the internal surface until somebody sends it. That transition
+   IS the accountability statement: nothing here is attributed to Edward once it
+   leaves, and nothing leaves without a name on it. The tint is neutral ink and
+   never amber — amber already means "someone still has to act", and a draft
+   nobody has to act on yet must not wear it. */
+.draft {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-card);
+  background: var(--surface-sunk);
+  padding: var(--space-8);
+}
+
+.draft.sent {
+  border-color: var(--line-strong);
+  background: var(--surface);
+}
+
+.draft-head {
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-6);
+  margin-bottom: var(--space-6);
+  display: flex;
+}
+
+/* Sober and no gradient. The plainest treatments in the sweep of 2026-08-24
+   were the strongest: Asana writes "AI summary" in grey and hyperlinks every
+   claim to the record it came from. */
+.draft-mark {
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--muted);
+  font-size: var(--fs-caps);
+  font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  display: inline-flex;
+}
+
+.draft-time {
+  color: var(--faint);
+  font-size: var(--fs-micro);
+  font-variant-numeric: tabular-nums;
+}
+
+.draft-subject {
+  margin: 0 0 var(--space-4);
+  color: var(--ink);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semi);
+}
+
+.draft-body {
+  margin: 0 0 var(--space-6);
+  color: var(--ink);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+/* What it was written from. A university is accountable for what it sends, so a
+   draft says its basis the way the Morning Brew says its records. */
+.draft-basis {
+  margin: 0 0 var(--space-6);
+  color: var(--faint);
+  font-size: var(--fs-micro);
+  line-height: var(--lh-body);
+}
+
+.draft-actions {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-7);
+  display: flex;
+}
+
+.draft-send,
+.draft-edit,
+.draft-discard {
+  border: 1px solid #0000;
+  border-radius: var(--radius-tile);
+  height: var(--control-height);
+  padding: 0 var(--space-7);
+  font: inherit;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+/* The one primary on the record, and it names the person who is accountable. */
+.draft-send {
+  background: var(--grad-purple);
+  color: var(--on-ink);
+  font-weight: var(--fw-semi);
+}
+
+.draft-send:hover { background: var(--purple-hover); }
+
+.draft-edit {
+  border-color: var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.draft-edit:hover { background: var(--surface-sunk); }
+
+.draft-discard {
+  background: none;
+  color: var(--muted);
+}
+
+.draft-discard:hover { color: var(--ink); }
+
+/* --- the student, in the overlay's own context column --------------------- */
+
+.record-person {
+  text-align: center;
+  margin-bottom: var(--space-9);
+}
+
+.record-person-name {
+  margin: var(--space-6) 0 var(--space-1);
+  color: var(--ink);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-semi);
+}
+
+.record-person-role {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-meta);
+}
+
+.record-facts {
+  flex-direction: column;
+  gap: var(--space-5);
+  margin: 0;
+  display: flex;
+}
+
+.record-facts > div {
+  border-bottom: 1px solid var(--line-soft);
+  padding-bottom: var(--space-5);
+}
+
+.record-facts dt {
+  margin-bottom: var(--space-2);
+  color: var(--faint);
+  font-size: var(--fs-caps);
+  font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+}
+
+.record-facts dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-meta);
+}
+
+/* --- the link, confirmed -------------------------------------------------- */
+
+/* A record having an address is one of the overlay's four obligations, and the
+   confirmation says what the address means: it opens here, for anyone entitled
+   to see this student. A workspace link is not a public link. */
+.record-copied {
+  align-items: center;
+  gap: var(--space-4);
+  border: 1px solid var(--green-line);
+  border-radius: var(--radius-row);
+  background: var(--green-soft);
+  margin: 0 0 var(--space-9);
+  padding: var(--space-5) var(--space-7);
+  color: var(--green-ink);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.record-copied svg { flex: none; }

@@ -1,0 +1,577 @@
+/* ============================================================================
+ * Tokens — every decision that is about the whole product.
+ *
+ * The rule this file exists to make keepable: a raw value in a rule is a bug
+ * the same way a raw hex is — it is a decision about the whole product taken
+ * locally, in a file nobody else will read.
+ *
+ * That rule was already written and already broken. The audit of 2026-08-20
+ * found 436 raw hex values outside `:root`, and they were not arbitrary — they
+ * were the same four decisions retyped from memory:
+ *
+ *   23 near-identical light purples where `--purple-soft` exists
+ *   15 near-identical greys      where `--muted` exists
+ *   14 near-identical mid purples for one hover state
+ *    7 near-identical dark greens where `--green` exists
+ *
+ * A screen did not invent `#e7e1fa` because it wanted a different purple. It
+ * invented it because the token it actually needed — the line around a purple
+ * tint, the text that sits on one — had no name. The fix is not more
+ * discipline. It is the missing names, below.
+ *
+ * Three layers, and a rule for each:
+ *
+ *   1. PALETTE   the raw ramps. Referenced only by layer 2, never by a rule.
+ *   2. ROLES     what a rule may name. If your rule needs a colour that is not
+ *                here, the token is missing — add it here, do not inline it.
+ *   3. SCALES    space, radius, type, motion, depth, layers.
+ * ==========================================================================*/
+
+:root {
+  /* ── 1. Palette ───────────────────────────────────────────────────────────
+     Raw ramps. A component rule must never name one of these directly; it
+     names a role from layer 2. They are here so the roles are visibly derived
+     from one ramp rather than eyeballed one at a time, which is how the 23
+     purples happened. */
+
+  /* Ink — the neutral ramp. Cool, because the product's one hue is purple and
+     a warm grey beside it reads as a second, accidental hue. */
+  --ink-900: #152037;
+  --ink-800: #1b203a;
+  --ink-700: #312960;
+  --ink-600: #5f6879;
+  --ink-500: #687086;
+  --ink-400: #9aa0b0;
+  --ink-300: #b9b4dd;
+  --ink-200: #d9dbe6;
+  --ink-150: #e6e7ee;
+  --ink-100: #eff0f4;
+  --ink-75: #f1f2f6;
+  --ink-50: #f6f6fb;
+  --ink-25: #f5f5fa;
+  --ink-0: #fff;
+
+  /* Purple — the product's one hue. */
+  --purple-700: #312960;
+  --purple-600: #45358e;
+  --purple-500: #4d3bb3;
+  --purple-450: #5b48bd;
+  --purple-400: #6854d9;
+  --purple-200: #ddd8f7;
+  --purple-100: #e6e2ff;
+  --purple-50: #efedff;
+  --purple-25: #f7f5ff;
+
+  /* Green — covered, satisfied, done. One meaning, never a section's colour. */
+  --green-700: #2f6152;
+  --green-500: #227a5b;
+  --green-200: #b9f1d7;
+  --green-100: #dff3ea;
+  --green-50: #e8f7f0;
+  --green-25: #f3fbf7;
+
+  /* Amber — someone still has to act. */
+  --amber-700: #75602c;
+  --amber-500: #a65d19;
+  --amber-200: #f0dcb8;
+  --amber-100: #fff1dc;
+  --amber-50: #fff4df;
+  --amber-25: #fff7e8;
+
+  /* Crimson — a deadline is close, or a panel failed. */
+  --crimson-700: #7a3a46;
+  --crimson-500: #a51c30;
+  --crimson-200: #eed3d8;
+  --crimson-50: #f9e9ec;
+
+  /* Blue — added 2026-08-22 for the one thing the palette could not say: *in
+     progress, or waiting on the institution*. Until then amber did that job as
+     well as "needs you", so a reviewing step and an overdue one wore the same
+     colour (review of 2026-08-21, C3). Same six stops as green. */
+  --blue-700: #1f4b7c;
+  --blue-500: #2a63a9;
+  --blue-200: #c4d9f2;
+  --blue-100: #dce9f8;
+  --blue-50: #e9f1fb;
+  --blue-25: #f3f8fd;
+
+  /* Teal — the one hue in the product that the design system never named, and
+     the audit's clearest example of what an unnamed decision becomes. It exists
+     for exactly one thing: `.task-type-icon.form`, the tile on a task that is a
+     form rather than an upload or a profile edit. It is here so it is visible
+     in the styleguide and can be decided on, not so it can spread. Either the
+     document-type tiles become a named categorical set or this hue goes; until
+     that call is made, nothing new may use it. */
+  --teal-500: #1a6984;
+  --teal-200: #d2eaef;
+  --teal-50: #e7f4f7;
+
+  /* The two stops of the primary action's surface. A gradient is a decision
+     about the whole product the same way a colour is, and this one was written
+     out three times — the primary button, the student's Edward bubble and
+     Edward's send control — which is how a "same" button ends up not being one. */
+  --purple-grad-from: #5e47cd;
+  --purple-grad-to: #735ee0;
+
+  /* ── 2. Roles ─────────────────────────────────────────────────────────────
+     What a rule names. Every one of these answers a question a screen actually
+     asked, which is why each carries the raw value it replaces. */
+
+  /* Text. Four weights of voice and no more: the answer, the second fact, the
+     label above it, and the thing that is barely a word. */
+  --ink: var(--ink-900);
+  --ink-2: var(--ink-600);            /* was #5f6879 ×5, #5c6377 ×2, #616a7e   */
+  --muted: var(--ink-500);
+  --faint: var(--ink-400);            /* was #9aa0b0 ×3, #9096a8 ×3, #999ca8   */
+
+  /* Surfaces. Three planes and no more — canvas, card, ink — plus the card's
+     own paper one shade down, which is not a fourth plane but the head and the
+     foot of a card. All four are rendered side by side at `#/styleguide`. */
+  --canvas: var(--ink-25);
+  --surface: var(--ink-0);
+  --surface-sunk: var(--ink-75);      /* was #f1f2f6 ×3, #f4f4f8 ×3            */
+  --card-zone: var(--ink-50);
+  --surface-ink: var(--ink-800);      /* was #1b203a ×6 — the anchor card      */
+
+  /* What sits on the ink plane. Three tokens, because eight rail cards each
+     worked them out again. */
+  --on-ink: var(--ink-0);
+  --on-ink-muted: var(--ink-300);     /* was #b9b4dd ×7, #bbb4dd, #c4c0dd ×4   */
+  --on-ink-line: #ffffff2e;           /* was #ffffff2e ×3, #ffffff26 ×2        */
+
+  /* Lines. `--line` divides two surfaces; `--line-soft` divides two rows on
+     one surface; `--line-strong` closes a card's head or foot. */
+  --line: var(--ink-150);
+  --line-soft: var(--ink-100);        /* was #eff0f4 ×7, #f0f1f4 ×2            */
+  --line-strong: var(--ink-200);      /* was #d9dbe6 ×2, #d6d8e4 ×2            */
+
+  /* The browser's own furniture, in the product's colours: the thumb of every
+     scrollbar, and selected text. A default the browser paints is still a
+     colour on the page — round two of the Jam of 2026-08-21. */
+  --scrollbar-thumb: var(--ink-200);
+  --selection: var(--purple-tint);
+
+  /* The accent, and the roles a hue needs. Every status hue below has the same
+     shape, which is the point: a screen that needs "the line around an amber
+     tint" must find it by the same name it found the purple one. */
+  --purple: var(--purple-400);
+  --purple-dark: var(--purple-500);
+  --purple-hover: var(--purple-450);  /* was 14 mid purples for one state      */
+  --purple-ink: var(--purple-600);    /* text/icon on a purple tint            */
+  --purple-deep: var(--purple-700);   /* purple on the ink plane               */
+  --purple-line: var(--purple-200);   /* was #ddd8f7 ×11, #dcd6ff ×4           */
+  --purple-tint: var(--purple-100);   /* was #e6e2ff ×3 and 20 neighbours      */
+  --purple-soft: var(--purple-50);
+  --purple-wash: var(--purple-25);    /* was #f7f5ff ×5 — the faintest row     */
+
+  --green: var(--green-500);
+  --green-ink: var(--green-700);
+  --green-line: var(--green-200);     /* was #b9f1d7 ×3, #bcebd5, #c1f1d8      */
+  --green-tint: var(--green-100);     /* was #dff3ea ×3, #dff2e9, #e3f2eb      */
+  --green-soft: var(--green-50);
+  --green-wash: var(--green-25);      /* was #f3fbf7, #f7fbf9 ×2, #f1faf6…     */
+
+  --amber: var(--amber-500);
+  --amber-ink: var(--amber-700);      /* was #75602c ×3                        */
+  --amber-line: var(--amber-200);     /* was #f0dcb8 ×3, #f2dcc4, #e8cfa6      */
+  --amber-tint: var(--amber-100);     /* was #fff1dc ×3, #fff2dc, #fff2df      */
+  --amber-soft: var(--amber-50);
+  --amber-wash: var(--amber-25);      /* was #fff7e8 ×3, #fffaf1               */
+
+  --crimson: var(--crimson-500);
+  --crimson-ink: var(--crimson-700);  /* was #7a3a46 ×4, #7a2634, #9b3040      */
+  --crimson-line: var(--crimson-200); /* was #eed3d8 ×3, #eec6cd, #f0d4da      */
+  --crimson-soft: var(--crimson-50);
+
+  --blue: var(--blue-500);            /* in progress, or Aster holds it         */
+  --blue-ink: var(--blue-700);
+  --blue-line: var(--blue-200);
+  --blue-tint: var(--blue-100);
+  --blue-soft: var(--blue-50);
+  --blue-wash: var(--blue-25);
+
+  /* Off-system, and named so it stops being invisible. See the palette note. */
+  --teal: var(--teal-500);
+  --teal-line: var(--teal-200);
+  --teal-soft: var(--teal-50);
+
+  /* The primary action's surface. Name this; never the two stops. */
+  --grad-purple: linear-gradient(100deg, var(--purple-grad-from), var(--purple-grad-to));
+
+  /* Two glass surfaces and the scrim under an overlay. */
+  --glass: #ffffffeb;
+  --scrim: #12172740;
+
+  /* ── 3. Scales ────────────────────────────────────────────────────────── */
+
+  /* Space.
+     The audit counted every spacing declaration in the product and found each
+     whole pixel from 1 to 20 in use, at roughly the same frequency: 1px 28
+     times, 6px 81, 9px 85, 12px 91, 18px 48. A flat distribution over twenty
+     consecutive values is not a scale with exceptions in it — it is the
+     absence of a scale. Nothing was hiding in the data to be extracted.
+
+     So these twelve steps are a decision rather than a measurement, and the
+     migration snapped the existing 1,400 declarations onto them, moving most
+     by a pixel. Two rules keep it a scale:
+
+       - a raw px in a spacing declaration is a bug;
+       - if a screen needs a step that is not here, that is a case for changing
+         the scale in this file, never for one raw value in one rule.
+
+     Anything above 36px is a layout constant, not a step — it names a specific
+     piece of the frame, and lives with the other constants below. */
+  --space-1: 2px;    /* inside a chip; a label to the value under it           */
+  --space-2: 4px;    /* an icon to its own word                                */
+  --space-3: 6px;    /* two facts sharing one line                             */
+  --space-4: 8px;    /* elements in a row                                      */
+  --space-5: 10px;   /* a row's own padding                                    */
+  --space-6: 12px;   /* blocks inside a card                                   */
+  --space-7: 14px;   /* a roomier block, where the content asks something      */
+  --space-8: 16px;   /* card to card                                           */
+  --space-9: 18px;   /* a card's own padding                                   */
+  --space-10: 22px;  /* a page region to the next                              */
+  --space-11: 28px;  /* the top and the bottom of a page                       */
+  --space-12: 36px;  /* a page's own top and bottom on a wide screen           */
+  --space-13: 44px;  /* the widest step: the padding on a page's outer frame   */
+
+  /* Radius. Fifteen values were in use; these seven cover them, and the ladder
+     is the point — the bigger the thing, the rounder it is, so a row inside a
+     card can never come out rounder than the card holding it. That ordering is
+     what stops the tell the Jam of 2026-08-20 called out: a square row meeting
+     a rounded card. */
+  --radius-xs: 5px;       /* a bar, a tiny marker                              */
+  --radius-chip: 9px;     /* a chip, a small tile                              */
+  --radius-tile: 12px;    /* an icon tile, a control                           */
+  --radius-row: 15px;     /* a row, or a block nested inside a card            */
+  --radius-card: 18px;    /* a card on the canvas                              */
+  --radius-panel: 23px;   /* a drawer, a modal, a window, a sheet              */
+  --radius-pill: 99px;
+  --radius-round: 50%;
+
+  /* Depth, named — the page-shell pass. Three planes and no more:
+       canvas   the ground a page sits on
+       surface  a card raised off it
+       ink      the rail's anchor card
+     There is deliberately no fourth. A list inside a card sits on that card's
+     own white; it never gets a surface of its own. A box inside a box is what
+     made the portal read as stacked rather than built (Jam, 2026-08-20). */
+  --shadow-soft: 0 12px 36px #1f253a12;
+  --shadow-card: 0 7px 22px #1f253a0e, 0 1px 2px #1f253a0d;
+  /* A floating window rather than a card on the page. ENR-181 named it so the
+     info modal and the Edward window cannot drift apart. */
+  --shadow-float: 0 25px 70px #0d12233d;
+  /* The primary action's glow, and its lift on hover. It is the accent's own
+     colour under the button, which is why it lives here and moves when the
+     accent does — it was written raw on the button, in a purple the product no
+     longer has. */
+  --shadow-primary: 0 6px 14px #5943c83d;
+  --shadow-primary-hover: 0 9px 18px #5943c84a;
+
+  /* Motion, named — ENR-181. Three loose durations were doing this job. */
+  --dur-fast: .22s;
+  --dur-base: .26s;
+  --ease: cubic-bezier(.22, .61, .36, 1);
+  /* The wait before a hint names the control under the pointer. Long enough
+     that crossing a row of icon buttons does not flash three labels; short
+     enough that stopping on one feels like an answer. Keyboard focus and tap
+     ignore it — those are deliberate, and a deliberate act gets an answer at
+     once. */
+  --delay-tip: .3s;
+
+  /* Layers, named — ENR-181. A raw z-index in a new rule is a bug the same way
+     a raw hex is: it is a decision about the whole product taken locally. */
+  --z-topbar: 20;
+  --z-nav-scrim: 29;
+  --z-sidebar: 30;
+  --z-popover-scrim: 40;
+  --z-popover: 50;
+  --z-edward: 60;
+  --z-scrim: 70;
+  --z-panel: 71;
+  --z-modal: 90;
+  /* Above everything but a toast, and it is not an exception: a tooltip is
+     attached to the thing you are pointing at, and the thing you are pointing
+     at is whatever is on top. At 40 — where it sat while it was drawn inside
+     its own parent — a hint on a drawer's close button rendered under the
+     drawer. */
+  --z-tooltip: 110;
+  --z-toast: 120;
+
+  /* Layout constants — facts about the page frame, not steps on a scale.
+
+     How the hero band meets what comes after it. `--hero-gap` is the one gap
+     after the band — or after the summary panel tucked into it — before the
+     next block, on every section. The Jam of 2026-08-21 approved the 30 My
+     Enrollment had, and found it written as a raw 30px on the panel while a
+     band with no panel got 22: one idea, two values. `--hero-tuck` is the extra
+     the panel eats into the band, which only ever happens when it directly
+     follows it; under 620 it is 14px, set beside the other two constants that
+     shrink there in `patterns.css`.
+
+     `--band-outdent` is how far the band reaches past the shared column on each
+     side, and it is what makes the summary panel line up with the tabs and the
+     cards below it instead of standing 22px in from them. It must stay under
+     `.content-wrap`'s side padding, so it shrinks with it.
+
+     `--safe-bottom` is the lower-right corner Edward owns on every page —
+     ENR-175 AC 7. No page may put a primary action inside it. */
+  --hero-gap: var(--space-10);       /* 22px — the region step. 30px until the review of 2026-08-21 (C4): "wide enough to park my Volkswagen" */
+  --hero-tuck: 20px;
+  --band-outdent: 22px;
+  --panel-pad: 23px;
+  /* The shell holds still between sections — round two of the Jam of
+     2026-08-21. The band is `--hero-min` tall on every route (a two-line lede
+     fits; a one-line one does not shrink it), the summary panel's body is at
+     least `--panel-min` (three meta lines fit), and every control in the topbar
+     — the preview pill, a chip, an icon button — is `--control-height`. Before
+     this the band was 172 or 183, the panel 102 to 114, the controls 25, 37 and
+     38, and the page started somewhere different on each route. */
+  --hero-min: 184px;
+  --panel-min: 114px;
+  --control-height: 38px;
+  /* The frame's two fixed measures: the sidebar's width, which the workspace
+     steps past, and the topbar's height, which the brand row across from it
+     matches so the mark and the controls share one centre line. */
+  --sidebar-width: 254px;
+  --topbar-height: 70px;
+  --safe-bottom: 76px;
+  --toast-bottom: 25px;
+  /* The tooltip's three measurements. They are constants rather than steps
+     because the bubble is positioned in JavaScript, against the window rather
+     than against a parent — `Tooltip.jsx` reads these three off the cascade so
+     the numbers are still decided here and not retyped there. */
+  --tip-gap: 8px;      /* bubble to the control it points at                  */
+  --tip-edge: 12px;    /* the closest a bubble may come to the window's edge  */
+  --tip-measure: 264px; /* an explainer's measure — about 40 characters       */
+  /* A full-screen flow's frame — ENR-163, its surface aligned to the approved
+     prototype on 2026-08-21. The rail is the sidebar's width (`--sidebar-width`
+     above — it is the same column, continued); the main column reads at
+     `--flow-column`, with the step panel beside it between `--flow-aside-min`
+     and `--flow-aside` when the two fit — decided by a container query on the
+     column at column + gap + aside-min (1032px), not by a fifth viewport
+     breakpoint. */
+  --flow-column: 736px;
+  --flow-aside: 384px;
+  --flow-aside-min: 272px;
+  /* The anchored panel a topbar control opens — `Popover`. Wide enough for a
+     40px tile, a two-line title and a trailing cell; as tall as the window
+     allows before it scrolls under its own head. */
+  --popover-width: 372px;
+  --popover-max-height: 720px;
+
+  --font-geist-sans: 'Geist Variable', 'Geist', sans-serif;
+  --font-geist-mono: 'Geist Mono Variable', 'Geist Mono', monospace;
+
+  /* Type, named — the ramp My Enrollment was built on, published so the rest of
+     the portal stops inventing its own. A raw px in a font-size is a bug the
+     same way a raw hex is. Twenty-eight sizes, eleven weights, twenty trackings
+     and fourteen leadings were what "each section designed on its own" looked
+     like.
+
+     Sizes carry a role, not a number. Pick by what the text IS — and since the
+     review of 2026-08-21 the roles are the reference screen's, measured:
+       hero     the page's one h1
+       title    the title of a drawer or a modal; the h1 under 620px
+       display  the one lead figure of a card or a panel, always bold — the
+                only size a figure is ever set at (9.0); 27px is not a step
+       h2       a section title (semi); a row, a block or a value (regular);
+                a dark card's lead line and the advisor's name (bold) — a row
+                title is never heavier than the section above it
+       h3       the brand line, and where a row title steps down under 620px;
+                nowhere else — not a title, not a value, not a name
+       h4       navigation rows and tab labels; the band's lede; a strong
+                lead-in inside running copy — never a figure, a title, a value
+                or a price
+       body     running copy in a drawer or a panel; a price or an amount
+                inside a row; the copy of a rail card
+       copy     running copy in a card
+       meta     the line under a heading, and the label on a control
+       small    facts, timestamps, states — a status is never smaller
+       micro    footnotes and footer links; the smallest thing that is still a word */
+  --fs-hero: clamp(25px, 2.5vw, 34px);
+  --fs-title: 27px;
+  --fs-display: 21px;
+  --fs-h2: 17px;
+  --fs-h3: 15px;
+  --fs-h4: 13.5px;
+  --fs-body: 12.5px;
+  --fs-copy: 11.5px;
+  --fs-meta: 10.5px;
+  --fs-small: 9.5px;
+  --fs-micro: 8.5px;
+  /* Five weights. `heavy` exists because 9px uppercase needs more than bold to
+     hold its colour; it is not a sixth heading level. */
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semi: 600;
+  --fw-bold: 700;
+  --fw-heavy: 750;
+  /* Tracking follows size: the bigger the type the tighter it sets, and
+     uppercase always opens up. `wide` is the mono eyebrow on the hero band and
+     nothing else. */
+  --ls-hero: -.035em;
+  --ls-tight: -.025em;
+  --ls-snug: -.015em;
+  --ls-caps: .08em;
+  --ls-wide: .13em;
+  /* Three leadings: figures, headings, everything you read. */
+  --lh-tight: 1.1;
+  --lh-heading: 1.35;
+  --lh-body: 1.55;
+}
+
+/* ============================================================================
+ * The second language — the staff workspace, scoped to `.staff`.
+ *
+ * Audentra is two products for two people and it must read as one product.
+ * The student opens the portal a few times a week, often on a phone, to learn
+ * where she stands. Staff live in the workspace for a working day, on a wide
+ * screen, moving through other people's records. Those are different jobs, and
+ * a token set tuned for one is measurably wrong for the other.
+ *
+ * So there is one rule here, and everything below is an application of it:
+ *
+ *   THE ROLES KEEP THEIR NAMES AND THEIR MEANINGS. ONLY THEIR VALUES CHANGE.
+ *
+ * `--fs-body` still means "running copy in a drawer or a panel"; inside
+ * `.staff` it is 14px instead of 12.5px. `--radius-card` still means "a card on
+ * the canvas"; inside `.staff` it is 10px instead of 18px. Nothing above is
+ * edited and no name is invented for the workspace's own sake, which is what
+ * makes every primitive the portal already owns — `Card`, `Button`, `Avatar`,
+ * `StatusPill`, `Drawer`, `Notice` — render correctly on a staff screen without
+ * being told it is one. That is the whole mechanism by which the two products
+ * stay relatives instead of becoming two products.
+ *
+ * Where the values come from
+ * --------------------------
+ * The stakeholder chose direction **B, "the student's family"**, from three
+ * skins of one screen (check-in of 2026-08-21;
+ * `.scratch/brief-2026-08-21-staff-visual-direction/spec.md` §10). B is the
+ * portal's own token set, so it cannot be taken whole — and the first guess at
+ * why was wrong. The hypothesis was that B is too *dense* for staff. Mobbin
+ * says the opposite: Twenty and Attio run 30px rows, below both B's 40 and A's
+ * 44. B's pitch was never the problem.
+ *
+ *   B is wrong about the DECORATION, not the density.
+ *
+ * The 18px radius, the shadow under every card, the 15px rounded row, the glass
+ * sidebar, the 40px duotone tile on a queue row and the gradient primary are
+ * all things a workspace pays for and does not use. What follows removes them
+ * and leaves B's shapes standing. Evidence, per value, is in
+ * `research-chrome-and-density.md` beside the brief — 62 screens, platform web.
+ *
+ * Everything not restated below is inherited from `:root` deliberately: the
+ * palette, every colour role, the colour semantics (green done, amber someone
+ * must act, blue in progress, crimson a deadline or a failure, purple the
+ * action), the space scale, motion, layers and the breakpoints. A hue means the
+ * same thing to a director as it does to a student, and that was never a
+ * direction's to choose.
+ * ==========================================================================*/
+.staff {
+  /* Chrome. The sidebar stays light — B was right, and no screen in the corpus
+     puts a dark nav beside a light canvas unless it is a 56px icon rail. What
+     goes is the glass: not one of the 62 screens uses translucency between nav
+     and canvas, because there is nothing behind it to see, and it costs a
+     `backdrop-filter` for a blur of the colour underneath it. 224px is the
+     measured cluster (210–235); above that the widths belong to file trees. */
+  --sidebar-width: 224px;
+
+  /* The data sits on the whitest plane. The portal puts its canvas one step
+     down (`--ink-25`) so that a white card lifts off it; a workspace inverts
+     that, because the thing that has to be legible is the table, not the
+     container around it. The sunk plane stays for a card's head and foot, which
+     is the one piece of B's construction the workspace keeps whole. */
+  --canvas: var(--ink-0);
+  --surface-sunk: var(--ink-50);
+
+  /* Depth. A workspace card is a hairline, not a shadow — the largest radius
+     found on any operational surface was 12, and shadow appeared only on things
+     that genuinely float. So the card's shadow goes and the float's stays: a
+     drawer, a popover and the record overlay are above the page and say so.
+     The primary loses its glow with its gradient, below. */
+  --shadow-card: none;
+  --shadow-primary: none;
+  --shadow-primary-hover: none;
+
+  /* Radius, one rung shorter, with the ladder intact — a row inside a card
+     still cannot come out rounder than the card. A queue row sets no radius at
+     all; it is full-bleed with a hairline, which is what every dense list in
+     the corpus does. Deel draws the boundary on a single page: boxed tiles
+     above, ruled rows below. */
+  --radius-card: 10px;
+  --radius-row: 8px;
+  --radius-panel: 12px;
+
+  /* Type. The structural finding, and the reason this is not just "bigger":
+     a dense tool shrinks the LABEL and never the VALUE. The only 11px type
+     anywhere in the corpus is a tracked, uppercase column head — and nothing on
+     Zendesk's agent workspace, the closest analogue to an advisor's day, goes
+     below 11 at all.
+
+     So the portal's 9.5 and 8.5 steps have no staff values: `--fs-small` and
+     `--fs-micro` are pulled up to 12 and 11, and the sizes below 11 simply do
+     not exist here. A status, a timestamp and a fact are values, not labels,
+     and they read at 12.
+
+     `--fs-caps` is the one name this layer adds, because the workspace has a
+     shape the portal does not have: a column of data with a head over it. It is
+     the only place 11px is allowed, and it is always uppercase and tracked. */
+  --fs-hero: 24px;
+  --fs-title: 20px;
+  --fs-display: 22px;
+  --fs-h2: 16px;
+  --fs-h3: 15px;
+  --fs-h4: 13px;
+  --fs-body: 14px;
+  --fs-copy: 13px;
+  --fs-meta: 12px;
+  --fs-small: 12px;
+  --fs-micro: 11px;
+  --fs-caps: 11px;
+
+  /* The primary is solid. A gradient with a coloured shadow under it works when
+     there is one primary on the page; a staff screen has one per card, and six
+     of them read as decoration rather than as the action. The token is the
+     surface, not the two stops, so re-pointing it here is all it takes. */
+  --grad-purple: var(--purple);
+
+  /* The frame's own measures. 40px is B's pitch and it survives — it is the
+     middle of the corpus, not the loose end. A row that genuinely carries two
+     lines gets 56 rather than growing the whole table. The queue's context
+     column is 380px, which is an industry constant to within 25px (Intercom
+     ~370, Jira ~370, Linear ~390, Attio ~395), and it collapses to a 48px icon
+     strip rather than disappearing — it is a toggle, not a fixture.
+
+     The record overlay is 1160 wide and splits 780/380: the same split as the
+     shell, so a card built for one fits the other without a second size. */
+  --row-height: 40px;
+  --row-height-tall: 56px;
+  /* The work log's mark, and with it the line behind the marks — the line is
+     derived from this rather than measured against it, because a mark and the
+     thread through it drifting apart by a pixel is the kind of defect nobody
+     files and everybody sees. */
+  --log-mark: 32px;
+  --context-width: 380px;
+  --context-collapsed: 48px;
+  --overlay-width: 1160px;
+}
+
+/* Breakpoints.
+ *
+ * CSS cannot tokenise a media query — `@media (width <= var(--bp-sheet))` is
+ * not a thing, and this repo has no PostCSS to fake it with. So the breakpoints
+ * are a documented list rather than a token, and the enforcement is that there
+ * are exactly four of them. A fifth width in a new `@media` is drift.
+ *
+ *   1060px   the page stops being two grids: `.page-rail` reflows under the
+ *            main column. Mirrored in JS as `RAIL_QUERY`.
+ *    820px   the sidebar becomes a drawer; two panes become one.
+ *            Mirrored in JS as `TWO_PANE_QUERY`.
+ *    620px   a covering overlay becomes a bottom sheet and turns modal.
+ *            Mirrored in JS as `SHEET_QUERY`.
+ *    560px   the one place a layout gains a second column going up.
+ *
+ * The JS mirrors live in `src/lib/overlay.js` and must not be re-typed inline;
+ * a `matchMedia` string in a component is the same bug as a raw hex.
+ */

@@ -11,11 +11,11 @@ import {
 } from "react";
 import { useSearchParams } from "next/navigation";
 import { PortalShell } from "../components/portal-shell";
+import { StudentPortalIcon } from "../components/student-portal-icon";
 import {
   EmptyState,
   ErrorState,
   LoadingState,
-  PageCard,
 } from "../components/portal-ui";
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
 import {
@@ -61,7 +61,8 @@ function StudentInquiryForm({ onSent }: { onSent: () => void }) {
   };
 
   return (
-    <PageCard eyebrow="Ask the enrollment team" title="Send an inquiry">
+    <section className="section-card ask-card">
+      <div className="status-heading"><span className="status-icon accent"><StudentPortalIcon name="message" size={20} /></span><div><h2>Send an inquiry</h2><p>Ask the enrollment team for a decision or human follow-up.</p></div></div>
       <form className="student-inquiry-form" onSubmit={submit}>
         <label>
           Topic
@@ -93,14 +94,14 @@ function StudentInquiryForm({ onSent }: { onSent: () => void }) {
           </p>
         ) : null}
         <button
-          className="button button--primary"
+          className="primary-button"
           type="submit"
           disabled={action.status === "loading"}
         >
           {action.status === "loading" ? "Sending…" : "Send inquiry"}
         </button>
       </form>
-    </PageCard>
+    </section>
   );
 }
 
@@ -230,13 +231,14 @@ function HelpPageContent() {
       ) : help.status === "error" ? (
         <ErrorState message={help.error} onRetry={help.reload} />
       ) : (
-        <div className="resource-layout">
-          <div className="resource-main student-support-main">
-            <PageCard eyebrow="Knowledge center" title="Frequently asked questions">
-            <div className="filter-chips" aria-label="Filter help topics">
+        <div className="page-body">
+          <div className="page-main student-support-main">
+            <section className="section-card guide-section">
+            <div className="status-heading"><span className="status-icon accent"><StudentPortalIcon name="help" size={20} /></span><div><h2>Frequently asked questions</h2><p>Aster’s published guides</p></div></div>
+            <div className="filter-row"><div className="filter-chips" aria-label="Filter help topics">
               {(Object.keys(categoryLabels) as HelpCategory[]).map((key) => (
                 <button
-                  className={category === key ? "filter-chip--active" : undefined}
+                  className={category === key ? "selected" : undefined}
                   type="button"
                   aria-pressed={category === key}
                   onClick={() => setCategory(key)}
@@ -245,7 +247,7 @@ function HelpPageContent() {
                   {categoryLabels[key]}
                 </button>
               ))}
-            </div>
+            </div></div>
             {articles.length === 0 ? (
               <EmptyState
                 title="No articles in this topic"
@@ -261,9 +263,10 @@ function HelpPageContent() {
                 ))}
               </div>
             )}
-            </PageCard>
+            </section>
             {help.data.requests.length > 0 ? (
-              <PageCard eyebrow="Your support history" title="Enrollment conversations">
+              <section className="section-card request-section">
+                <div className="status-heading"><span className="status-icon review"><StudentPortalIcon name="message" size={20} /></span><div><h2>Your requests</h2><p>Enrollment conversations and office replies</p></div><span className="status-count">{help.data.requests.length}</span></div>
                 <p className="student-support-live-status" role="status">
                   Live updates are on. New team replies appear here without refreshing the page.
                 </p>
@@ -277,22 +280,22 @@ function HelpPageContent() {
                     />
                   ))}
                 </div>
-              </PageCard>
+              </section>
             ) : null}
-          </div>
-          <aside className="resource-aside">
             <StudentInquiryForm onSent={help.refresh} />
-            <div className="support-card">
+          </div>
+          <aside className="page-rail">
+            <div className="anchor-card support-card">
               <span className="support-card__mark" aria-hidden="true">{tenant.mark}</span>
-              <p className="eyebrow">Talk with a person</p>
+              <span className="panel-label">Talk with a person</span>
               <h2>Student support</h2>
               <p>{support.hours || help.data.support.hours}</p>
               {support.email ? (
-                <a className="button button--light" href={`mailto:${support.email}`}>
+                <a className="primary-button full" href={`mailto:${support.email}`}>
                   Email support
                 </a>
               ) : support.url ? (
-                <a className="button button--light" href={tenantRuntime.href(support.url)}>Contact support</a>
+                <a className="primary-button full" href={tenantRuntime.href(support.url)}>Contact support</a>
               ) : null}
               {support.phone ? (
                 <a href={`tel:${support.phone.replace(/[^\d+]/g, "")}`}>
@@ -300,7 +303,8 @@ function HelpPageContent() {
                 </a>
               ) : null}
             </div>
-            <PageCard title="More ways to connect">
+            <div className="provenance-card">
+              <span className="panel-label">More ways to connect</span>
               <nav className="aside-links" aria-label="Support options">
                 {support.email ? (
                   <a href={`mailto:${support.email}`}>
@@ -316,7 +320,7 @@ function HelpPageContent() {
                   <a href={tenantRuntime.href(support.url)}>{support.label} <span>→</span></a>
                 ) : null}
               </nav>
-            </PageCard>
+            </div>
           </aside>
         </div>
       )}

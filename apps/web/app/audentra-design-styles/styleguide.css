@@ -1,0 +1,845 @@
+/* ==========================================================================
+ * The styleguide page — `#/styleguide`.
+ *
+ * This is the one stylesheet in the repo that is not part of the product. It
+ * still obeys every rule the product obeys, on purpose: if the design system
+ * cannot render its own reference page out of its own tokens, it is not a
+ * design system. There is not a raw hex or a raw pixel below.
+ * ==========================================================================*/
+
+.sg-page {
+  flex-direction: column;
+  gap: var(--space-11);
+  padding-bottom: var(--safe-bottom);
+  display: flex;
+}
+
+.sg-section {
+  flex-direction: column;
+  gap: var(--space-8);
+  display: flex;
+}
+
+.sg-section-head {
+  border-bottom: 1px solid var(--line);
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-bottom: var(--space-6);
+  display: flex;
+}
+
+.sg-section-head h2 {
+  letter-spacing: var(--ls-tight);
+  font-size: var(--fs-display);
+  margin: 0;
+}
+
+.sg-section-head p {
+  color: var(--muted);
+  max-width: 74ch;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  text-wrap: pretty;
+  margin: 0;
+}
+
+.sg-block {
+  flex-direction: column;
+  gap: var(--space-4);
+  display: flex;
+}
+
+.sg-block h3 {
+  letter-spacing: var(--ls-snug);
+  font-size: var(--fs-h3);
+  margin: 0;
+}
+
+.sg-note {
+  color: var(--muted);
+  max-width: 74ch;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  text-wrap: pretty;
+  margin: 0;
+}
+
+.sg-page code {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: var(--fs-small);
+}
+
+/* --- colour --- */
+
+.sg-swatches {
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+}
+
+.sg-swatches li {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-tile);
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+}
+
+/* The chip sits in a frame so a translucent token can be read: `--glass` over
+   paper is paper, and `--scrim` over ink is ink. Half of each, and both. */
+.sg-chip-frame {
+  border-radius: var(--radius-chip);
+  flex: none;
+  width: var(--space-11);
+  height: var(--space-11);
+}
+
+.sg-swatches.over-ink .sg-chip-frame {
+  background: var(--surface-ink);
+}
+
+.sg-swatches.alpha .sg-chip-frame {
+  background: linear-gradient(90deg, var(--surface) 50%, var(--surface-ink) 50%);
+}
+
+.sg-chip-colour {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-chip);
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.sg-gradient {
+  background: var(--grad-purple);
+  border-radius: var(--radius-tile);
+  height: var(--space-12);
+}
+
+.sg-gradient-name {
+  margin: var(--space-3) 0 0;
+}
+
+.sg-swatches code {
+  color: var(--ink);
+  flex: 1;
+  min-width: 0;
+}
+
+.sg-swatches small {
+  color: var(--faint);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: var(--fs-micro);
+}
+
+/* --- the space scale --- */
+
+.sg-scale {
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+}
+
+.sg-scale li {
+  border-bottom: 1px solid var(--line-soft);
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-3) 0;
+  display: flex;
+}
+
+.sg-scale code {
+  color: var(--ink);
+  flex: none;
+  width: 9ch;
+}
+
+.sg-scale small,
+.sg-radii small,
+.sg-type small {
+  color: var(--faint);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: var(--fs-micro);
+  flex: none;
+  width: 6ch;
+}
+
+.sg-bar {
+  background: var(--purple);
+  border-radius: var(--radius-xs);
+  flex: none;
+  height: var(--space-5);
+}
+
+/* `--z-popover-scrim` is seventeen characters; nine were only ever enough for
+   `--space-nn`. */
+.sg-scale.wide code {
+  width: 19ch;
+}
+
+.sg-scale.wide small {
+  width: 24ch;
+}
+
+.sg-weight-demo,
+.sg-tracking-demo,
+.sg-family-demo {
+  flex: none;
+  width: 17rem;
+  font-size: var(--fs-h4);
+}
+
+.sg-leading-demo {
+  color: var(--ink-2);
+  flex: none;
+  width: 17rem;
+  font-size: var(--fs-copy);
+}
+
+.sg-depth li {
+  padding: var(--space-6) 0;
+}
+
+/* Card-shaped on purpose. `--radius-card` on anything near-square rounds to a
+   disc — 18px of radius leaves 8px of straight edge on a 44px box — and a
+   specimen for depth that is the wrong shape teaches the wrong thing. */
+.sg-depth-tile {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  flex: none;
+  width: 17rem;
+  height: var(--space-13);
+}
+
+/* The token is the specimen: hover the row and the dot runs on that duration,
+   on the one curve. */
+.sg-motion-demo {
+  background: var(--purple);
+  border-radius: var(--radius-pill);
+  flex: none;
+  width: var(--space-11);
+  height: var(--space-5);
+  transition: transform var(--dur-base) var(--ease);
+}
+
+.sg-motion li:hover .sg-motion-demo {
+  transform: translateX(var(--space-13));
+}
+
+.sg-scale p,
+.sg-radii p {
+  color: var(--muted);
+  font-size: var(--fs-copy);
+  margin: 0;
+}
+
+/* --- the radius scale --- */
+
+.sg-radii {
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+}
+
+.sg-radii li {
+  align-items: center;
+  gap: var(--space-4);
+  display: flex;
+}
+
+.sg-radius-box {
+  background: var(--purple-soft);
+  border: 1px solid var(--purple-line);
+  flex: none;
+  width: var(--space-12);
+  height: var(--space-12);
+}
+
+.sg-radii code {
+  color: var(--ink);
+  flex: none;
+}
+
+.sg-radii p {
+  flex-basis: 100%;
+  font-size: var(--fs-small);
+}
+
+/* --- the type ramp --- */
+
+.sg-type {
+  flex-direction: column;
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+}
+
+.sg-type li {
+  border-bottom: 1px solid var(--line-soft);
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding-bottom: var(--space-6);
+  display: flex;
+}
+
+.sg-type li > p:first-child {
+  letter-spacing: var(--ls-snug);
+  flex: 1;
+  min-width: 18rem;
+  margin: 0;
+}
+
+.sg-type code {
+  color: var(--ink);
+}
+
+.sg-type .sg-note {
+  flex-basis: 100%;
+  font-size: var(--fs-small);
+}
+
+/* --- specimens --- */
+
+.sg-grid {
+  grid-template-columns: repeat(auto-fit, minmax(21rem, 1fr));
+  align-items: start;
+  gap: var(--space-8);
+  display: grid;
+}
+
+.sg-row {
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-5);
+  display: flex;
+}
+
+.sg-row span {
+  color: var(--muted);
+  font-size: var(--fs-copy);
+}
+
+.sg-row strong {
+  letter-spacing: var(--ls-snug);
+  font-size: var(--fs-h4);
+}
+
+.sg-rail-demo {
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  align-items: start;
+  gap: var(--space-8);
+  display: grid;
+}
+
+.sg-controls {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-5);
+  display: flex;
+}
+
+.sg-controls.block {
+  max-width: 26rem;
+  margin-top: var(--space-6);
+}
+
+/* --- the written rules --- */
+
+.sg-rules {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  flex-direction: column;
+  gap: var(--space-6);
+  margin: 0;
+  padding: var(--space-9);
+  list-style: none;
+  display: flex;
+}
+
+.sg-rules li {
+  color: var(--muted);
+  border-left: 0;
+  max-width: 82ch;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  text-wrap: pretty;
+}
+
+.sg-rules strong {
+  color: var(--ink);
+}
+
+@media (width<=620px) {
+  .sg-swatches,
+  .sg-radii,
+  .sg-grid,
+  .sg-rail-demo {
+    grid-template-columns: 1fr;
+  }
+
+  .sg-scale li {
+    flex-wrap: wrap;
+  }
+
+  .sg-scale p {
+    flex-basis: 100%;
+  }
+}
+
+/* The step rail, shown in a box. On a real flow it is the full height of the
+   frame and sticky; here it is one specimen among many, so it is boxed and the
+   sticky is cancelled — the states are what the page is showing, not the
+   layout. */
+.sg-rail-demo {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  max-width: 360px;
+  margin-bottom: var(--space-9);
+  overflow: hidden;
+}
+
+.sg-rail-demo .step-rail {
+  border-right: 0;
+  width: 100%;
+  height: auto;
+  position: static;
+  inset: auto;
+  overflow: visible;
+}
+
+.sg-rail-demo .rail-steps {
+  flex: none;
+  overflow: visible;
+}
+
+/* In the box the human does not need to be pushed to the floor. */
+.sg-rail-demo .rail-advisor {
+  margin-top: var(--space-10);
+}
+
+/* Three stated facts side by side, each at its own height. */
+.sg-stated-demo {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-8);
+  display: grid;
+}
+
+.sg-rail-demo .rail-advisor {
+  margin-top: var(--space-9);
+}
+
+/* --- the tooltip demo: two rows that look like the rows the explainer lives on --- */
+
+.sg-tip-demo {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-row);
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+}
+
+.sg-tip-demo li {
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-6);
+  display: flex;
+}
+
+.sg-tip-demo li + li {
+  border-top: 1px solid var(--line-soft);
+}
+
+.sg-tip-demo span {
+  align-items: center;
+  display: inline-flex;
+}
+
+.sg-tip-demo strong {
+  letter-spacing: var(--ls-snug);
+  font-size: var(--fs-h3);
+}
+
+/* --- the notice, and the zones it docks into --------------------------------
+ *
+ * The specimens on this section are not swatches: a notice has no shape of its
+ * own, so showing one on its own would show nothing. Each demo is the real host
+ * — a summary panel, a section card — with a real notice in its zone, which is
+ * the only way the rule this section states can be checked by eye. */
+.sg-zone-title {
+  letter-spacing: var(--ls-snug);
+  margin: var(--space-9) 0 0;
+  font-size: var(--fs-h4);
+}
+
+.sg-zone-demo {
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  margin-top: var(--space-6);
+  padding: var(--space-10);
+}
+
+/* The panel is built to tuck under a hero band, and there is no band here. The
+   demo cancels the tuck rather than borrowing a band it does not need. */
+.sg-zone-demo .page-summary,
+.sg-zone-demo .section-card {
+  margin: 0;
+}
+
+.sg-zone-demo.tones {
+  flex-direction: column;
+  gap: var(--space-6);
+  display: flex;
+}
+
+/* Each tone needs a host to take its wash from, and in this one place the host
+   is the demo itself. `--card-radius` is what a docked notice reads for its
+   corners; the zones publish it, so the specimen publishes it too. */
+.sg-zone-demo.tones .notice {
+  --card-radius: var(--radius-row);
+  border-radius: var(--radius-row);
+  padding: var(--space-6) var(--space-7);
+}
+
+.sg-zone-row {
+  color: var(--muted);
+  padding-top: var(--space-6);
+  padding-bottom: var(--space-6);
+  font-size: var(--fs-copy);
+}
+
+/* Scope, then where it goes: the pairing is the whole rule, so it is set as one
+   and not as prose with the answers buried in it. */
+.sg-scope-list {
+  gap: var(--space-5);
+  margin: var(--space-6) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+}
+
+.sg-scope-list li {
+  grid-template-columns: 13rem minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-7);
+  display: grid;
+}
+
+.sg-scope-list strong {
+  color: var(--ink);
+  font-size: var(--fs-copy);
+  font-weight: var(--fw-semi);
+}
+
+.sg-scope-list span {
+  color: var(--muted);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+@media (width<=620px) {
+  .sg-scope-list li {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+
+  .sg-zone-demo {
+    padding: var(--space-7);
+  }
+}
+
+/* --- native controls demo — round two of the Jam of 2026-08-21 --- */
+
+.sg-native-row {
+  flex-direction: column;
+  gap: var(--space-5);
+  display: flex;
+}
+
+.sg-native-check {
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--fs-copy);
+  display: flex;
+}
+
+.sg-native-textarea {
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-tile);
+  width: 100%;
+  padding: var(--space-5) var(--space-6);
+  resize: vertical;
+}
+
+.sg-native-link {
+  color: var(--purple-dark);
+  font-size: var(--fs-copy);
+  text-decoration: underline;
+}
+
+.sg-native-scroll {
+  background: var(--surface-sunk);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-tile);
+  max-height: 132px;
+  padding: var(--space-5) var(--space-6);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.sg-native-scroll p {
+  margin: 0 0 var(--space-4);
+  font-size: var(--fs-copy);
+}
+
+/* --- icons, people, marks and spots — Jam of 2026-08-21 --- */
+
+.sg-icon-rules {
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+}
+
+.sg-icon-rules li {
+  border-bottom: 1px solid var(--line-soft);
+  align-items: center;
+  gap: var(--space-7);
+  padding: var(--space-4) 0;
+  display: flex;
+}
+
+.sg-icon-spec {
+  color: var(--ink-2);
+  flex: none;
+  align-items: center;
+  gap: var(--space-5);
+  width: 7rem;
+  display: flex;
+}
+
+.sg-icon-rules code {
+  color: var(--ink);
+  flex: none;
+  width: 16ch;
+}
+
+.sg-icon-rules p {
+  color: var(--muted);
+  margin: 0;
+  font-size: var(--fs-copy);
+}
+
+.sg-icons {
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+}
+
+.sg-icons li {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-tile);
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+}
+
+.sg-icon-weights {
+  color: var(--ink-2);
+  justify-content: space-between;
+  align-items: center;
+  display: flex;
+}
+
+.sg-icons code {
+  color: var(--muted);
+  font-size: var(--fs-micro);
+}
+
+.sg-people-row,
+.sg-marks-row,
+.sg-spots-row {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-6);
+  display: flex;
+}
+
+.sg-people-sep {
+  background: var(--line);
+  flex: none;
+  width: 1px;
+  height: var(--space-12);
+  display: block;
+}
+
+.sg-mark-on-ink {
+  color: var(--on-ink);
+  background: var(--surface-ink);
+  border-radius: var(--radius-tile);
+  place-items: center;
+  padding: var(--space-4) var(--space-6);
+  display: grid;
+}
+
+.sg-spots-row .spot {
+  margin: 0;
+}
+
+.sg-skeleton-demo .page-skeleton {
+  pointer-events: none;
+}
+
+/* --- Navigation: the sidebar's column, standing on the canvas --- */
+
+.sg-nav-demo {
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  flex-direction: column;
+  width: var(--sidebar-width);
+  max-width: 100%;
+  padding: 0 var(--space-9) var(--space-9);
+  display: flex;
+}
+
+.sg-nav-demo + .sg-nav-demo {
+  margin-top: var(--space-8);
+}
+
+/* A specimen has no window to fill: its list is as tall as its rows. */
+.sg-nav-demo .main-nav {
+  flex: none;
+  overflow: visible;
+}
+
+/* The time picker specimen: the drawer's width, so the day strip and the slot
+   grid read as they do in the sheet. */
+.sg-picker-demo {
+  max-width: 409px;
+}
+
+/* The status pill's tones, side by side. */
+.sg-pills {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-5);
+  display: flex;
+}
+
+/* Edward's section: a row the inline ask sits in, and the window's width for the check and the routes. */
+.sg-row-demo {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-5);
+  max-width: 480px;
+  padding: var(--space-5) 0;
+  display: flex;
+}
+
+.sg-edward-demo {
+  max-width: 380px;
+}
+
+/* The place photograph at full width — capped so the demo is a tile, not a banner. */
+.sg-place-full {
+  max-width: 360px;
+  margin-top: var(--space-6);
+}
+
+/* --- the staff page's own demonstration furniture -------------------------- */
+
+/* A row of specimens that are inline shapes rather than blocks — the dots, the
+   due cells, the two visibility lines. */
+.sg-row-demo {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-6) var(--space-10);
+  margin: 0;
+  display: flex;
+}
+
+.sg-open {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-tile);
+  background: var(--surface);
+  height: var(--control-height);
+  padding: 0 var(--space-8);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+}
+
+.sg-open:hover { background: var(--surface-sunk); }
+
+/* The three outcome states, stacked, each with the hairline it would have as
+   the foot of a record. */
+.sg-outcomes {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.sg-outcomes > * + * { border-top: 1px solid var(--line); }
+
+.sg-context-person {
+  text-align: center;
+  margin-bottom: var(--space-9);
+}
+
+.sg-context-name {
+  margin: var(--space-6) 0 var(--space-1);
+  color: var(--ink);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-semi);
+}
+
+.sg-context-role {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-meta);
+}
+
+/* The queue is a table and wants the page's full measure, plus its own frame —
+   on a screen it is full-bleed inside the shell, and here it needs an edge. */
+.sg-block .queue {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.sg-block .queue .queue-row:last-child { border-bottom: 0; }

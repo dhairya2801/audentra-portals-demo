@@ -14,9 +14,9 @@ function money(cents: number) {
 }
 
 const segmentColors = {
-  aid: "#27765a",
-  payments: "#3979ad",
-  balance: "#d5a229",
+  aid: "#227a5b",
+  payments: "#6854d9",
+  balance: "#d9dbe6",
 } as const;
 
 export function DashboardFinancialSnapshot({

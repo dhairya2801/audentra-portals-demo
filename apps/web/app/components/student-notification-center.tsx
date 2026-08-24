@@ -10,6 +10,7 @@ import {
 } from "../lib/api-client";
 import { safePortalDestination } from "../lib/safe-destination";
 import { TenantLink as Link } from "./tenant-link";
+import { StudentPortalIcon } from "./student-portal-icon";
 import styles from "./student-notification-center.module.css";
 
 function sentLabel(value: string) {
@@ -188,8 +189,10 @@ export function StudentNotificationCenter({
           setToast(null);
         }}
       >
-        <span aria-hidden="true">●</span>
-        Notifications
+        <span aria-hidden="true">
+          <StudentPortalIcon name="bell" size={19} />
+        </span>
+        <span className={styles.triggerLabel}>Notifications</span>
         {unreadCount > 0 ? <strong>{unreadCount}</strong> : null}
       </button>
 

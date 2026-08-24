@@ -1656,27 +1656,26 @@ test("DSM feedback surfaces remain connected to portal data and safe fallbacks",
       ),
     ]);
 
-  assert.match(financials, /function FinancialAidDonut/);
-  assert.match(financials, /award\.type !== "work_study"/);
-  assert.match(financials, /not counted as[\s\S]*accepted aid/);
-  assert.match(financials, /How this award works/);
-  assert.match(financials, /FinancialDocumentAction/);
+  assert.match(financials, /award\.type === "work_study" \? 0/);
+  assert.match(financials, /Accepted financial aid/);
+  assert.match(financials, /Not counted until awarded/);
+  assert.match(financials, /Documents that need you/);
   assert.match(financials, /document\.documentId/);
-  assert.match(financials, /FinancialPaymentSchedule/);
-  assert.match(financials, /Projected from your enrolled plan/);
-  assert.match(campusLife, /clubCategory/);
+  assert.match(financials, /selectFinancialPaymentPlan/);
+  assert.match(financials, /Payment plans/);
+  assert.match(campusLife, /const categories/);
   assert.match(campusLife, /Filter clubs by category/);
   assert.match(edward, /webkitSpeechRecognition/);
   assert.match(edward, /speechSynthesis\.speak/);
   assert.match(edward, /Microphone access was blocked/);
-  assert.match(shell, /tenant\.contacts\.admissions/);
-  assert.match(enrollment, /OptionalSupportChecklist/);
-  assert.match(enrollment, /<StudentCalendar/);
-  assert.match(enrollment, /title="Enrollment deadlines"/);
-  assert.match(enrollment, /Action needed/);
+  assert.match(shell, /contacts\.admissions/);
+  assert.match(enrollment, /Your next steps/);
+  assert.match(enrollment, /Coming up later/);
+  assert.match(enrollment, /Your enrollment advisor/);
+  assert.match(enrollment, /Start here/);
   assert.match(enrollment, /In review/);
   assert.match(enrollment, /Completed/);
-  assert.match(enrollment, /requirementPriority\(right\)/);
+  assert.match(enrollment, /priorityOf\(right\)/);
 });
 
 test("student routes enforce bootstrap gating and expose no dead static links", async () => {
@@ -1740,9 +1739,16 @@ test("student routes enforce bootstrap gating and expose no dead static links", 
     "/appointments",
     "/dashboard",
     "/documents",
+    "/edward",
     "/enrollment",
     "/enrollment/ferpa",
+    "/financials",
+    "/financials/aid",
+    "/health",
     "/help",
+    "/housing",
+    "/classrooms",
+    "/campus-life",
     "/messages",
     "/onboarding",
     "/payments",
@@ -1752,7 +1758,7 @@ test("student routes enforce bootstrap gating and expose no dead static links", 
   const source = [shell, signIn, ...routeFiles].join("\n");
   assert.doesNotMatch(source, />Open task</);
   assert.match(source, /Upload transcript/);
-  assert.match(source, /Select housing/);
+  assert.match(source, /Choose housing/);
   for (const match of source.matchAll(/href=["'](\/[^"'#?{}]*)["']/g)) {
     assert.ok(allRoutes.has(match[1]), `dead static link: ${match[1]}`);
   }
@@ -1772,43 +1778,34 @@ test("tenant points stay visible and enrollment tasks advertise their reward", a
   assert.match(shell, /rewards\.lifetimePoints/);
   assert.match(shell, /rewards\.pointName/);
   assert.match(shell, /bookstoreCreditCents/);
+  assert.match(shell, /aster-points-popover/);
+  assert.match(shell, /href="\/enrollment#momentum"/);
   assert.match(enrollment, /item\.reward\.points/);
-  assert.match(enrollment, /points earned/);
+  assert.match(enrollment, /pts today/);
   assert.match(apiClient, /vv:student-record-changed/);
   assert.match(styles, /\.aster-points-balance/);
   assert.match(styles, /\.aster-sidebar__rewards/);
   assert.match(styles, /\.enrollment-reward--earned/);
 });
 
-test("campus event visuals are data-driven, accessible, and backed by local assets", async () => {
-  const [campusPage, contracts, styles] =
+test("campus event visuals are data-driven, accessible, and preserve canonical registration", async () => {
+  const [campusPage, contracts] =
     await Promise.all([
       readFile(new URL("../app/campus-life/page.tsx", import.meta.url), "utf8"),
       readFile(
         new URL("../../../packages/contracts/src/index.ts", import.meta.url),
         "utf8",
       ),
-      readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     ]);
 
   assert.match(contracts, /visualTheme\?: "festival" \| "discovery"/);
-  assert.match(campusPage, /data-visual-theme=/);
-  assert.match(campusPage, /activeEvent\.imageAlt/);
-  assert.match(campusPage, /activeEvent\.imageAttribution/);
+  assert.match(campusPage, /function dateParts/);
+  assert.match(campusPage, /event\.category/);
+  assert.match(campusPage, /event\.location/);
   assert.match(campusPage, /Refresh current events/);
   assert.match(campusPage, /campus\.refresh\(\)/);
-  assert.match(styles, /\.campus-carousel--theme-festival/);
-  assert.match(styles, /\.campus-carousel--theme-discovery/);
-  assert.match(styles, /\.campus-carousel--theme-career/);
-  assert.match(styles, /\.campus-carousel--theme-community/);
-
-  for (const asset of [
-    "welcome-week-block-party.webp",
-    "first-year-research-showcase.webp",
-    "internship-ready-lab.webp",
-  ]) {
-    await access(new URL(`../public/media/events/${asset}`, import.meta.url));
-  }
+  assert.match(campusPage, /expectedVersion: event\.version/);
+  assert.match(campusPage, /crypto\.randomUUID\(\)/);
 });
 
 test("experience updates aggregate once per portal visit with an accessible decision flow", async () => {

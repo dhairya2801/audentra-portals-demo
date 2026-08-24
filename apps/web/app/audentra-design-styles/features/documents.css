@@ -1,0 +1,785 @@
+/* ==========================================================================
+ * My Documents — ENR-165.
+ * ==========================================================================*/
+
+/* ------------------------------------------------------------------ *
+ * My Documents — ENR-165
+ *
+ * The vocabulary here is about a wait and a decision, so almost nothing in this
+ * block is a new shape: the rows are `.card-rows` children on the card's own
+ * white, the drawer is the task drawer, the two notices are `<Notice>`. What is
+ * genuinely new is three things the portal had no expression for:
+ *
+ *   - a **state as the line under a title** rather than a chip on the right, so
+ *     `In review` has room to name who holds it and how long that takes;
+ *   - a **reason panel**, the one tinted block in a drawer, carrying why
+ *     something came back and what would fix it;
+ *   - an **extraction review**, where every value is an editable field that has
+ *     to be decided before anything can be sent.
+ *
+ * Nothing paints an edge. The two states where the student owes a move mark the
+ * square tile, which is the shape that can take a mark.
+ * ------------------------------------------------------------------ */
+
+/* --- the row --- */
+
+.document-row {
+  cursor: pointer;
+  text-align: left;
+  background: none;
+  border: 0;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-6);
+  padding-top: var(--space-7);
+  padding-bottom: var(--space-7);
+  display: grid;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.document-row:hover {
+  background: var(--card-zone);
+}
+
+.document-row:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: -3px;
+}
+
+/* The mark lives on the tile because the tile is square. A 3px bar down the
+   left of a row with rounded corners is a rule wearing a card's shape. */
+.document-tile {
+  color: var(--muted);
+  background: var(--canvas);
+  border-radius: var(--radius-tile);
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  display: grid;
+}
+
+.document-tile.act {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.document-tile.stop {
+  color: var(--crimson);
+  background: var(--crimson-soft);
+}
+
+.document-tile.done {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.document-tile.progress {
+  color: var(--purple);
+  background: var(--purple-soft);
+}
+
+.document-tile.issued {
+  color: var(--muted);
+  background: var(--canvas);
+}
+
+.document-body {
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-1);
+  display: flex;
+}
+
+.document-body strong {
+  color: var(--ink);
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--fs-h4);
+  font-weight: var(--fw-semi);
+  display: flex;
+}
+
+/* The unread mark for a decision she has not opened — ENR-158 AC 5. */
+.document-new {
+  background: var(--purple);
+  border-radius: var(--radius-round);
+  flex: none;
+  width: 6px;
+  height: 6px;
+}
+
+/* The anchor of the row is this line, not a chip: it is the only place that can
+   say who holds the next step and how long that usually takes. */
+.document-state {
+  color: var(--muted);
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.document-row.done .document-state {
+  color: var(--green);
+}
+
+.document-row.stop .document-state {
+  color: var(--crimson);
+}
+
+.document-row.act .document-state {
+  color: var(--amber);
+}
+
+/* A helper line only where it changes what she does — never on every row. */
+.document-consequence {
+  color: var(--muted);
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.document-consequence svg {
+  color: var(--crimson);
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+.document-trail {
+  align-items: center;
+  gap: var(--space-5);
+  display: flex;
+}
+
+.document-open {
+  color: var(--faint);
+  flex: none;
+  display: grid;
+}
+
+.document-row:hover .document-open {
+  color: var(--purple);
+}
+
+.document-row.issued .document-body strong {
+  font-weight: var(--fw-medium);
+}
+
+/* The caption that labels a run of rows, so the boundary between the runs does
+   the work a tag on every row would otherwise be asked to do. */
+.rows-caption {
+  color: var(--muted);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  background: var(--card-zone);
+  border-bottom: 1px solid var(--line);
+  margin: 0;
+  padding-top: var(--space-4);
+  padding-bottom: var(--space-4);
+  font-family: var(--font-geist-mono);
+  font-size: var(--fs-micro);
+}
+
+.card-rows > .rows-caption + * {
+  border-top: 0;
+}
+
+/* --- the drawer --- */
+
+.document-drawer .document-lede {
+  color: var(--muted);
+  margin: 0 0 var(--space-9);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+/* The one tinted block in the drawer: spend colour once, on the thing that is
+   asking. Everything below it sits on the drawer's own white. */
+.reject-panel {
+  background: var(--crimson-soft);
+  border: 1px solid var(--crimson-line);
+  border-radius: var(--radius-row);
+  margin-bottom: var(--space-9);
+  padding: var(--space-8);
+}
+
+.reject-panel h3 {
+  color: var(--crimson);
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-4);
+  font-size: var(--fs-h2);
+  display: flex;
+  font-weight: var(--fw-regular);
+}
+
+.reject-reason {
+  color: var(--ink);
+  margin: 0 0 var(--space-7);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.reject-lead {
+  color: var(--crimson);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-geist-mono);
+  font-size: var(--fs-micro);
+}
+
+.reject-remedies {
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+}
+
+.reject-remedies li {
+  color: var(--ink);
+  align-items: flex-start;
+  gap: var(--space-4);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.reject-remedies svg {
+  color: var(--crimson);
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+.reject-by {
+  color: var(--muted);
+  border-top: 1px solid var(--crimson-line);
+  margin: var(--space-7) 0 0;
+  padding-top: var(--space-5);
+  font-size: var(--fs-meta);
+}
+
+/* --- what the requirement wants, stated before any file field --- */
+
+.document-brief h3,
+.document-upload h3,
+.document-history h3 {
+  color: var(--ink);
+  margin: 0 0 var(--space-4);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-regular);
+}
+
+.document-brief p {
+  color: var(--muted);
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.document-why,
+.document-unblocks {
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  font-size: var(--fs-copy);
+  display: flex;
+}
+
+.document-why svg,
+.document-unblocks svg {
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+.document-brief .document-unblocks {
+  color: var(--green);
+}
+
+/* The formats, stated before the attempt — never only inside an error. */
+.document-brief .document-accepts {
+  letter-spacing: .06em;
+  margin-top: var(--space-5);
+  font-family: var(--font-geist-mono);
+  font-size: var(--fs-meta);
+}
+
+.document-route {
+  background: var(--card-zone);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-row);
+  margin-top: var(--space-9);
+  padding: var(--space-8);
+}
+
+.document-route p {
+  color: var(--muted);
+  margin: 0 0 var(--space-6);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+/* --- the file field --- */
+
+.document-upload {
+  border-top: 1px solid var(--line);
+  margin-top: var(--space-10);
+  padding-top: var(--space-9);
+}
+
+/* The base zone is a tall column for a first upload. Here the file is one line
+   in a row of controls, so it is overridden rather than duplicated. */
+.document-upload .upload-zone {
+  cursor: default;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: 0;
+  padding: var(--space-7);
+}
+
+.document-upload .upload-mark {
+  color: var(--purple-hover);
+  background: var(--purple-soft);
+  border-radius: var(--radius-tile);
+  flex: none;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  display: grid;
+}
+
+.upload-chosen {
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+  display: flex;
+}
+
+.upload-chosen strong {
+  overflow-wrap: anywhere;
+  font-size: var(--fs-copy);
+}
+
+.upload-chosen span {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+}
+
+.document-upload .upload-zone.has-file .upload-mark {
+  color: var(--green);
+  background: var(--green-tint);
+}
+
+/* Refused in the field, against the rule it broke — never in a modal. */
+.document-upload .upload-zone.refused {
+  background: var(--crimson-soft);
+  border-style: solid;
+  border-color: var(--crimson-line);
+}
+
+.document-upload .upload-zone.refused .upload-mark {
+  color: var(--crimson);
+  background: var(--crimson-line);
+}
+
+.upload-refusal {
+  color: var(--crimson);
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: var(--space-5) 0 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.upload-refusal svg {
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+.upload-privacy {
+  color: var(--muted);
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: var(--space-5) 0 0;
+  font-size: var(--fs-micro);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.upload-privacy svg {
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+.document-upload > .primary-button {
+  justify-content: center;
+  width: 100%;
+  margin-top: var(--space-8);
+}
+
+.upload-blocked {
+  color: var(--amber);
+  text-align: center;
+  margin: var(--space-4) 0 0;
+  font-size: var(--fs-copy);
+}
+
+/* A send that never arrived created nothing, so this is a panel about a file
+   still in her hands — not a record of a submission. */
+.upload-failed {
+  background: var(--crimson-soft);
+  border: 1px solid var(--crimson-line);
+  border-radius: var(--radius-row);
+  margin-top: var(--space-8);
+  padding: var(--space-8);
+}
+
+.upload-failed p {
+  color: var(--ink);
+  margin: 0 0 var(--space-6);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.upload-failed-actions {
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  display: flex;
+}
+
+/* --- the extraction review --- */
+
+.extract-review {
+  background: var(--card-zone);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-row);
+  margin-top: var(--space-8);
+  padding: var(--space-8);
+}
+
+.extract-head h3 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-regular);
+}
+
+.extract-note {
+  color: var(--muted);
+  margin: 0 0 var(--space-7);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.extract-fields {
+  flex-direction: column;
+  gap: var(--space-7);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+}
+
+.extract-field label {
+  color: var(--muted);
+  margin-bottom: var(--space-3);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+  display: block;
+}
+
+.extract-control {
+  align-items: center;
+  gap: var(--space-4);
+  display: flex;
+}
+
+.extract-field input {
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-chip);
+  min-width: 0;
+  flex: 1;
+  padding: var(--space-4) var(--space-5);
+  font-family: inherit;
+  font-size: var(--fs-copy);
+}
+
+.extract-field input:focus-visible {
+  border-color: var(--purple);
+  outline: 2px solid #6854d933;
+  outline-offset: 1px;
+}
+
+/* Undecided is the loud state, because silence is what must not pass. */
+.extract-field.open input {
+  background: var(--amber-soft);
+  border-color: var(--amber-line);
+}
+
+.extract-agree {
+  cursor: pointer;
+  color: var(--ink);
+  white-space: nowrap;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  flex: none;
+  padding: var(--space-4) var(--space-6);
+  font-family: inherit;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+}
+
+.extract-agree:hover {
+  border-color: var(--purple);
+  color: var(--purple);
+}
+
+.extract-verdict {
+  white-space: nowrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+  display: flex;
+}
+
+.extract-verdict.right {
+  color: var(--green);
+}
+
+.extract-verdict.fixed {
+  color: var(--purple);
+}
+
+/* The machine's answer, marked as the machine's. */
+.extract-read {
+  color: var(--muted);
+  margin-top: var(--space-3);
+  font-family: var(--font-geist-mono);
+  font-size: var(--fs-micro);
+  display: block;
+}
+
+.extract-left {
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  margin: var(--space-7) 0 0;
+  padding-top: var(--space-6);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+/* --- the history --- */
+
+.document-history {
+  border-top: 1px solid var(--line);
+  margin-top: var(--space-10);
+  padding-top: var(--space-9);
+}
+
+.history-list {
+  flex-direction: column;
+  gap: var(--space-7);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+}
+
+/* A left rule is correct here and nowhere else on this screen: these items are
+   square on that side, and the rule is a timeline rather than an accent. */
+.history-list li {
+  border-left: 2px solid var(--line);
+  padding-left: var(--space-7);
+}
+
+.history-head {
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+  display: flex;
+}
+
+.history-head strong {
+  overflow-wrap: anywhere;
+  font-size: var(--fs-copy);
+}
+
+.history-head span {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+}
+
+.history-outcome {
+  margin: var(--space-2) 0 var(--space-3);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.history-outcome.wait {
+  color: var(--muted);
+}
+
+.history-outcome.done {
+  color: var(--green);
+}
+
+.history-outcome.stop {
+  color: var(--crimson);
+}
+
+.history-rule {
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  margin: var(--space-8) 0 0;
+  padding-top: var(--space-6);
+  font-size: var(--fs-micro);
+  line-height: var(--lh-body);
+}
+
+/* --- the anchor card this section named ---
+ *
+ * `waiting-card` was My Documents' rail until 2026-08-21, when the section
+ * became a panel and the rail went with it: `With Aster right now` restated the
+ * rows under it. The variant survives on the styleguide, which is where a shape
+ * the product may want again is kept, and these two rules are what it needs. */
+
+.waiting-card strong {
+  letter-spacing: var(--ls-tight);
+  margin: var(--space-1) 0 var(--space-5);
+  font-size: var(--fs-display);
+  display: block;
+}
+
+.waiting-card p {
+  margin: 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+/* --- the panel ---------------------------------------------------------------
+ *
+ * My Documents opens as a drawer since 2026-08-21, so the record has to read at
+ * 465px instead of at 700. Nothing here is a new shape. The rows are the same
+ * `.document-row` children of the same `.card-rows`, the runs are labelled with
+ * `.panel-label` — the caps label every drawer in the product already uses —
+ * and the two notices are `<Notice>`.
+ *
+ * The one thing that had to be said: `.card-rows` bleeds to a card's edge by
+ * pulling `--card-pad` back on each side, and inside a drawer the padding is
+ * the drawer's, not a card's. So the token is *restated*, and the negative
+ * margin keeps working untouched. Retyping the margin against `--space-11`
+ * would have been the same number written a second place it could drift from. */
+
+.documents-drawer .panel-run,
+.documents-section .panel-run {
+  padding-top: var(--space-10);
+}
+
+.documents-drawer .panel-label,
+.documents-section .panel-label {
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-6);
+  display: flex;
+}
+
+.documents-drawer .card-rows {
+  --card-pad: var(--drawer-inset);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  margin-bottom: 0;
+}
+
+/* A notice inside a run is about that run, so it gets the same treatment the
+   drawer already gives one docked at its head. */
+.documents-drawer .panel-run > .notice,
+.documents-section .panel-run > .notice {
+  border-radius: var(--radius-row);
+  margin: 0 0 var(--space-8);
+  padding: var(--space-6) var(--space-7);
+}
+
+/* The retention guardrail, under the record it is about. It was a card in the
+   rail; a foot is what is left when the column it stood in is gone, and it is
+   the more honest place for a sentence that qualifies everything above it. */
+.documents-drawer .panel-foot,
+.documents-section .panel-foot {
+  color: var(--muted);
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin-top: var(--space-10);
+  font-size: var(--fs-micro);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.documents-drawer .panel-foot svg,
+.documents-section .panel-foot svg {
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+/* The panel is 465px and never wider, which is inside the width the rows were
+   designed against at 380 — so it takes the narrow row, at every viewport. The
+   same three declarations sit in `health.css` under `@media (width<=620px)`,
+   keyed to the viewport; here they are keyed to the container, because that is
+   what actually decides it. When a container query can key both, this block and
+   that one become one. Until then the reason is written in both places rather
+   than in neither.
+
+   The deadline chip stops competing with the title for the row width, and the
+   chevron goes: at this width the whole row is the button, and on a settled row
+   the chevron is the only thing in the trail, which puts an empty line under
+   every accepted document. */
+.documents-drawer .document-row {
+  grid-template-columns: auto minmax(0, 1fr);
+  row-gap: var(--space-5);
+}
+
+.documents-drawer .document-trail {
+  grid-column: 2;
+  justify-content: space-between;
+}
+
+.documents-drawer .document-open {
+  display: none;
+}
+
+.documents-drawer .document-row:has(.document-trail:empty) {
+  row-gap: 0;
+}
+
+/* The same runs as a section of Profile (C1.3): the card's own head, then the
+   runs with the card's padding rather than the drawer's inset. */
+.documents-section .panel-run:first-of-type {
+  padding-top: var(--space-7);
+}
+.documents-section .panel-run .card-rows {
+  border-radius: 0;
+  margin-bottom: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.documents-section .panel-foot {
+  margin-bottom: 0;
+}
+
+/* Inline, a document row is a row in a content column: its title takes the
+   row step and weight every other row title wears, not the panel's 13.5px. */
+.documents-section .document-body strong {
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-regular);
+}

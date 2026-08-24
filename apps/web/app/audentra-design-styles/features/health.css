@@ -1,0 +1,296 @@
+/* ==========================================================================
+ * Health — ENR-206.
+ * ==========================================================================*/
+
+/* ── Health — ENR-206 ──
+   Two cards that must not read as one thing. The record above is a card in the
+   ordinary construction: banded head, state pill, the page's band, a foot — and
+   since the changes of 2026-08-21 the pages she sent are a card of their own
+   under it, one row per page. Everything below is the
+   other silhouette — a question with no band at all, opening in prose and
+   closing on a foot. Nothing here paints an edge, and nothing here is washed:
+   the one colour this page spends is on the record while it is the one asking. */
+
+/* The state in the record's head is `StatusPill` since the changes of
+   2026-08-21 — the product's one pill, in `patterns.css`. The head's grid
+   centres it where the chip sat. */
+.immunization-card .status-heading > .status-pill {
+  align-self: center;
+}
+
+.status-icon.act {
+  color: color-mix(in srgb, var(--amber) 74%, var(--ink));
+}
+
+.status-icon.stop {
+  color: var(--crimson);
+}
+
+.record-state {
+  padding: 0;
+}
+.record-line {
+  color: var(--ink);
+  align-items: baseline;
+  gap: var(--space-4);
+  font-size: var(--fs-body);
+  line-height: 1.55;
+  display: flex;
+  text-wrap: pretty;
+}
+.record-line .pulse {
+  flex: none;
+  transform: translateY(-2px);
+}
+/* The date, only on the card that is still asking, and never in crimson at 102
+   days out — a distant deadline drawn as an emergency is the threat the brief
+   rules out. */
+.record-due {
+  color: var(--muted);
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  font-size: var(--fs-meta);
+  display: flex;
+}
+.record-due svg {
+  flex: none;
+}
+
+/* Stripe's order: what would fix it, then what went wrong. The one tinted block
+   on the page, and it sits with the control that acts on it. */
+.record-returned {
+  border: 1px solid color-mix(in srgb, var(--crimson) 18%, transparent);
+  border-radius: var(--radius-row);
+  background: color-mix(in srgb, var(--crimson) 5%, var(--surface));
+  margin-top: var(--space-8);
+  padding: var(--space-8);
+}
+.returned-lead {
+  color: var(--ink);
+  margin-bottom: var(--space-5);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-semi);
+}
+.record-returned .reject-remedies {
+  margin: 0;
+}
+.returned-reason {
+  color: var(--muted);
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin-top: var(--space-7);
+  padding-top: var(--space-6);
+  border-top: 1px solid color-mix(in srgb, var(--crimson) 14%, transparent);
+  font-size: var(--fs-meta);
+  line-height: 1.55;
+  display: flex;
+  text-wrap: pretty;
+}
+.returned-reason svg {
+  flex: none;
+  margin-top: var(--space-1);
+  color: var(--crimson);
+}
+.returned-by {
+  color: var(--muted);
+  margin-top: var(--space-4);
+  font-size: var(--fs-micro);
+}
+
+/* One row per page she sent, in `RecordHistory` — a card of its own under the
+   record since the changes of 2026-08-21. The returned page is the one row that
+   carries a control, at the row's trailing end. */
+.record-row > .secondary-button {
+  flex: none;
+  align-self: center;
+  margin-left: auto;
+}
+.record-row {
+  align-items: flex-start;
+  gap: var(--space-6);
+  padding-top: var(--space-7);
+  padding-bottom: var(--space-7);
+  display: flex;
+}
+.record-row-mark {
+  color: var(--muted);
+  flex: none;
+  margin-top: var(--space-1);
+}
+.record-row-body {
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-1);
+  display: flex;
+}
+.record-row-body strong {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semi);
+}
+.record-row-body > span {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+}
+.record-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  margin-top: var(--space-9);
+}
+.record-foot > span {
+  color: var(--muted);
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--fs-micro);
+  display: flex;
+}
+.record-foot svg {
+  flex: none;
+}
+
+/* ── The rail ── */
+
+.teams-list {
+  flex-direction: column;
+  gap: var(--space-8);
+  margin-top: var(--space-6);
+  display: flex;
+}
+.teams-list li {
+  flex-direction: column;
+  gap: var(--space-1);
+  display: flex;
+}
+.teams-list strong {
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-semi);
+}
+.teams-list span {
+  color: var(--muted);
+  font-size: var(--fs-micro);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+.team-where {
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+  display: flex;
+  opacity: .8;
+}
+.team-where svg {
+  flex: none;
+}
+.published-card .link-button {
+  margin-top: var(--space-6);
+}
+
+/* Several files in one attempt, listed under the zone that chose them. */
+.upload-files {
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-5);
+  display: flex;
+}
+.upload-files li {
+  border-radius: var(--radius-chip);
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-5);
+  display: flex;
+}
+.upload-files li:nth-child(odd) {
+  background: var(--card-zone);
+}
+.upload-files svg {
+  color: var(--muted);
+  flex: none;
+}
+.upload-file-name {
+  min-width: 0;
+  flex: 1;
+  font-size: var(--fs-micro);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.upload-file-size {
+  color: var(--muted);
+  flex: none;
+  font-size: var(--fs-micro);
+}
+
+@media (width<=620px) {
+  .record-foot {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .record-foot .primary-button {
+    justify-content: center;
+  }
+  /* The replace control drops under the page's name, full width, as the
+     foot's button does. */
+  .record-row {
+    flex-wrap: wrap;
+  }
+  .record-row > .secondary-button {
+    flex: 1 0 100%;
+    justify-content: center;
+    margin-left: 0;
+  }
+}
+
+.visually-hidden {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  width: 1px;
+  height: 1px;
+  position: absolute;
+  overflow: hidden;
+}
+
+/* ── Responsive: designed at 380px first ── */
+
+@media (width<=620px) {
+  /* The deadline chip stops competing with the title for the row width. */
+  .document-row {
+    grid-template-columns: auto minmax(0, 1fr);
+    row-gap: var(--space-5);
+  }
+  .document-trail {
+    grid-column: 2;
+    justify-content: space-between;
+  }
+  /* The whole row is the button at this width, so the chevron is decoration —
+     and on a settled row it is the *only* thing in the trail, which put an
+     empty line under every accepted document. */
+  .document-open {
+    display: none;
+  }
+  .document-row:has(.document-trail:empty) {
+    row-gap: 0;
+  }
+  /* Stacked, the control needs the field on its own line or the input is 90px
+     wide with a pill beside it. */
+  .extract-control {
+    flex-wrap: wrap;
+  }
+  .extract-field input {
+    flex: 1 0 100%;
+  }
+  .document-upload .upload-zone {
+    flex-wrap: wrap;
+  }
+  .upload-chosen {
+    flex: 1 0 60%;
+  }
+  .upload-failed-actions .primary-button,
+  .upload-failed-actions .secondary-button {
+    flex: 1 0 100%;
+    justify-content: center;
+  }
+}

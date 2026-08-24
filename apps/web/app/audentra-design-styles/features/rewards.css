@@ -1,0 +1,278 @@
+/* ==========================================================================
+ * What a point is worth — ENR-162.
+ * ==========================================================================*/
+
+/* --- The popover: the balance on ink, then what it reaches -----------------
+   The panel is `Popover` (patterns.css): the anchor card takes its top
+   corners, the rows and the foot follow on the card's white. Here is only
+   what the balance adds to the anchor and to a row. */
+
+/* The anchor's one figure, at the rail's headline size; the unit rides beside
+   it in the second voice. */
+.balance-card strong {
+  letter-spacing: var(--ls-tight);
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: var(--space-1) 0 0;
+  font-size: var(--fs-display);
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-tight);
+  display: flex;
+}
+
+.balance-card strong small {
+  color: var(--on-ink-muted);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semi);
+}
+
+.balance-card p {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+/* The spark in the corner — a bare outline glyph. Duotone on a gradient is mud. */
+.balance-mark {
+  color: var(--on-ink-muted);
+  position: absolute;
+  top: var(--space-9);
+  right: var(--space-9);
+}
+
+/* The ladder on ink: what the balance has covered, and where each reward
+   sits on the way. Every colour here is one the ink plane already names. */
+.ladder-track {
+  background: var(--on-ink-line);
+  border-radius: var(--radius-pill);
+  height: 6px;
+  margin-top: var(--space-8);
+  position: relative;
+}
+
+.ladder-fill {
+  background: var(--purple-line);
+  border-radius: var(--radius-pill);
+  height: 100%;
+  display: block;
+}
+
+.ladder-mark {
+  box-sizing: border-box;
+  background: var(--surface-ink);
+  border: 2px solid var(--on-ink-muted);
+  border-radius: var(--radius-pill);
+  width: 10px;
+  height: 10px;
+  position: absolute;
+  top: -2px;
+  transform: translateX(-50%);
+}
+
+.ladder-mark.reached {
+  background: var(--on-ink);
+  border-color: var(--on-ink);
+}
+
+/* The catalogue: one compact row per reward and no control on any of them —
+   redemption is out of scope on ENR-148. The marker is the track's mark
+   brought down to the row. The next reward is the one the balance is heading
+   for and the one row that spends colour; a reached reward is green, because
+   green means exactly one thing; the rest are not yet, and say so by weight. */
+.rows-label.reaches {
+  color: var(--muted);
+}
+
+.ladder-row {
+  color: var(--muted);
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding-top: var(--space-4);
+  padding-bottom: var(--space-4);
+  font-size: var(--fs-copy);
+  display: grid;
+}
+
+.ladder-dot {
+  box-sizing: border-box;
+  border: 2px solid var(--line-strong);
+  border-radius: var(--radius-round);
+  justify-self: center;
+  width: 10px;
+  height: 10px;
+}
+
+.ladder-row.next {
+  color: var(--ink);
+  background: var(--purple-wash);
+  font-weight: var(--fw-semi);
+}
+
+.ladder-row.next .ladder-dot {
+  background: var(--purple);
+  border-color: var(--purple);
+}
+
+.ladder-row.reached {
+  color: var(--ink);
+}
+
+.ladder-row.reached .ladder-dot {
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.ladder-cost {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* AC 2 — every award attributed to the requirement that earned it, in the
+   completed step's own row, and its points in the same purple they were
+   earned in on My Enrollment. The run is hers, so its label is the colour My
+   Profile gives "Yours to change". */
+.rows-label.earned-run {
+  color: var(--purple-dark);
+}
+
+.award-points {
+  color: var(--purple-hover);
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+  display: flex;
+}
+
+/* ============================================================================
+   The registration gate — ENR-214.
+
+   Colour is spent once, at the top. The notice carries the escalation for the
+   whole section; the chip on a card is a FACT about that step, not a second
+   alarm. A card already wears a priority badge, and three coloured chips in one
+   row is texture rather than information.
+   ========================================================================= */
+
+/* AC 2 — what is blocked, and by when, above everything. */
+/* AC 1 — the mark, wherever the requirement appears. A chip in the row that
+   already holds standing; never a border, never a left bar on a rounded card. */
+.gate-chip {
+  color: var(--ink);
+  background: var(--canvas);
+  border-radius: var(--radius-chip);
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--space-3);
+  width: fit-content;
+  margin: 0 0 var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+  display: inline-flex;
+}
+
+/* The flag is the only colour on the chip, and it is the same amber the notice
+   uses when there is still time. */
+.gate-chip svg {
+  color: var(--amber);
+  flex: none;
+}
+
+/* AC 6. In review is not met, and the chip says where the requirement actually
+   is rather than disappearing the moment something was sent. */
+.gate-detail {
+  color: var(--muted);
+  font-weight: var(--fw-regular);
+}
+
+.document-row .gate-chip, .requirement-card .gate-chip {
+  margin: var(--space-3) 0 0;
+}
+
+/* ------------------------------------------------------------------------
+ * Lifted out of `patterns.css`, where it had been sitting among the shared
+ * vocabulary because this section's rules and the shared ones were written
+ * interleaved. Nothing here is referenced by any other feature.
+ * ------------------------------------------------------------------------*/
+
+
+.momentum-header {
+  align-items: center;
+  gap: var(--space-5);
+  display: flex;
+}
+
+.momentum-header>div:last-child {
+  flex-direction: column;
+  flex: 1;
+  display: flex;
+}
+
+.momentum-header span {
+  color: var(--purple-line);
+  font-size: var(--fs-small);
+}
+
+.momentum-header strong {
+  margin-top: var(--space-1);
+  font-size: var(--fs-h2);
+}
+
+.level-track {
+  background: #ffffff21;
+  border-radius: var(--radius-pill);
+  height: 7px;
+  margin: var(--space-8) 0 var(--space-3);
+  overflow: hidden;
+}
+
+.level-track span {
+  border-radius: inherit;
+  background: linear-gradient(90deg,#a993ff,var(--green-line));
+  height: 100%;
+  display: block;
+  box-shadow: 0 0 14px #a993ff80;
+}
+
+.level-labels {
+  color: var(--faint);
+  justify-content: space-between;
+  font-size: var(--fs-micro);
+  display: flex;
+}
+
+.today-reward {
+  background: #ffffff13;
+  border-radius: var(--radius-tile);
+  gap: var(--space-4);
+  margin-top: var(--space-8);
+  padding: var(--space-6);
+  display: flex;
+}
+
+.today-reward>span {
+  color: #d4caff;
+  background: #b8a5ff26;
+  border-radius: var(--radius-chip);
+  flex: none;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  display: grid;
+}
+
+.today-reward strong {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-heading);
+  display: block;
+}
+
+.today-reward p {
+  color: var(--faint);
+  margin: var(--space-1) 0 0;
+  font-size: var(--fs-micro);
+}

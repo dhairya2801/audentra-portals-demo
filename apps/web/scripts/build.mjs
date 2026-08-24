@@ -11,6 +11,7 @@ const result = spawnSync(process.execPath, [cli, command, ...commandArguments], 
   cwd: resolve(scriptDirectory, ".."),
   env: {
     ...process.env,
+    NODE_ENV: command === "dev" ? "development" : "production",
     WRANGLER_LOG_PATH: ".wrangler/wrangler.log",
     ...(command === "start" ? { WRANGLER_WRITE_LOGS: "false" } : {}),
   },

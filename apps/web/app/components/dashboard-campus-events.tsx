@@ -102,7 +102,10 @@ export function DashboardCampusEvents({
               Boolean(event.registrationUrl) &&
               registration.href !== "/campus-life";
             return (
-              <li className={styles.eventCard} key={event.id}>
+              <li
+                className={styles.eventCard}
+                key={event.id || `${event.startsAt}-${event.title}`}
+              >
                 {event.imageUrl ? (
                   <img src={event.imageUrl} alt={event.imageAlt ?? ""} />
                 ) : (

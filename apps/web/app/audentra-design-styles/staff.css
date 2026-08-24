@@ -1,0 +1,774 @@
+/* ============================================================================
+ * The staff workspace's own shapes.
+ *
+ * Five things the portal has no word for, because the portal has no table, no
+ * record opened over a list, no history of what the institution did, no outcome
+ * separate from a status, and nothing a person writes on behalf of Aster:
+ *
+ *   the queue and its row          `Queue.jsx`
+ *   the record overlay            `RecordOverlay.jsx`
+ *   the work log                  `WorkLog.jsx`
+ *   the outcome band              `OutcomeBand.jsx`
+ *   the due cell and the dot      `Deadline.jsx`, `StatusDot.jsx`
+ *
+ * plus the guardrail that is a shape rather than a rule (`Visibility.jsx`).
+ *
+ * These rules are NOT scoped to `.staff`, and that is deliberate. The tokens
+ * are scoped; the shapes are not. A `.queue` inside `.staff` reads the
+ * workspace's 14px body and 10px card, and the same `.queue` dropped on a
+ * student page would read the portal's — which is the honest behaviour, and it
+ * is how every primitive in `design-system/` already works. What is scoped here
+ * is only the handful of places a SHARED shape needs different proportions in
+ * a workspace, and each one says why.
+ *
+ * Everything a value here could have been is a token. If a number appears below
+ * that is not a token, it is either a fact about this shape's own geometry (the
+ * 6px of a dot) or a bug.
+ * ==========================================================================*/
+
+/* --- the state, as a dot and a word --------------------------------------- */
+
+.status-dot {
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--ink-2);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  display: inline-flex;
+}
+
+.status-dot-mark {
+  border-radius: var(--radius-round);
+  background: var(--faint);
+  flex: none;
+  width: 6px;
+  height: 6px;
+}
+
+.status-dot.act .status-dot-mark { background: var(--amber); }
+.status-dot.wait .status-dot-mark,
+.status-dot.progress .status-dot-mark { background: var(--blue); }
+.status-dot.done .status-dot-mark { background: var(--green); }
+.status-dot.stop .status-dot-mark { background: var(--crimson); }
+
+/* --- when a thing is due, told by two clocks ------------------------------ */
+
+.deadline {
+  flex-direction: column;
+  gap: var(--space-1);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-heading);
+  display: inline-flex;
+}
+
+.deadline-date {
+  color: var(--ink);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+}
+
+.deadline-relative {
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--faint);
+  font-size: var(--fs-micro);
+  display: inline-flex;
+}
+
+/* The one coloured thing in a table. Not "due soon" — only missed. */
+.deadline.late .deadline-relative {
+  color: var(--crimson);
+  font-weight: var(--fw-semi);
+}
+
+/* --- who can see this ----------------------------------------------------- */
+
+.visibility {
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--faint);
+  font-size: var(--fs-micro);
+  display: flex;
+}
+
+.visibility.hidden { color: var(--ink-2); }
+
+/* --- the queue ------------------------------------------------------------ */
+
+.queue {
+  flex-direction: column;
+  width: 100%;
+  display: flex;
+}
+
+.queue-head,
+.queue-row {
+  grid-template-columns: var(--queue-columns);
+  align-items: center;
+  gap: var(--space-6);
+  padding: 0 var(--space-6);
+  display: grid;
+}
+
+.queue-head {
+  border-bottom: 1px solid var(--line-strong);
+  min-height: 32px;
+  color: var(--faint);
+  /* The one place 11px is allowed, and it is always uppercase and tracked. */
+  font-size: var(--fs-caps);
+  font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+}
+
+/* Urgency is stated once, on the heading — never on the forty rows under it. */
+.queue-group-head {
+  align-items: baseline;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-7) var(--space-6) var(--space-4);
+  color: var(--ink-2);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  display: flex;
+}
+
+.queue-group-head.act { color: var(--amber-ink); }
+.queue-group-head.wait,
+.queue-group-head.progress { color: var(--blue-ink); }
+.queue-group-head.done { color: var(--green-ink); }
+.queue-group-head.stop { color: var(--crimson-ink); }
+
+.queue-group-count {
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunk);
+  padding: 0 var(--space-3);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-semi);
+  letter-spacing: 0;
+}
+
+.queue-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A row is not a card: full bleed, a hairline under it, and nothing else. */
+.queue-row {
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  background: none;
+  width: 100%;
+  min-height: var(--row-height);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.queue-row:hover { background: var(--surface-sunk); }
+
+.queue-row:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: -2px;
+}
+
+.queue-row.active { background: var(--purple-soft); }
+.queue-row.active .queue-title { font-weight: var(--fw-semi); }
+
+.queue-subject {
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+  display: flex;
+}
+
+/* Never a 40px duotone tile. A queue row's mark is a glyph or a face. */
+.queue-mark {
+  color: var(--faint);
+  flex: none;
+}
+
+.queue-subject-copy {
+  align-items: baseline;
+  gap: var(--space-3);
+  min-width: 0;
+  display: flex;
+}
+
+.queue-title {
+  color: var(--ink);
+  font-size: var(--fs-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.queue-note {
+  color: var(--faint);
+  font-size: var(--fs-micro);
+  white-space: nowrap;
+  flex: none;
+}
+
+.queue-cell {
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-meta);
+  font-variant-numeric: tabular-nums;
+  display: flex;
+}
+
+.queue-cell.end { justify-content: flex-end; }
+.queue-column.end { text-align: right; }
+
+/* A row that genuinely carries two lines grows; the table does not. */
+.queue-row.tall { min-height: var(--row-height-tall); }
+
+.queue-row.tall .queue-subject-copy {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
+/* --- the record, opened over the list -------------------------------------
+ *
+ * The children are prefixed `ro-` and not `record-`, and that is not a style
+ * preference. `.record-foot` already exists: it is the foot of the immunization
+ * record in `features/health.css`, and while this overlay carried that class it
+ * silently inherited Health's flex row and 18px of margin — the overlay's foot
+ * grew by 18px and nothing failed a build. Same class, two owners, and the one
+ * that won was decided by which file `app.css` imports last.
+ *
+ * `.record-overlay` itself is safe and keeps the component's name. Anything a
+ * future workspace shape adds under it takes `ro-`.
+ */
+
+.ro-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  place-items: center;
+  padding: var(--space-11);
+  background: var(--scrim);
+  display: grid;
+}
+
+.record-overlay {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  width: min(var(--overlay-width), 100%);
+  max-height: 100%;
+  display: grid;
+  overflow: hidden;
+}
+
+/* The bar is the four obligations, and nothing else lives in it. */
+.ro-bar {
+  align-items: center;
+  gap: var(--space-6);
+  border-bottom: 1px solid var(--line);
+  padding: var(--space-4) var(--space-6);
+  display: flex;
+}
+
+.ro-close,
+.ro-steps button,
+.ro-link {
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-3);
+  border: 1px solid #0000;
+  border-radius: var(--radius-tile);
+  background: none;
+  min-width: var(--control-height);
+  height: var(--control-height);
+  padding: 0 var(--space-4);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: var(--fs-meta);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+  display: inline-flex;
+}
+
+.ro-close:hover,
+.ro-steps button:hover:not(:disabled),
+.ro-link:hover { background: var(--surface-sunk); }
+
+.ro-steps {
+  align-items: center;
+  gap: var(--space-2);
+  display: flex;
+}
+
+.ro-steps button:disabled {
+  color: var(--faint);
+  cursor: default;
+}
+
+/* `n of m`: a person working a queue is owed the size of what they are in. */
+.ro-count {
+  color: var(--faint);
+  font-size: var(--fs-micro);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ro-bar-end { margin-left: auto; }
+
+.ro-body {
+  grid-template-columns: minmax(0, 1fr) var(--context-width);
+  min-height: 0;
+  display: grid;
+}
+
+.ro-main {
+  padding: var(--space-10) var(--space-10) var(--space-11);
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.ro-title { margin-bottom: var(--space-9); }
+
+.ro-kicker {
+  margin: 0 0 var(--space-3);
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+}
+
+.ro-title-row {
+  align-items: center;
+  gap: var(--space-6);
+  display: flex;
+}
+
+.ro-title-row h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-title);
+  font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-tight);
+  line-height: var(--lh-heading);
+}
+
+/* The context travels with the subject: it is INSIDE the overlay, because the
+   student is who this record is about. Outside it, it would be a panel about a
+   subject nobody is looking at any more. */
+.ro-context {
+  border-left: 1px solid var(--line);
+  background: var(--canvas);
+  padding: var(--space-10) var(--space-9);
+  min-width: 0;
+  overflow-y: auto;
+}
+
+/* Pinned, outside the scroll: how a case ended is not something a colleague
+   should have to scroll to find. */
+.ro-foot {
+  border-top: 1px solid var(--line);
+  background: var(--surface-sunk);
+}
+
+/* Stacked, the record is ONE scroll and not two.
+ *
+ * Side by side, the two columns scroll independently and that is right: the
+ * student's standing should stay put while somebody reads down the case. Once
+ * they are stacked, two scroll areas inside a fixed-height panel means the case
+ * cuts off mid-sentence with a second scroller under it, and neither of them
+ * reaches its end. So the panes give their overflow back to the body. */
+@media (width <= 1060px) {
+  .ro-body {
+    grid-template-columns: minmax(0, 1fr);
+    overflow-y: auto;
+  }
+
+  .ro-main,
+  .ro-context { overflow: visible; }
+
+  .ro-context {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+}
+
+@media (width <= 620px) {
+  .ro-scrim {
+    align-items: end;
+    padding: 0;
+  }
+
+  .record-overlay {
+    border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+    max-height: 92%;
+  }
+
+  .ro-main { padding: var(--space-9) var(--space-8) var(--space-10); }
+}
+
+/* --- the work log --------------------------------------------------------- */
+
+.worklog {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-9);
+}
+
+.worklog-head {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-6);
+  margin-bottom: var(--space-8);
+  display: flex;
+}
+
+.worklog-head h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-semi);
+}
+
+/* One section, filtered — not four sections. Jira's arrangement, and its word. */
+.worklog-filters {
+  gap: var(--space-1);
+  border-radius: var(--radius-tile);
+  background: var(--surface-sunk);
+  padding: var(--space-1);
+  display: inline-flex;
+}
+
+.worklog-filters button {
+  border: 0;
+  border-radius: var(--radius-chip);
+  background: none;
+  padding: var(--space-3) var(--space-5);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: var(--fs-meta);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.worklog-filters button.active {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: var(--fw-semi);
+}
+
+.worklog-entries {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  position: relative;
+}
+
+/* The one connecting line. Behind the marks, so a run of system entries reads
+   as one thread rather than as five unrelated sentences. */
+.worklog-entries:before {
+  position: absolute;
+  top: var(--space-6);
+  bottom: var(--space-6);
+  left: calc(var(--log-mark) / 2 - .5px);
+  background: var(--line-soft);
+  width: 1px;
+  content: "";
+}
+
+.log-entry {
+  gap: var(--space-6);
+  padding: var(--space-5) 0;
+  display: flex;
+  position: relative;
+}
+
+.log-mark {
+  justify-content: center;
+  align-items: center;
+  border-radius: var(--radius-round);
+  background: var(--surface);
+  width: var(--log-mark);
+  height: var(--log-mark);
+  color: var(--faint);
+  flex: none;
+  display: flex;
+}
+
+.log-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.log-title {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-heading);
+}
+
+/* Two weights and no more: a person wrote something, or the system recorded
+   something. `strong` inside the title is the actor's name. */
+.log-entry.person .log-title { color: var(--ink); }
+.log-title strong { font-weight: var(--fw-semi); }
+
+.log-body {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-row);
+  margin-top: var(--space-4);
+  padding: var(--space-6) var(--space-7);
+  color: var(--ink);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.log-body > :first-child { margin-top: 0; }
+.log-body > :last-child { margin-bottom: 0; }
+
+/* The guardrail, as a surface. Neutral ink and never amber: amber already means
+   "someone still has to act", and a note nobody has to act on must not wear it. */
+.log-entry.internal .log-body {
+  border-color: var(--line-soft);
+  background: var(--surface-sunk);
+}
+
+.log-entry.internal .visibility { margin-top: var(--space-3); }
+.log-entry.outbound .log-body { border-color: var(--line-strong); }
+
+.log-time {
+  color: var(--faint);
+  font-size: var(--fs-micro);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex: none;
+}
+
+.log-fold-toggle {
+  align-items: center;
+  gap: var(--space-3);
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--fs-meta);
+  cursor: pointer;
+  display: inline-flex;
+}
+
+.log-fold-toggle:hover { color: var(--ink); }
+
+.log-fold-count {
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunk);
+  padding: 0 var(--space-3);
+  font-size: var(--fs-micro);
+  font-variant-numeric: tabular-nums;
+}
+
+.log-fold.open .log-fold-toggle svg { transform: rotate(180deg); }
+
+.log-fold-entries {
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.log-fold-entries .log-entry { padding: var(--space-3) 0; }
+
+.log-fold-entries .log-mark {
+  width: 20px;
+  height: 20px;
+}
+
+/* --- the outcome, apart from the status ----------------------------------- */
+
+.outcome-band {
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-7) var(--space-10);
+  display: flex;
+}
+
+.outcome-label {
+  margin: 0 0 var(--space-2);
+  color: var(--faint);
+  font-size: var(--fs-caps);
+  font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+}
+
+.outcome-value {
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-semi);
+  display: flex;
+}
+
+/* An outcome that has not happened yet is an absence, not a warning. It says so
+   in words; `quiet` spends no colour at all. */
+.outcome-band.quiet .outcome-value {
+  color: var(--muted);
+  font-weight: var(--fw-regular);
+}
+
+.outcome-band.done .outcome-value { color: var(--green-ink); }
+.outcome-band.stop .outcome-value { color: var(--crimson-ink); }
+.outcome-band.act .outcome-value { color: var(--amber-ink); }
+.outcome-band.wait .outcome-value,
+.outcome-band.progress .outcome-value { color: var(--blue-ink); }
+
+.outcome-note {
+  margin: var(--space-2) 0 0;
+  color: var(--faint);
+  font-size: var(--fs-micro);
+}
+
+.outcome-action {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-tile);
+  background: var(--surface);
+  height: var(--control-height);
+  padding: 0 var(--space-7);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  flex: none;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.outcome-action:hover { background: var(--surface-sunk); }
+
+/* --- where a shared shape needs different proportions in a workspace ------- */
+
+/* The pill's 27px was sized around a 9.5px caps label. In `.staff` the smallest
+   step is 11 and the pill would be tight; it gets the workspace's caps size and
+   loses a pixel of height. The tones and the vocabulary are untouched. */
+.staff .status-pill {
+  height: 26px;
+  font-size: var(--fs-caps);
+}
+
+/* --- the reference page's context column, as a definition list ------------- */
+
+.sg-context-facts {
+  grid-template-columns: 1fr;
+  gap: var(--space-5);
+  margin: 0 0 var(--space-9);
+  display: grid;
+}
+
+.sg-context-facts dt {
+  color: var(--faint);
+  font-size: var(--fs-caps);
+  font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+}
+
+.sg-context-facts dd {
+  margin: var(--space-1) 0 0;
+  color: var(--ink);
+  font-size: var(--fs-meta);
+}
+
+/* --- the queue on a narrow screen ------------------------------------------
+ *
+ * A table with five columns cannot survive 390px, and the page body must never
+ * scroll sideways. Two answers exist and the corpus uses both: a table that
+ * scrolls inside its own frame, and a table that stops being one.
+ *
+ * Below the sheet breakpoint the queue stops being a table. The columns are
+ * gone, so the head is gone with them — a column head over nothing is a label
+ * for a column that no longer exists — and the row becomes what it always was
+ * underneath: a subject, and the facts about it on a second line. The row grows
+ * to `--row-height-tall`, and the table does not need to grow at all, because
+ * there is no longer a grid to keep aligned.
+ *
+ * Between 620 and the two-pane breakpoint the table survives, and it survives
+ * by scrolling inside its own frame rather than by dropping a column: which
+ * column a person needs is not a decision a stylesheet can take for them.
+ */
+@media (width <= 820px) {
+  .queue {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .queue-head,
+  .queue-group { min-width: 720px; }
+}
+
+@media (width <= 620px) {
+  .queue {
+    overflow-x: visible;
+  }
+
+  .queue-head { display: none; }
+
+  .queue-head,
+  .queue-group { min-width: 0; }
+
+  /* A flex row rather than a grid: with no columns to keep aligned, the cells
+     should wrap as a line of facts, and a grid would give each of them a row of
+     its own and make one task four lines tall. */
+  .queue-row {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3) var(--space-6);
+    padding: var(--space-5) var(--space-6);
+    min-height: var(--row-height-tall);
+    display: flex;
+  }
+
+  /* The mark belongs to the title, not to the block. Centred against a subject
+     that is now two lines, it drifts to the gap between them; aligned to the
+     start it sits on the line it names. `--space-1` is the half-difference
+     between the 16px glyph and the title's line box, to within a pixel. */
+  .queue-row .queue-subject {
+    align-items: flex-start;
+    flex: 0 0 100%;
+  }
+
+  .queue-row .queue-mark { margin-top: var(--space-1); }
+
+  .queue-row .queue-subject-copy {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+  }
+
+  /* The facts keep the order the columns had them in, which is the order the
+     head named while there was a head — a person who learned the table has not
+     had it rearranged on them. */
+  .queue-row .queue-cell,
+  .queue-row .queue-cell.end {
+    justify-content: flex-start;
+    flex: none;
+  }
+
+  /* Two clocks side by side rather than stacked: on one line among other facts,
+     a two-line cell is the only thing setting the row's height. */
+  .queue-row .deadline {
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--space-3);
+  }
+}

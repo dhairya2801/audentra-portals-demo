@@ -482,3 +482,92 @@
     transition: none;
   }
 }
+
+/* Student portal v2: the dashboard widgets use the same Audentra design roles
+   as the shared shell while retaining their canonical data projections. */
+.events,
+.financial {
+  border-color: var(--portal-line, #e6e7ee);
+  border-radius: 18px;
+  background: var(--portal-surface, #fff);
+  box-shadow: var(--portal-shadow-card, 0 7px 22px rgb(31 37 58 / 5%));
+}
+
+.widgetHeader p,
+.eventBody > small,
+.donutWrap span,
+.financialMetrics span,
+.financialCardDetails > p,
+.financialCardDetails li {
+  color: var(--portal-muted, #687086);
+}
+
+.widgetHeader h2,
+.eventBody h3,
+.eventEmpty strong,
+.donutWrap strong,
+.financialDetails li strong,
+.financialMetrics strong,
+.financialCardDetails h2,
+.financialCardDetails li strong,
+.compactDonutWrap strong {
+  color: var(--portal-ink, #152037);
+}
+
+.widgetHeader > a,
+.eventControls > a,
+.eventBody > a {
+  color: var(--portal-accent-strong, #45358e);
+}
+
+.eventControls button {
+  border-color: var(--portal-accent-line, #ddd8f7);
+  border-radius: 12px;
+  color: var(--portal-accent-strong, #45358e);
+  background: var(--portal-surface, #fff);
+}
+
+.eventControls button:hover,
+.eventControls button:focus-visible {
+  border-color: var(--portal-accent, #6854d9);
+  background: var(--portal-accent-soft, #efedff);
+}
+
+.eventCard {
+  border-color: var(--portal-line, #e6e7ee);
+  background: var(--portal-card-zone, #f6f6fb);
+}
+
+.eventCard > img,
+.eventArt {
+  background: linear-gradient(135deg, #1b203a, var(--portal-accent-strong, #45358e));
+}
+
+.eventDate {
+  color: var(--portal-accent-strong, #45358e);
+  background: var(--portal-accent-soft, #efedff);
+}
+
+.eventBody > p,
+.eventBody > div,
+.eventEmpty,
+.financialDetails li {
+  color: var(--portal-ink-2, #5f6879);
+}
+
+.eventEmpty,
+.financialDetails li {
+  background: var(--portal-sunk, #f1f2f6);
+}
+
+.eventEmpty > span {
+  color: var(--portal-accent, #6854d9);
+}
+
+.donut > circle:first-child {
+  stroke: var(--portal-line, #e6e7ee);
+}
+
+.financialMetrics > div {
+  border-color: var(--portal-line, #e6e7ee);
+}

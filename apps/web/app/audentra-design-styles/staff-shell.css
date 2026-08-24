@@ -1,0 +1,387 @@
+/* ============================================================================
+ * The workspace's frame — navigation · work · context.
+ *
+ * The portal's equivalent is `chrome.css`, and this is deliberately not it: a
+ * staff screen and a student screen are two frames, and trying to make one
+ * stylesheet hold both would put a `.staff` qualifier on every rule in the file
+ * to keep them apart. What they share is the vocabulary inside the frame, and
+ * that is already shared — `tokens.css` layer 3 and `staff.css`.
+ *
+ * Every value here is a token. The three widths are the measured constants in
+ * the `.staff` layer: 224 for the nav, 380 for the context column, and whatever
+ * is left for the work.
+ * ==========================================================================*/
+
+.staff-shell {
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  background: var(--canvas);
+  min-height: 100vh;
+  color: var(--ink);
+  font-family: var(--font-geist-sans);
+  display: grid;
+}
+
+/* --- navigation ----------------------------------------------------------- */
+
+/* Light, opaque, and 224 wide. Not one of the 62 screens surveyed on 2026-08-24
+   puts translucency between the nav and the canvas — there is nothing behind it
+   to see — and the measured widths cluster at 210–235. */
+.staff-nav {
+  border-right: 1px solid var(--line);
+  background: var(--surface-sunk);
+  padding: var(--space-8) var(--space-6);
+  flex-direction: column;
+  gap: var(--space-9);
+  display: flex;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+/* Audentra's mark, not Aster's — the opposite of the portal, and the reason is
+   ADR 0009 read from the other side. A student is Aster's and a vendor's logo
+   over her enrollment would misname who is enrolling her. Staff bought the
+   software and are entitled to know whose tool they are in; Aster appears here
+   as data, in the office line under the mark. */
+.staff-brand {
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  color: inherit;
+  text-decoration: none;
+  display: flex;
+}
+
+.staff-brand span {
+  flex-direction: column;
+  min-width: 0;
+  display: flex;
+}
+
+.staff-brand strong {
+  color: var(--ink);
+  font-size: var(--fs-h4);
+  font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-snug);
+}
+
+.staff-brand small {
+  color: var(--muted);
+  font-size: var(--fs-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.staff-nav-list {
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+}
+
+.staff-nav-foot {
+  flex-direction: column;
+  gap: var(--space-6);
+  margin-top: auto;
+  display: flex;
+}
+
+.staff-identity {
+  align-items: center;
+  gap: var(--space-5);
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-7);
+  display: flex;
+}
+
+.staff-identity span {
+  flex-direction: column;
+  min-width: 0;
+  display: flex;
+}
+
+.staff-identity strong {
+  color: var(--ink);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-semi);
+}
+
+.staff-identity small {
+  color: var(--muted);
+  font-size: var(--fs-micro);
+}
+
+/* --- the work, and the context beside it ---------------------------------- */
+
+.staff-workspace {
+  flex-direction: column;
+  min-width: 0;
+  display: flex;
+}
+
+/* A thin bar and not the portal's 70px topbar: the workspace's chrome should
+   cost as few rows as it can, because the rows belong to the work. */
+.staff-topbar {
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-8);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  padding: var(--space-5) var(--space-10);
+  display: flex;
+}
+
+.staff-today {
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+  display: flex;
+}
+
+.staff-today svg { color: var(--faint); }
+
+.staff-reply {
+  margin: 0;
+  color: var(--faint);
+  font-size: var(--fs-micro);
+}
+
+.staff-panes {
+  grid-template-columns: minmax(0, 1fr) var(--context-width);
+  flex: 1;
+  min-height: 0;
+  display: grid;
+}
+
+.staff-main {
+  padding: var(--space-11) var(--space-10);
+  min-width: 0;
+}
+
+/* The context column belongs to whatever is in charge of the screen. While the
+   queue is what you are looking at, this is the queue's own standing; when a
+   record opens, the record carries its own, inside the overlay. */
+.staff-context {
+  border-left: 1px solid var(--line);
+  padding: var(--space-11) var(--space-9);
+  min-width: 0;
+}
+
+.context-title {
+  margin: 0 0 var(--space-6);
+  color: var(--faint);
+  font-size: var(--fs-caps);
+  font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+}
+
+/* The one lead figure, at the one size a figure is ever set at. */
+.context-figure {
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-9);
+  color: var(--ink);
+  font-size: var(--fs-display);
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-tight);
+  display: flex;
+}
+
+.context-figure span {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-regular);
+}
+
+.context-facts {
+  flex-direction: column;
+  gap: var(--space-5);
+  margin: 0 0 var(--space-9);
+  display: flex;
+}
+
+.context-facts > div {
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-6);
+  border-bottom: 1px solid var(--line-soft);
+  padding-bottom: var(--space-5);
+  display: flex;
+}
+
+.context-facts dt {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+}
+
+.context-facts dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.context-note {
+  gap: var(--space-4);
+  margin: 0;
+  color: var(--faint);
+  font-size: var(--fs-micro);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.context-note svg { flex: none; margin-top: 1px; }
+
+/* --- a destination whose screen has not landed ---------------------------- */
+
+.staff-placeholder {
+  max-width: 46ch;
+}
+
+.staff-placeholder h1 {
+  margin: 0 0 var(--space-6);
+  font-size: var(--fs-hero);
+  font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-tight);
+}
+
+.staff-placeholder p {
+  margin: 0 0 var(--space-6);
+  color: var(--ink-2);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.staff-placeholder-produces { color: var(--muted); }
+
+.staff-placeholder a {
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--accent-ink, var(--purple-ink));
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-semi);
+  text-decoration: none;
+  display: inline-flex;
+}
+
+/* --- the frame on a narrower screen --------------------------------------- */
+
+/* The context column goes under the work before the navigation does: a column
+   of standing is a companion to the table, and a table with no navigation is
+   not reachable at all. */
+@media (width <= 1240px) {
+  .staff-panes { grid-template-columns: minmax(0, 1fr); }
+
+  .staff-context {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+}
+
+@media (width <= 820px) {
+  .staff-shell { grid-template-columns: minmax(0, 1fr); }
+
+  .staff-nav {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-6);
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding: var(--space-5) var(--space-6);
+    height: auto;
+    overflow-x: auto;
+  }
+
+  .staff-nav-list { flex-direction: row; }
+  .staff-nav-foot { flex-direction: row; align-items: center; margin-left: auto; }
+  .staff-identity { border-top: 0; padding-top: 0; }
+  .staff-identity span { display: none; }
+  .staff-main { padding: var(--space-9) var(--space-8); }
+  .staff-context { padding: var(--space-9) var(--space-8); }
+}
+
+@media (width <= 620px) {
+  .staff-topbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-5) var(--space-8);
+  }
+}
+
+/* --- the context column is a toggle, not mobília -------------------------- */
+
+/* Front folds its context panel to a 48px icon strip, and that is the sweep's
+   clearest statement about what this column is. 380px is a third of the work
+   area on a 1440 screen; somebody reading a long list of titles should be able
+   to take that width back without losing the way to the standing. */
+.staff-shell.context-closed .staff-panes {
+  grid-template-columns: minmax(0, 1fr) var(--context-collapsed);
+}
+
+.staff-context { position: relative; }
+
+.context-toggle {
+  justify-content: center;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-round);
+  background: var(--surface);
+  width: 26px;
+  height: 26px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+  display: flex;
+  position: absolute;
+  top: var(--space-10);
+  left: calc(var(--space-6) * -1);
+}
+
+.context-toggle:hover {
+  background: var(--surface-sunk);
+  color: var(--ink);
+}
+
+.staff-shell.context-closed .staff-context {
+  padding: var(--space-11) 0;
+  overflow: hidden;
+}
+
+/* Collapsed, the strip still carries the one figure that would have made
+   somebody open it. A rail that says nothing is a rail nobody opens twice. */
+.context-rail {
+  align-items: center;
+  gap: var(--space-6);
+  margin: var(--space-11) 0 0;
+  writing-mode: vertical-rl;
+  color: var(--muted);
+  font-size: var(--fs-caps);
+  font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  display: flex;
+}
+
+.context-rail span:first-child {
+  color: var(--crimson);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Below the two-pane width the column is already under the work, so the toggle
+   has nothing to give back and would only be a control that moves the page. */
+@media (width <= 1240px) {
+  .context-toggle { display: none; }
+  .staff-shell.context-closed .staff-panes { grid-template-columns: minmax(0, 1fr); }
+  .staff-shell.context-closed .staff-context { padding: var(--space-9) var(--space-8); }
+  .context-rail { display: none; }
+}

@@ -1,0 +1,70 @@
+/* ==========================================================================
+ * The reset, and what an element does before anyone styles it.
+ * ==========================================================================*/
+
+* {
+  box-sizing: border-box;
+  /* Every scrollbar in the product is the thin one, in the product's colour
+     (`--scrollbar-thumb`, inherited from `html`). The browser's default is a
+     15px grey gutter that belongs to no design system. */
+  scrollbar-width: thin;
+}
+
+html {
+  scroll-behavior: smooth;
+  /* The scrollbar's column is reserved whether or not there is a scrollbar in
+     it. Without this a page that fits the window — the loading skeleton, an
+     empty state, a short section — is 15px wider than one that scrolls, and
+     everything centred or right-aligned walks sideways on every route change
+     and again when the content arrives. The portal's frame has to be the same
+     width on every page, including the ones that have not loaded yet. Overlay
+     scrollbars (phones, macOS) take no space, so nothing is reserved there. */
+  scrollbar-gutter: stable;
+  /* The portal is light, and says so: native controls, scrollbars and the
+     canvas behind the page render in the light scheme whatever the OS prefers,
+     instead of a dark scrollbar appearing on a paper page. */
+  color-scheme: light;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+/* Selected text is purple-tinted, not the OS blue — the one accent, spent once
+   more, and ink stays readable on it. */
+::selection {
+  background: var(--selection);
+  color: var(--ink);
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
+}
+
+button, input, textarea, select {
+  font: inherit;
+}
+
+/* The native controls that stay native — a checkbox, a radio, a progress bar —
+   take the accent once, here, instead of wherever someone last remembered. */
+input[type="checkbox"], input[type="radio"], progress {
+  accent-color: var(--purple);
+}
+
+/* The one focus ring, for anything that has not drawn its own. `:where()` has
+   no specificity, so every control with a ring of its own keeps it; what this
+   reaches is the element nobody styled — a bare link in running text, a
+   textarea — which used to show the browser's ring in the browser's colour. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 2px;
+}
+
+button, a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  color: inherit;
+}

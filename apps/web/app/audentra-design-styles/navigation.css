@@ -1,0 +1,507 @@
+/* ==========================================================================
+ * Portal navigation — ENR-180.
+ * ==========================================================================*/
+
+/* ------------------------------------------------------------------ *
+ * ENR-180 · Portal navigation — the frame every page inherits
+ * ------------------------------------------------------------------ */
+
+.sr-only {
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  position: absolute;
+  overflow: hidden;
+}
+
+.skip-to-content {
+  z-index: var(--z-modal);
+  color: var(--purple-dark);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-tile);
+  padding: var(--space-5) var(--space-8);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-bold);
+  text-decoration: none;
+  transition: transform .16s;
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  transform: translateY(-180%);
+  box-shadow: var(--shadow-card);
+}
+
+.skip-to-content:focus {
+  outline: 2px solid var(--purple);
+  outline-offset: 2px;
+  transform: translateY(0);
+}
+
+.content-wrap:focus {
+  outline: none;
+}
+
+/* --- the navigation itself --- */
+
+/* The sidebar's own rules — the rows, the groups, the foot — live with the
+   frame in chrome.css. What stays here is the one control that must come
+   after `.icon-button`: the drawer's close button, hidden above 820px. */
+
+.nav-close {
+  flex: none;
+  margin-left: auto;
+  display: none;
+}
+
+/* --- the preview-state control --- */
+
+.preview-state {
+  position: relative;
+}
+
+/* The pill itself — its surface, its states, its family — is in `chrome.css`
+   with the topbar's other controls; here is only what opens under it. */
+
+.preview-scrim {
+  z-index: var(--z-popover-scrim);
+  cursor: default;
+  background: 0 0;
+  border: 0;
+  position: fixed;
+  inset: 0;
+}
+
+.preview-menu {
+  z-index: var(--z-popover);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-row);
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 272px;
+  padding: var(--space-4);
+  display: flex;
+  position: absolute;
+  top: calc(100% + 9px);
+  right: 0;
+  box-shadow: var(--shadow-soft);
+}
+
+.preview-menu-label {
+  color: var(--muted);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  margin: var(--space-2) var(--space-4) var(--space-3);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+}
+
+.preview-menu button {
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  background: 0 0;
+  border: 0;
+  border-radius: var(--radius-chip);
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-5);
+  width: 100%;
+  padding: var(--space-4) var(--space-4);
+  display: flex;
+}
+
+.preview-menu button:hover {
+  background: var(--canvas);
+}
+
+.preview-menu button.selected {
+  color: var(--purple-dark);
+  background: var(--purple-soft);
+}
+
+.preview-menu button>span {
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  display: flex;
+}
+
+.preview-menu strong {
+  font-size: var(--fs-copy);
+}
+
+.preview-menu small {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-heading);
+}
+
+.preview-menu button.selected small {
+  color: #6e64a6;
+}
+
+.preview-menu-foot {
+  color: var(--muted);
+  margin: var(--space-3) var(--space-4) var(--space-1);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+}
+
+.mobile-avatar {
+  text-decoration: none;
+}
+
+/* The plain page head this file used to carry is gone. Half the portal opened
+   with it and half opened with the gradient band, which is what the Jam of
+   2026-08-20 read as two products. `.page-hero` is the only page head now. */
+
+.section-route {
+  color: var(--purple-dark);
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--fs-copy);
+  font-weight: var(--fw-bold);
+  text-decoration: none;
+  display: inline-flex;
+}
+
+.section-route:hover {
+  text-decoration: underline;
+}
+
+/* --- a section that has nothing yet says what will be here --- */
+
+.section-placeholder {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  justify-items: start;
+  gap: var(--space-6);
+  max-width: 720px;
+  margin-top: var(--space-10);
+  padding: var(--space-11) 32px;
+  display: grid;
+  box-shadow: var(--shadow-card);
+}
+
+.placeholder-icon {
+  color: var(--purple);
+  background: var(--purple-soft);
+  border-radius: var(--radius-row);
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  display: grid;
+}
+
+.section-placeholder h2 {
+  margin: 0;
+  font-size: var(--fs-h2);
+}
+
+.section-placeholder p {
+  color: var(--muted);
+  max-width: 58ch;
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.placeholder-route {
+  color: var(--purple-dark);
+  background: var(--purple-soft);
+  border-radius: var(--radius-tile);
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  padding: var(--space-4) var(--space-6);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-bold);
+  text-decoration: none;
+  display: inline-flex;
+}
+
+.placeholder-route:hover {
+  background: var(--purple-tint);
+}
+
+.placeholder-route.standalone {
+  margin-top: var(--space-9);
+}
+
+.inline-empty {
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-row);
+  margin: 0;
+  padding: var(--space-8) var(--space-9);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.inline-empty.wide {
+  max-width: 780px;
+  margin-bottom: var(--space-9);
+}
+
+/* --- error --- the page-sized error is `StateCard` at `size="page"` (patterns.css). --- */
+
+/* --- loading --- */
+
+.skeleton-line {
+  background: linear-gradient(90deg,var(--line-strong),var(--line-soft),var(--line-strong)) 0 0/220% 100%;
+  border-radius: var(--radius-pill);
+  height: 12px;
+  animation: 1.5s ease-in-out infinite skeleton-shimmer;
+  display: block;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 110% 0;
+  }
+
+  to {
+    background-position: -110% 0;
+  }
+}
+
+.page-skeleton {
+  flex-direction: column;
+  gap: var(--hero-gap, var(--space-9));
+  display: flex;
+}
+
+/* The page's anatomy, in skeleton: a band the height of the hero, a panel the
+   height of the summary, then cards — so loading → ready is a fade, not a
+   rearrangement (Jam, 2026-08-21). The band says what it is doing, once, where
+   the eye lands first. */
+.skeleton-band {
+  background: var(--purple-wash);
+  border: 1px solid var(--purple-line);
+  border-radius: var(--radius-card);
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-6);
+  min-height: var(--hero-min, 172px);
+  padding: var(--space-10) var(--space-11);
+  display: flex;
+}
+
+.skeleton-status {
+  color: var(--purple-ink);
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-bold);
+  display: flex;
+}
+
+.skeleton-spinner {
+  color: var(--purple);
+  place-items: center;
+  display: grid;
+  animation: 1s linear infinite skeleton-spin;
+}
+
+@keyframes skeleton-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.skeleton-band .skeleton-line {
+  background: linear-gradient(90deg, var(--purple-line), var(--purple-soft), var(--purple-line)) 0 0/220% 100%;
+}
+
+.skeleton-band .skeleton-line.title {
+  width: min(420px, 68%);
+  height: 31px;
+}
+
+.skeleton-band .skeleton-line.lede {
+  width: min(560px, 86%);
+}
+
+.skeleton-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-8);
+  min-height: var(--panel-min, 102px);
+  padding: var(--space-8) var(--space-10);
+  display: grid;
+  box-shadow: var(--shadow-card);
+}
+
+.skeleton-disc {
+  background: var(--line-soft);
+  border-radius: var(--radius-round);
+  width: 56px;
+  height: 56px;
+  display: block;
+}
+
+.skeleton-lines {
+  flex-direction: column;
+  gap: var(--space-4);
+  display: flex;
+}
+
+.skeleton-lines .skeleton-line.short {
+  width: 40%;
+  height: 9px;
+}
+
+.skeleton-lines .skeleton-line.figure {
+  width: 70%;
+  height: 18px;
+}
+
+.skeleton-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-10);
+  display: flex;
+  box-shadow: var(--shadow-card);
+}
+
+.skeleton-card .skeleton-line.short {
+  width: 46%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-line {
+    animation: none;
+    background: var(--line-soft);
+  }
+  .skeleton-spinner {
+    animation: none;
+  }
+}
+
+@media (width<=820px) {
+  .skeleton-panel {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .skeleton-lines.trailing {
+    grid-column: 1 / -1;
+  }
+}
+
+/* --- the Dashboard --- */
+
+.summary-task {
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  width: 100%;
+  transition: background .16s;
+}
+
+.summary-task:hover {
+  background: var(--surface);
+}
+
+.summary-task .compact-check {
+  color: var(--purple);
+  background: var(--purple-soft);
+}
+
+.summary-task .compact-copy strong {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-body);
+  display: block;
+}
+
+.summary-task .compact-copy>span {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  display: block;
+}
+
+.summary-task .compact-copy .compact-meta {
+  display: flex;
+}
+
+.summary-open {
+  color: var(--purple);
+  background: var(--purple-soft);
+  border-radius: var(--radius-chip);
+  place-items: center;
+  width: 31px;
+  height: 31px;
+  display: grid;
+}
+
+.momentum-unavailable {
+  color: var(--on-ink-muted);
+  margin: var(--space-7) 0 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+@media (width<=820px) {
+  .nav-close {
+    display: grid;
+  }
+
+  .preview-menu {
+    width: min(272px,80vw);
+  }
+}
+
+@media (width<=620px) {
+  /* ENR-167 hid the pill on a phone. It carries the preview states now, and the
+     card is designed mobile first, so it stays — reading just the state. */
+  .concept-pill {
+    gap: var(--space-2);
+    padding: 0 var(--space-4);
+    display: inline-flex;
+  }
+
+  .pill-word {
+    display: none;
+  }
+
+  .concept-pill:not(.switched) .pill-word {
+    display: inline;
+  }
+
+  .section-placeholder {
+    gap: var(--space-5);
+    padding: var(--space-10) var(--space-9);
+  }
+
+  .page-error {
+    padding: var(--space-10) var(--space-9);
+  }
+
+  .skeleton-head .skeleton-line.title {
+    height: 26px;
+  }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .skeleton-line {
+    animation: none;
+  }
+
+  .group-chevron, .nav-item, .nav-group-toggle, .profile-chip, .skip-to-content, .summary-task {
+    transition: none;
+  }
+}

@@ -1,0 +1,376 @@
+/* ==========================================================================
+ * My Enrollment — the section this design system was extracted out of.
+ *
+ * It was built first, so every shared shape in the product was lifted from it
+ * in place and the two lived interleaved in `patterns.css`, run by run, for as
+ * long as the file existed. What is here is what turned out to be nobody
+ * else's: every rule whose classes no other feature, and not the design
+ * system, ever renders.
+ *
+ * What stayed behind in `patterns.css` stayed on purpose. A shape My
+ * Enrollment shares with My Classrooms or My Financials is shared, whatever it
+ * is called and whichever screen it was written for first.
+ * ==========================================================================*/
+
+.task-card {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-card);
+  transition: all .2s;
+  overflow: hidden;
+}
+
+.task-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px #1f253a16;
+}
+
+.task-card.recommended {
+  border-color: #a99cee;
+  box-shadow: 0 12px 30px #4e3bb31d,0 0 0 1px #6854d90f;
+}
+
+/* The ribbon under the head — `.recommended-banner` — is `.action-band` in
+   `patterns.css` since the My Degree brief of 2026-08-21 asked for the same
+   band on a second screen. What stays here is the row it sits on. */
+
+/* The action column is as wide as its widest label and never narrower than
+   the button's resting width — a fixed 142px made "Upload documents" wrap to
+   two lines at 1600. Controls never wrap; the text column gives instead.
+   Round two of the Jam of 2026-08-21. */
+.task-card-body {
+  grid-template-columns: 40px minmax(0,1fr) minmax(142px, auto);
+  gap: var(--space-6);
+  padding: var(--space-9) var(--space-9) var(--space-8);
+  display: grid;
+}
+
+.task-type-icon {
+  border-radius: var(--radius-tile);
+  width: 40px;
+  height: 40px;
+}
+
+.task-meta-row {
+  color: var(--faint);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 20px;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+  display: flex;
+}
+
+.priority-badge {
+  letter-spacing: var(--ls-caps);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-3);
+}
+
+.priority-badge.critical {
+  color: var(--crimson);
+  background: var(--crimson-soft);
+}
+
+.priority-badge.normal {
+  color: var(--ink-2);
+  background: var(--line-soft);
+}
+
+.task-main h3 {
+  letter-spacing: var(--ls-tight);
+  margin: var(--space-2) 0 var(--space-3);
+  font-size: var(--fs-h2);
+}
+
+.task-main>p {
+  color: var(--muted);
+  max-width: 550px;
+  margin: 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.task-facts {
+  color: var(--muted);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-5);
+  margin-top: var(--space-5);
+  font-size: var(--fs-small);
+  display: flex;
+}
+
+.task-facts span {
+  align-items: center;
+  gap: var(--space-2);
+  display: flex;
+}
+
+.task-facts b {
+  color: var(--ink-2);
+  font-weight: var(--fw-semi);
+}
+
+.task-action {
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  gap: var(--space-3);
+  display: flex;
+}
+
+.point-reward {
+  color: var(--purple-hover);
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  column-gap: var(--space-2);
+  min-height: 26px;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+  display: flex;
+}
+
+.point-reward span {
+  align-items: center;
+  gap: var(--space-2);
+  display: flex;
+}
+
+.point-reward small {
+  color: var(--faint);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semi);
+}
+
+/* The tint this used to declare had never once been drawn. `.locked-task` only
+   ever appears as a child of `.card-rows`, and the row reset — "a row gives up
+   its own background" — is the same specificity and came later in the file, so
+   it won every time. Moving these rules into their own stylesheet put them
+   after the reset and the tint appeared for the first time, on a screen nobody
+   had changed. Removed rather than kept: a locked step is already marked, by
+   being dimmed and by the lock, and the doctrine says a row lives on the card's
+   own white. */
+.locked-task {
+  opacity: .72;
+}
+
+.compact-meta {
+  color: var(--faint);
+  gap: var(--space-6);
+  margin-top: var(--space-3);
+  font-size: var(--fs-small);
+  display: flex;
+}
+
+/* `.status-pill` lives in `patterns.css` since the evening of 2026-08-21 — it
+   is the product's one pill (`StatusPill`), and *In review* here is one use
+   of it. */
+
+.locked-due {
+  color: var(--faint);
+  font-size: var(--fs-small);
+}
+
+/* The completed group is a card like the other two now — `Card` + a status
+   head that is the group's handle + `CardRows` — so the green box it used to be
+   (`.completed-section`, with `#d9e7e1`, `#6d7c74` and a 25px margin typed by
+   hand) is gone. What is left here is the row's own shape. */
+.skipped-top {
+  justify-content: space-between;
+  align-items: center;
+  display: flex;
+}
+
+.drawer-reward {
+  color: var(--purple-hover);
+  background: var(--purple-wash);
+  border: 1px solid var(--purple-tint);
+  border-radius: var(--radius-tile);
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--space-9);
+  padding: var(--space-6) var(--space-7);
+  display: flex;
+}
+
+.drawer-reward>div {
+  align-items: center;
+  gap: var(--space-4);
+  display: flex;
+}
+
+.drawer-reward span {
+  flex-direction: column;
+  display: flex;
+}
+
+.drawer-reward strong {
+  font-size: var(--fs-copy);
+}
+
+.drawer-reward small {
+  color: #847d9e;
+  margin-top: var(--space-1);
+  font-size: var(--fs-small);
+}
+
+.drawer-reward button {
+  color: #7768c4;
+  cursor: pointer;
+  background: 0 0;
+  border: 0;
+}
+
+.external-panel {
+  margin-top: var(--space-8);
+}
+
+.external-destination {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-tile);
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-7);
+  display: flex;
+}
+
+.external-destination>div:nth-child(2) {
+  flex-direction: column;
+  flex: 1;
+  display: flex;
+}
+
+.external-destination strong {
+  font-size: var(--fs-meta);
+}
+
+.external-destination span {
+  color: var(--muted);
+  margin-top: var(--space-1);
+  font-size: var(--fs-small);
+}
+
+.external-destination>svg {
+  color: var(--green);
+}
+
+.external-panel>p {
+  color: var(--muted);
+  margin: var(--space-6) var(--space-1);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+}
+
+.upload-panel {
+  margin-top: var(--space-8);
+}
+
+.privacy-line {
+  color: var(--muted);
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-5) 0 0;
+  font-size: var(--fs-micro);
+  display: flex;
+}
+
+.skip-link {
+  color: var(--muted);
+  cursor: pointer;
+  background: 0 0;
+  border: 0;
+  width: 100%;
+  margin-top: var(--space-6);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semi);
+}
+
+.form-panel label {
+  color: var(--ink-2);
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-bold);
+  display: flex;
+}
+
+.form-panel input {
+  height: 43px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-chip);
+  outline: none;
+  padding: 0 var(--space-6);
+  font-size: var(--fs-copy);
+}
+
+.form-panel input:focus {
+  border-color: #7868d1;
+  box-shadow: 0 0 0 3px var(--purple-soft);
+}
+
+@media (width<=820px) {
+  .task-card-body {
+    grid-template-columns: 39px minmax(0,1fr);
+  }
+  .task-action {
+    grid-column: 2;
+    grid-template-columns: 1fr auto;
+    display: grid;
+  }
+  .task-action .point-reward {
+    justify-content: flex-start;
+  }
+}
+
+@media (width<=620px) {
+  .task-card-body {
+    gap: var(--space-5);
+    padding: var(--space-8);
+  }
+  .task-main h3 {
+    font-size: var(--fs-h3);
+  }
+  .task-main>p {
+    font-size: var(--fs-copy);
+  }
+  .task-facts {
+    gap: var(--space-4);
+  }
+  .task-facts span:last-child {
+    display: none;
+  }
+  .task-action {
+    grid-column: 1/-1;
+    grid-template-columns: 1fr minmax(145px, auto);
+    margin-top: var(--space-1);
+  }
+  .locked-due {
+    margin-top: -7px;
+  }
+}
+
+/* Every row carries its category — C2.3 of the walkthrough of 2026-08-20. The
+   same small caps the active card's meta row uses, so a category reads the
+   same whether the step is open, waiting or done. */
+.compact-eyebrow {
+  color: var(--faint);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  margin: 0 0 var(--space-1);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semi);
+  display: block;
+}
+
+/* The inline ask under the card's actions — C5. Quiet, after "How this works",
+   never heavier than it. */
+.task-action .edward-ask {
+  margin-top: var(--space-2);
+}

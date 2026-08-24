@@ -1,571 +1,102 @@
 "use client";
 
-import type { FinancialAward, StudentFinancials } from "@vv/contracts";
-import { TenantLink as Link } from "../components/tenant-link";
-import { useCallback, useEffect, useState } from "react";
+import type { StudentFinancials } from "@vv/contracts";
+import { useCallback, useState } from "react";
 import { PortalShell } from "../components/portal-shell";
-import { ErrorState, LoadingState, StatusPill } from "../components/portal-ui";
-import { useTenant } from "../components/tenant-provider";
-import { useActivityTracking } from "../hooks/use-activity-tracking";
+import { StudentPortalIcon } from "../components/student-portal-icon";
+import { TenantLink as Link } from "../components/tenant-link";
+import { ErrorState, LoadingState } from "../components/portal-ui";
 import { useApiResource } from "../hooks/use-api-resource";
-import {
-  getStudentFinancials,
-  selectFinancialPaymentPlan,
-} from "../lib/api-client";
-import { safePortalDestination } from "../lib/safe-destination";
+import { getStudentFinancials, selectFinancialPaymentPlan } from "../lib/api-client";
+import { useTenant } from "../components/tenant-provider";
 import { formatTenantDate, formatTenantMoney } from "../lib/tenant";
 
-function awardLabel(award: FinancialAward) {
-  return {
-    grant: "Grant",
-    scholarship: "Scholarship",
-    loan: "Loan",
-    work_study: "Work-study",
-  }[award.type];
-}
+const segmentClass = ["grants", "scholarships", "loans", "paid", "open"];
 
-function awardExplanation(award: FinancialAward) {
-  const typeExplanation = {
-    grant: "Grants generally do not need to be repaid when eligibility requirements remain satisfied.",
-    scholarship: "Scholarships are gift aid and may carry enrollment, academic, or donor conditions.",
-    loan: "Loans must be repaid. Review the lender, interest, fees, and disbursement terms before accepting.",
-    work_study: "Work-study is earned as wages through eligible employment; it is not an upfront credit on your bill.",
-  }[award.type];
-  const statusExplanation = award.requiresAction
-    ? "Your aid file currently needs a decision or follow-up before this award is final."
-    : award.status === "accepted"
-      ? "This award is included in the accepted-aid total shown above."
-      : award.status === "pending"
-        ? "This award is still being reviewed and is not yet counted as accepted aid."
-        : award.status === "declined"
-          ? "This award is not included in your accepted aid."
-          : "This award is available for your review.";
-  return `${typeExplanation} ${statusExplanation}`;
-}
-
-function financialDocumentHref(document: StudentFinancials["requiredDocuments"][number]) {
-  const documentId = document.documentId;
-  const fallback = documentId
-    ? `/documents?document=${encodeURIComponent(documentId)}`
-    : "/documents";
-  const destination = safePortalDestination(document.href, fallback);
-  if (!destination.external && destination.href === "/documents" && documentId) {
-    return `${destination.href}?document=${encodeURIComponent(documentId)}`;
-  }
-  return destination.href;
-}
-
-function FinancialDocumentAction({
-  document,
-}: {
-  document: StudentFinancials["requiredDocuments"][number];
-}) {
-  const href = financialDocumentHref(document);
-  const label =
-    document.status === "verified"
-      ? "View record"
-      : ["submitted", "under_review"].includes(document.status)
-        ? "View submission status"
-        : document.status === "action_required"
-          ? "Resolve requirement"
-          : "Complete requirement";
-  return /^https:\/\//i.test(href) ? (
-    <a href={href} target="_blank" rel="noreferrer">
-      {label} <span aria-hidden="true">↗</span>
-    </a>
-  ) : (
-    <Link href={href}>
-      {label} <span aria-hidden="true">→</span>
-    </Link>
-  );
-}
-
-const fundingColors = {
-  grant: "#2f7d5b",
-  scholarship: "#f2b824",
-  loan: "#5f68c5",
-  payments: "#44a6a8",
-  balance: "#d9dee6",
-} as const;
-
-type FinancialPaymentScheduleItem = {
-  id: string;
-  kind: "deposit" | "installment";
-  label: string;
-  amountCents: number;
-  enrollmentFeeCents: number;
-  dueAt: string;
-  status: "paid" | "due" | "projected";
-  projected: boolean;
-};
-
-function FinancialPaymentSchedule({
-  items,
-}: {
-  items: readonly FinancialPaymentScheduleItem[];
-}) {
+function FinancialSummary({ data }: { data: StudentFinancials }) {
   const { tenant } = useTenant();
-  const money = (cents: number) => formatTenantMoney(cents, tenant);
-  if (items.length === 0) return null;
+  const money = (value: number) => formatTenantMoney(value, tenant);
   return (
-    <section className="aster-section financial-payment-schedule">
-      <div className="aster-section__heading">
-        <div>
-          <p className="eyebrow">Dates and amounts</p>
-          <h2>Payment schedule</h2>
-        </div>
-        <Link href="/payments">Open payment history →</Link>
+    <section className="page-summary" aria-label="Your balance">
+      <div className="summary-main">
+        <div className="summary-figure"><div className="summary-figure-copy"><span className="panel-label">Estimated remaining balance</span><strong><span className="balance-figure">{money(data.remainingBalanceCents)} <span className="estimate-chip">Estimate</span></span></strong><p>This estimate is for {data.academicYear}. It changes only when your canonical student account changes.</p></div></div>
+        <div className="advisor-bar"><img className="avatar avatar-md advisor-avatar" src="/people/tomas-okafor.webp" width="40" height="40" alt="" /><div className="advisor-bar-copy"><span className="panel-label">Your financial aid advisor</span><strong>Priya Nair <span>· Financial Aid Office</span></strong></div><div className="advisor-actions"><a className="advisor-action" href={`mailto:${tenant.contacts.financialAid?.email ?? "financialaid@aster.edu"}`} aria-label="Email Financial Aid">✉</a><Link className="advisor-action" href="/appointments" aria-label="Book Financial Aid"><StudentPortalIcon name="calendar" size={16} /></Link></div></div>
       </div>
-      <ol>
-        {items.map((item) => (
-          <li className={`financial-payment-schedule__item is-${item.status}`} key={item.id}>
-            <time dateTime={item.dueAt}>
-              {formatTenantDate(item.dueAt, tenant, {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })}
-            </time>
-            <div>
-              <span>{item.kind === "deposit" ? "Enrollment deposit" : "Plan installment"}</span>
-              <h3>{item.label}</h3>
-              <p>
-                {item.status === "paid"
-                  ? "Payment recorded."
-                  : item.projected
-                    ? "Projected from your enrolled plan; billing dates can change before statements are issued."
-                    : "Current amount due on the university record."}
-              </p>
-            </div>
-            <div>
-              <strong>{money(item.amountCents)}</strong>
-              {item.enrollmentFeeCents > 0 ? (
-                <small>+ {money(item.enrollmentFeeCents)} enrollment fee</small>
-              ) : null}
-              <StatusPill value={item.status} />
-            </div>
-          </li>
-        ))}
-      </ol>
+      {data.requiredDocuments.some((item) => !["verified", "submitted", "under_review"].includes(item.status)) ? <div className="summary-alert"><div className="action-band"><span className="action-band-label"><StudentPortalIcon name="file" size={14} /> {data.requiredDocuments.find((item) => !["verified", "submitted", "under_review"].includes(item.status))?.title} needs you</span><Link className="notice-action" href="/financials/aid">Open it →</Link></div></div> : null}
     </section>
   );
 }
 
-function FinancialAidDonut({
-  financials,
-}: {
-  financials: StudentFinancials;
-}) {
-  const { tenant } = useTenant();
-  const money = (cents: number) => formatTenantMoney(cents, tenant);
-  const acceptedByType = financials.awards.reduce(
-    (totals, award) => {
-      if (award.type !== "work_study") {
-        totals[award.type] += award.acceptedAmountCents;
-      }
-      return totals;
-    },
-    { grant: 0, scholarship: 0, loan: 0 },
-  );
-  const slices = [
-    {
-      key: "grant",
-      label: "Accepted grants",
-      cents: acceptedByType.grant,
-      color: fundingColors.grant,
-    },
-    {
-      key: "scholarship",
-      label: "Accepted scholarships",
-      cents: acceptedByType.scholarship,
-      color: fundingColors.scholarship,
-    },
-    {
-      key: "loan",
-      label: "Accepted loans",
-      cents: acceptedByType.loan,
-      color: fundingColors.loan,
-    },
-    {
-      key: "payments",
-      label: "Payments and deposits",
-      cents: financials.paymentsCents,
-      color: fundingColors.payments,
-    },
-    {
-      key: "balance",
-      label: "Remaining balance",
-      cents: financials.remainingBalanceCents,
-      color: fundingColors.balance,
-    },
-  ].filter((slice) => slice.cents > 0);
-  const total = Math.max(
-    1,
-    slices.reduce((sum, slice) => sum + slice.cents, 0),
-  );
-  let offset = 0;
-
-  return (
-    <section className="financial-donut-card" aria-labelledby="financial-donut-title">
-      <div>
-        <p className="eyebrow">{financials.academicYear}</p>
-        <h2 id="financial-donut-title">How your college cost is covered</h2>
-        <p>
-          Accepted funding and recorded payments are shown against your current
-          estimated balance.
-        </p>
-      </div>
-      <div className="financial-donut">
-        <div className="financial-donut__chart">
-          <svg viewBox="0 0 42 42" role="img" aria-label="Financial aid breakdown">
-            <circle
-              className="financial-donut__track"
-              cx="21"
-              cy="21"
-              r="15.9155"
-              pathLength="100"
-            />
-            {slices.map((slice) => {
-              const percent = (slice.cents / total) * 100;
-              const dashOffset = -offset;
-              offset += percent;
-              return (
-                <circle
-                  className="financial-donut__segment"
-                  cx="21"
-                  cy="21"
-                  r="15.9155"
-                  pathLength="100"
-                  stroke={slice.color}
-                  strokeDasharray={`${percent} ${100 - percent}`}
-                  strokeDashoffset={dashOffset}
-                  key={slice.key}
-                />
-              );
-            })}
-          </svg>
-          <div>
-            <span>Remaining</span>
-            <strong>{money(financials.remainingBalanceCents)}</strong>
-          </div>
-        </div>
-        <ul className="financial-donut__legend">
-          {slices.map((slice) => (
-            <li key={slice.key}>
-              <span style={{ backgroundColor: slice.color }} />
-              <div>
-                <small>{slice.label}</small>
-                <strong>{money(slice.cents)}</strong>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </section>
-  );
+function FinancialTabs() {
+  return <nav className="group-tabs" aria-label="My Financials sections"><Link className="active" href="/financials" aria-current="page"><StudentPortalIcon name="wallet" size={16} /> Overview</Link><Link href="/financials/aid"><StudentPortalIcon name="spark" size={16} /> Financial aid</Link><Link href="/payments"><StudentPortalIcon name="card" size={16} /> Payments</Link></nav>;
 }
 
-export default function FinancialsPage() {
+function FinancialOverview({ data, reload }: { data: StudentFinancials; reload: () => void }) {
   const { tenant } = useTenant();
-  const money = (cents: number) => formatTenantMoney(cents, tenant);
-  const load = useCallback(
-    (signal: AbortSignal) => getStudentFinancials(signal),
-    [],
-  );
-  const financials = useApiResource(load);
-  const { track } = useActivityTracking();
+  const money = (value: number) => formatTenantMoney(value, tenant);
   const [selecting, setSelecting] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const acceptedByType = data.awards.reduce<Record<string, number>>((sum, award) => ({ ...sum, [award.type]: (sum[award.type] ?? 0) + (award.type === "work_study" ? 0 : award.acceptedAmountCents) }), {});
+  const coverage = [
+    { label: "Grants", value: acceptedByType.grant ?? 0 },
+    { label: "Scholarships", value: acceptedByType.scholarship ?? 0 },
+    { label: "Loans", value: acceptedByType.loan ?? 0 },
+    { label: "Payments", value: data.paymentsCents },
+    { label: "Still open", value: data.remainingBalanceCents },
+  ];
 
-  useEffect(() => {
-    if (!financials.data) return;
-    track("ui.financial_aid_viewed.v1", {
-      surface: "financials_home",
-      aid_status: financials.data.requiredDocuments.some(
-        (document) => document.status === "action_required",
-      )
-        ? "action_required"
-        : "current",
-    });
-  }, [financials.data, track]);
-
-  const selectPlan = async (planId: string) => {
-    setSelecting(planId);
+  const choosePlan = async (id: string) => {
+    setSelecting(id);
     setFeedback(null);
     try {
-      await selectFinancialPaymentPlan(planId, crypto.randomUUID());
-      setFeedback("Payment plan enrolled. Your student account projection is updated.");
-      financials.reload();
-    } catch (caught) {
-      setFeedback(
-        caught instanceof Error ? caught.message : "The plan could not be selected.",
-      );
+      await selectFinancialPaymentPlan(id, crypto.randomUUID());
+      setFeedback("Payment plan enrolled. Your canonical student account projection is updated.");
+      reload();
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "The plan could not be selected.");
     } finally {
       setSelecting(null);
     }
   };
 
   return (
-    <PortalShell
-      active="financials"
-      eyebrow="My financials"
-      title="A clear view of college costs"
-      description="Aid, required documents, your estimated balance, payment options, and academic eligibility—together."
-      actions={
-        <Link className="button button--accent" href="/appointments">
-          Talk with Financial Aid
-        </Link>
-      }
-    >
-      {financials.status === "loading" ? (
-        <LoadingState label="Loading your financial picture" />
-      ) : financials.status === "error" ? (
-        <ErrorState message={financials.error} onRetry={financials.reload} />
-      ) : (
-        <>
-          <div className="financial-overview">
-            <FinancialAidDonut financials={financials.data} />
-            <section className="financial-summary" aria-label="Financial summary">
-            <div className="financial-summary__balance">
-              <p className="eyebrow">{financials.data.academicYear}</p>
-              <span>Estimated remaining balance</span>
-              <strong>{money(financials.data.remainingBalanceCents)}</strong>
-              <small>
-                After accepted aid and recorded payments. Estimates may change
-                after verification or enrollment updates.
-              </small>
-            </div>
-            <div>
-              <span>Cost of attendance</span>
-              <strong>{money(financials.data.costOfAttendanceCents)}</strong>
-            </div>
-            <div>
-              <span>Accepted aid</span>
-              <strong className="positive">− {money(financials.data.acceptedAidCents)}</strong>
-            </div>
-            <div>
-              <span>Payments & deposits</span>
-              <strong className="positive">− {money(financials.data.paymentsCents)}</strong>
-            </div>
-            <div>
-              <span>Possible additional aid</span>
-              <strong>{money(financials.data.pendingAidCents)}</strong>
-            </div>
-            </section>
-          </div>
-
-          <div className="financial-columns">
-            <section className="aster-card">
-              <div className="aster-section__heading">
-                <div>
-                  <p className="eyebrow">Your aid package</p>
-                  <h2>Funding sources</h2>
-                </div>
-                <Link href="/edward">Ask Edward to explain →</Link>
-              </div>
-              <ul className="financial-awards">
-                {financials.data.awards
-                  .filter((award) => award.type !== "work_study")
-                  .map((award) => (
-                  <li key={award.id}>
-                    <span aria-hidden="true">
-                      {award.type === "grant"
-                        ? "G"
-                        : award.type === "scholarship"
-                          ? "S"
-                          : award.type === "loan"
-                            ? "L"
-                            : "W"}
-                    </span>
-                    <div>
-                      <small>{awardLabel(award)} · {award.source}</small>
-                      <h3>{award.name}</h3>
-                      {award.requiresAction ? <em>Decision required</em> : null}
-                      <details className="financial-award-details">
-                        <summary>How this award works</summary>
-                        <p>{awardExplanation(award)}</p>
-                        <dl>
-                          <div>
-                            <dt>Offered</dt>
-                            <dd>{money(award.offeredAmountCents)}</dd>
-                          </div>
-                          <div>
-                            <dt>Accepted</dt>
-                            <dd>{money(award.acceptedAmountCents)}</dd>
-                          </div>
-                        </dl>
-                        {award.requiresAction ? (
-                          <Link href="/appointments">Ask Financial Aid about this award →</Link>
-                        ) : null}
-                      </details>
-                    </div>
-                    <div>
-                      <strong>{money(award.offeredAmountCents)}</strong>
-                      <StatusPill value={award.status} />
-                    </div>
-                  </li>
-                  ))}
-              </ul>
-              {financials.data.awards.some(
-                (award) => award.type === "work_study",
-              ) ? (
-                <div className="work-study-callout">
-                  <span aria-hidden="true">W</span>
-                  <div>
-                    <p className="eyebrow">Earned through employment</p>
-                    <h3>Federal Work-Study</h3>
-                    <p>
-                      Up to{" "}
-                      {money(
-                        financials.data.awards
-                          .filter((award) => award.type === "work_study")
-                          .reduce(
-                            (total, award) =>
-                              total + award.offeredAmountCents,
-                            0,
-                          ),
-                      )}{" "}
-                      may be earned through an eligible campus job. These are
-                      wages paid as you work, so they are not counted as
-                      accepted aid or subtracted from your remaining balance.
-                    </p>
-                  </div>
-                  <Link href="/appointments">Ask about campus jobs</Link>
-                </div>
-              ) : null}
-            </section>
-
-            <section className="aster-card financial-documents">
-              <div className="aster-section__heading">
-                <div>
-                  <p className="eyebrow">Financial aid checklist</p>
-                  <h2>Required documents</h2>
-                </div>
-              </div>
-              <ul>
-                {financials.data.requiredDocuments.map((document) => (
-                  <li key={document.id}>
-                    <span
-                      className={`financial-doc-state financial-doc-state--${document.status}`}
-                      aria-hidden="true"
-                    >
-                      {document.status === "verified" ? "✓" : "!"}
-                    </span>
-                    <div>
-                      <h3>{document.title}</h3>
-                      <p>{document.description}</p>
-                      {document.dueAt ? (
-                        <small>
-                          Due{" "}
-                          {formatTenantDate(document.dueAt, tenant, {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })}
-                        </small>
-                      ) : null}
-                    </div>
-                    <div className="financial-document-actions">
-                      <FinancialDocumentAction document={document} />
-                      <details>
-                        <summary>Status details</summary>
-                        <p>
-                          {document.status === "verified"
-                            ? "Financial Aid has verified this record. Keep it available for reference."
-                            : document.status === "under_review"
-                              ? "Your submission is with Financial Aid. No new upload is needed unless the office contacts you."
-                              : document.status === "submitted"
-                                ? "Your document was received and is waiting to enter review."
-                                : document.status === "action_required"
-                                  ? "Open this requirement to see what needs correction or additional evidence."
-                                  : "This document is still needed before your aid file can be finalized."}
-                        </p>
-                      </details>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          </div>
-
-          <FinancialPaymentSchedule
-            items={
-              (financials.data as StudentFinancials & {
-                paymentSchedule?: FinancialPaymentScheduleItem[];
-              }).paymentSchedule ?? []
-            }
-          />
-
-          <section className="aster-section">
-            <div className="aster-section__heading">
-              <div>
-                <p className="eyebrow">Ways to pay</p>
-                <h2>Payment plans</h2>
-              </div>
-              <p>Choose one plan; you can change it before billing begins.</p>
-            </div>
-            {feedback ? (
-              <p className="action-feedback" role="status">{feedback}</p>
-            ) : null}
-            <div className="payment-plan-grid">
-              {financials.data.paymentPlans.map((plan) => (
-                <article
-                  className={plan.status === "enrolled" ? "is-selected" : undefined}
-                  key={plan.id}
-                >
-                  <span>{plan.status === "enrolled" ? "Current plan" : "Available"}</span>
-                  <h3>{plan.name}</h3>
-                  <strong>{money(plan.installmentAmountCents)} <small>/ installment</small></strong>
-                  <p>
-                    {plan.installmentCount} installments · {money(plan.enrollmentFeeCents)} enrollment fee
-                  </p>
-                  <button
-                    className="button button--secondary"
-                    type="button"
-                    disabled={selecting === plan.id || plan.status === "enrolled"}
-                    onClick={() => void selectPlan(plan.id)}
-                  >
-                    {selecting === plan.id
-                      ? "Selecting…"
-                      : plan.status === "enrolled"
-                        ? "✓ Enrolled"
-                        : "Select plan"}
-                  </button>
-                </article>
-              ))}
-            </div>
+    <>
+      <FinancialSummary data={data} />
+      <FinancialTabs />
+      <div className="page-body">
+        <div className="page-main">
+          <section className="section-card" aria-labelledby="cost-title">
+            <div className="card-heading"><span className="card-icon"><StudentPortalIcon name="wallet" size={19} /></span><div><h2 id="cost-title">Cost and coverage</h2><p>{data.academicYear} academic year</p></div></div>
+            <div className="coverage"><div className="coverage-bar" role="img" aria-label={`Cost of attendance ${money(data.costOfAttendanceCents)}, remaining ${money(data.remainingBalanceCents)}`}>{coverage.map((segment, index) => <span className={`coverage-segment ${segmentClass[index]}`} style={{ width: `${data.costOfAttendanceCents ? Math.max(0, (segment.value / data.costOfAttendanceCents) * 100) : 0}%` }} key={segment.label} />)}</div><ul className="coverage-legend">{coverage.map((segment, index) => <li key={segment.label}><i className={`coverage-key ${segmentClass[index]}`} /><span><strong>{money(segment.value)}</strong>{segment.label}</span></li>)}</ul></div>
+            <table className="ledger"><caption className="sr-only">What the year costs, what covers it, and what remains</caption><tbody>
+              <tr className="ledger-group"><th scope="row">Cost of attendance<small>Aster’s current estimate for the year</small></th><td /><td className="ledger-amount">{money(data.costOfAttendanceCents)}</td></tr>
+              <tr className="ledger-group"><th scope="row">Accepted financial aid</th><td><Link className="ledger-link" href="/financials/aid">See every source →</Link></td><td className="ledger-amount credit">− {money(data.acceptedAidCents)}</td></tr>
+              <tr className="ledger-group"><th scope="row">Payments and deposits</th><td><Link className="ledger-link" href="/payments">See your schedule →</Link></td><td className="ledger-amount credit">− {money(data.paymentsCents)}</td></tr>
+              <tr className="ledger-group soft"><th scope="row">Possible additional aid<small>Not counted until awarded</small></th><td><Link className="ledger-link" href="/financials/aid">Review pending aid →</Link></td><td className="ledger-amount soft">up to {money(data.pendingAidCents)}</td></tr>
+              <tr className="ledger-total"><th scope="row">Estimated remaining balance</th><td><span className="estimate-chip">Estimate</span></td><td className="ledger-amount">{money(data.remainingBalanceCents)}</td></tr>
+            </tbody></table>
           </section>
 
-          <section className="sap-card">
-            <div>
-              <p className="eyebrow">Satisfactory academic progress</p>
-              <h2>You are meeting SAP requirements</h2>
-              <p>
-                SAP can affect federal grants, loans, work-study, and some
-                institutional scholarships. This preview combines the
-                qualitative, pace, and maximum-timeframe checks.
-              </p>
-            </div>
-            <div className="sap-metrics">
-              <div>
-                <span>Cumulative GPA</span>
-                <strong>{financials.data.sap.cumulativeGpa.toFixed(2)}</strong>
-                <small>Minimum {financials.data.sap.minimumGpa.toFixed(2)}</small>
-              </div>
-              <div>
-                <span>Completion pace</span>
-                <strong>{financials.data.sap.completionRatePercent}%</strong>
-                <small>Minimum {financials.data.sap.minimumCompletionRatePercent}%</small>
-              </div>
-              <div>
-                <span>Attempted credits</span>
-                <strong>{financials.data.sap.attemptedCredits}</strong>
-                <small>Maximum {financials.data.sap.maximumAttemptedCredits}</small>
-              </div>
-            </div>
+          <section className="section-card doc-section">
+            <div className="status-heading"><span className="status-icon docs"><StudentPortalIcon name="file" size={18} /></span><div><h2>Documents that need you</h2><p>Financial paperwork still connected to your aid file.</p></div><span className="status-count">{data.requiredDocuments.length}</span></div>
+            {data.requiredDocuments.length ? <div className="card-rows doc-list">{data.requiredDocuments.map((document) => <article className="compact-task doc-task" key={document.id}><div className="task-type-icon upload"><StudentPortalIcon name="file" size={21} /></div><div className="compact-copy"><h3>{document.title}</h3><p className="doc-meta">Financial Aid Office{document.dueAt ? ` · due ${formatTenantDate(document.dueAt, tenant, { month: "short", day: "numeric" })}` : ""}</p><p>{document.description}</p></div><div className="doc-action"><span className={`status-pill ${document.status === "verified" ? "done" : document.status === "under_review" ? "wait" : "act"}`}>{document.status.replaceAll("_", " ")}</span><Link className="secondary-button" href={document.documentId ? `/documents?document=${encodeURIComponent(document.documentId)}` : "/documents"}>Open <StudentPortalIcon name="chevron" size={14} /></Link></div></article>)}</div> : <p className="inline-empty">Financial Aid has everything it needs for now.</p>}
           </section>
-        </>
-      )}
-    </PortalShell>
+
+          <section className="section-card">
+            <div className="status-heading"><span className="status-icon accent"><StudentPortalIcon name="card" size={20} /></span><div><h2>Payment plans</h2><p>Choose one before billing begins.</p></div></div>
+            {feedback ? <p className="action-feedback" role="status">{feedback}</p> : null}
+            <div className="payment-plan-grid">{data.paymentPlans.map((plan) => <article className={plan.status === "enrolled" ? "is-selected" : undefined} key={plan.id}><span>{plan.status === "enrolled" ? "Current plan" : "Available"}</span><h3>{plan.name}</h3><strong>{money(plan.installmentAmountCents)} <small>/ installment</small></strong><p>{plan.installmentCount} installments · {money(plan.enrollmentFeeCents)} enrollment fee</p><button className="secondary-button" type="button" disabled={selecting === plan.id || plan.status === "enrolled"} onClick={() => void choosePlan(plan.id)}>{selecting === plan.id ? "Selecting…" : plan.status === "enrolled" ? "✓ Enrolled" : "Select plan"}</button></article>)}</div>
+          </section>
+
+          <section className="section-card sap-card"><div><span className="panel-label">Satisfactory academic progress</span><h2>{data.sap.status === "meeting" ? "You are meeting SAP requirements" : "Review your SAP standing"}</h2><p>This advisory preview combines the qualitative, pace, and maximum-timeframe checks.</p></div><div className="sap-metrics"><div><span>Cumulative GPA</span><strong>{data.sap.cumulativeGpa.toFixed(2)}</strong><small>Minimum {data.sap.minimumGpa.toFixed(2)}</small></div><div><span>Completion pace</span><strong>{data.sap.completionRatePercent}%</strong><small>Minimum {data.sap.minimumCompletionRatePercent}%</small></div><div><span>Attempted credits</span><strong>{data.sap.attemptedCredits}</strong><small>Maximum {data.sap.maximumAttemptedCredits}</small></div></div></section>
+        </div>
+        <aside className="page-rail"><div className="anchor-card next-payment-card"><span className="panel-label">Next payment</span><strong className="next-payment-figure">{data.paymentPlans.find((plan) => plan.status === "enrolled") ? money(data.paymentPlans.find((plan) => plan.status === "enrolled")!.installmentAmountCents) : "Choose a plan"}</strong><p className="next-payment-meta">Your live payment history and deposit record are on Payments.</p><Link className="primary-button full" href="/payments">Open payments <StudentPortalIcon name="chevron" size={16} /></Link></div><div className="provenance-card"><span className="panel-label">About this estimate</span><p>Aid still pending is not subtracted. Housing, meal-plan, and enrollment changes can move this figure.</p><Link className="text-button" href="/appointments">Talk with Financial Aid <StudentPortalIcon name="chevron" size={14} /></Link></div></aside>
+      </div>
+    </>
   );
+}
+
+export default function FinancialsPage() {
+  const financials = useApiResource(useCallback((signal: AbortSignal) => getStudentFinancials(signal), []));
+  return <PortalShell active="financials" eyebrow="My Financials · Current academic year" title="Financials" description="What the year costs, what’s covering it, and what still needs you.">{financials.status === "loading" ? <LoadingState label="Loading your financial picture" /> : financials.status === "error" ? <ErrorState message={financials.error} onRetry={financials.reload} /> : <FinancialOverview data={financials.data} reload={financials.reload} />}</PortalShell>;
 }

@@ -216,3 +216,45 @@
     flex-direction: column;
   }
 }
+
+.progressCard > p,
+.progressTaskCopy small {
+  color: var(--portal-muted, #687086);
+}
+
+.progressTodoHeading {
+  border-top-color: var(--portal-line, #e6e7ee);
+}
+
+.progressTodoHeading span,
+.progressTodoHeading > a,
+.progressTaskArrow {
+  color: var(--portal-accent-strong, #45358e);
+}
+
+.progressTodoHeading strong,
+.progressTask {
+  color: var(--portal-ink, #152037);
+}
+
+.progressTask {
+  border-color: var(--portal-line, #e6e7ee);
+  border-radius: 15px;
+  background: var(--portal-card-zone, #f6f6fb);
+}
+
+.progressTask:hover,
+.progressTask:focus-visible {
+  border-color: var(--portal-accent-line, #ddd8f7);
+  background: var(--portal-surface, #fff);
+}
+
+.progressTaskMarker {
+  color: var(--portal-accent-strong, #45358e);
+  background: var(--portal-accent-soft, #efedff);
+}
+
+.progressComplete {
+  color: var(--portal-green-ink, #2f6152);
+  background: var(--portal-green-soft, #e8f7f0);
+}

@@ -1,0 +1,53 @@
+/* ==========================================================================
+ * What changed — ENR-161.
+ * ==========================================================================*/
+
+/* --- The popover's rows ------------------------------------------------------
+   The panel is `Popover` (patterns.css) and a row is `.pop-row`; here is only
+   what a notification adds. Two runs rather than three equal tabs: AC 4's
+   categories are the data, the split is the ranking, so the reader is not
+   asked to sort a feed the product could have sorted. Each run is labelled
+   once, and a run with no items renders no label. */
+
+/* The needs-you label spends the bell's colour, for the bell's reason — the
+   chip and the panel agree. News is muted. */
+.rows-label.needs-you {
+  color: var(--crimson);
+}
+
+.rows-label.also-new {
+  color: var(--muted);
+}
+
+/* The tile is tinted once, on the row that is asking. Everything else keeps
+   the neutral tile — what was accepted and what changed is in the title. */
+.note-row .task-type-icon.needs-you {
+  color: var(--crimson);
+  background: var(--crimson-soft);
+  border-color: var(--crimson-line);
+}
+
+/* Unread is weight and the dot; read falls back to regular, still in ink. */
+.note-row .pop-copy strong {
+  font-weight: var(--fw-regular);
+}
+
+.note-row.unread .pop-copy strong {
+  font-weight: var(--fw-semi);
+}
+
+/* AC 6. It stays in the feed, because deleting it would answer what changed
+   with silence — but it is text, and it leads nowhere because there is nowhere. */
+.note-row.gone {
+  cursor: default;
+}
+
+.note-row.gone .pop-copy strong {
+  color: var(--muted);
+}
+
+.note-row.gone .task-type-icon {
+  color: var(--muted);
+  background: var(--surface-sunk);
+  border-color: var(--line);
+}

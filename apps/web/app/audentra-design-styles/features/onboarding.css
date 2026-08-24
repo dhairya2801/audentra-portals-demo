@@ -1,0 +1,810 @@
+/* ============================================================================
+ * Onboarding — ENR-163.
+ *
+ * The one section that is not a section: it renders its own frame, because it
+ * is what a newly admitted student walks through once, before the portal
+ * exists for her.
+ *
+ * The frame, since 2026-08-21, is the approved surface's: a paper rail
+ * (`StepRail`, in `patterns.css`) beside a main column that reads at
+ * `--flow-column`, with a step panel riding beside the cards when the column
+ * is wide enough for both. There is no top bar — the preview control and the
+ * one way out sit in a line above the question — and nothing here is
+ * saturated but the primary button. What this file holds is the composition;
+ * every shape in it is the design system's.
+ * ==========================================================================*/
+
+.onboarding {
+  background: var(--canvas);
+  min-height: 100vh;
+}
+
+/* ============================================================================
+ * The main column — one question at a time, and the panel that reads it back.
+ * ==========================================================================*/
+
+/* The column is the container the grid is measured against: two columns when
+   the content column, the gap and the panel's minimum fit side by side, one
+   column below that. A container query, not a fifth viewport breakpoint — the
+   summary panel's 940 is the precedent. */
+/* The main column steps past the fixed rail exactly as the workspace steps past
+   the sidebar — the same margin, so the content starts on the same x in the
+   flow and in the portal. */
+.flow-page {
+  container: flow / inline-size;
+  min-height: 100vh;
+  margin-left: var(--sidebar-width);
+}
+
+/* The portal's topbar, across the main column: sticky, glass, the controls on
+   the right. `.topbar` is the shell's rule and this is the shell's shape; what
+   the flow adds is the one control the portal's topbar does not have. */
+.flow-leave {
+  font-weight: var(--fw-semi);
+}
+
+.flow-body {
+  padding: var(--space-12) var(--space-13) var(--space-13);
+}
+
+.flow-measure {
+  max-width: calc(var(--flow-column) + var(--space-10) + var(--flow-aside));
+  margin: 0 auto;
+}
+
+/* `.text-button` is a bare button in `patterns.css`; anything in this flow that
+   carries an icon has to say how the icon sits beside the word. */
+.onboarding .text-button {
+  align-items: center;
+  gap: var(--space-3);
+  display: inline-flex;
+}
+
+/* The card that stands for a frame that could not be read reads at the content
+   column's width, not across the panel's too. */
+.flow-measure > .state-card {
+  max-width: var(--flow-column);
+}
+
+/* --- the question is the band --- */
+
+/* The title takes focus when the step changes; on ink the ring is paper. */
+.onboarding .page-hero h1:focus-visible {
+  outline: 2px solid var(--on-ink);
+  outline-offset: var(--space-3);
+  border-radius: var(--radius-xs);
+}
+
+/* The notice line sits between the band and the grid, and the shell's own
+   distance after the band already holds it off; the line keeps the shell's
+   distance after itself. */
+.flow-measure > .page-notice {
+  margin-top: calc(-1 * var(--hero-gap) + var(--space-9));
+}
+
+/* --- the grid: the cards, the panel beside them, the action bar under them --- */
+
+.flow-grid {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-10);
+  display: grid;
+}
+
+.flow-content,
+.flow-aside {
+  min-width: 0;
+}
+
+/* The last card's own margin would add to the grid's gap. */
+.flow-content > :last-child {
+  margin-bottom: 0;
+}
+
+/* 1032px is `--flow-column` + `--space-10` + `--flow-aside-min`, the width at
+   which the two columns fit; a container query cannot read a custom property,
+   so the sum is written out and named here. */
+@container flow (min-width: 1032px) {
+  .flow-grid {
+    grid-template-columns: minmax(0, var(--flow-column)) minmax(var(--flow-aside-min), var(--flow-aside));
+  }
+
+  .flow-aside {
+    grid-area: 1 / 2 / span 2 / 3;
+    position: sticky;
+    top: var(--space-12);
+  }
+
+  .flow-grid > .step-actions {
+    grid-column: 1;
+  }
+}
+
+/* The panel: a card that reads the step back. Its rows are stated facts; its
+   foot is the one sentence that qualifies them. */
+.step-panel {
+  margin-bottom: 0;
+}
+
+.step-panel .card-foot p {
+  color: var(--muted);
+  margin: 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+/* ENR-149 AC 4. A save that failed says so where the save was pressed, and the
+   count above it has not moved. */
+.step-failed {
+  color: var(--crimson-ink);
+  background: var(--crimson-soft);
+  border: 1px solid var(--crimson-line);
+  border-radius: var(--radius-row);
+  align-items: flex-start;
+  gap: var(--space-5);
+  margin: var(--space-8) 0 0;
+  padding: var(--space-7);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.step-failed svg {
+  color: var(--crimson);
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+.step-failed strong {
+  margin-right: var(--space-3);
+}
+
+/* --- the action bar --- */
+
+.step-actions {
+  border-top: 1px solid var(--line);
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-8);
+  padding-top: var(--space-9);
+  display: flex;
+}
+
+.step-back {
+  color: var(--muted);
+  margin-right: auto;
+  font-size: var(--fs-body);
+}
+
+.step-back:hover {
+  color: var(--ink);
+}
+
+.step-forward {
+  align-items: center;
+  gap: var(--space-10);
+  margin-left: auto;
+  display: flex;
+}
+
+/* A real answer, at a real size. A `Skip` at half the contrast of everything
+   else reads as an apology for existing; if a step is genuinely optional, its
+   skip looks like the answer it is. */
+.step-skip {
+  color: var(--muted);
+  font-size: var(--fs-body);
+}
+
+.step-skip:hover {
+  color: var(--ink);
+}
+
+/* ============================================================================
+ * What the steps are built from.
+ * ==========================================================================*/
+
+.card-body {
+  display: block;
+}
+
+.body-copy {
+  color: var(--ink-2, var(--ink));
+  text-wrap: pretty;
+  margin: 0 0 var(--space-7);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.body-copy.strong {
+  color: var(--ink);
+  font-weight: var(--fw-semi);
+}
+
+.body-copy:last-child {
+  margin-bottom: 0;
+}
+
+.head-note {
+  color: var(--muted);
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-bold);
+  display: inline-flex;
+}
+
+/* --- fields ---
+   `.field` and everything under it moved to `patterns.css`. It is the design
+   system's shape, not this section's: four steps, a drawer and the styleguide
+   all draw it, and while it lived here its `.field-label` was silently
+   overriding My Profile's rule of the same name. */
+
+/* The Registrar's three facts, three up — two up left one alone on a row.
+   `StatedField` is the design system's; the grid is this step's. */
+.stated-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-8);
+  display: grid;
+}
+
+/* --- the card that asks, and the card that only states -------------------- */
+
+/* Spend colour once per card, on the one that is asking. */
+.section-card.asking > .status-heading:first-child {
+  background: var(--purple-wash);
+  border-bottom-color: var(--purple-line);
+}
+
+/* The card that only states goes quiet, so the one that asks is the one with
+   colour in it. Scoped to the flow: elsewhere in the product a `card` head's
+   tile is purple by default and stays that way. */
+.onboarding .stating .card-icon {
+  color: var(--muted);
+  background: var(--line-soft);
+}
+
+.status-icon.ask {
+  color: var(--purple-dark);
+}
+
+.status-icon.calm {
+  color: var(--ink);
+}
+
+.status-icon.done {
+  color: var(--green-ink);
+}
+
+/* The foot that separates one thing from another — ENR-152 AC 4. It carries the
+   distinction, so it is the one foot in the flow that is not grey. */
+.card-foot.separating {
+  color: var(--amber-ink);
+  background: var(--amber-wash);
+  border-top-color: var(--amber-line);
+}
+
+.card-foot p {
+  align-items: flex-start;
+  gap: var(--space-5);
+  margin: 0;
+  display: flex;
+}
+
+.card-foot p svg {
+  color: var(--purple);
+  flex: none;
+  margin-top: 2px;
+}
+
+.card-foot.separating p svg {
+  color: var(--amber);
+}
+
+.card-foot em {
+  font-style: normal;
+  font-weight: var(--fw-semi);
+}
+
+.choice-panel.tight {
+  margin-top: 0;
+}
+
+/* ============================================================================
+ * Step 4 — family permissions.
+ * ==========================================================================*/
+
+.nobody-yet {
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-row);
+  align-items: flex-start;
+  gap: var(--space-6);
+  margin: 0 0 var(--space-8);
+  padding: var(--space-8);
+  display: flex;
+}
+
+.nobody-yet svg {
+  color: var(--muted);
+  flex: none;
+  margin-top: 2px;
+}
+
+.nobody-yet strong {
+  font-size: var(--fs-body);
+  display: block;
+}
+
+.nobody-yet small {
+  color: var(--muted);
+  margin-top: var(--space-3);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  display: block;
+}
+
+.grant-row {
+  padding-top: var(--space-9);
+  padding-bottom: var(--space-9);
+}
+
+.grant-top {
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-5);
+  display: grid;
+}
+
+.grant-who strong {
+  letter-spacing: var(--ls-tight);
+  font-size: var(--fs-body);
+  display: block;
+}
+
+.grant-who small {
+  color: var(--muted);
+  margin-top: var(--space-1);
+  font-size: var(--fs-small);
+  display: block;
+}
+
+.grant-ends {
+  color: var(--muted);
+  background: var(--canvas);
+  border-radius: var(--radius-pill);
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-5);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-bold);
+  display: inline-flex;
+}
+
+/* A sentence, not a matrix of chips. The chips are the legalistic version of
+   this, and the count beside the sentence is what keeps it honest — three named
+   things cannot, on their own, answer "what else could she see?". */
+.grant-scope {
+  color: var(--ink);
+  margin: var(--space-7) 0 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.grant-count {
+  color: var(--purple-ink);
+  background: var(--purple-soft);
+  border-radius: var(--radius-pill);
+  margin-left: var(--space-4);
+  padding: var(--space-1) var(--space-4);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+  white-space: nowrap;
+}
+
+.grant-controls {
+  align-items: center;
+  gap: var(--space-9);
+  margin-top: var(--space-7);
+  display: flex;
+}
+
+.grant-controls .text-button,
+.set-aside .text-button {
+  font-size: var(--fs-copy);
+}
+
+.set-aside .text-button {
+  color: var(--purple);
+  text-decoration: none;
+}
+
+.text-button.danger {
+  color: var(--crimson);
+}
+
+/* --- the drawer that adds or narrows one authorization --- */
+
+.drawer-title {
+  letter-spacing: var(--ls-tight);
+  margin: 0 0 var(--space-9);
+  font-size: var(--fs-display);
+  font-weight: var(--fw-heavy);
+  line-height: var(--lh-tight);
+}
+
+/* `Drawer`'s `foot` slot is outside the scroll — but only if the panel itself
+   stops scrolling and hands the overflow to its content. `.drawer` scrolls as
+   one piece by default, which put the save button below the fold the moment a
+   refusal appeared above it. */
+.person-drawer {
+  flex-direction: column;
+  display: flex;
+  overflow: hidden;
+}
+
+.person-drawer .drawer-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.person-foot {
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  flex: none;
+  padding: var(--space-8) var(--space-11);
+}
+
+.person-drawer .permission-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.person-drawer .permission-set legend {
+  justify-content: space-between;
+  gap: var(--space-5);
+  width: 100%;
+  display: flex;
+}
+
+.person-drawer .permission-set legend small {
+  color: var(--purple-ink);
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: var(--fs-small);
+}
+
+.person-drawer .permission-set.invalid .permission-grid {
+  border: 1px solid var(--crimson-line);
+  border-radius: var(--radius-row);
+  padding: var(--space-5);
+}
+
+.person-drawer .drawer-note {
+  color: var(--muted);
+  border-top: 1px solid var(--line-soft);
+  align-items: flex-start;
+  gap: var(--space-5);
+  margin: var(--space-10) 0 0;
+  padding-top: var(--space-8);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.person-drawer .drawer-note svg {
+  color: var(--purple);
+  flex: none;
+  margin-top: 1px;
+}
+
+/* A refusal states what is missing. A greyed-out save says "you cannot"; this
+   says "here is what is left" — ENR-153 Scenario 2 asks for the reason, and a
+   grey button carries none. */
+.drawer-problem {
+  color: var(--crimson-ink);
+  background: var(--crimson-soft);
+  border: 1px solid var(--crimson-line);
+  border-radius: var(--radius-row);
+  align-items: flex-start;
+  gap: var(--space-5);
+  margin: 0 0 var(--space-6);
+  padding: var(--space-6);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.drawer-problem svg {
+  color: var(--crimson);
+  flex: none;
+  margin-top: 1px;
+}
+
+/* ============================================================================
+ * Step 5 — the shortlist.
+ * ==========================================================================*/
+
+.residence-pick {
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  background: none;
+  border: 0;
+  align-items: center;
+  gap: var(--space-6);
+  padding-top: var(--space-7);
+  padding-bottom: var(--space-7);
+  font: inherit;
+  display: flex;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.residence-pick:hover:not(:disabled) {
+  background: var(--purple-wash);
+}
+
+.residence-pick:disabled {
+  cursor: not-allowed;
+}
+
+.residence-pick:disabled .pick-copy {
+  opacity: .55;
+}
+
+.residence-pick:disabled .pick-action {
+  color: var(--faint);
+}
+
+.pick-rank {
+  color: var(--faint);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-round);
+  flex: none;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  font-size: var(--fs-copy);
+  font-weight: var(--fw-heavy);
+  display: grid;
+}
+
+.pick-rank.set {
+  color: var(--on-ink);
+  background: var(--purple);
+  border: 0;
+}
+
+.pick-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.pick-copy strong {
+  font-size: var(--fs-body);
+  display: block;
+}
+
+.pick-copy small {
+  color: var(--muted);
+  margin-top: var(--space-2);
+  font-size: var(--fs-small);
+  display: block;
+}
+
+.pick-action {
+  color: var(--purple);
+  flex: none;
+  font-size: var(--fs-copy);
+  font-weight: var(--fw-bold);
+}
+
+.residence-pick.picked .pick-action {
+  color: var(--muted);
+}
+
+/* ============================================================================
+ * Step 7 — the photo. The zone is `Dropzone`, the design system's; what is
+ * here is the list of rules under it.
+ * ==========================================================================*/
+
+.photo-rules {
+  margin: var(--space-9) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.photo-rules li {
+  color: var(--muted);
+  align-items: flex-start;
+  gap: var(--space-5);
+  padding: var(--space-4) 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.photo-rules svg {
+  color: var(--green);
+  flex: none;
+  margin-top: 2px;
+}
+
+/* ============================================================================
+ * The finish — two counts, never one.
+ * ==========================================================================*/
+
+.set-aside {
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-8);
+  padding-top: var(--space-7);
+  padding-bottom: var(--space-7);
+  display: flex;
+}
+
+.set-aside-copy strong {
+  font-size: var(--fs-body);
+  display: block;
+}
+
+.set-aside-copy small {
+  color: var(--muted);
+  margin-top: var(--space-2);
+  font-size: var(--fs-small);
+  display: block;
+}
+
+.set-aside .text-button {
+  flex: none;
+}
+
+/* --- loading --- */
+
+.step-skeleton {
+  flex-direction: column;
+  gap: var(--space-8);
+  display: flex;
+}
+
+.step-skeleton .skeleton-band,
+.step-skeleton .skeleton-line,
+.step-skeleton .skeleton-card {
+  background: linear-gradient(90deg, var(--surface-sunk), var(--line-soft), var(--surface-sunk));
+  background-size: 300% 100%;
+  border-radius: var(--radius-chip);
+  animation: onboarding-shimmer 1.4s linear infinite;
+  display: block;
+}
+
+.step-skeleton .skeleton-line {
+  height: 14px;
+}
+
+.step-skeleton .skeleton-line.short {
+  width: 120px;
+}
+
+.step-skeleton .skeleton-line.wide {
+  width: 70%;
+  height: 30px;
+}
+
+.step-skeleton .skeleton-card {
+  border-radius: var(--radius-card);
+  height: 190px;
+}
+
+/* The band's own height, so loading → ready is a fade and not a rearrangement. */
+.step-skeleton .skeleton-band {
+  border-radius: var(--radius-panel);
+  height: var(--hero-min);
+  margin-bottom: var(--space-6);
+}
+
+@keyframes onboarding-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step-skeleton .skeleton-band,
+  .step-skeleton .skeleton-line,
+  .step-skeleton .skeleton-card {
+    animation: none;
+  }
+}
+
+/* ============================================================================
+ * Narrow. The rail's own half of this lives with the rail, in `patterns.css`;
+ * what is here is the frame around it.
+ * ==========================================================================*/
+
+@media (width<=1060px) {
+  .stated-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Where the portal's sidebar becomes a drawer, the rail becomes the header and
+   the column takes the whole width. */
+@media (width<=820px) {
+  .flow-page {
+    margin-left: 0;
+  }
+
+  /* The rail is the sticky header here; a second sticky bar under it would
+     ride up into it. */
+  .flow-topbar {
+    position: static;
+  }
+
+  .flow-body {
+    padding: var(--space-11) var(--space-11) var(--space-13);
+  }
+}
+
+@media (width<=620px) {
+  /* The bottom clearance is the fixed action bar's: the corner Edward owns
+     plus one outer step. */
+  .flow-body {
+    padding: var(--space-9) var(--space-8) calc(var(--safe-bottom) + var(--space-13));
+  }
+
+  .grant-top {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .grant-ends {
+    grid-column: 2;
+    margin-top: var(--space-4);
+    justify-self: start;
+  }
+
+  .grant-controls {
+    flex-wrap: wrap;
+    gap: var(--space-7);
+  }
+
+  .set-aside {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-5);
+  }
+
+  /* The action bar pins to the bottom, because on a phone the question is
+     longer than the screen and the one control that moves her forward must not
+     be at the end of a scroll. */
+  .step-actions {
+    background: var(--glass);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid var(--line);
+    flex-direction: row-reverse;
+    flex-wrap: wrap;
+    gap: var(--space-5);
+    margin: 0;
+    padding: var(--space-7) var(--space-8);
+    position: fixed;
+    inset: auto 0 0;
+    z-index: var(--z-topbar);
+  }
+
+  .step-forward {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: var(--space-5);
+    width: 100%;
+  }
+
+  .step-forward .primary-button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .step-skip {
+    padding: var(--space-4) 0;
+    text-align: center;
+  }
+
+  .step-back {
+    margin: 0;
+  }
+}

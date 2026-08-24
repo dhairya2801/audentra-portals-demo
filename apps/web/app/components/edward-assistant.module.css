@@ -19,10 +19,10 @@
   min-height: 34rem;
   max-height: none;
   grid-template-rows: auto minmax(0, 1fr) auto auto;
-  border-color: #dce1e7;
-  border-radius: 1rem;
+  border-color: #e6e7ee;
+  border-radius: 14px;
   background: #fff;
-  box-shadow: 0 18px 55px rgb(19 27 46 / 8%);
+  box-shadow: 0 1px 2px rgb(21 32 55 / 4%), 0 10px 32px rgb(21 32 55 / 5%);
   animation: none;
 }
 
@@ -30,9 +30,9 @@
   grid-template-columns: auto auto minmax(0, 1fr) auto;
   gap: 0.65rem;
   padding: 0.7rem 0.85rem;
-  border-bottom: 1px solid #e6e9ed;
+  border-bottom: 1px solid #eff0f4;
   background: rgb(255 255 255 / 96%);
-  color: #162033;
+  color: #152037;
 }
 
 .workspaceHeader :global(.edward-avatar) {
@@ -43,21 +43,21 @@
 }
 
 .workspaceHeader > div > strong {
-  color: #162033;
-  font-family: "Hanken Grotesk", Inter, sans-serif;
+  color: #152037;
+  font-family: "Geist Variable", "Geist", sans-serif;
   font-size: 0.78rem;
   font-weight: 800;
 }
 
 .workspaceHeader > div > span {
-  color: #677386;
+  color: #687086;
   font-size: 0.52rem;
 }
 
 .workspaceHeader :global(.edward-secure) {
-  border: 1px solid #dfe5e9;
-  background: #f4f7f5;
-  color: #486052 !important;
+  border: 1px solid #ddd8f7;
+  background: #f7f5ff;
+  color: #45358e !important;
 }
 
 :global(.edward-panel__header).workspaceHeader .historyToggle {
@@ -70,13 +70,13 @@
   border: 1px solid transparent;
   border-radius: 0.5rem;
   background: transparent;
-  color: #253147;
+  color: #312960;
 }
 
 :global(.edward-panel__header).workspaceHeader .historyToggle:hover,
 :global(.edward-panel__header).workspaceHeader .historyToggle:focus-visible {
-  border-color: #dce1e7;
-  background: #f4f6f8;
+  border-color: #e6e7ee;
+  background: #f5f5fa;
 }
 
 .historyToggle > span {
@@ -93,7 +93,7 @@
   max-height: none;
   gap: 1.15rem;
   padding: 1.6rem clamp(1rem, 6vw, 3rem);
-  background: #fff;
+  background: #fdfdff;
   overscroll-behavior: contain;
 }
 
@@ -105,10 +105,11 @@
 
 .embeddedTranscript .embeddedAssistantMessage > p {
   padding: 0;
+  border: 0;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-  color: #273348;
+  color: #152037;
   font-size: 0.78rem;
   line-height: 1.65;
 }
@@ -119,9 +120,10 @@
   margin-left: auto;
   padding: 0.68rem 0.85rem;
   border-radius: 1rem 1rem 0.25rem 1rem;
-  background: #eef1f4;
+  border: 0;
+  background: linear-gradient(135deg, #5e47cd, #735ee0);
   box-shadow: none;
-  color: #202b3d;
+  color: #fff;
   font-size: 0.76rem;
   line-height: 1.55;
 }
@@ -129,10 +131,11 @@
 /* Structured turns lie flat in the workspace, like its plain paragraphs. */
 .embeddedTranscript .embeddedAssistantMessage > :global(.assistant-blocks) {
   padding: 0;
+  border: 0;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-  color: #273348;
+  color: #152037;
   font-size: 0.78rem;
   line-height: 1.65;
 }
@@ -157,8 +160,9 @@
   margin: 0 auto 0.8rem;
   place-items: center;
   border-radius: 0.75rem;
-  background: var(--gold);
-  color: #231900;
+  background: linear-gradient(145deg, #6854d9, #45358e);
+  box-shadow: 0 6px 13px rgb(77 59 179 / 24%), inset 0 1px rgb(255 255 255 / 30%);
+  color: #fff;
   content: "E";
   font-family: "Source Serif 4", Georgia, serif;
   font-size: 1.2rem;
@@ -168,7 +172,7 @@
 .embeddedTranscript .welcomeMessage > p {
   max-width: 30rem;
   margin: 0 auto;
-  color: #4b5668;
+  color: #5f6879;
 }
 
 .embeddedTranscript .welcomeMessage :global(.edward-actions) {
@@ -200,10 +204,10 @@
 :global(.edward-prompts).embeddedPrompts > button {
   min-width: 0;
   padding: 0.65rem 0.75rem;
-  border: 1px solid #dde3e8;
+  border: 1px solid #e6e7ee;
   border-radius: 0.7rem;
   background: #fff;
-  color: #334056;
+  color: #152037;
   font-size: 0.6rem;
   text-align: left;
   white-space: normal;
@@ -211,8 +215,8 @@
 
 :global(.edward-prompts).embeddedPrompts > button:hover,
 :global(.edward-prompts).embeddedPrompts > button:focus-visible {
-  border-color: #c8a02b;
-  background: #fffbef;
+  border-color: #ddd8f7;
+  background: #f7f5ff;
 }
 
 :global(.edward-composer).embeddedComposer {
@@ -226,7 +230,7 @@
   grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 0.35rem;
   padding: 0.35rem;
-  border: 1px solid #cfd6dd;
+  border: 1px solid #d9dbe6;
   border-radius: 1rem;
   background: #fff;
   box-shadow: 0 8px 28px rgb(19 27 46 / 9%);
@@ -242,14 +246,14 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: #263247;
+  color: #152037;
   font: inherit;
   font-size: 0.72rem;
   line-height: 1.4;
 }
 
 .embeddedComposer textarea::placeholder {
-  color: #8a94a3;
+  color: #9aa0b0;
 }
 
 .embeddedComposer textarea:focus-visible {
@@ -258,9 +262,9 @@
 
 :global(.edward-composer).embeddedComposer
   > div:has(textarea:focus-visible) {
-  border-color: #ab851d;
+  border-color: #6854d9;
   box-shadow:
-    0 0 0 3px rgb(251 191 36 / 17%),
+    0 0 0 3px rgb(104 84 217 / 12%),
     0 8px 28px rgb(19 27 46 / 9%);
 }
 
@@ -276,7 +280,7 @@
 
 :global(.edward-composer).embeddedComposer > small {
   margin-top: 0.45rem;
-  color: #788395;
+  color: #687086;
   font-size: 0.48rem;
   text-align: center;
 }
@@ -288,10 +292,10 @@
   flex-direction: column;
   padding: 0.75rem;
   overflow: hidden;
-  border: 1px solid #dce1e7;
-  border-radius: 1rem;
-  background: #f2f4f5;
-  color: #263247;
+  border: 1px solid #e6e7ee;
+  border-radius: 14px;
+  background: #f1f2f6;
+  color: #152037;
 }
 
 .conversationNavigation[hidden] {
@@ -317,7 +321,7 @@
 
 .conversationNavigation > header small,
 .conversationNavigation nav small {
-  color: #758092;
+  color: #687086;
   font-size: 0.48rem;
 }
 
@@ -329,13 +333,13 @@
   border: 0;
   border-radius: 0.45rem;
   background: transparent;
-  color: #536074;
+  color: #687086;
   cursor: pointer;
 }
 
 .conversationNavigation > header button:hover,
 .conversationNavigation > header button:focus-visible {
-  background: #e3e7e9;
+  background: #e6e7ee;
 }
 
 .newConversation {
@@ -344,10 +348,10 @@
   gap: 0.55rem;
   min-height: 2.5rem;
   padding: 0 0.65rem;
-  border: 1px solid #cfd6dd;
+  border: 1px solid #d9dbe6;
   border-radius: 0.65rem;
   background: #fff;
-  color: #283449;
+  color: #152037;
   cursor: pointer;
   font-size: 0.62rem;
   font-weight: 800;
@@ -375,14 +379,14 @@
   border: 0;
   border-radius: 0.55rem;
   background: transparent;
-  color: #354156;
+  color: #152037;
   cursor: pointer;
   text-align: left;
 }
 
 .conversationNavigation nav button:hover,
 .conversationNavigation nav button:focus-visible {
-  background: #e5e9eb;
+  background: #e6e7ee;
 }
 
 .conversationNavigation nav button[aria-current="page"] {
@@ -403,14 +407,14 @@
   gap: 0.35rem;
   margin: auto 0 0;
   padding: 0.7rem 0.25rem 0.15rem;
-  border-top: 1px solid #dce1e7;
-  color: #758092;
+  border-top: 1px solid #e6e7ee;
+  color: #687086;
   font-size: 0.46rem;
   line-height: 1.45;
 }
 
 .conversationNavigation > p > span {
-  color: #3d7659;
+  color: #45358e;
   font-size: 0.45rem;
 }
 

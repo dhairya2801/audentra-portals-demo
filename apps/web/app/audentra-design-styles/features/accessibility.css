@@ -1,0 +1,206 @@
+/* ============================================================================
+ * Accessibility — the accommodation question, as a panel.
+ *
+ * These rules were written for ENR-206, where the question was the second card
+ * inside Health; they moved here whole and in order when the question got its
+ * own section (ADR-0003), and they survived it becoming a drawer on 2026-08-21
+ * with two changes and no third. The office eyebrow inside the card is gone —
+ * the drawer's label is where a drawer says who owns what is in it — and the
+ * heading now beats `.drawer-content h2` by naming its parent, rather than by
+ * whichever file the cascade happens to read last.
+ * ==========================================================================*/
+
+/* ── The question ── */
+
+.question-head {
+  padding: 0;
+}
+.drawer-content .question-head h2 {
+  margin: var(--space-8) 0 0;
+  font-size: 19px;
+  font-weight: var(--fw-semi);
+  line-height: 1.35;
+  text-wrap: pretty;
+}
+.question-lede {
+  color: var(--muted);
+  margin-top: var(--space-4);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+/* The absence, said out loud. It is the sentence that stops the card reading as
+   the first field of a medical form. */
+.question-collects {
+  color: var(--muted);
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  font-size: var(--fs-meta);
+  display: flex;
+}
+.question-collects svg {
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+.question-ask {
+  padding: var(--space-9) 0 0;
+}
+.question-open-label {
+  color: var(--muted);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  font-size: var(--fs-micro);
+}
+.answer-options {
+  flex-direction: column;
+  gap: var(--space-5);
+  margin-top: var(--space-5);
+  display: flex;
+}
+.answer-option {
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-row);
+  background: var(--surface);
+  align-items: flex-start;
+  gap: var(--space-6);
+  width: 100%;
+  padding: var(--space-7) var(--space-8);
+  transition:
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease;
+  display: flex;
+}
+.answer-option:hover {
+  border-color: color-mix(in srgb, var(--purple) 38%, var(--line));
+  background: color-mix(in srgb, var(--purple) 3%, var(--surface));
+}
+.answer-option:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 2px;
+}
+.answer-option[disabled] {
+  opacity: .6;
+  cursor: default;
+}
+.answer-dot {
+  border: 1.9px solid var(--line);
+  border-radius: var(--radius-round);
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: var(--space-1);
+}
+.answer-option:hover .answer-dot {
+  border-color: var(--purple);
+}
+.answer-copy {
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-2);
+  display: flex;
+}
+.answer-copy strong {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semi);
+}
+.answer-copy span {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+/* Answered: a sentence, not a control — and never a congratulation. */
+.question-answered {
+  padding: var(--space-9) 0 0;
+}
+.answered-said {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  display: flex;
+}
+.answered-said strong {
+  font-size: 17px;
+  font-weight: var(--fw-semi);
+}
+.answered-said > span {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+}
+.answer-mark {
+  border-radius: var(--radius-round);
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  display: grid;
+}
+.answer-mark.done {
+  background: var(--green-soft);
+  color: color-mix(in srgb, var(--green) 70%, var(--ink));
+}
+.answered-next {
+  color: var(--muted);
+  margin-top: var(--space-5);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+.answered-change {
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  margin-top: var(--space-8);
+  padding-top: var(--space-8);
+  border-top: 1px solid var(--line);
+  display: flex;
+}
+.answered-change > span {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+}
+
+.question-failed,
+.question-unreadable {
+  border: 1px solid color-mix(in srgb, var(--crimson) 20%, transparent);
+  border-radius: var(--radius-row);
+  background: color-mix(in srgb, var(--crimson) 5%, var(--surface));
+  margin-top: var(--space-8);
+  padding: var(--space-8);
+}
+.question-failed p,
+.question-unreadable p {
+  font-size: var(--fs-meta);
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+.question-failed .secondary-button,
+.question-unreadable .secondary-button {
+  margin-top: var(--space-6);
+}
+
+.question-foot {
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-9);
+  display: flex;
+}
+.question-foot svg {
+  flex: none;
+}
+
+@media (width<=620px) {
+  .answered-change {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .answered-change .secondary-button {
+    justify-content: center;
+  }
+}

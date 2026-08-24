@@ -3,37 +3,82 @@
 }
 
 .trigger {
+  position: relative;
+  display: inline-flex;
+  min-width: 38px;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  width: 38px;
   padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
+  border: 1px solid var(--portal-accent-line, #ddd8f7);
+  border-radius: 12px;
+  color: var(--portal-accent-strong, #45358e);
+  background: var(--portal-surface, #fff);
   cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.trigger:hover,
+.trigger[aria-expanded="true"] {
+  border-color: var(--portal-accent-line, #ddd8f7);
+  color: var(--portal-accent-strong, #45358e);
+  background: var(--portal-accent-soft, #f7f5ff);
+}
+
+.trigger > span:first-child {
+  display: grid;
+}
+
+.trigger > strong {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: grid;
+  min-width: 17px;
+  height: 17px;
+  place-items: center;
+  margin-left: 0;
+  padding: 0 4px;
+  border: 2px solid var(--portal-surface, #fff);
+  border-radius: 999px;
+  color: #fff;
+  background: var(--portal-red, #a51c30);
+  font-size: 8px;
+  line-height: 1;
+}
+
+.triggerLabel {
+  display: none;
 }
 
 .panel {
   position: absolute;
-  z-index: 90;
+  z-index: 190;
   top: calc(100% + 13px);
   right: 0;
   width: min(390px, calc(100vw - 28px));
-  border: 1px solid #dce4ed;
-  border-radius: 18px;
-  background: #fff;
-  box-shadow: 0 24px 70px rgba(15, 35, 58, 0.2);
-  color: #17324f;
   overflow: hidden;
+  border: 1px solid var(--portal-line, #e6e7ee);
+  border-radius: 14px;
+  color: var(--portal-ink, #152037);
+  background: var(--portal-surface, #fff);
+  box-shadow: var(--portal-shadow-float, 0 18px 55px rgb(21 32 55 / 14%));
 }
 
 .panel::before {
   position: absolute;
   top: -7px;
-  right: 34px;
+  right: 27px;
   width: 12px;
   height: 12px;
-  border-top: 1px solid #dce4ed;
-  border-left: 1px solid #dce4ed;
-  background: #fff;
+  border-top: 1px solid var(--portal-line, #e6e7ee);
+  border-left: 1px solid var(--portal-line, #e6e7ee);
+  background: var(--portal-surface, #fff);
   content: "";
   transform: rotate(45deg);
 }
@@ -43,31 +88,35 @@
   align-items: center;
   justify-content: space-between;
   gap: 15px;
-  padding: 20px 20px 15px;
-  border-bottom: 1px solid #e7ebf0;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid var(--portal-line-soft, #eff0f4);
 }
 
 .panel header p {
-  margin: 0 0 2px;
-  color: #708094;
-  font-size: 0.66rem;
-  font-weight: 850;
-  letter-spacing: 0.08em;
+  margin: 0 0 3px;
+  color: var(--portal-accent-strong, #45358e);
+  font-family: "Geist Mono Variable", "Geist Mono", monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .panel header h2 {
   margin: 0;
-  font-size: 1.12rem;
+  color: var(--portal-ink, #152037);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
 }
 
 .panel header > span {
   padding: 5px 9px;
-  border-radius: 99px;
-  background: #edf3f8;
-  color: #47627f;
-  font-size: 0.68rem;
-  font-weight: 800;
+  border-radius: 999px;
+  color: var(--portal-ink-2, #5f6879);
+  background: var(--portal-sunk, #f1f2f6);
+  font-size: 9px;
+  font-weight: 700;
 }
 
 .panel ul {
@@ -80,74 +129,77 @@
 
 .panel li {
   display: grid;
-  grid-template-columns: 8px minmax(0, 1fr) auto;
+  grid-template-columns: 7px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: start;
-  padding: 14px 18px;
-  border-bottom: 1px solid #edf0f4;
-  background: #fff;
+  padding: 14px 17px;
+  border-bottom: 1px solid var(--portal-line-soft, #eff0f4);
+  background: var(--portal-surface, #fff);
 }
 
 .panel li.unread {
-  background: #f5f8fc;
+  background: var(--portal-accent-soft, #f7f5ff);
 }
 
 .dot {
   width: 7px;
   height: 7px;
-  margin-top: 6px;
+  margin-top: 5px;
   border-radius: 50%;
   background: transparent;
 }
 
 .unread .dot {
-  background: #d7a31f;
-  box-shadow: 0 0 0 3px rgba(215, 163, 31, 0.14);
+  background: var(--portal-accent, #6854d9);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--portal-accent, #6854d9) 13%, transparent);
 }
 
 .panel li a {
   display: block;
-  color: #173f6f;
-  font-size: 0.82rem;
-  font-weight: 820;
+  color: var(--portal-ink, #152037);
+  font-size: 11px;
+  font-weight: 700;
   line-height: 1.35;
   text-decoration: none;
 }
 
 .panel li a:hover {
+  color: var(--portal-accent-strong, #45358e);
   text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .panel li p,
 .panel li time {
   display: block;
   margin: 3px 0 0;
-  color: #6d7c8e;
-  font-size: 0.68rem;
+  color: var(--portal-muted, #687086);
+  font-size: 9px;
 }
 
 .readButton {
   padding: 4px 6px;
   border: 0;
+  border-radius: 6px;
+  color: var(--portal-accent-strong, #45358e);
   background: transparent;
-  color: #55708c;
-  font: inherit;
-  font-size: 0.62rem;
-  font-weight: 800;
   cursor: pointer;
+  font: inherit;
+  font-size: 8px;
+  font-weight: 700;
 }
 
 .readButton:hover,
 .readButton:focus-visible {
-  color: #173f6f;
+  background: var(--portal-surface, #fff);
   text-decoration: underline;
 }
 
 .state {
   margin: 0;
-  padding: 28px 20px;
-  color: #66768a;
-  font-size: 0.8rem;
+  padding: 30px 20px;
+  color: var(--portal-muted, #687086);
+  font-size: 11px;
   text-align: center;
 }
 
@@ -157,54 +209,54 @@
 
 .state button {
   border: 0;
+  color: var(--portal-accent-strong, #45358e);
   background: transparent;
-  color: #173f6f;
-  font: inherit;
-  font-weight: 800;
   cursor: pointer;
+  font: inherit;
+  font-weight: 700;
 }
 
 .error {
   margin: 0;
-  padding: 9px 18px;
-  background: #fff1f1;
-  color: #8e3434;
-  font-size: 0.72rem;
+  padding: 9px 17px;
+  color: var(--portal-red, #a51c30);
+  background: var(--portal-red-soft, #f9e9ec);
+  font-size: 10px;
 }
 
 .panel footer {
-  padding: 13px 18px;
-  background: #f7f9fb;
+  padding: 13px 17px;
+  background: var(--portal-sunk, #f1f2f6);
   text-align: center;
 }
 
 .panel footer a {
-  color: #173f6f;
-  font-size: 0.76rem;
-  font-weight: 850;
+  color: var(--portal-accent-strong, #45358e);
+  font-size: 10px;
+  font-weight: 750;
   text-decoration: none;
 }
 
 .toast {
   position: fixed;
-  z-index: 120;
+  z-index: 220;
   top: 80px;
   right: 22px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 12px;
   width: min(360px, calc(100vw - 30px));
-  padding: 17px;
-  border: 1px solid #dce4ed;
-  border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 24px 70px rgba(15, 35, 58, 0.22);
-  color: #17324f;
+  padding: 16px;
+  border: 1px solid var(--portal-line, #e6e7ee);
+  border-radius: 13px;
+  color: var(--portal-ink, #152037);
+  background: var(--portal-surface, #fff);
+  box-shadow: var(--portal-shadow-float, 0 18px 55px rgb(21 32 55 / 14%));
   animation: toast-in 180ms ease-out;
 }
 
 .toastIcon {
-  color: #d7a31f;
+  color: var(--portal-accent, #6854d9);
 }
 
 .toast small,
@@ -214,38 +266,39 @@
 }
 
 .toast small {
-  color: #718095;
-  font-size: 0.65rem;
-  font-weight: 850;
-  letter-spacing: 0.06em;
+  color: var(--portal-accent-strong, #45358e);
+  font-family: "Geist Mono Variable", "Geist Mono", monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .toast strong {
   margin-top: 3px;
-  font-size: 0.9rem;
+  font-size: 12px;
 }
 
 .toast p {
   margin: 3px 0 7px;
-  color: #69798c;
-  font-size: 0.7rem;
+  color: var(--portal-muted, #687086);
+  font-size: 10px;
 }
 
 .toast a {
-  color: #173f6f;
-  font-size: 0.72rem;
-  font-weight: 850;
+  color: var(--portal-accent-strong, #45358e);
+  font-size: 10px;
+  font-weight: 750;
   text-decoration: none;
 }
 
 .toast > button {
   align-self: start;
   border: 0;
+  color: var(--portal-muted, #687086);
   background: transparent;
-  color: #68788b;
-  font-size: 1.2rem;
   cursor: pointer;
+  font-size: 18px;
 }
 
 @keyframes toast-in {
@@ -256,6 +309,20 @@
 }
 
 @media (max-width: 680px) {
+  .trigger {
+    padding: 0;
+  }
+
+  .triggerLabel {
+    display: none;
+  }
+
+  .trigger > strong {
+    position: absolute;
+    top: -3px;
+    right: -3px;
+  }
+
   .panel {
     position: fixed;
     top: 68px;

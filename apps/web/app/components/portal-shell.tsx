@@ -17,7 +17,7 @@ import {
   touchExperienceUpdateVisit,
 } from "../lib/experience-update-session";
 import { EdwardAssistant } from "./edward-assistant";
-import { ErrorState, LoadingState, PortalMark } from "./portal-ui";
+import { ErrorState, LoadingState } from "./portal-ui";
 import { RewardCelebration } from "./reward-celebration";
 import { StudentNotificationCenter } from "./student-notification-center";
 import { connectStudentRealtime } from "./student-realtime";
@@ -25,11 +25,16 @@ import { TenantLink as Link } from "./tenant-link";
 import { useTenant } from "./tenant-provider";
 import { formatTenantMoney } from "../lib/tenant";
 import { isParentPortalPath, parentPortalHref } from "../lib/parent-portal-routes";
+import {
+  StudentPortalIcon,
+  type StudentPortalIconName,
+} from "./student-portal-icon";
 
 export type PortalSection =
   | "dashboard"
   | "enrollment"
   | "financials"
+  | "financial_aid"
   | "classrooms"
   | "campus_life"
   | "edward"
@@ -38,103 +43,129 @@ export type PortalSection =
   | "messages"
   | "appointments"
   | "payments"
-  | "help";
+  | "help"
+  | "health"
+  | "housing"
+  | "clubs";
 
 const navigation: {
   key: PortalSection;
   label: string;
   shortLabel: string;
   href: string;
-  symbol: string;
-  delegateOnly?: boolean;
+  icon: StudentPortalIconName;
+  group: "primary" | "financials" | "campus" | "after_groups" | "record" | "utility";
 }[] = [
-  {
-    key: "dashboard",
-    label: "Dashboard",
-    shortLabel: "Home",
-    href: "/dashboard",
-    symbol: "⌂",
-  },
   {
     key: "enrollment",
     label: "My Enrollment",
     shortLabel: "Enroll",
     href: "/enrollment",
-    symbol: "✓",
-  },
-  {
-    key: "financials",
-    label: "My Financials",
-    shortLabel: "Finance",
-    href: "/financials",
-    symbol: "$",
-  },
-  {
-    key: "classrooms",
-    label: "My Classrooms",
-    shortLabel: "Classes",
-    href: "/classrooms",
-    symbol: "▤",
-  },
-  {
-    key: "campus_life",
-    label: "My Campus Life",
-    shortLabel: "Campus",
-    href: "/campus-life",
-    symbol: "◉",
-  },
-  {
-    key: "messages",
-    label: "Messages",
-    shortLabel: "Messages",
-    href: "/messages",
-    symbol: "\u2709",
-  },
-  {
-    key: "edward",
-    label: "Edward AI",
-    shortLabel: "Edward",
-    href: "/edward",
-    symbol: "✦",
-  },
-  {
-    key: "documents",
-    label: "My Documents",
-    shortLabel: "Documents",
-    href: "/documents",
-    symbol: "↑",
-  },
-  {
-    key: "profile",
-    label: "Profile",
-    shortLabel: "Profile",
-    href: "/profile",
-    symbol: "○",
+    icon: "checklist",
+    group: "primary",
   },
   {
     key: "appointments",
     label: "Appointments",
     shortLabel: "Meet",
     href: "/appointments",
-    symbol: "◷",
-    delegateOnly: true,
+    icon: "calendar",
+    group: "primary",
+  },
+  {
+    key: "classrooms",
+    label: "My Degree",
+    shortLabel: "Degree",
+    href: "/classrooms",
+    icon: "degree",
+    group: "primary",
+  },
+  {
+    key: "health",
+    label: "My Health and Wellness",
+    shortLabel: "Health",
+    href: "/health",
+    icon: "health",
+    group: "primary",
+  },
+  {
+    key: "financials",
+    label: "Overview",
+    shortLabel: "Finance",
+    href: "/financials",
+    icon: "wallet",
+    group: "financials",
+  },
+  {
+    key: "financial_aid",
+    label: "Financial aid",
+    shortLabel: "Aid",
+    href: "/financials/aid",
+    icon: "spark",
+    group: "financials",
   },
   {
     key: "payments",
     label: "Payments",
     shortLabel: "Pay",
     href: "/payments",
-    symbol: "◇",
-    delegateOnly: true,
+    icon: "card",
+    group: "financials",
+  },
+  {
+    key: "campus_life",
+    label: "Events",
+    shortLabel: "Events",
+    href: "/campus-life",
+    icon: "ticket",
+    group: "campus",
+  },
+  {
+    key: "clubs",
+    label: "Clubs",
+    shortLabel: "Clubs",
+    href: "/campus-life?view=clubs",
+    icon: "users",
+    group: "campus",
+  },
+  {
+    key: "housing",
+    label: "Housing",
+    shortLabel: "Housing",
+    href: "/housing",
+    icon: "home",
+    group: "after_groups",
   },
   {
     key: "help",
     label: "Help",
     shortLabel: "Help",
     href: "/help",
-    symbol: "?",
-    delegateOnly: true,
+    icon: "help",
+    group: "utility",
   },
+  {
+    key: "profile",
+    label: "Profile",
+    shortLabel: "Profile",
+    href: "/profile",
+    icon: "profile",
+    group: "utility",
+  },
+  /* Existing production destinations remain addressable, but the design puts
+     them behind page entry points rather than in the primary sidebar. */
+  { key: "dashboard", label: "Dashboard", shortLabel: "Home", href: "/dashboard", icon: "home", group: "record" },
+  { key: "messages", label: "Messages", shortLabel: "Messages", href: "/messages", icon: "message", group: "record" },
+  { key: "edward", label: "Edward AI", shortLabel: "Edward", href: "/edward", icon: "spark", group: "record" },
+  { key: "documents", label: "My Documents", shortLabel: "Documents", href: "/documents", icon: "file", group: "record" },
+];
+
+const navigationGroups: Array<{
+  id: Exclude<(typeof navigation)[number]["group"], "primary" | "utility">;
+  label: string;
+}> = [
+  { id: "financials", label: "My Financials" },
+  { id: "campus", label: "My Campus Life" },
 ];
 
 function initials(fullName: string) {
@@ -353,13 +384,12 @@ export function PortalShell({
     tenant.contacts.financialAid ??
     tenant.contacts.support;
   const tenantNavigation = navigation.filter((item) => {
-    if (item.key === "campus_life") {
+    if (item.key === "campus_life" || item.key === "clubs") {
       return tenant.capabilities.campusLife !== false;
     }
     if (item.key === "edward") {
       return tenant.capabilities.assistant !== false;
     }
-    if (item.delegateOnly) return false;
     return true;
   });
   const publicFooterLinks: { label: string; href: string }[] = [];
@@ -379,6 +409,16 @@ export function PortalShell({
     });
   }
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const navigationPanel = useRef<HTMLElement>(null);
+  const [openNavigationGroups, setOpenNavigationGroups] = useState<
+    Record<string, boolean>
+  >(() => {
+    const activeGroup = navigation.find((item) => item.key === active)?.group;
+    return activeGroup && !["primary", "utility"].includes(activeGroup)
+      ? { [activeGroup]: true }
+      : {};
+  });
   const [experienceUpdates, setExperienceUpdates] = useState<
     StudentExperienceUpdate[]
   >([]);
@@ -402,13 +442,24 @@ export function PortalShell({
       : null;
   const visibleNavigation = navigation.filter((item) => {
     if (delegateActor) {
-      return delegateActor.scopes.includes(item.key as FerpaPortalScope);
+      const delegatedSection = item.key === "financial_aid" ? "financials" : item.key;
+      return delegateActor.scopes.includes(delegatedSection as FerpaPortalScope);
     }
     return tenantNavigation.some((candidate) => candidate.key === item.key);
   });
+  const activeNavigationItem = navigation.find((item) => item.key === active);
+  const primaryNavigation = visibleNavigation.filter(
+    (item) => item.group === "primary",
+  );
+  const utilityNavigation = visibleNavigation.filter(
+    (item) => item.group === "utility",
+  );
+  const afterGroupNavigation = visibleNavigation.filter(
+    (item) => item.group === "after_groups",
+  );
   const portalHome = visibleNavigation[0]?.href ?? "/help";
   const activeAllowed =
-    !delegateActor || delegateActor.scopes.includes(active as FerpaPortalScope);
+    !delegateActor || delegateActor.scopes.includes((active === "financial_aid" ? "financials" : active) as FerpaPortalScope);
   const needsOnboarding =
     !delegateActor && identity.data?.onboarding?.required &&
     identity.data.onboarding.status !== "completed";
@@ -419,6 +470,52 @@ export function PortalShell({
     identity.status === "ready" && !delegateActor
       ? studentExperienceUpdateSessionKey(tenant.id, identity.data.student.id)
       : null;
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const panel = navigationPanel.current;
+    if (!panel) return;
+
+    const previousFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const previousOverflow = document.body.style.overflow;
+    const focusableSelector =
+      'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusable = () =>
+      Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector)).filter(
+        (element) => element.getClientRects().length > 0,
+      );
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+        window.requestAnimationFrame(() => menuButton.current?.focus());
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const controls = focusable();
+      const first = controls[0];
+      const last = controls.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.body.style.overflow = "hidden";
+    panel.addEventListener("keydown", onKeyDown);
+    window.requestAnimationFrame(() => focusable()[0]?.focus());
+    return () => {
+      panel.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus && document.contains(previousFocus)) previousFocus.focus();
+    };
+  }, [menuOpen]);
 
   useEffect(() => {
     if (needsSignIn) {
@@ -624,51 +721,94 @@ export function PortalShell({
     );
   }
 
+  const presentedTitle =
+    active === "enrollment" && title === "Your requirements"
+      ? `You’re in, ${identity.data.student.preferredName}. Here’s what’s left.`
+        : active === "financials" || active === "financial_aid"
+        ? "What the year costs, and what covers it."
+        : active === "classrooms"
+          ? "What your degree asks of you."
+          : active === "appointments"
+            ? "Book time with the people who can help."
+            : active === "campus_life"
+              ? "Find your people."
+              : active === "help"
+                ? `Get unstuck, ${identity.data.student.preferredName}.`
+                : active === "profile"
+                  ? `What ${tenant.shortName} knows about you.`
+                  : title;
+  const presentedDescription =
+    active === "enrollment" && title === "Your requirements"
+      ? "Your next steps are in the order that keeps things moving. Start with the first one, or pick any task you can do now."
+      : active === "financials" || active === "financial_aid"
+        ? "What the year costs, what’s covering it, and what still needs you—all from your current student account."
+        : active === "classrooms"
+          ? "Every requirement your program sets, the courses that satisfy each one, and the current reading of your record."
+          : active === "appointments"
+            ? "Schedule focused time with the people who can unblock a step or answer a question."
+            : active === "campus_life"
+              ? `Events, clubs, and the people who run them, published for ${tenant.shortName} students.`
+              : active === "help"
+                ? `${tenant.shortName} guides and a direct route to the support team that owns your question.`
+                : active === "profile"
+                  ? "Some details are yours to change. The rest belong to the office responsible for your official record."
+                  : description;
+
   return (
-    <div className="aster-shell">
+    <div className="aster-shell app-shell">
       <a className="skip-link" href="#main-content">
         Skip to main content
       </a>
 
-      <header className="aster-topbar">
+      <section className="workspace">
+      <header className="aster-topbar topbar">
         <button
-          className="aster-menu-button"
+          ref={menuButton}
+          className="aster-menu-button mobile-menu icon-button"
           type="button"
           aria-label={menuOpen ? "Close portal menu" : "Open portal menu"}
           aria-expanded={menuOpen}
           aria-controls="portal-navigation"
           onClick={() => setMenuOpen((current) => !current)}
         >
-          <span />
-          <span />
-          <span />
+          <StudentPortalIcon name={menuOpen ? "close" : "menu"} />
         </button>
         <Link
-          className="aster-brand"
+          className="aster-mobile-brand mobile-school"
           href={portalHome}
           aria-label={`${tenant.name} student portal`}
         >
-          <PortalMark />
-          <span>
-            <strong>{tenant.shortName}</strong>
-            <small>University</small>
-          </span>
+          {tenant.shortName}
         </Link>
-        <div className="aster-topbar__right">
+        <div className="aster-topbar__section" aria-hidden="true">
+          {activeNavigationItem?.label ?? "Student portal"}
+        </div>
+        <div className="aster-topbar__right topbar-actions">
           {!delegateActor && identity.data.rewards ? (
-            <div
-              className="aster-points-balance"
-              title={`${formatTenantMoney(identity.data.rewards.bookstoreCreditCents, tenant)} in bookstore credit`}
-            >
-              <span aria-hidden="true">✦</span>
-              <div>
-                <strong>{identity.data.rewards.lifetimePoints}</strong>
-                <small>{identity.data.rewards.pointName}</small>
-              </div>
-            </div>
-          ) : null}
-          {!delegateActor || delegateActor.scopes.includes("help") ? (
-            <Link className="aster-help-link" href="/help">Student support</Link>
+            <details className="aster-points-popover popover">
+              <summary
+                className="aster-points-balance topbar-chip points-chip"
+                aria-label={`Your momentum, ${identity.data.rewards.lifetimePoints.toLocaleString()} points`}
+                title="Open your momentum"
+              >
+                <span aria-hidden="true"><StudentPortalIcon name="spark" size={17} /></span>
+                <strong className="chip-figure">{identity.data.rewards.lifetimePoints.toLocaleString()}</strong>
+                <small className="chip-unit">pts</small>
+              </summary>
+              <section className="section-card pop-panel points-balance-panel" aria-label="Your momentum">
+                <div className="anchor-card balance-card">
+                  <span className="balance-mark" aria-hidden="true"><StudentPortalIcon name="spark" size={18} /></span>
+                  <span className="panel-label">Your momentum</span>
+                  <strong>{identity.data.rewards.lifetimePoints.toLocaleString()} <small>pts</small></strong>
+                  <p>Points come from completed enrollment steps and never replace an outstanding required action.</p>
+                </div>
+                <div className="points-balance-details">
+                  <div><span>Bookstore credit</span><strong>{formatTenantMoney(identity.data.rewards.bookstoreCreditCents, tenant)}</strong></div>
+                  <div><span>Point program</span><strong>{identity.data.rewards.pointName}</strong></div>
+                </div>
+                <Link className="secondary-button points-balance-link" href="/enrollment#momentum">See how points work <StudentPortalIcon name="chevron" size={14} /></Link>
+              </section>
+            </details>
           ) : null}
           {!delegateActor || delegateActor.scopes.includes("messages") ? (
             <StudentNotificationCenter
@@ -724,7 +864,7 @@ export function PortalShell({
 
       {menuOpen ? (
         <button
-          className="aster-nav-backdrop"
+          className="aster-nav-backdrop nav-scrim"
           type="button"
           aria-label="Close portal menu"
           onClick={() => setMenuOpen(false)}
@@ -732,72 +872,183 @@ export function PortalShell({
       ) : null}
 
       <aside
+        ref={navigationPanel}
         id="portal-navigation"
-        className={`aster-sidebar${menuOpen ? " aster-sidebar--open" : ""}`}
+        className={`aster-sidebar sidebar${menuOpen ? " aster-sidebar--open sidebar-open" : ""}`}
+        role={menuOpen ? "dialog" : undefined}
+        aria-modal={menuOpen ? "true" : undefined}
+        aria-label={menuOpen ? "Student portal navigation" : undefined}
       >
-        <p className="aster-sidebar__label">Student portal</p>
-        <nav aria-label="Student portal sections">
-          {visibleNavigation.map((item) => (
-            <Link
-              className={active === item.key ? "aster-nav-link--active" : undefined}
-              href={item.href}
-              aria-current={active === item.key ? "page" : undefined}
-              onClick={() => setMenuOpen(false)}
-              key={item.key}
-            >
-              <span aria-hidden="true">{item.symbol}</span>
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        {!delegateActor && identity.data.rewards ? (
-          <section
-            className="aster-sidebar__rewards"
-            aria-label={`${identity.data.rewards.pointName} balance`}
+        <div className="aster-sidebar__brand-row brand-row">
+          <Link
+            className="aster-brand"
+            href={portalHome}
+            aria-label={`${tenant.name} student portal`}
+            onClick={() => setMenuOpen(false)}
           >
-            <span aria-hidden="true">✦</span>
-            <div>
-              <small>{identity.data.rewards.pointName}</small>
-              <strong>{identity.data.rewards.lifetimePoints} points</strong>
-              <p>
-                {formatTenantMoney(
-                  identity.data.rewards.bookstoreCreditCents,
-                  tenant,
-                )}{" "}
-                bookstore credit
-              </p>
-            </div>
-          </section>
-        ) : null}
-        {(!delegateActor || delegateActor.scopes.includes("help") || delegateActor.scopes.includes("appointments")) ? <div className="aster-sidebar__support">
-          <span aria-hidden="true">?</span>
-          <div>
-            <strong>Your student support team</strong>
-            <p>
-              {advisorContact.hours || `${tenant.shortName} advisors are available to help.`}
-            </p>
-            <div className="aster-sidebar__support-links">
-              {!delegateActor || delegateActor.scopes.includes("help")
-                ? advisorContact.email
-                  ? <a href={`mailto:${advisorContact.email}`}>{advisorContact.email}</a>
-                  : advisorContact.url
-                    ? <a href={tenantRuntime.href(advisorContact.url)}>{advisorContact.label}</a>
-                    : null
-                : null}
-              {!delegateActor || delegateActor.scopes.includes("appointments") ? (
-                <Link href="/appointments">Book an advisor</Link>
-              ) : null}
-            </div>
+            <span className="brand-mark" aria-hidden="true">
+              <img className="audentra-a-mark" src="/a-mark-only.png" width="40" height="40" alt="" />
+            </span>
+            <span className="brand-name">
+              <strong>{tenant.shortName}</strong>
+              <span>New Student Portal</span>
+            </span>
+          </Link>
+          <button
+            className="aster-sidebar__close nav-close icon-button compact"
+            type="button"
+            aria-label="Close portal menu"
+            onClick={() => setMenuOpen(false)}
+          >
+            <StudentPortalIcon name="close" size={19} />
+          </button>
+        </div>
+        <nav className="main-nav" aria-label="Student portal sections">
+          <div className="aster-nav-group aster-nav-group--primary nav-list">
+            {primaryNavigation.map((item) => (
+              <Link
+                className={`nav-item${active === item.key ? " aster-nav-link--active active" : ""}`}
+                href={item.href}
+                aria-current={active === item.key ? "page" : undefined}
+                onClick={() => setMenuOpen(false)}
+                key={item.key}
+              >
+                <span className="nav-icon" aria-hidden="true"><StudentPortalIcon name={item.icon} /></span>
+                <span className="nav-label">{item.label}</span>
+              </Link>
+            ))}
           </div>
-        </div> : null}
+          {navigationGroups.map((group) => {
+            const items = visibleNavigation.filter((item) => item.group === group.id);
+            if (items.length === 0) return null;
+            const holdsActive = items.some((item) => item.key === active);
+            const groupOpen = Boolean(openNavigationGroups[group.id] || holdsActive);
+            return (
+              <section className="aster-nav-group nav-group" key={group.id}>
+                <button
+                  className={`nav-group-toggle${holdsActive ? " holds-active" : ""}`}
+                  type="button"
+                  aria-expanded={groupOpen}
+                  aria-controls={`portal-nav-group-${group.id}`}
+                  onClick={() =>
+                    setOpenNavigationGroups((current) => ({
+                      ...current,
+                      [group.id]: !current[group.id],
+                    }))
+                  }
+                >
+                  <span>{group.label}</span>
+                  <span className={`group-chevron${groupOpen ? " open" : ""}`}>
+                    <StudentPortalIcon name="chevron" size={14} />
+                  </span>
+                </button>
+                <div className="nav-sublist" id={`portal-nav-group-${group.id}`} hidden={!groupOpen}>
+                  {items.map((item) => (
+                    <Link
+                      className={`nav-item${active === item.key ? " aster-nav-link--active active" : ""}`}
+                      href={item.href}
+                      aria-current={active === item.key ? "page" : undefined}
+                      onClick={() => setMenuOpen(false)}
+                      key={item.key}
+                    >
+                      <span className="nav-icon" aria-hidden="true"><StudentPortalIcon name={item.icon} /></span>
+                      <span className="nav-label">{item.label}</span>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+          {afterGroupNavigation.length > 0 ? (
+            <div className="nav-list aster-nav-after-groups">
+              {afterGroupNavigation.map((item) => (
+                <Link
+                  className={`nav-item${active === item.key ? " aster-nav-link--active active" : ""}`}
+                  href={item.href}
+                  aria-current={active === item.key ? "page" : undefined}
+                  onClick={() => setMenuOpen(false)}
+                  key={item.key}
+                >
+                  <span className="nav-icon" aria-hidden="true"><StudentPortalIcon name={item.icon} /></span>
+                  <span className="nav-label">{item.label}</span>
+                </Link>
+              ))}
+            </div>
+          ) : null}
+        </nav>
+        <div className="aster-sidebar__bottom sidebar-bottom">
+          {(!delegateActor || delegateActor.scopes.includes("help") || delegateActor.scopes.includes("appointments")) ? <div className="aster-sidebar__support">
+            <span aria-hidden="true"><StudentPortalIcon name="help" size={17} /></span>
+            <div>
+              <strong>Your student support team</strong>
+              <p>
+                {advisorContact.hours || `${tenant.shortName} advisors are available to help.`}
+              </p>
+              <div className="aster-sidebar__support-links">
+                {!delegateActor || delegateActor.scopes.includes("help")
+                  ? advisorContact.email
+                    ? <a href={`mailto:${advisorContact.email}`}>{advisorContact.email}</a>
+                    : advisorContact.url
+                      ? <a href={tenantRuntime.href(advisorContact.url)}>{advisorContact.label}</a>
+                      : null
+                  : null}
+                {!delegateActor || delegateActor.scopes.includes("appointments") ? (
+                  <Link href="/appointments">Book an advisor</Link>
+                ) : null}
+              </div>
+            </div>
+          </div> : null}
+          <div className="aster-sidebar__utilities">
+            {utilityNavigation.map((item) => (
+              <Link
+            className={`${item.key === "profile" ? "profile-chip" : "nav-item"}${active === item.key ? " aster-nav-link--active active" : ""}`}
+                href={item.href}
+                aria-current={active === item.key ? "page" : undefined}
+                onClick={() => setMenuOpen(false)}
+                key={item.key}
+              >
+                {item.key === "profile" ? (
+                  <img
+                    className="avatar avatar-md"
+                    src="/people/maya-johnson.webp"
+                    width="40"
+                    height="40"
+                    alt=""
+                  />
+                ) : (
+                  <span aria-hidden="true"><StudentPortalIcon name={item.icon} /></span>
+                )}
+                <span className={item.key === "profile" ? "profile-name" : undefined}>
+                  <strong>{item.key === "profile" ? identity.data.student.preferredName : item.label}</strong>
+                  {item.key === "profile" ? <span>{delegateActor ? relationshipLabel(delegateActor.relationship) : "Student"}</span> : null}
+                </span>
+                {item.key === "profile" ? <span className="chip-chevron" aria-hidden="true"><StudentPortalIcon name="chevron" size={16} /></span> : null}
+              </Link>
+            ))}
+          </div>
+          <p className="aster-powered-by powered-by">
+            <span>Powered by</span>
+            <span className="audentra-powered-logo" aria-hidden="true">
+              <img src="/main-logo.png" width="84" height="84" alt="" />
+            </span>
+          </p>
+        </div>
       </aside>
 
-      <main id="main-content" className="aster-main">
-        <header className="aster-page-heading">
-          <div>
+      <main id="main-content" className="aster-main content-wrap">
+        <header className="aster-page-heading page-hero">
+          <div className="aster-page-heading__copy hero-copy">
             <p className="eyebrow">{tenantRuntime.copy(eyebrow)}</p>
-            <h1>{tenantRuntime.copy(title)}</h1>
-            <p>{tenantRuntime.copy(description)}</p>
+            <h1>{tenantRuntime.copy(presentedTitle)}</h1>
+            <p className="hero-lede">{tenantRuntime.copy(presentedDescription)}</p>
+          </div>
+          <div className="aster-page-heading__figure hero-motif" aria-hidden="true">
+            <i className="aster-orbit-ring aster-orbit-ring--outer orbit-ring ring-one" />
+            <i className="aster-orbit-ring aster-orbit-ring--inner orbit-ring ring-two" />
+            <span className="orbit-core"><StudentPortalIcon name={activeNavigationItem?.icon ?? "home"} size={30} /></span>
+            <b className="aster-orbit-dot aster-orbit-dot--one spark-dot one" />
+            <b className="aster-orbit-dot aster-orbit-dot--two spark-dot two" />
+            <b className="aster-orbit-dot aster-orbit-dot--three spark-dot three" />
           </div>
           {actions ? <div className="aster-page-actions">{actions}</div> : null}
         </header>
@@ -831,20 +1082,7 @@ export function PortalShell({
           </nav>
         </footer>
       </main>
-
-      <nav className="aster-mobile-nav" aria-label="Mobile portal navigation">
-        {visibleNavigation.slice(0, 5).map((item) => (
-          <Link
-            className={active === item.key ? "aster-mobile-nav__active" : undefined}
-            href={item.href}
-            aria-current={active === item.key ? "page" : undefined}
-            key={item.key}
-          >
-            <span aria-hidden="true">{item.symbol}</span>
-            {item.shortLabel}
-          </Link>
-        ))}
-      </nav>
+      </section>
 
       {active !== "edward" && tenant.capabilities.assistant !== false &&
       (!delegateActor || delegateActor.scopes.includes("edward")) ? (

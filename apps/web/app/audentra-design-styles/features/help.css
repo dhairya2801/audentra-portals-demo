@@ -1,0 +1,685 @@
+/* ==========================================================================
+ * Help — ENR-182.
+ * ==========================================================================*/
+
+/* ─────────────────────────────────────────────────────────────
+   Help — ENR-182
+
+   Two halves that have to read as one page: what Aster has already published,
+   and a question that becomes an object with a state. Nothing here paints an
+   edge to mark a state — the chip carries it, which is the only marker that
+   survives a flattened list without fighting the card holding it.
+   ───────────────────────────────────────────────────────────── */
+
+/* The section's standing, and the way to add to it, at the head of the list
+   both are about. This was a summary panel above the page until the Jam of
+   2026-08-21 — a count beside a button standing in for the person every other
+   section shows, and this is the one section that may not name one (ENR-177
+   AC 3). A section that cannot fill the panel's second cell does not have a
+   panel; it has a card head. */
+.requests-standing {
+  align-items: center;
+  gap: var(--space-6);
+  display: flex;
+}
+
+.request-row {
+  cursor: pointer;
+  text-align: left;
+  grid-template-columns: 100px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-7);
+  padding-top: var(--space-7);
+  padding-bottom: var(--space-7);
+  transition: background var(--dur-fast) var(--ease);
+  display: grid;
+}
+
+.request-row:hover {
+  background: var(--canvas);
+}
+
+.request-row:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: -2px;
+}
+
+/* The state, and the only place it is drawn. Neutral is the card's own white
+   with a hairline, so `Received` reads as a fact rather than as a warning. */
+.request-chip {
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  border-radius: var(--radius-pill);
+  justify-self: start;
+  padding: var(--space-2) var(--space-5);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+}
+
+.request-chip.neutral {
+  color: var(--muted);
+  background: var(--canvas);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.request-chip.progress {
+  color: var(--purple-dark);
+  background: var(--purple-soft);
+}
+
+.request-chip.act {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.request-chip.done {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.request-body {
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  display: flex;
+}
+
+.request-body strong {
+  letter-spacing: var(--ls-snug);
+  font-size: var(--fs-body);
+}
+
+.request-meta {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+}
+
+.request-trail {
+  text-align: right;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+  display: flex;
+}
+
+.request-when {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+}
+
+.request-unread {
+  color: var(--purple-dark);
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-bold);
+  display: flex;
+}
+
+.request-unread i {
+  background: var(--purple);
+  border-radius: var(--radius-pill);
+  width: 6px;
+  height: 6px;
+  display: block;
+}
+
+.request-open {
+  color: var(--muted);
+  display: grid;
+}
+
+/* --- asking: topic, then where it goes, then the box --- */
+
+.ask-form {
+  flex-direction: column;
+  gap: var(--space-8);
+  display: flex;
+}
+
+/* `min-width: 0` because a fieldset's default is `min-content`, which refuses
+   to shrink and pushes the whole page into a horizontal scroll at 380px. */
+.ask-step {
+  border: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.ask-step legend, .ask-step label {
+  letter-spacing: var(--ls-snug);
+  margin-bottom: var(--space-4);
+  padding: 0;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semi);
+  display: block;
+}
+
+.ask-input, .ask-textarea {
+  color: var(--ink);
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-tile);
+  width: 100%;
+  padding: var(--space-5) var(--space-6);
+  font-family: inherit;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.ask-textarea {
+  resize: vertical;
+  min-height: 98px;
+}
+
+.ask-input:focus, .ask-textarea:focus {
+  border-color: color-mix(in srgb, var(--purple) 35%, var(--line));
+  outline: none;
+}
+
+.ask-input::placeholder, .ask-textarea::placeholder {
+  color: var(--muted);
+}
+
+/* Where it goes, before a character is typed — ENR-177 AC 7. */
+.ask-route {
+  background: var(--purple-soft);
+  border-radius: var(--radius-row);
+  align-items: flex-start;
+  gap: var(--space-6);
+  padding: var(--space-7) var(--space-7);
+  display: flex;
+}
+
+.route-icon {
+  color: var(--purple-dark);
+  background: var(--surface);
+  border-radius: var(--radius-tile);
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  display: grid;
+}
+
+.ask-route strong {
+  letter-spacing: var(--ls-snug);
+  margin: var(--space-1) 0 var(--space-1);
+  font-size: var(--fs-h4);
+  display: block;
+}
+
+.ask-route p {
+  color: color-mix(in srgb, var(--ink) 70%, var(--purple));
+  margin: 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.ask-route .route-meta {
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-8);
+  margin-top: var(--space-4);
+  font-size: var(--fs-meta);
+  display: flex;
+}
+
+.ask-route .route-meta span {
+  align-items: center;
+  gap: var(--space-2);
+  display: flex;
+}
+
+/* The guide, offered before the question costs anybody two business days. */
+.ask-guide {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-row);
+  overflow: hidden;
+}
+
+.guide-toggle {
+  cursor: pointer;
+  text-align: left;
+  background: none;
+  border: 0;
+  align-items: center;
+  gap: var(--space-6);
+  width: 100%;
+  padding: var(--space-6) var(--space-7);
+  transition: background var(--dur-fast) var(--ease);
+  display: flex;
+}
+
+.guide-toggle:hover {
+  background: var(--canvas);
+}
+
+.guide-toggle:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: -2px;
+}
+
+.guide-toggle > span:nth-child(2) {
+  flex-direction: column;
+  flex: 1;
+  gap: var(--space-1);
+  min-width: 0;
+  display: flex;
+}
+
+.guide-toggle strong {
+  letter-spacing: var(--ls-snug);
+  font-size: var(--fs-body);
+}
+
+.guide-office {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+}
+
+.guide-chevron {
+  color: var(--muted);
+  flex: none;
+  transition: rotate var(--dur-fast) var(--ease);
+  display: grid;
+}
+
+.guide-chevron.open {
+  rotate: 180deg;
+}
+
+.guide-body {
+  padding: 0 var(--space-7) var(--space-7) 58px;
+}
+
+.guide-body p {
+  color: var(--muted);
+  margin: 0 0 var(--space-4);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.guide-body .guide-source {
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  margin: 0;
+  padding-top: var(--space-4);
+  font-size: var(--fs-meta);
+  font-style: italic;
+}
+
+/* In the guide list the toggle bleeds back out to the card's own edges, so the
+   hover fills the row the way the hairline spans it. `--card-pad` is the card's
+   — a row never hard-codes it. */
+.guide-rows .guide-toggle {
+  width: calc(100% + var(--card-pad) * 2);
+  margin: 0 calc(-1 * var(--card-pad));
+  padding: var(--space-7) var(--card-pad);
+}
+
+.guide-rows .guide-body {
+  padding: 0 0 var(--space-8) var(--space-13);
+}
+
+.ask-send {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-5) var(--space-7);
+  display: flex;
+}
+
+/* ENR-177 AC 6, in the place a student would otherwise assume the opposite. */
+.ask-channel-note {
+  color: var(--muted);
+  flex: 1;
+  min-width: 210px;
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+}
+
+/* --- receipt: the half of the page the card says is missing --- */
+
+.ask-receipt {
+  background: var(--green-soft);
+  border-radius: var(--radius-row);
+  padding: var(--space-10);
+}
+
+.receipt-tick {
+  color: var(--surface);
+  background: var(--green);
+  border-radius: var(--radius-row);
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  margin-bottom: var(--space-7);
+  display: grid;
+}
+
+.ask-receipt h3 {
+  letter-spacing: var(--ls-tight);
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-h2);
+}
+
+.receipt-subject {
+  color: var(--green);
+  margin: 0 0 var(--space-8);
+  font-size: var(--fs-body);
+}
+
+.ask-receipt .panel-label {
+  color: var(--green);
+  margin-bottom: var(--space-5);
+  display: block;
+}
+
+.receipt-next {
+  counter-reset: step;
+  margin: 0 0 var(--space-9);
+  padding: 0;
+  list-style: none;
+}
+
+.receipt-next li {
+  counter-increment: step;
+  color: var(--muted);
+  padding-left: var(--space-11);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  position: relative;
+}
+
+.receipt-next li + li {
+  margin-top: var(--space-5);
+}
+
+.receipt-next li:before {
+  content: counter(step);
+  color: var(--green);
+  background: var(--surface);
+  border-radius: var(--radius-pill);
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-bold);
+  display: grid;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.receipt-next strong {
+  color: var(--ink);
+  font-size: var(--fs-body);
+  display: block;
+}
+
+.receipt-actions {
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  display: flex;
+}
+
+/* --- the rail --- */
+
+/* Housing's anchor card is the same shape — a label, a figure, a line of copy
+   and facts under a hairline — so it takes the same four rules rather than a
+   second set of its own. ENR-207. */
+.reply-card strong,
+.deadline-card strong {
+  letter-spacing: var(--ls-tight);
+  margin: var(--space-1) 0 var(--space-5);
+  font-size: var(--fs-display);
+  display: block;
+}
+
+.reply-card p,
+.deadline-card p {
+  margin: 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.reply-card .reply-note,
+.deadline-card .reply-note {
+  border-top: 1px solid color-mix(in srgb, var(--surface) 14%, transparent);
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  font-size: var(--fs-meta);
+  display: flex;
+}
+
+.reply-card .reply-note svg,
+.deadline-card .reply-note svg {
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+/* Two facts under one hairline, not two divided rows. */
+.deadline-card .reply-note + .reply-note {
+  border-top: 0;
+  margin-top: var(--space-3);
+  padding-top: 0;
+}
+
+.office-list {
+  margin: var(--space-7) 0 var(--space-7);
+  padding: 0;
+  list-style: none;
+}
+
+.office-list li {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-5);
+}
+
+.office-list li + li {
+  margin-top: var(--space-5);
+}
+
+.office-list strong {
+  letter-spacing: var(--ls-snug);
+  font-size: var(--fs-body);
+  display: block;
+}
+
+.office-list span {
+  color: var(--muted);
+  margin-top: var(--space-1);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  display: block;
+}
+
+.office-list .office-meta {
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  font-size: var(--fs-meta);
+  display: flex;
+}
+
+.office-list .office-meta svg {
+  flex: none;
+}
+
+.office-card .secondary-button {
+  width: 100%;
+  justify-content: center;
+}
+
+/* --- the request, opened --- */
+
+.request-state {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4) var(--space-6);
+  margin: var(--space-7) 0 var(--space-9);
+  display: flex;
+}
+
+.request-state p {
+  color: var(--muted);
+  flex: 1;
+  min-width: 190px;
+  margin: 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.reopened-note {
+  color: var(--purple-dark);
+  background: var(--purple-soft);
+  border-radius: var(--radius-tile);
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-8);
+  padding: var(--space-5) var(--space-6);
+  font-size: var(--fs-copy);
+  display: flex;
+}
+
+/* The path a request has taken. One list holds what was written and what
+   happened, so the state can never disagree with the conversation under it. */
+.request-thread {
+  margin: 0 0 var(--space-9);
+  padding: 0 0 0 var(--space-10);
+  list-style: none;
+  position: relative;
+}
+
+.request-thread:before {
+  content: "";
+  background: var(--line);
+  width: 1px;
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  left: 4px;
+}
+
+.request-thread li {
+  position: relative;
+}
+
+.request-thread li + li {
+  margin-top: var(--space-8);
+}
+
+.thread-dot {
+  background: var(--line);
+  border: 2px solid var(--surface);
+  border-radius: var(--radius-pill);
+  width: 9px;
+  height: 9px;
+  position: absolute;
+  top: 4px;
+  left: -21px;
+}
+
+.thread-message.student .thread-dot {
+  background: var(--ink);
+}
+
+.thread-message.office .thread-dot {
+  background: var(--purple);
+}
+
+.thread-from {
+  color: var(--ink);
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-3);
+  font-size: var(--fs-copy);
+  font-weight: var(--fw-semi);
+  display: flex;
+}
+
+.thread-from span {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+}
+
+.thread-message div p {
+  color: var(--muted);
+  margin: 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.thread-message div p + p {
+  margin-top: var(--space-4);
+}
+
+.thread-event p {
+  color: var(--muted);
+  margin: 0;
+  font-size: var(--fs-meta);
+}
+
+.thread-event p span {
+  color: var(--muted);
+  opacity: .7;
+  margin-left: var(--space-2);
+}
+
+.reply-panel {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-9);
+}
+
+.reply-panel .panel-label {
+  margin-bottom: var(--space-4);
+  display: block;
+}
+
+.reply-panel .primary-button {
+  margin-top: var(--space-6);
+}
+
+/* ── Responsive: designed at 380px first ── */
+
+@media (width<=620px) {
+  .request-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    row-gap: var(--space-4);
+  }
+  .request-chip {
+    grid-column: 1 / -1;
+  }
+  .request-trail {
+    align-self: center;
+  }
+  /* Campus filters become a scrollable strip at this width because they are
+     optional and a hidden one costs nothing. A topic is a required step, so it
+     wraps instead: an option the student cannot see is an office they cannot
+     reach. */
+  .ask-step .filter-chips {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+  .ask-send .primary-button,
+  .receipt-actions .primary-button,
+  .receipt-actions .secondary-button {
+    flex: 1 0 100%;
+    justify-content: center;
+  }
+  .guide-body {
+    padding-left: var(--space-7);
+  }
+  .guide-rows .guide-body {
+    padding-left: 0;
+  }
+  .ask-receipt {
+    padding: var(--space-9);
+  }
+}

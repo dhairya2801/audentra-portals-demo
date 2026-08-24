@@ -408,3 +408,51 @@
     min-height: 92px;
   }
 }
+
+.calendar {
+  --calendar-enrollment: var(--portal-accent, #6854d9);
+  --calendar-campus: var(--portal-green, #227a5b);
+  --calendar-financial: var(--portal-amber, #a65d19);
+  --calendar-payment: var(--portal-purple-ink, #45358e);
+  border-color: var(--portal-line, #e6e7ee);
+  border-radius: 18px;
+  background: var(--portal-surface, #fff);
+  box-shadow: var(--portal-shadow-card, 0 7px 22px rgb(31 37 58 / 5%));
+}
+
+.header p,
+.legend,
+.monthLabel span,
+.more,
+.emptyDetail p {
+  color: var(--portal-muted, #687086);
+}
+
+.header h2,
+.monthLabel strong {
+  color: var(--portal-ink, #152037);
+}
+
+.controls button {
+  border-color: var(--portal-accent-line, #ddd8f7);
+  color: var(--portal-accent-strong, #45358e);
+  background: var(--portal-surface, #fff);
+}
+
+.controls button:hover,
+.controls button:focus-visible {
+  border-color: var(--portal-accent, #6854d9);
+  background: var(--portal-accent-soft, #efedff);
+}
+
+.layout,
+.grid,
+.weekday,
+.day {
+  border-color: var(--portal-line-soft, #eff0f4);
+}
+
+.currentDay > time,
+.detail a {
+  background: var(--portal-accent-strong, #45358e);
+}

@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
+import "@fontsource-variable/geist";
+import "@fontsource-variable/geist-mono";
 import { ServerStateProvider } from "./components/server-state-provider";
 import { TenantProvider } from "./components/tenant-provider";
 import "./globals.css";
+import "./audentra-design-styles/student.css";
 
 const vercelHost =
   process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim() ||
@@ -20,7 +23,7 @@ export const metadata: Metadata = {
     "Audentra helps institutions identify enrollment barriers early, prioritize students, and take the right action.",
   applicationName: "Audentra Higher Education Intelligence Platform",
   icons: {
-    icon: [{ url: "/icon.png", type: "image/png", sizes: "512x512" }],
+    icon: [{ url: "/icon.png", type: "image/png", sizes: "1254x1254" }],
     shortcut: "/icon.png",
   },
   openGraph: {
