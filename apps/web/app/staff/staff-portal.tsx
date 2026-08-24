@@ -38,7 +38,6 @@ import {
   draftStaffConfigurationWithEdward,
   getStaffInquiryThread,
   getStaffOperationsWorkspace,
-  previewStaffEdward,
   signOutStaff,
   simulateStaffOutreach,
   updateStaffClub,
@@ -3950,125 +3949,33 @@ function OutreachView({
   );
 }
 
-function EdwardView() {
-  const action = useApiAction(previewStaffEdward);
-  const [message, setMessage] = useState(
-    "Show me students with incomplete deposits, then prepare a voice call outreach for 100 of them.",
-  );
-  const [answer, setAnswer] = useState<Awaited<
-    ReturnType<typeof previewStaffEdward>
-  > | null>(null);
-  const ask = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    try {
-      setAnswer(await action.run({ message }));
-    } catch {
-      setAnswer(null);
-    }
-  };
+function EdwardView({ staffName }: { staffName: string }) {
   return (
     <>
       <PageHeading
         view="edward"
-        action={<StatusPill tone="preview">Preview-only execution</StatusPill>}
+        action={<StatusPill tone="success">Read-only assistant</StatusPill>}
       />
-      <div className="staff-edward-layout">
+      <div className="edward-page-layout">
+        <StaffEdwardAssistant staffName={staffName} variant="embedded" />
         <aside className="staff-edward-context">
           <div className="staff-edward-context__mark">E</div>
-          <h2>Edward can work across</h2>
+          <h2>Edward reads across</h2>
           <ul>
             <li>Student and cohort records</li>
             <li>Enrollment tasks and documents</li>
-            <li>Knowledge base and core plays</li>
-            <li>Campus and portal content</li>
+            <li>Your Action Center queue</li>
+            <li>Staff guidance and action rules</li>
             <li>Student inquiries and draft replies</li>
           </ul>
           <div>
             <strong>Safety model</strong>
             <p>
-              Reads can happen immediately. Writes are proposed as a plan and
-              require staff confirmation. External contact stays disabled.
+              Edward is read-only. It can inspect canonical records and draft
+              language, but it cannot change data or contact a student.
             </p>
           </div>
         </aside>
-        <section className="staff-edward-chat">
-          <header>
-            <div>
-              <span>E</span>
-              <div>
-                <strong>Edward for staff</strong>
-                <small>Operational copilot · preview</small>
-              </div>
-            </div>
-            <StatusPill tone="success">Workspace connected</StatusPill>
-          </header>
-          <div className="staff-edward-chat__conversation">
-            <div className="staff-edward-bubble staff-edward-bubble--assistant">
-              <strong>Edward</strong>
-              <p>
-                I can help you inspect staff data, prepare changes, and build a
-                reviewable execution plan. What would you like to accomplish?
-              </p>
-            </div>
-            {answer ? (
-              <>
-                <div className="staff-edward-bubble staff-edward-bubble--user">
-                  <strong>You</strong>
-                  <p>{message}</p>
-                </div>
-                <div className="staff-edward-bubble staff-edward-bubble--assistant">
-                  <strong>Edward</strong>
-                  <p>{answer.message}</p>
-                  <div className="staff-edward-plan">
-                    {answer.plan.map((step, index) => (
-                      <article key={`${step.capability}-${index}`}>
-                        <span>{index + 1}</span>
-                        <div>
-                          <strong>{step.label}</strong>
-                          <small>{step.capability.replaceAll("_", " ")}</small>
-                        </div>
-                        <StatusPill
-                          tone={
-                            step.status === "available"
-                              ? "success"
-                              : step.status === "simulation_only"
-                                ? "preview"
-                                : "warning"
-                          }
-                        >
-                          {step.status.replaceAll("_", " ")}
-                        </StatusPill>
-                      </article>
-                    ))}
-                  </div>
-                </div>
-              </>
-            ) : null}
-          </div>
-          <form onSubmit={ask}>
-            <textarea
-              value={message}
-              maxLength={2000}
-              aria-label="Ask Edward"
-              onChange={(event) => setMessage(event.target.value)}
-            />
-            {action.message ? (
-              <p className="field-error" role="alert">
-                {action.message}
-              </p>
-            ) : null}
-            <footer>
-              <small>Edward will not contact students in this preview.</small>
-              <button
-                className="button button--primary"
-                type="submit"
-                disabled={action.status === "loading" || !message.trim()}
-              >
-                {action.status === "loading" ? "Preparing plan…" : "Prepare plan"}
-              </button>
-            </footer>
-          </form>
-        </section>
       </div>
     </>
   );
@@ -4342,9 +4249,12 @@ function StaffWorkspaceShell({
         ) : view === "outreach" ? (
           <OutreachView workspace={workspace} refresh={refresh} />
         ) : (
-          <EdwardView />
+          <EdwardView staffName={workspace.currentStaff.name} />
         )}
       </main>
+      {view !== "edward" ? (
+        <StaffEdwardAssistant staffName={workspace.currentStaff.name} />
+      ) : null}
     </div>
   );
 }
@@ -4408,12 +4318,9 @@ export default function StaffPortal() {
     );
   }
   return (
-    <>
-      <StaffWorkspaceShell
-        workspace={workspace.data}
-        refresh={workspace.refresh}
-      />
-      <StaffEdwardAssistant staffName={workspace.data.currentStaff.name} />
-    </>
+    <StaffWorkspaceShell
+      workspace={workspace.data}
+      refresh={workspace.refresh}
+    />
   );
 }

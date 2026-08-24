@@ -94,6 +94,178 @@
   gap: 0.75rem;
 }
 
+/* --- durable user feedback --------------------------------------------- */
+
+.feedbackIndex {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0.85rem 1rem 0;
+}
+
+.feedbackCount {
+  margin: 0.18rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.68rem;
+}
+
+.feedbackFilters {
+  display: grid;
+  grid-template-columns: minmax(10rem, 2fr) repeat(4, minmax(7rem, 1fr)) auto;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+  padding: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: var(--paper);
+}
+
+.feedbackFilters label {
+  display: grid;
+  gap: 0.22rem;
+  color: var(--ink-soft);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.feedbackFilters input,
+.feedbackFilters select {
+  min-width: 0;
+  min-height: 2rem;
+  padding: 0.32rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 0.38rem;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.68rem;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.feedbackFilters > button {
+  align-self: end;
+  min-height: 2rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid #b68a14;
+  border-radius: 0.4rem;
+  background: #e8ba35;
+  color: #251b03;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.64rem;
+  font-weight: 800;
+}
+
+.feedbackList {
+  display: grid;
+  max-height: calc(100dvh - 15rem);
+  min-height: 18rem;
+  margin: 0 -1rem;
+  overflow-y: auto;
+  border-top: 1px solid var(--line);
+}
+
+.feedbackRow {
+  display: grid;
+  gap: 0.32rem;
+  width: 100%;
+  padding: 0.8rem 1rem;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.feedbackRow:hover,
+.feedbackRowActive {
+  background: #f4f7fc;
+}
+
+.feedbackRowActive {
+  box-shadow: inset 3px 0 var(--audentra-blue);
+}
+
+.feedbackRowHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.feedbackRowHead strong {
+  font-size: 0.67rem;
+}
+
+.feedbackRowHead time {
+  color: var(--ink-soft);
+  font-size: 0.6rem;
+}
+
+.feedbackQuestion {
+  overflow: hidden;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feedbackAnswer {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.feedbackComment {
+  padding: 0.38rem 0.48rem;
+  border-left: 2px solid #d5a92e;
+  background: #fffbeb;
+  color: #6a5317;
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.feedbackContext {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.feedbackContext > div {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.25fr) minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+.feedbackContext dt {
+  color: var(--ink-soft);
+  font-size: 0.64rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.feedbackContext dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 1280px) {
+  .feedbackFilters {
+    grid-template-columns: repeat(3, minmax(8rem, 1fr));
+  }
+}
+
 /* --- turn timeline ------------------------------------------------------ */
 
 .timeline {

@@ -33,6 +33,8 @@ import type {
   DeferStudentExperienceUpdatesInput,
   DeferStudentExperienceUpdatesResult,
   DecideStudentExperienceUpdateInput,
+  EdwardFeedbackInput,
+  EdwardResponseFeedback,
   StudentAppointment,
   StudentAppointmentList,
   StudentAcademics,
@@ -1627,6 +1629,21 @@ export function askEdward(
   );
 }
 
+export function submitStudentEdwardFeedback(
+  assistantMessageId: string,
+  input: EdwardFeedbackInput,
+) {
+  return request<EdwardResponseFeedback>(
+    `/v1/student/assistant/messages/${encodeURIComponent(assistantMessageId)}/feedback`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
 export function createStaffAssistantConversation() {
   return request<StaffAssistantConversation>(
     "/v1/staff/assistant/conversations",
@@ -1657,6 +1674,24 @@ export function askStaffEdward(input: AskStaffEdwardInput, signal?: AbortSignal)
       // Staff Edward is read-only; nothing on the student record changes.
       notifyStudentRecordChanged: false,
     },
+  );
+}
+
+export function submitStaffEdwardFeedback(
+  assistantMessageId: string,
+  input: EdwardFeedbackInput,
+) {
+  return request<EdwardResponseFeedback>(
+    `/v1/staff/assistant/messages/${encodeURIComponent(assistantMessageId)}/feedback`,
+    {
+      method: "PATCH",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
   );
 }
 

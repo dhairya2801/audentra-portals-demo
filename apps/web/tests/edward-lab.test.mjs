@@ -68,6 +68,10 @@ test("production build serves neither the lab page nor its proxy routes", async 
   assert.equal(proxyList.status, 404);
   const proxyDetail = await renderBuiltWorker("/api/edward-lab/traces/some-trace-id");
   assert.equal(proxyDetail.status, 404);
+  const feedback = await renderBuiltWorker(
+    "/api/edward-lab/feedback?assistantKind=student",
+  );
+  assert.equal(feedback.status, 404);
   const personas = await renderBuiltWorker("/api/edward-lab/personas");
   assert.equal(personas.status, 404);
 });

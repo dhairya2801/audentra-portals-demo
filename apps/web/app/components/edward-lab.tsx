@@ -20,12 +20,13 @@ import {
   type TraceListEntry,
 } from "../lib/edward-lab";
 import { EdwardAssistant, type EdwardTurnEvent } from "./edward-assistant";
+import { EdwardFeedbackLab } from "./edward-feedback-lab";
 import { EdwardLabCompare } from "./edward-lab-compare";
 import { EdwardTraceInspector } from "./edward-trace-inspector";
 import styles from "./edward-lab.module.css";
 
 /** "chat" is the original trace dashboard; "compare" runs one question twice. */
-type LabView = "chat" | "compare";
+type LabView = "chat" | "compare" | "feedback";
 
 interface LabPersona {
   name: string;
@@ -200,7 +201,7 @@ export function EdwardLab() {
         <h1>Edward Lab</h1>
         <span className={styles.devBadge}>Developer tool</span>
         <div className={styles.viewTabs} role="tablist" aria-label="Lab view">
-          {(["chat", "compare"] as const).map((candidate) => (
+          {(["chat", "compare", "feedback"] as const).map((candidate) => (
             <button
               key={candidate}
               type="button"
@@ -209,7 +210,11 @@ export function EdwardLab() {
               className={view === candidate ? styles.viewTabActive : styles.viewTab}
               onClick={() => setView(candidate)}
             >
-              {candidate === "chat" ? "Chat + trace" : "Normal vs deterministic"}
+              {candidate === "chat"
+                ? "Chat + trace"
+                : candidate === "compare"
+                  ? "Normal vs deterministic"
+                  : "User Feedback"}
             </button>
           ))}
         </div>
@@ -256,7 +261,9 @@ export function EdwardLab() {
           {labError}
         </div>
       ) : null}
-      {view === "compare" ? (
+      {view === "feedback" ? (
+        <EdwardFeedbackLab assistantKind="student" />
+      ) : view === "compare" ? (
         <EdwardLabCompare resetKey={`${activePersona}:${chatEpoch}`} />
       ) : (
       <div className={styles.shell}>

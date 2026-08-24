@@ -31,6 +31,7 @@ import {
   createStaffAssistantConversation,
 } from "../lib/api-client";
 import { AssistantBlocks } from "./assistant-blocks";
+import { EdwardResponseFeedback } from "./edward-response-feedback";
 import labStyles from "./edward-lab.module.css";
 
 const quickPrompts = [
@@ -46,6 +47,7 @@ interface StaffDisplayMessage {
   blocks?: StaffAssistantResponseBlock[];
   resolvedStudent?: { id: string; name: string } | null;
   provider?: string;
+  traceId?: string;
 }
 
 function conversationStorageKey(): string {
@@ -133,8 +135,14 @@ function StaffBlocks({
   );
 }
 
-export function StaffEdwardAssistant({ staffName }: { staffName: string }) {
-  const [open, setOpen] = useState(false);
+export function StaffEdwardAssistant({
+  staffName,
+  variant = "floating",
+}: {
+  staffName: string;
+  variant?: "floating" | "embedded";
+}) {
+  const [open, setOpen] = useState(variant === "embedded");
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -244,6 +252,7 @@ export function StaffEdwardAssistant({ staffName }: { staffName: string }) {
           ...(response.blocks?.length ? { blocks: response.blocks } : {}),
           resolvedStudent: response.resolvedStudent,
           provider: response.provider,
+          traceId: response.requestId,
         },
       ]);
     } catch (caught) {
@@ -265,8 +274,8 @@ export function StaffEdwardAssistant({ staffName }: { staffName: string }) {
   const panel = (
     <section
       id="staff-edward-panel"
-      className="edward-panel"
-      role="dialog"
+      className={`edward-panel${variant === "embedded" ? " edward-panel--embedded" : ""}`}
+      role={variant === "embedded" ? "region" : "dialog"}
       aria-label="Edward AI staff assistant"
     >
       <header className="edward-panel__header">
@@ -280,13 +289,17 @@ export function StaffEdwardAssistant({ staffName }: { staffName: string }) {
             read-only
           </span>
         </div>
-        <button
-          type="button"
-          aria-label="Close Edward"
-          onClick={() => setOpen(false)}
-        >
-          ×
-        </button>
+        {variant === "floating" ? (
+          <button
+            type="button"
+            aria-label="Close Edward"
+            onClick={() => setOpen(false)}
+          >
+            ×
+          </button>
+        ) : (
+          <span className="edward-secure">Private</span>
+        )}
       </header>
 
       <div ref={transcript} className="edward-transcript" aria-live="polite">
@@ -318,6 +331,15 @@ export function StaffEdwardAssistant({ staffName }: { staffName: string }) {
                   ? "AI-generated — verify before acting on a student record"
                   : "Built-in workspace guidance"}
               </small>
+            ) : null}
+            {message.role === "assistant" && message.traceId ? (
+              <EdwardResponseFeedback
+                target={{
+                  assistantKind: "staff",
+                  assistantMessageId: message.id,
+                  traceId: message.traceId,
+                }}
+              />
             ) : null}
           </article>
         ))}
@@ -380,6 +402,8 @@ export function StaffEdwardAssistant({ staffName }: { staffName: string }) {
       </form>
     </section>
   );
+
+  if (variant === "embedded") return panel;
 
   return (
     <>

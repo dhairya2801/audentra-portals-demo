@@ -34,6 +34,8 @@ import {
   type TraceListEntry,
 } from "../lib/edward-lab";
 import { AssistantBlocks } from "./assistant-blocks";
+import { EdwardFeedbackLab } from "./edward-feedback-lab";
+import { EdwardResponseFeedback } from "./edward-response-feedback";
 import { EdwardTraceInspector } from "./edward-trace-inspector";
 import styles from "./edward-lab.module.css";
 
@@ -54,6 +56,7 @@ interface StaffChatMessage {
   resolvedStudent?: { id: string; name: string } | null;
   provider?: string;
   model?: string | null;
+  traceId?: string;
 }
 
 async function labFetch(url: string, init?: RequestInit): Promise<Response> {
@@ -134,6 +137,7 @@ function StaffBlocks({
 }
 
 export function StaffEdwardLab() {
+  const [view, setView] = useState<"chat" | "feedback">("chat");
   const [messages, setMessages] = useState<StaffChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -319,6 +323,7 @@ export function StaffEdwardLab() {
           resolvedStudent: response.resolvedStudent,
           provider: response.provider,
           model: response.model,
+          traceId: response.requestId,
         },
       ]);
       recordTurn(normalized, response, null, performance.now() - startedAt);
@@ -341,6 +346,20 @@ export function StaffEdwardLab() {
       <header className={styles.topBar}>
         <h1>Staff Edward Lab</h1>
         <span className={styles.devBadge}>Developer tool</span>
+        <div className={styles.viewTabs} role="tablist" aria-label="Lab view">
+          {(["chat", "feedback"] as const).map((candidate) => (
+            <button
+              key={candidate}
+              type="button"
+              role="tab"
+              aria-selected={view === candidate}
+              className={view === candidate ? styles.viewTabActive : styles.viewTab}
+              onClick={() => setView(candidate)}
+            >
+              {candidate === "chat" ? "Chat + trace" : "User Feedback"}
+            </button>
+          ))}
+        </div>
         <div className={styles.personaControls}>
           <span className={styles.personaMeta}>
             Read-only staff assistant · dev staff actor ·{" "}
@@ -354,6 +373,9 @@ export function StaffEdwardLab() {
           </span>
         </div>
       </header>
+      {view === "feedback" ? (
+        <EdwardFeedbackLab assistantKind="staff" />
+      ) : (
       <div className={styles.shell}>
         <div className={styles.chatColumn}>
           <section className={`card ${styles.chatCard}`}>
@@ -403,6 +425,15 @@ export function StaffEdwardLab() {
                           {message.provider}
                           {message.model ? ` · ${message.model}` : ""}
                         </span>
+                      ) : null}
+                      {message.role === "assistant" && message.traceId ? (
+                        <EdwardResponseFeedback
+                          target={{
+                            assistantKind: "staff",
+                            assistantMessageId: message.id,
+                            traceId: message.traceId,
+                          }}
+                        />
                       ) : null}
                     </article>
                   ))
@@ -546,6 +577,7 @@ export function StaffEdwardLab() {
           </section>
         </div>
       </div>
+      )}
     </>
   );
 }

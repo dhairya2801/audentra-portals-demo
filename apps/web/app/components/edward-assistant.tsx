@@ -34,6 +34,7 @@ import {
   type EdwardCanonicalVoiceResponse,
 } from "../lib/edward-voice";
 import { AssistantBlocks } from "./assistant-blocks";
+import { EdwardResponseFeedback } from "./edward-response-feedback";
 import { useTenant } from "./tenant-provider";
 import styles from "./edward-assistant.module.css";
 
@@ -52,6 +53,7 @@ type DisplayMessage = EdwardChatMessage & {
   contextReceipts?: AskEdwardResponse["contextReceipts"];
   widgets?: EdwardActionWidget[];
   blocks?: AssistantResponseBlock[];
+  traceId?: string;
 };
 
 type Conversation = {
@@ -117,6 +119,7 @@ function persistedMessageToDisplay(
       : {}),
     ...(message.widgets.length ? { widgets: message.widgets } : {}),
     ...(message.blocks?.length ? { blocks: message.blocks } : {}),
+    ...(message.requestId ? { traceId: message.requestId } : {}),
   };
 }
 
@@ -451,6 +454,7 @@ export function EdwardAssistant({
                 contextReceipts,
                 widgets: response.widgets ?? [],
                 ...(response.blocks?.length ? { blocks: response.blocks } : {}),
+                ...(response.requestId ? { traceId: response.requestId } : {}),
               },
             ],
           };
@@ -700,6 +704,7 @@ export function EdwardAssistant({
             contextReceipts,
             widgets: response.widgets ?? [],
             ...(response.blocks?.length ? { blocks: response.blocks } : {}),
+            ...(response.requestId ? { traceId: response.requestId } : {}),
           },
         ],
       }));
@@ -1006,6 +1011,15 @@ export function EdwardAssistant({
                   ? "AI-generated guidance · verify important decisions"
                   : "Built-in portal guidance"}
               </small>
+            ) : null}
+            {message.role === "assistant" && message.traceId ? (
+              <EdwardResponseFeedback
+                target={{
+                  assistantKind: "student",
+                  assistantMessageId: message.id,
+                  traceId: message.traceId,
+                }}
+              />
             ) : null}
           </article>
         ))}

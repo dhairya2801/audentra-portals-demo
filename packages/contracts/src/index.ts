@@ -1423,10 +1423,96 @@ export interface StudentSsoConfiguration {
 
 export interface StaffSession {
   authenticated: true;
-  mode: "credentials";
+  mode: "credentials" | "google" | "microsoft";
   actorType: "staff";
   staff: StaffMemberSummary;
   notice: string;
+}
+
+export type StaffIdentityProvider = "google" | "microsoft";
+
+export interface StaffAuthOptions {
+  tenantSlug: string;
+  providers: StaffIdentityProvider[];
+  passwordEnabled: boolean;
+}
+
+export interface StaffMailbox {
+  id: string;
+  provider: StaffIdentityProvider;
+  address: string;
+  displayName: string | null;
+  kind: "personal" | "shared";
+  status: "active" | "reconnect_required" | "disabled";
+  canRead: boolean;
+  canSend: boolean;
+  canManage: boolean;
+  lastSyncedAt: string | null;
+}
+
+export interface StaffMailboxList {
+  items: StaffMailbox[];
+  total: number;
+}
+
+export interface StaffMailMessage {
+  id?: string;
+  providerMessageId?: string;
+  threadId: string | null;
+  sender: string;
+  recipients: string[];
+  subject: string | null;
+  body: string | null;
+  direction?: "inbound" | "outbound";
+  receivedAt: string | null;
+}
+
+export interface StaffMailMessageList {
+  items: StaffMailMessage[];
+  total: number;
+}
+
+export interface SearchStaffMailInput {
+  mailboxId: string;
+  query: string;
+  limit?: number;
+}
+
+export interface CreateStaffEmailSendIntentInput {
+  mailboxId: string;
+  studentId?: string;
+  replyToMessageId?: string;
+  interactionId?: string;
+  subject: string;
+  body: string;
+}
+
+export interface StaffEmailSendIntent {
+  id: string;
+  version: number;
+  status:
+    | "pending_confirmation"
+    | "queued"
+    | "sending"
+    | "sent"
+    | "failed"
+    | "expired"
+    | "cancelled";
+  mailboxId: string;
+  sender: string;
+  recipients: string[];
+  subject: string;
+  body: string;
+  contentSha256: string;
+  expiresAt: string;
+  confirmedAt?: string | null;
+  sentAt?: string | null;
+  error?: { code: string; message: string } | null;
+}
+
+export interface ConfirmStaffEmailSendIntentInput {
+  expectedVersion: number;
+  contentSha256: string;
 }
 
 export interface StaffSignInInput {
@@ -2482,6 +2568,46 @@ export interface AssistantConversation {
 export interface AssistantConversationMessagesResponse {
   conversationId: string;
   messages: AssistantConversationMessage[];
+}
+
+/** One mutable response-scoped feedback record shared by Student/Staff Edward. */
+export type EdwardFeedbackRating = "positive" | "negative";
+
+export interface EdwardFeedbackInput {
+  /** The request/trace id returned with this exact assistant message. */
+  traceId: string;
+  /** Omit to preserve the current rating; null clears it when written feedback remains. */
+  rating?: EdwardFeedbackRating | null;
+  /** Omit to preserve the current comment; null clears it when a rating remains. */
+  writtenFeedback?: string | null;
+}
+
+export interface EdwardResponseFeedback {
+  id: string;
+  assistantKind: "student" | "staff";
+  tenantId: string;
+  actorType: "student" | "staff";
+  actorId: string;
+  actorName: string | null;
+  referencedStudentId: string | null;
+  referencedStudentName: string | null;
+  conversationId: string;
+  userMessageId: string;
+  assistantMessageId: string;
+  traceId: string;
+  question: string;
+  response: string;
+  rating: EdwardFeedbackRating | null;
+  writtenFeedback: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EdwardFeedbackListResponse {
+  items: EdwardResponseFeedback[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 /* ---------------------------------------------------------------------------
