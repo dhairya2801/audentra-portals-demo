@@ -1,0 +1,123 @@
+/* Production-only bridge rules for the classrooms pages. Restate a design decision here only
+   when a legacy or production-only element has no design-system shape; never restyle
+   a reference class. */
+
+/* --- the catalog search: a form the reference has no screen for --- */
+
+.app-shell .catalog-card {
+  margin-top: var(--space-11);
+}
+
+.app-shell .catalog-search {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-6);
+  margin-bottom: var(--space-8);
+}
+
+.app-shell .catalog-search .field {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.app-shell .catalog-search .primary-button {
+  flex: none;
+}
+
+/* A result is a course row on the card's white, not inside a requirement. */
+.app-shell .catalog-results .course-row {
+  padding-top: var(--space-6);
+  padding-bottom: var(--space-6);
+}
+
+/* --- the course drawer's media: an embed the reference drawer never carried.
+   Scoped to `.course-drawer` rather than `.app-shell`: the drawer is a sibling of the
+   shell, as in the reference. --- */
+
+.course-drawer .course-media .evidence-kicker {
+  justify-content: space-between;
+}
+
+.course-drawer .course-media-count {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.course-drawer .course-media-frame {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--radius-tile);
+  background: var(--surface-sunk);
+}
+
+.course-drawer .course-media-frame iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.course-drawer .course-media-copy {
+  margin-top: var(--space-5);
+}
+
+.course-drawer .course-media-copy strong {
+  display: block;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semi);
+  line-height: var(--lh-heading);
+}
+
+.course-drawer .course-media-copy p {
+  color: var(--muted);
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.course-drawer .course-media-copy small {
+  color: var(--muted);
+  display: block;
+  margin-top: var(--space-2);
+  font-size: var(--fs-meta);
+}
+
+.course-drawer .course-media-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4) var(--space-6);
+  margin-top: var(--space-5);
+}
+
+.course-drawer .course-media-actions .text-button,
+.course-drawer .evidence-block .evidence-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+}
+
+.course-drawer .course-resources {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.course-drawer .course-resources .rule-card:last-child {
+  margin-bottom: 0;
+}
+
+.course-drawer .course-resources .rule-card .evidence-link {
+  display: inline-flex;
+  margin-top: var(--space-3);
+}
+
+@media (width <= 620px) {
+  .course-drawer .catalog-search {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

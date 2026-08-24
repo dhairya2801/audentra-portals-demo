@@ -1,0 +1,27 @@
+/* Cancels the legacy `globals.css` declarations whose class names collide with the
+   design's (eyebrow, text-button, filter-chips, deadline, nav-count, why-card, field-error,
+   section-heading). Imported before the design's own rules, at the legacy rule's own
+   specificity and later in the cascade, so each property goes back to the browser default
+   and the design's declaration — which follows — is the only one left standing. */
+
+:where(.app-shell) .text-button {
+  width: revert; padding: revert; border: revert; background: revert; color: revert;
+  font-size: revert; font-weight: revert; text-decoration: revert; text-underline-offset: revert;
+}
+:where(.app-shell) .filter-chips { display: revert; flex-wrap: revert; gap: revert; padding: revert; border-bottom: revert; }
+:where(.app-shell) .filter-chips button {
+  min-height: revert; padding: revert; border: revert; border-radius: revert; background: revert;
+  color: revert; font-size: revert; font-weight: revert;
+}
+:where(.app-shell) .eyebrow { margin: revert; color: revert; font-size: revert; font-weight: revert; letter-spacing: revert; text-transform: revert; }
+:where(.app-shell) .deadline { display: revert; align-items: revert; gap: revert; padding: revert; border-top: revert; }
+:where(.app-shell) .deadline time { display: revert; flex: revert; width: revert; height: revert; place-items: revert; align-content: revert; border-radius: revert; background: revert; color: revert; line-height: revert; }
+:where(.app-shell) .deadline time strong, :where(.app-shell) .deadline time span, :where(.app-shell) .deadline p, :where(.app-shell) .deadline p strong { font: revert; margin: revert; letter-spacing: revert; text-transform: revert; display: revert; overflow: revert; text-overflow: revert; min-width: revert; flex-direction: revert; }
+:where(.app-shell) .nav-count { display: revert; min-width: revert; height: revert; margin-left: revert; padding: revert; place-items: revert; border-radius: revert; background: revert; color: revert; font-size: revert; font-weight: revert; }
+:where(.app-shell) .why-card { display: revert; gap: revert; margin-top: revert; padding: revert; border: revert; border-radius: revert; background: revert; }
+:where(.app-shell) .why-card > span { display: revert; flex: revert; width: revert; height: revert; place-items: revert; border: revert; border-radius: revert; color: revert; font-family: revert; font-size: revert; }
+:where(.app-shell) .why-card strong { display: revert; font-family: revert; font-size: revert; font-weight: revert; }
+:where(.app-shell) .why-card p { margin: revert; color: revert; font-size: revert; line-height: revert; }
+:where(.app-shell) .field-error { margin: revert; padding: revert; border-left: revert; background: revert; color: revert; font-size: revert; line-height: revert; }
+:where(.app-shell) .section-heading, :where(.app-shell) .section-heading > p, :where(.app-shell) .section-heading h2 { all: revert; }
+:where(.app-shell) .edward-launcher > span:last-child { display: revert; flex-direction: revert; align-items: revert; }

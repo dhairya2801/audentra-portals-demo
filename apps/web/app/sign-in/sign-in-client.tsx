@@ -28,6 +28,7 @@ import {
 import { ActionFeedback, PortalMark } from "../components/portal-ui";
 import { TenantLink as Link } from "../components/tenant-link";
 import { useTenant } from "../components/tenant-provider";
+import { studentLandingRoute } from "../lib/student-landing";
 
 type AuthMode = "sign_in" | "sign_up";
 type AuthField = "email" | "phone" | "password" | "passwordConfirmation";
@@ -197,7 +198,7 @@ export function SignInClient() {
         return;
       }
       const bootstrap = await signIn.run({ email, password });
-      window.location.assign(tenantRuntime.href(bootstrap.initialRoute));
+      window.location.assign(tenantRuntime.href(studentLandingRoute(bootstrap.initialRoute)));
     } catch {
       // Keep the submitted form available for a corrected retry.
     }
@@ -555,7 +556,7 @@ function DemoStudentSignIn() {
     setResolvedName(null);
     try {
       const bootstrap = await demoSignIn.run(normalizeStudentReference(raw));
-      window.location.assign(tenantRuntime.href(bootstrap.initialRoute));
+      window.location.assign(tenantRuntime.href(studentLandingRoute(bootstrap.initialRoute)));
     } catch {
       // The typed id stays in the field so it can be corrected.
     }

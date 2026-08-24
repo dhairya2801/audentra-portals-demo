@@ -1,0 +1,247 @@
+/* Production-only bridge rules for the edward pages. Restate a design decision here only
+   when a legacy or production-only element has no design-system shape; never restyle
+   a reference class. */
+
+/* The legacy `.edward-composer > div` grid in globals.css outranks the reference's
+   `.edward-context` / `.edward-field` rules. Restate the reference values here. */
+.app-shell .edward-panel .edward-composer > .edward-context {
+  display: flex;
+  grid-template-columns: none;
+  gap: 0;
+}
+
+.app-shell .edward-panel .edward-composer > .edward-field {
+  display: flex;
+  grid-template-columns: none;
+  gap: var(--space-3);
+}
+
+/* The legacy `.edward-panel` grid leaves a max-height behind the reference height. */
+.app-shell .edward-panel:not(.edward-panel--embedded) {
+  max-height: none;
+  grid-template-rows: none;
+}
+
+/* Response feedback (production-only) in the reference's answer-actions row:
+   three icon buttons with tooltips, pushed to the row's end. */
+.app-shell .edward-answer-actions .edward-feedback {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+
+.app-shell .edward-answer-actions .edward-feedback .icon-button {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-chip);
+  color: var(--muted);
+}
+
+.app-shell .edward-answer-actions .edward-feedback .icon-button.active {
+  color: var(--purple-dark);
+  background: var(--purple-soft);
+  border-color: var(--purple-line);
+}
+
+.app-shell .edward-answer-actions .edward-feedback small {
+  color: var(--muted);
+  margin-left: var(--space-2);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semi);
+  white-space: nowrap;
+}
+
+.app-shell .edward-answer-actions .edward-feedback small.error {
+  color: var(--crimson);
+}
+
+.app-shell .edward-answer-actions .edward-feedback-editor {
+  display: flex;
+  flex-basis: 100%;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.app-shell .edward-feedback-editor label {
+  color: var(--ink-2);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semi);
+}
+
+.app-shell .edward-feedback-editor textarea {
+  width: 100%;
+  resize: vertical;
+  padding: var(--space-4) var(--space-5);
+  color: var(--ink);
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-tile);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+}
+
+.app-shell .edward-feedback-editor textarea:focus {
+  outline: none;
+  border-color: var(--purple-line);
+}
+
+.app-shell .edward-feedback-editor > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.app-shell .edward-feedback-editor .secondary-button {
+  min-height: 30px;
+  padding: 0 var(--space-5);
+  font-size: var(--fs-small);
+}
+
+/* The platform's live caption sits where the student's turn will land. */
+.app-shell .edward-bubble.edward-live-caption {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4) var(--space-6);
+  border: 0;
+  background: var(--grad-purple);
+  opacity: 0.85;
+}
+
+.app-shell .edward-mic-note .text-button {
+  min-height: 0;
+  margin-left: var(--space-2);
+  padding: 0;
+  font-size: var(--fs-small);
+}
+
+/* The platform live-voice session (LiveKit) — production-only, restated in
+   the reference's tokens so it reads as part of the composer. */
+.app-shell .edward-panel .edward-live-voice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--purple-line);
+  border-radius: var(--radius-tile);
+  background: var(--purple-soft);
+}
+
+.app-shell .edward-panel .edward-live-voice__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.app-shell .edward-panel .edward-live-voice__summary > span {
+  color: var(--purple-dark);
+  font-size: var(--fs-copy);
+}
+
+.app-shell .edward-panel .edward-live-voice__summary strong {
+  display: block;
+  color: var(--purple-dark);
+  font-size: var(--fs-meta);
+}
+
+.app-shell .edward-panel .edward-live-voice__summary small {
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+.app-shell .edward-panel .edward-live-voice__problem {
+  color: var(--crimson);
+  font-size: var(--fs-small);
+}
+
+.app-shell .edward-panel .edward-live-voice__problem p {
+  margin: var(--space-1) 0 0;
+}
+
+.app-shell .edward-panel .edward-live-voice__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.app-shell .edward-panel .edward-live-voice__controls button {
+  min-height: 28px;
+  padding: 0 var(--space-4);
+  color: var(--purple-dark);
+  background: var(--surface);
+  border: 1px solid var(--purple-line);
+  border-radius: var(--radius-chip);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+  cursor: pointer;
+}
+
+.app-shell .edward-panel .edward-live-voice__controls button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* The greeting's routes — the production welcome carries two, the reference none. */
+.app-shell .edward-greeting .edward-answer-actions {
+  margin-top: var(--space-2);
+}
+
+/* The deposit / upload / appointment widgets inside a reference answer. */
+.app-shell .edward-answer .edward-widget {
+  margin: 0;
+}
+
+/* Structured answers (`AssistantBlocks`) inside a reference answer bubble: the
+   legacy block rules size them for the old panel, so restate the answer's scale. */
+.app-shell .edward-answer .assistant-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.app-shell .edward-answer .assistant-blocks .assistant-block h4 {
+  margin: 0 0 var(--space-2);
+  color: var(--ink);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+}
+
+.app-shell .edward-answer .assistant-blocks ul,
+.app-shell .edward-answer .assistant-blocks ol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-shell .edward-answer .assistant-blocks li {
+  color: var(--ink-2);
+  border-left: 2px solid var(--purple-line);
+  padding-left: var(--space-4);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+}
+
+.app-shell .edward-answer .assistant-blocks a {
+  color: var(--purple-dark);
+  font-weight: var(--fw-semi);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.app-shell .edward-answer .assistant-blocks .assistant-block__owner {
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  color: var(--muted);
+  background: var(--canvas);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-small);
+  letter-spacing: var(--ls-caps);
+}

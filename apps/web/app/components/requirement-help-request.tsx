@@ -11,14 +11,16 @@ import {
   useMemo,
   useState,
 } from "react";
+import Icon from "../design-system/Icon.jsx";
+import Button from "../design-system/primitives/Button.jsx";
+import StatusPill from "../design-system/primitives/StatusPill.jsx";
+import Notice from "../design-system/patterns/Notice.jsx";
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
 import {
   createStudentHelpRequest,
   getStudentHelp,
 } from "../lib/api-client";
-import { TenantLink as Link } from "./tenant-link";
 import { useTenant } from "./tenant-provider";
-import styles from "./requirement-help-request.module.css";
 
 const activeHelpStatuses = new Set<StudentHelpRequest["status"]>([
   "new",
@@ -63,6 +65,12 @@ function helpMessageForRequirement(
   ].join("\n");
 }
 
+/**
+ * The route to a person, at the foot of the step — after Edward, never before
+ * it (the door rule). It is the reference `help-note` sentence, and the ask
+ * opens in place as a `form-panel`; what it sends is the production help
+ * request, with the requirement named in it.
+ */
 export function RequirementHelpRequest({
   requirement,
   onHelpStateChange,
@@ -70,7 +78,7 @@ export function RequirementHelpRequest({
   requirement: StudentRequirementDetail;
   onHelpStateChange: (requested: boolean) => void;
 }) {
-  const { tenant } = useTenant();
+  const { tenant, href } = useTenant();
   const [expanded, setExpanded] = useState(false);
   const [studentNote, setStudentNote] = useState("");
   const [optimisticRequest, setOptimisticRequest] =
@@ -131,138 +139,125 @@ export function RequirementHelpRequest({
 
   if (activeRequest) {
     return (
-      <section
-        className={`${styles.card} ${styles.requested}`}
-        aria-labelledby="requirement-help-title"
+      <Notice
+        tone="working"
+        icon="help"
+        title="Your enrollment team has this"
+        action={{ label: "View the conversation", href: href("/help") }}
       >
-        <span className={styles.icon} aria-hidden="true">
-          ?
-        </span>
-        <div className={styles.copy}>
-          <span className={styles.state}>Help requested</span>
-          <h3 id="requirement-help-title">Your support team has this item</h3>
-          <p>
-            Your request is linked to <strong>{requirement.title}</strong>. You
-            can continue this task while {tenant.shortName} reviews your question.
-          </p>
-        </div>
-        <Link className={styles.historyLink} href="/help">
-          View conversation <span aria-hidden="true">→</span>
-        </Link>
-      </section>
+        Your question about {requirement.title} is with {tenant.shortName}. You
+        can keep going with the step while they answer.
+      </Notice>
     );
   }
 
   return (
-    <section className={styles.card} aria-labelledby="requirement-help-title">
-      <span className={styles.icon} aria-hidden="true">
-        ?
-      </span>
-      <div className={styles.copy}>
-        <p className={styles.eyebrow}>Need help with this step?</p>
-        <h3 id="requirement-help-title">Ask about this exact requirement</h3>
-        <p>
-          Your message will include this requirement so the enrollment team can
-          respond with the right context.
-        </p>
-        {help.status === "error" ? (
-          <div className={styles.lookupWarning} role="status">
-            <span>
-              We could not check earlier requests. You can still send this one safely.
+    <div className="requirement-help">
+      {help.status === "error" ? (
+        <Notice
+          tone="quiet"
+          icon="info"
+          action={{ label: "Check again", icon: "refresh", onClick: help.reload }}
+        >
+          Earlier requests could not be checked. You can still send this one safely.
+        </Notice>
+      ) : help.refreshError ? (
+        <Notice
+          tone="quiet"
+          icon="info"
+          action={{ label: "Check again", icon: "refresh", onClick: help.refresh }}
+        >
+          Earlier request status may be out of date.
+        </Notice>
+      ) : null}
+
+      {expanded ? (
+        <form
+          id={`requirement-help-form-${requirement.id}`}
+          className="requirement-form"
+          onSubmit={submit}
+        >
+          <label className="field" htmlFor={`requirement-help-${requirement.id}`}>
+            <span className="field-label">What do you need help with?</span>
+            <span className="field-control">
+              <textarea
+                id={`requirement-help-${requirement.id}`}
+                value={studentNote}
+                onChange={(event) => setStudentNote(event.target.value)}
+                minLength={1}
+                maxLength={maximumStudentNoteLength}
+                placeholder="Say what is blocking you or what you want cleared up."
+                disabled={createRequest.status === "loading"}
+                required
+                autoFocus
+                rows={4}
+                aria-describedby={`requirement-help-limit-${requirement.id}`}
+              />
             </span>
-            <button type="button" onClick={help.reload}>
-              Retry status check
-            </button>
-          </div>
-        ) : help.refreshError ? (
-          <div className={styles.lookupWarning} role="status">
-            <span>Earlier request status may be out of date.</span>
-            <button type="button" onClick={help.refresh}>
-              Check again
-            </button>
-          </div>
-        ) : null}
-        {expanded ? (
-          <form
-            id={`requirement-help-form-${requirement.id}`}
-            className={styles.form}
-            onSubmit={submit}
-          >
-            <label htmlFor={`requirement-help-${requirement.id}`}>
-              What do you need help with?
-            </label>
-            <textarea
-              id={`requirement-help-${requirement.id}`}
-              value={studentNote}
-              onChange={(event) => setStudentNote(event.target.value)}
-              minLength={1}
-              maxLength={maximumStudentNoteLength}
-              placeholder="Describe what is blocking you or what you need clarified."
-              disabled={createRequest.status === "loading"}
-              required
-              autoFocus
-              aria-describedby={`requirement-help-limit-${requirement.id}`}
-            />
             <small
               id={`requirement-help-limit-${requirement.id}`}
-              className={styles.formHint}
+              className="field-hint"
             >
-              {maximumStudentNoteLength - studentNote.length} characters remaining
+              This step is named in your message, so the team answers with the
+              right context. {maximumStudentNoteLength - studentNote.length}{" "}
+              characters left.
             </small>
-            {createRequest.message ? (
-              <p className={styles.error} role="alert">
-                {createRequest.message} Your message is still here; try again when
-                you are ready.
-              </p>
-            ) : null}
-            <div className={styles.formActions}>
-              <button
-                className="button button--accent"
-                type="submit"
-                disabled={
-                  createRequest.status === "loading" || !studentNote.trim()
-                }
-              >
-                {createRequest.status === "loading"
-                  ? "Sending request…"
-                  : createRequest.status === "error"
-                    ? "Try again"
-                    : "Send help request"}
-              </button>
-              <button
-                className="button button--secondary"
-                type="button"
-                onClick={() => {
-                  createRequest.reset();
-                  setExpanded(false);
-                }}
-                disabled={createRequest.status === "loading"}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        ) : (
-          <button
-            className={`button button--secondary ${styles.openButton}`}
-            type="button"
-            aria-expanded="false"
-            aria-controls={`requirement-help-form-${requirement.id}`}
-            onClick={() => setExpanded(true)}
-          >
-            Request help
-          </button>
-        )}
-      </div>
-    </section>
+          </label>
+          {createRequest.message ? (
+            <p className="field-error" role="alert">
+              <Icon name="alert" size={13} /> {createRequest.message} Your message
+              is still here; try again when you are ready.
+            </p>
+          ) : null}
+          <div className="upload-failed-actions">
+            <Button
+              kind="primary"
+              icon="send"
+              type="submit"
+              pending={createRequest.status === "loading"}
+              disabled={!studentNote.trim()}
+            >
+              {createRequest.status === "error" ? "Try again" : "Send to the enrollment team"}
+            </Button>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => {
+                createRequest.reset();
+                setExpanded(false);
+              }}
+              disabled={createRequest.status === "loading"}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="help-note">
+          <Icon name="help" size={18} />
+          <p>
+            <strong>Still unsure?</strong> Ask your enrollment team about this exact
+            step. Usually replies in 1 business day.{" "}
+            <button
+              className="link-button"
+              type="button"
+              aria-expanded="false"
+              aria-controls={`requirement-help-form-${requirement.id}`}
+              onClick={() => setExpanded(true)}
+            >
+              Write to them <Icon name="arrow" size={14} />
+            </button>
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 
 export function RequirementHelpRequestedStatus() {
   return (
-    <span className={styles.helpRequestedStatus} role="status">
-      <span aria-hidden="true" />
+    <StatusPill tone="wait" pulse>
       Help requested
-    </span>
+    </StatusPill>
   );
 }

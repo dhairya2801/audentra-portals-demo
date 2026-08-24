@@ -1,0 +1,61 @@
+/* Production-only bridge rules for the campus pages. Restate a design decision here only
+   when a legacy or production-only element has no design-system shape; never restyle
+   a reference class. */
+
+/* Legacy `globals.css` still styles `.filter-chips` (padding, a bottom rule, a 2.2rem
+   chip) and `.text-button` (underline, forest green, a padding) for the old portal.
+   Restate the reference's values under the campus containers until those rules go. */
+.app-shell .section-card .filter-chips {
+  border-bottom: 0;
+  padding: 0;
+}
+
+.app-shell .section-card .filter-chips button {
+  min-height: 0;
+}
+
+.app-shell .section-card .text-button,
+.app-shell .provenance-card .text-button,
+.app-shell .campus-drawer .text-button {
+  width: auto;
+  padding: 0;
+  text-decoration: none;
+}
+
+/* The register panel's feedback line: the API's own conflict or stale-event message,
+   kept where the student can read it, in the tone the reference gives an error. */
+.app-shell .register-panel .register-feedback {
+  color: var(--crimson);
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-5) 0 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  display: flex;
+}
+
+.app-shell .register-panel .register-feedback .text-button {
+  padding: 0;
+  font-size: inherit;
+}
+
+/* A club's coming-up list in the drawer: the reference's fact rows, with the
+   time and place said under the title. */
+.app-shell .about-panel .campus-facts {
+  margin-top: 0;
+}
+
+.app-shell .campus-facts .campus-fact-meta {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  display: block;
+}
+
+/* The registered label carries its check the way the row's other labels carry
+   their glyphs. */
+.app-shell .campus-row-action {
+  align-items: center;
+  gap: var(--space-1);
+  display: inline-flex;
+}

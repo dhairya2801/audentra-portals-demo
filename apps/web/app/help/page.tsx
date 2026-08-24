@@ -1,336 +1,288 @@
 "use client";
 
-import type { StudentHelpRequest } from "@vv/contracts";
-import {
-  Suspense,
-  type FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import type { HelpArticle, StudentHelpRequest } from "@vv/contracts";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PortalShell } from "../components/portal-shell";
-import { StudentPortalIcon } from "../components/student-portal-icon";
-import {
-  EmptyState,
-  ErrorState,
-  LoadingState,
-} from "../components/portal-ui";
-import { useApiAction, useApiResource } from "../hooks/use-api-resource";
-import {
-  createStudentHelpRequest,
-  createStudentInquiryMessage,
-  getStudentHelp,
-} from "../lib/api-client";
 import { useTenant } from "../components/tenant-provider";
+import { useApiAction, useApiResource } from "../hooks/use-api-resource";
+import { createStudentHelpRequest, createStudentInquiryMessage, getStudentHelp } from "../lib/api-client";
+import Notice from "../design-system/patterns/Notice.jsx";
+import PageError from "../design-system/patterns/PageError.jsx";
+import PageSkeleton from "../design-system/patterns/PageSkeleton.jsx";
+import ToastStack from "../design-system/patterns/Toast.jsx";
+import { useToasts } from "../design-lib/toast.js";
+import { onHandoff, takeHandoff } from "../design-lib/door.js";
+import { HelpAskCard } from "../components/help-ask-card";
+import { HelpGuideList } from "../components/help-guide-list";
+import { HelpRail } from "../components/help-rail";
+import { HelpRequestDrawer } from "../components/help-request-drawer";
+import { HelpRequestList } from "../components/help-request-list";
+import {
+  guideFor,
+  helpTopics,
+  officeName,
+  openRequests,
+  sortRequests,
+  waitingOnYou,
+} from "../components/help-logic";
 
-const categoryLabels = {
-  all: "All topics",
-  getting_started: "Getting started",
-  documents: "Documents",
-  payments: "Payments",
-  support: "Support",
-} as const;
+/**
+ * Help — the reference's `HelpPage` over the production help projection. A question, once sent,
+ * becomes an object with a state the student can come back to, which is why the receipt and the
+ * request list are built here as one thing. Guides are on the page because most questions do not
+ * need a decision; the ask block is under them because some do.
+ */
 
-type HelpCategory = keyof typeof categoryLabels;
-
-function StudentInquiryForm({ onSent }: { onSent: () => void }) {
-  const action = useApiAction(createStudentHelpRequest);
-  const [sent, setSent] = useState(false);
-
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setSent(false);
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    try {
-      await action.run(
-        {
-          topicCode: data.get("topicCode") as Exclude<HelpCategory, "all">,
-          message: String(data.get("message")),
-        },
-        crypto.randomUUID(),
-      );
-      form.reset();
-      setSent(true);
-      onSent();
-    } catch {
-      // The action state provides the student-safe error.
-    }
-  };
-
-  return (
-    <section className="section-card ask-card">
-      <div className="status-heading"><span className="status-icon accent"><StudentPortalIcon name="message" size={20} /></span><div><h2>Send an inquiry</h2><p>Ask the enrollment team for a decision or human follow-up.</p></div></div>
-      <form className="student-inquiry-form" onSubmit={submit}>
-        <label>
-          Topic
-          <select name="topicCode" defaultValue="support">
-            <option value="getting_started">Getting started</option>
-            <option value="documents">Documents</option>
-            <option value="payments">Payments</option>
-            <option value="support">Other support</option>
-          </select>
-        </label>
-        <label>
-          Your question
-          <textarea
-            name="message"
-            minLength={1}
-            maxLength={500}
-            placeholder="Tell us what you need help with."
-            required
-          />
-        </label>
-        {action.message ? (
-          <p className="field-error" role="alert">
-            {action.message}
-          </p>
-        ) : null}
-        {sent ? (
-          <p className="student-inquiry-form__success" role="status">
-            Your inquiry is now in the staff message portal.
-          </p>
-        ) : null}
-        <button
-          className="primary-button"
-          type="submit"
-          disabled={action.status === "loading"}
-        >
-          {action.status === "loading" ? "Sending…" : "Send inquiry"}
-        </button>
-      </form>
-    </section>
-  );
+function isTopic(value: unknown): value is HelpArticle["category"] {
+  return helpTopics.some((topic) => topic.id === value);
 }
 
-function InquiryThread({
-  request,
-  onUpdated,
-  openByDefault,
-}: {
-  request: StudentHelpRequest;
-  onUpdated: () => void;
-  openByDefault: boolean;
-}) {
-  const reply = useApiAction(createStudentInquiryMessage);
-  const [sent, setSent] = useState(false);
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setSent(false);
-    const form = event.currentTarget;
-    const body = String(new FormData(form).get("body") ?? "").trim();
-    if (!body) return;
-    try {
-      await reply.run(
-        request.id,
-        { expectedVersion: request.version, body },
-        crypto.randomUUID(),
-      );
-      form.reset();
-      setSent(true);
-      onUpdated();
-    } catch {
-      // Keep the student's text in the form. The action exposes a safe error.
-    }
-  };
-  return (
-    <details
-      className="student-support-thread"
-      open={openByDefault || request.status === "waiting_on_student"}
-    >
-      <summary>
-        <span>
-          <strong>{request.subject}</strong>
-          <small>
-            Updated {new Date(request.updatedAt).toLocaleString()}
-            {request.expiresAt
-              ? ` · active until ${new Date(request.expiresAt).toLocaleString()}`
-              : ""}
-          </small>
-        </span>
-        <span className={`student-support-status student-support-status--${request.status}`}>
-          {request.status.replaceAll("_", " ")}
-        </span>
-      </summary>
-      <ol className="student-support-messages">
-        {request.messages.map((message) => (
-          <li
-            className={
-              message.direction === "student"
-                ? "student-support-message student-support-message--student"
-                : "student-support-message student-support-message--staff"
-            }
-            key={message.id}
-          >
-            <div><strong>{message.authorName}</strong><time>{new Date(message.createdAt).toLocaleString()}</time></div>
-            <p>{message.body}</p>
-            <small>{message.deliveryStatus}</small>
-          </li>
-        ))}
-      </ol>
-      <form className="student-support-reply" onSubmit={submit}>
-        <label>
-          Reply to the enrollment team
-          <textarea name="body" required minLength={1} maxLength={2_000} />
-        </label>
-        <p>
-          Replies are saved immediately. This live conversation remains active for five days
-          after the latest message; after that it leaves active inboxes while its history stays
-          safely protected.
-        </p>
-        {reply.message ? <p className="field-error" role="alert">{reply.message}</p> : null}
-        {sent ? <p className="student-inquiry-form__success" role="status">Reply sent.</p> : null}
-        <button className="button button--primary" type="submit" disabled={reply.status === "loading"}>
-          {reply.status === "loading" ? "Sending..." : "Send reply"}
-        </button>
-      </form>
-    </details>
-  );
+function heroLede({ institution, open, waiting }: { institution: string; open: number; waiting: StudentHelpRequest | null }) {
+  if (waiting) {
+    return `One of your requests is waiting on you. Below it: ${institution}’s own guides, and a way to put a named office on a step that is blocked.`;
+  }
+  if (open === 0) {
+    return `${institution}’s own guides, and a way to put a named office on a step that is blocked.`;
+  }
+  return `${open === 1 ? "One question is" : `${open} questions are`} with ${institution}, and every answer lands on this page. Below are ${institution}’s guides, and a way to reach the office that owns a step.`;
 }
 
 function HelpPageContent() {
-  const tenantRuntime = useTenant();
-  const { tenant } = tenantRuntime;
+  const runtime = useTenant();
+  const { tenant } = runtime;
   const support = tenant.contacts.support;
-  const [category, setCategory] = useState<HelpCategory>("all");
+  const office = officeName(support);
+  const institution = tenant.shortName;
   const searchParams = useSearchParams();
   const selectedConversationId = searchParams.get("conversation");
-  const loadHelp = useCallback(
-    (signal: AbortSignal) => getStudentHelp(signal),
-    [],
-  );
-  const help = useApiResource(loadHelp);
+
+  const help = useApiResource(useCallback((signal: AbortSignal) => getStudentHelp(signal), []));
   const refreshHelp = help.refresh;
+  const send = useApiAction(createStudentHelpRequest);
+  const reply = useApiAction(createStudentInquiryMessage);
+  const { toasts, push, dismiss } = useToasts();
+
+  const [topicId, setTopicId] = useState<HelpArticle["category"] | null>(null);
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<StudentHelpRequest | null>(null);
+  const [askGuideOpen, setAskGuideOpen] = useState(false);
+  const [openGuides, setOpenGuides] = useState<string[]>([]);
+  const [openId, setOpenId] = useState<string | null>(selectedConversationId);
+  const [replyText, setReplyText] = useState("");
+  const [now] = useState(() => Date.now());
+
+  const askCard = useRef<HTMLDivElement>(null);
+  const sendKey = useRef<string | null>(null);
+
   useEffect(() => {
-    // The stream only invalidates local state; the REST projection remains
-    // canonical. Refreshing this lightweight view for every student event
-    // avoids missing a support reply when a provider evolves its event shape.
+    // The stream only invalidates local state; the REST projection remains canonical. Refreshing
+    // this lightweight view for every student event avoids missing a support reply.
     const refreshAfterStudentEvent = () => refreshHelp();
     window.addEventListener("vv:student-realtime", refreshAfterStudentEvent);
     return () => window.removeEventListener("vv:student-realtime", refreshAfterStudentEvent);
   }, [refreshHelp]);
-  const articles = useMemo(
-    () =>
-      help.data?.articles.filter(
-        (article) => category === "all" || article.category === category,
-      ) || [],
-    [category, help.data],
+
+  const focusAsk = useCallback(() => {
+    askCard.current?.scrollIntoView({ block: "center" });
+    askCard.current?.querySelector<HTMLElement>("button, input")?.focus();
+  }, []);
+
+  // An inquiry that started in Edward arrives with what she already said. Read once, then gone.
+  useEffect(() => {
+    function consume() {
+      const handoff = takeHandoff("inquiry");
+      if (!handoff) return;
+      const question = typeof handoff.question === "string" ? handoff.question : "";
+      setTopicId(isTopic(handoff.topicId) ? handoff.topicId : "support");
+      setSubject(question.slice(0, 80));
+      setMessage(
+        question
+          ? `${question}\n\nI asked Edward first${typeof handoff.context === "string" ? `, from ${handoff.context}` : ""}, and it didn’t settle it.`
+          : "",
+      );
+      window.setTimeout(focusAsk, 0);
+    }
+    consume();
+    return onHandoff(consume);
+  }, [focusAsk]);
+
+  const articles = help.data?.articles ?? [];
+  const requests = sortRequests(help.data?.requests ?? []);
+  const open = openRequests(requests);
+  const waiting = waitingOnYou(requests);
+  const openRequest = requests.find((item) => item.id === openId) ?? null;
+  const guide = topicId ? guideFor(articles, topicId) : null;
+
+  function chooseTopic(next: HelpArticle["category"]) {
+    setTopicId(next);
+    setAskGuideOpen(false);
+    setFailed(null);
+  }
+
+  async function sendRequest() {
+    if (!topicId) return;
+    setFailed(null);
+    const key = sendKey.current ?? (sendKey.current = crypto.randomUUID());
+    const body = [subject.trim(), message.trim()].filter(Boolean).join("\n\n").slice(0, 500);
+    try {
+      const created = await send.run({ topicCode: topicId, message: body }, key);
+      sendKey.current = null;
+      setReceipt(created);
+      setSubject("");
+      setMessage("");
+      setAskGuideOpen(false);
+      push({ tone: "success", title: `${office} has your question.`, body: "The answer lands on this page." });
+      refreshHelp();
+    } catch {
+      // Nothing arrived, so nothing is created: the words are still in the form.
+      setFailed(send.message ?? "");
+    }
+  }
+
+  function askAnother() {
+    setReceipt(null);
+    setTopicId(null);
+    setFailed(null);
+    focusAsk();
+  }
+
+  function openDetail(request: StudentHelpRequest) {
+    setReplyText("");
+    reply.reset();
+    setOpenId(request.id);
+  }
+
+  function closeDetail() {
+    setOpenId(null);
+    setReplyText("");
+  }
+
+  async function sendReply() {
+    if (!openRequest) return;
+    const reopening = openRequest.status === "resolved";
+    try {
+      await reply.run(openRequest.id, { expectedVersion: openRequest.version, body: replyText.trim() }, crypto.randomUUID());
+      setReplyText("");
+      push(reopening ? `Reopened. This is back with ${office}.` : `${office} has your reply.`);
+      refreshHelp();
+    } catch {
+      // The text stays in the box; the drawer shows the student-safe error.
+    }
+  }
+
+  const requestList = (
+    <HelpRequestList
+      requests={requests}
+      open={open.length}
+      office={office}
+      tenant={tenant}
+      now={now}
+      institution={institution}
+      onOpen={openDetail}
+      onAsk={focusAsk}
+    />
   );
+
+  const askBlock = (
+    <div ref={askCard}>
+      <HelpAskCard
+        topic={topicId}
+        subject={subject}
+        message={message}
+        sending={send.status === "loading"}
+        failed={failed}
+        receipt={receipt}
+        guide={guide}
+        guideOpen={askGuideOpen}
+        support={support}
+        institution={institution}
+        onTopic={chooseTopic}
+        onSubject={setSubject}
+        onMessage={setMessage}
+        onToggleGuide={() => setAskGuideOpen((value) => !value)}
+        onSend={sendRequest}
+        onSeeRequest={() => receipt && openDetail(receipt)}
+        onAskAnother={askAnother}
+      />
+    </div>
+  );
+
+  // The page opens on what exists: the list leads when there is one.
+  const leadWithList = requests.length > 0;
 
   return (
     <PortalShell
       active="help"
-      eyebrow="Student support"
-      title="How can we help?"
-      description={`Plain-language answers and human support for every part of your ${tenant.shortName} journey.`}
+      hero={{ lede: heroLede({ institution, open: open.length, waiting }) }}
+      notice={
+        waiting ? (
+          <Notice
+            tone="soon"
+            icon="alert"
+            title={`${office} asked you something`}
+            action={{ label: "Open it", onClick: () => openDetail(waiting) }}
+          >
+            {waiting.subject} · nothing is late while this is open, but it stops moving until you reply.
+          </Notice>
+        ) : null
+      }
+      rail={<HelpRail support={support} institution={institution} href={runtime.href} />}
     >
       {help.status === "loading" ? (
-        <LoadingState label={`Loading ${tenant.shortName} help`} />
+        <PageSkeleton label={`${institution} help`} />
       ) : help.status === "error" ? (
-        <ErrorState message={help.error} onRetry={help.reload} />
+        <PageError label="help" onRetry={help.reload} />
       ) : (
-        <div className="page-body">
-          <div className="page-main student-support-main">
-            <section className="section-card guide-section">
-            <div className="status-heading"><span className="status-icon accent"><StudentPortalIcon name="help" size={20} /></span><div><h2>Frequently asked questions</h2><p>Aster’s published guides</p></div></div>
-            <div className="filter-row"><div className="filter-chips" aria-label="Filter help topics">
-              {(Object.keys(categoryLabels) as HelpCategory[]).map((key) => (
-                <button
-                  className={category === key ? "selected" : undefined}
-                  type="button"
-                  aria-pressed={category === key}
-                  onClick={() => setCategory(key)}
-                  key={key}
-                >
-                  {categoryLabels[key]}
-                </button>
-              ))}
-            </div></div>
-            {articles.length === 0 ? (
-              <EmptyState
-                title="No articles in this topic"
-                description={`Choose another topic or contact ${support.label}.`}
-              />
-            ) : (
-              <div className="faq-list">
-                {articles.map((article) => (
-                  <details key={article.id}>
-                    <summary>{article.question}</summary>
-                    <p>{article.answer}</p>
-                  </details>
-                ))}
-              </div>
-            )}
-            </section>
-            {help.data.requests.length > 0 ? (
-              <section className="section-card request-section">
-                <div className="status-heading"><span className="status-icon review"><StudentPortalIcon name="message" size={20} /></span><div><h2>Your requests</h2><p>Enrollment conversations and office replies</p></div><span className="status-count">{help.data.requests.length}</span></div>
-                <p className="student-support-live-status" role="status">
-                  Live updates are on. New team replies appear here without refreshing the page.
-                </p>
-                <div className="student-support-threads">
-                  {help.data.requests.map((request) => (
-                    <InquiryThread
-                      request={request}
-                      onUpdated={help.refresh}
-                      openByDefault={request.id === selectedConversationId}
-                      key={request.id}
-                    />
-                  ))}
-                </div>
-              </section>
-            ) : null}
-            <StudentInquiryForm onSent={help.refresh} />
-          </div>
-          <aside className="page-rail">
-            <div className="anchor-card support-card">
-              <span className="support-card__mark" aria-hidden="true">{tenant.mark}</span>
-              <span className="panel-label">Talk with a person</span>
-              <h2>Student support</h2>
-              <p>{support.hours || help.data.support.hours}</p>
-              {support.email ? (
-                <a className="primary-button full" href={`mailto:${support.email}`}>
-                  Email support
-                </a>
-              ) : support.url ? (
-                <a className="primary-button full" href={tenantRuntime.href(support.url)}>Contact support</a>
-              ) : null}
-              {support.phone ? (
-                <a href={`tel:${support.phone.replace(/[^\d+]/g, "")}`}>
-                  {support.phone}
-                </a>
-              ) : null}
-            </div>
-            <div className="provenance-card">
-              <span className="panel-label">More ways to connect</span>
-              <nav className="aside-links" aria-label="Support options">
-                {support.email ? (
-                  <a href={`mailto:${support.email}`}>
-                    {support.email} <span>→</span>
-                  </a>
-                ) : null}
-                {support.phone ? (
-                  <a href={`tel:${support.phone.replace(/[^\d+]/g, "")}`}>
-                    Call student support <span>→</span>
-                  </a>
-                ) : null}
-                {support.url && !support.email ? (
-                  <a href={tenantRuntime.href(support.url)}>{support.label} <span>→</span></a>
-                ) : null}
-              </nav>
-            </div>
-          </aside>
-        </div>
+        <>
+          {leadWithList ? (
+            <>
+              {requestList}
+              {askBlock}
+            </>
+          ) : (
+            <>
+              {askBlock}
+              {requestList}
+            </>
+          )}
+
+          <HelpGuideList
+            guides={articles}
+            open={openGuides}
+            institution={institution}
+            onToggle={(id) =>
+              setOpenGuides((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]))
+            }
+          />
+        </>
       )}
+
+      {openRequest && (
+        <HelpRequestDrawer
+          request={openRequest}
+          office={office}
+          tenant={tenant}
+          institution={institution}
+          replyText={replyText}
+          sending={reply.status === "loading"}
+          error={reply.status === "error" ? reply.message : null}
+          onReply={setReplyText}
+          onSend={sendReply}
+          onClose={closeDetail}
+        />
+      )}
+
+      <ToastStack toasts={toasts} onDismiss={dismiss} />
     </PortalShell>
   );
 }
 
 export default function HelpPage() {
   return (
-    <Suspense fallback={<LoadingState label="Loading help" />}>
+    <Suspense fallback={<PageSkeleton label="help" />}>
       <HelpPageContent />
     </Suspense>
   );

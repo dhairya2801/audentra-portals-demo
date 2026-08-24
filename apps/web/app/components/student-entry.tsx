@@ -6,6 +6,7 @@ import { getStudentBootstrap } from "../lib/api-client";
 import { PortalMark } from "./portal-ui";
 import { TenantLink as Link } from "./tenant-link";
 import { useTenant } from "./tenant-provider";
+import { studentLandingRoute } from "../lib/student-landing";
 
 export function StudentEntry() {
   const tenantRuntime = useTenant();
@@ -18,7 +19,7 @@ export function StudentEntry() {
 
   useEffect(() => {
     if (bootstrap.data) {
-      window.location.replace(tenantRuntime.href(bootstrap.data.initialRoute));
+      window.location.replace(tenantRuntime.href(studentLandingRoute(bootstrap.data.initialRoute)));
     } else if (
       bootstrap.status === "error" &&
       (bootstrap.errorStatus === 401 || bootstrap.errorStatus === 403)

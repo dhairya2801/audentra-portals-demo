@@ -1,103 +1,283 @@
 "use client";
 
-import type { CreateStudentAppointmentInput, StudentAppointmentList, StudentAppointmentType } from "@vv/contracts";
-import { type FormEvent, useCallback, useRef, useState } from "react";
+import type { StudentAppointment, StudentAppointmentType } from "@vv/contracts";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PortalShell } from "../components/portal-shell";
-import { StudentPortalIcon } from "../components/student-portal-icon";
-import { TenantLink as Link } from "../components/tenant-link";
-import { ActionFeedback, ErrorState, LoadingState } from "../components/portal-ui";
-import { useApiAction, useApiResource } from "../hooks/use-api-resource";
-import { createStudentAppointment, getStudentAppointments } from "../lib/api-client";
 import { useTenant } from "../components/tenant-provider";
-import { formatTenantDate } from "../lib/tenant";
+import { useApiResource } from "../hooks/use-api-resource";
+import { getStudentAppointments } from "../lib/api-client";
+import Card, { CardHead, CardRows } from "../design-system/primitives/Card.jsx";
+import InfoModal from "../design-system/patterns/InfoModal.jsx";
+import PageError from "../design-system/patterns/PageError.jsx";
+import PageSkeleton from "../design-system/patterns/PageSkeleton.jsx";
+import StateCard from "../design-system/patterns/StateCard.jsx";
+import ToastStack from "../design-system/patterns/Toast.jsx";
+import { useToasts } from "../design-lib/toast.js";
+import { onHandoff, takeHandoff } from "../design-lib/door.js";
+import { AppointmentsBookingDrawer } from "../components/appointments-booking-drawer";
+import { AppointmentsDrawer } from "../components/appointments-drawer";
+import { AppointmentsRail } from "../components/appointments-rail";
+import { AppointmentsRow } from "../components/appointments-row";
+import { AppointmentsTopicRow } from "../components/appointments-topic-row";
+import {
+  type ConversationType,
+  articled,
+  conversationTypes,
+  splitAppointments,
+  typeById,
+} from "../components/appointments-logic";
 
-const labels: Record<StudentAppointmentType, string> = {
-  admissions_counseling: "Admissions counseling",
-  financial_aid: "Financial aid",
-  enrollment_support: "Enrollment support",
-};
+/**
+ * Appointments — the reference's `AppointmentsPage` over the production appointment record.
+ *
+ *   - A topic is chosen first, because the topic decides which team receives it.
+ *   - The backend publishes no times: the student chooses one in the booking drawer, and only a
+ *     confirmed API response adds the conversation to the list. There is no optimistic row.
+ *   - *Your conversations* and *Past and cancelled* are the product's disclosure; the first
+ *     starts open, the second closed, and the choice is remembered the way the reference does.
+ */
 
-const descriptions: Record<StudentAppointmentType, string> = {
-  admissions_counseling: "Talk through your offer, enrollment timeline, or a decision that is holding you up.",
-  financial_aid: "Review aid, required documents, your balance, or a payment question.",
-  enrollment_support: "Get help with a requirement, form, upload, or next enrollment step.",
-};
+const GROUPS_STORE = "aster.appointments.groups";
+const GROUPS_DEFAULT = { conversations: true, record: false };
 
-function AppointmentWorkspace({ list, reload }: { list: StudentAppointmentList; reload: () => void }) {
-  const { tenant } = useTenant();
-  const form = useRef<HTMLFormElement>(null);
-  const intentKey = useRef<string | null>(null);
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const [selectedType, setSelectedType] = useState<StudentAppointmentType>("enrollment_support");
-  const action = useApiAction(useCallback((input: CreateStudentAppointmentInput, key: string) => createStudentAppointment(input, key), []));
-
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setValidationError(null);
-    action.reset();
-    const values = new FormData(event.currentTarget);
-    const startsAt = new Date(String(values.get("startsAt")));
-    if (Number.isNaN(startsAt.getTime()) || startsAt.getTime() <= Date.now()) {
-      setValidationError("Choose an appointment time in the future.");
-      return;
-    }
-    const notes = String(values.get("notes") || "").trim();
-    const input: CreateStudentAppointmentInput = { type: values.get("type") as StudentAppointmentType, startsAt: startsAt.toISOString(), ...(notes ? { notes } : {}) };
-    const key = intentKey.current ?? (intentKey.current = crypto.randomUUID());
-    try {
-      await action.run(input, key);
-      intentKey.current = null;
-      form.current?.reset();
-      setSelectedType("enrollment_support");
-      reload();
-    } catch {
-      // The form and idempotency key remain for a safe retry.
-    }
-  };
-
-  return (
-    <>
-      <section className="page-summary" aria-label="Appointments standing">
-        <div className="summary-main">
-          <div className="summary-figure"><div className="summary-figure-copy"><span className="panel-label">Your conversations</span><strong>{list.total ? `${list.total} ${list.total === 1 ? "appointment" : "appointments"}` : "Nothing booked yet"}</strong><p>{list.total ? "Every confirmed time is listed below with the team that owns it." : "The teams below are ready when you need them."}</p></div></div>
-          <div className="advisor-bar"><img className="avatar avatar-md advisor-avatar" src="/people/tomas-okafor.webp" width="40" height="40" alt="" /><div className="advisor-bar-copy"><span className="panel-label">Your enrollment advisor</span><strong>Tomás Okafor <span>· Admissions Office</span></strong></div><div className="advisor-actions"><a className="advisor-action" href="mailto:admissions@aster.edu" aria-label="Email Tomás Okafor">✉</a><Link className="advisor-action" href="/messages" aria-label="Message Tomás Okafor"><StudentPortalIcon name="message" size={16} /></Link></div></div>
-        </div>
-      </section>
-
-      <div className="page-body">
-        <div className="page-main">
-          <section className="section-card">
-            <div className="status-heading"><span className="status-icon review"><StudentPortalIcon name="calendar" size={20} /></span><div><h2>Your conversations</h2><p>Booked with Aster teams</p></div>{list.total ? <span className="status-count">{list.total}</span> : null}</div>
-            {list.items.length ? <div className="card-rows appointment-list">{list.items.map((appointment) => {
-              const date = new Date(appointment.startsAt);
-              return <article className={`appointment-row ${appointment.status}`} key={appointment.id}><div className="appointment-row-body"><span className="date-tile" aria-hidden="true"><small>{formatTenantDate(appointment.startsAt, tenant, { month: "short" })}</small><strong>{formatTenantDate(appointment.startsAt, tenant, { day: "numeric" })}</strong></span><div className="campus-row-copy"><span className="campus-row-when">{formatTenantDate(appointment.startsAt, tenant, { timeStyle: "short" })}</span><h3 className="campus-row-title">{labels[appointment.type]}</h3><span className="campus-row-meta"><span className="appointment-subject">{appointment.notes ? `About: ${appointment.notes}` : "No subject was added"}</span></span></div><div className="task-action"><span className={`appt-state ${appointment.status}`}>{appointment.status.replaceAll("_", " ")}</span><a className="secondary-button" href={`data:text/calendar;charset=utf-8,${encodeURIComponent(`BEGIN:VCALENDAR\nBEGIN:VEVENT\nDTSTART:${date.toISOString().replaceAll(/[-:]/g, "").replace(".000", "")}\nSUMMARY:${labels[appointment.type]}\nEND:VEVENT\nEND:VCALENDAR`)}`} download="aster-appointment.ics"><StudentPortalIcon name="calendar" size={15} /> Add to calendar</a></div></div></article>;
-            })}</div> : <div className="state-card empty inset"><span className="state-icon"><StudentPortalIcon name="calendar" size={20} /></span><div><h3>No appointments booked</h3><p>Choose a conversation below whenever a team can help.</p></div></div>}
-          </section>
-
-          <section className="section-card" id="book-appointment">
-            <div className="status-heading"><span className="status-icon accent"><StudentPortalIcon name="calendar" size={20} /></span><div><h2>Choose a conversation</h2><p>The subject decides which team receives it.</p></div></div>
-            <div className="card-rows task-list">{(Object.keys(labels) as StudentAppointmentType[]).map((type, index) => <article className={`task-card topic-row${selectedType === type ? " recommended" : ""}`} key={type}>{selectedType === type && index === 0 ? <div className="action-band"><span className="action-band-label"><StudentPortalIcon name="spark" size={14} /> Start here</span></div> : null}<div className="task-card-body"><div className="task-type-icon meeting"><StudentPortalIcon name="calendar" size={21} /></div><div className="task-main"><div className="task-meta-row"><span>{type === "financial_aid" ? "Financial Aid Office" : "Admissions Office"}</span></div><h3>{labels[type]}</h3><p>{descriptions[type]}</p><div className="task-facts"><span><StudentPortalIcon name="calendar" size={15} /> You choose the time</span><span><StudentPortalIcon name="message" size={15} /> Add your question</span></div></div><div className="task-action"><button className={selectedType === type ? "primary-button" : "secondary-button"} type="button" onClick={() => { setSelectedType(type); document.getElementById("appointment-form")?.scrollIntoView({ behavior: "smooth", block: "center" }); }}>Book a time <StudentPortalIcon name="chevron" size={15} /></button><Link className="edward-ask" href={`/edward?topic=${encodeURIComponent(type)}`}><span className="edward-ask-mark">E</span> Ask Edward</Link></div></div></article>)}</div>
-          </section>
-
-          <section className="section-card booking-card" id="appointment-form">
-            <div className="status-heading"><span className="status-icon accent"><StudentPortalIcon name="calendar" size={20} /></span><div><h2>Book {labels[selectedType].toLowerCase()}</h2><p>Only a confirmed API response adds the appointment above.</p></div></div>
-            <form ref={form} className="portal-form booking-form" onSubmit={submit}>
-              <label className="field"><span>Conversation type</span><select name="type" value={selectedType} onChange={(event) => setSelectedType(event.target.value as StudentAppointmentType)}>{Object.entries(labels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
-              <label className="field"><span>Date and time</span><input name="startsAt" type="datetime-local" required /></label>
-              <label className="field"><span>What would you like to discuss? <small>Optional</small></span><textarea name="notes" rows={4} maxLength={500} /></label>
-              {validationError ? <p className="field-error" role="alert">{validationError}</p> : null}
-              <ActionFeedback status={action.status} error={action.message} success="Your appointment is scheduled." />
-              <button className="primary-button" type="submit" disabled={action.status === "loading"}>{action.status === "loading" ? "Scheduling…" : action.status === "error" ? "Retry appointment" : "Schedule appointment"}</button>
-            </form>
-          </section>
-        </div>
-        <aside className="page-rail"><div className="anchor-card booking-card"><span className="panel-label">How this works</span><p>Each team owns its conversations. A time only appears in your list after Aster confirms it.</p><div className="booking-provenance"><span><StudentPortalIcon name="calendar" size={13} /> Live student appointments</span><span>·</span><span>Canonical API record</span></div><Link className="learn-link" href="/help">Appointment help <StudentPortalIcon name="chevron" size={14} /></Link></div><div className="skipped-card"><span className="resume-badge">Need a different route?</span><h3>Edward can help choose the right team.</h3><p>Describe what is blocked and Edward will keep your question with the handoff.</p><Link href="/edward">Ask Edward <StudentPortalIcon name="chevron" size={16} /></Link></div></aside>
-      </div>
-    </>
-  );
+function readGroups(): typeof GROUPS_DEFAULT {
+  try {
+    const raw = window.localStorage.getItem(GROUPS_STORE);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed && typeof parsed === "object" ? { ...GROUPS_DEFAULT, ...parsed } : GROUPS_DEFAULT;
+  } catch {
+    return GROUPS_DEFAULT;
+  }
 }
 
+function isAppointmentType(value: unknown): value is StudentAppointmentType {
+  return conversationTypes.some((type) => type.id === value);
+}
+
+type Booking = { type: ConversationType; prefill: { subject?: string } | null };
+
 export default function AppointmentsPage() {
+  const { tenant } = useTenant();
   const appointments = useApiResource(useCallback((signal: AbortSignal) => getStudentAppointments(signal), []));
-  return <PortalShell active="appointments" eyebrow="Appointments · Times published by Aster teams" title="Appointments" description="Schedule focused time with a {institution} advisor for the questions that matter.">{appointments.status === "loading" ? <LoadingState label="Loading your appointments" /> : appointments.status === "error" ? <ErrorState message={appointments.error} onRetry={appointments.reload} /> : <AppointmentWorkspace list={appointments.data} reload={appointments.refresh} />}</PortalShell>;
+  const refresh = appointments.refresh;
+  const { toasts, push, dismiss } = useToasts();
+
+  const [booking, setBooking] = useState<Booking | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const [how, setHow] = useState(false);
+  const [groups, setGroups] = useState(GROUPS_DEFAULT);
+  const [now, setNow] = useState(() => Date.now());
+  const returnFocus = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    // Read after mount: the server render has no storage, and the first paint must match it.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setGroups(readGroups());
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(GROUPS_STORE, JSON.stringify(groups));
+    } catch {
+      // A portal that cannot remember a preference still has to work.
+    }
+  }, [groups]);
+
+  const openBooking = useCallback((type: ConversationType, node: HTMLElement | null, prefill: Booking["prefill"] = null) => {
+    returnFocus.current = node;
+    setOpen(null);
+    setBooking({ type, prefill });
+  }, []);
+
+  // What Edward's escalation sent her here to do arrives with what she already told him: a
+  // booking opens the drawer on that team with the question written. Read once, then gone.
+  useEffect(() => {
+    function consume() {
+      const handoff = takeHandoff("booking");
+      if (handoff && isAppointmentType(handoff.topic)) {
+        openBooking(typeById(handoff.topic), null, {
+          subject: typeof handoff.question === "string" ? handoff.question : "",
+        });
+      }
+    }
+    consume();
+    return onHandoff(consume);
+  }, [openBooking]);
+
+  function closeBooking() {
+    setBooking(null);
+    setNow(Date.now());
+    returnFocus.current?.focus();
+  }
+
+  function openAppointment(appointment: StudentAppointment, node: HTMLElement | null) {
+    returnFocus.current = node;
+    setOpen(appointment.id);
+  }
+
+  function closeAppointment() {
+    setOpen(null);
+    returnFocus.current?.focus();
+  }
+
+  function booked(appointment: StudentAppointment) {
+    const type = typeById(appointment.type);
+    push({ tone: "success", title: "Booked.", body: `${articled(type.team, true)} has it too.` });
+    refresh();
+  }
+
+  function bookAgain(appointment: StudentAppointment, node: HTMLElement | null = null) {
+    openBooking(typeById(appointment.type), node, { subject: appointment.notes ?? "" });
+  }
+
+  function toggleGroup(id: keyof typeof GROUPS_DEFAULT) {
+    setGroups((value) => ({ ...value, [id]: !value[id] }));
+  }
+
+  const list = appointments.data?.items ?? [];
+  const { current, record } = splitAppointments(list, now);
+  const conversationsOpen = groups.conversations;
+  const openRecord = list.find((item) => item.id === open) ?? null;
+  // The band points at the first topic when nothing is booked — and at nothing once one is.
+  const band = current.length === 0 ? conversationTypes[0].id : null;
+
+  return (
+    <PortalShell
+      active="appointments"
+      rail={<AppointmentsRail institution={tenant.shortName} onOpenHow={() => setHow(true)} />}
+    >
+      {appointments.status === "loading" ? (
+        <PageSkeleton label="your appointments" />
+      ) : appointments.status === "error" ? (
+        <PageError label="your appointments" onRetry={appointments.reload} />
+      ) : (
+        <>
+          <Card aria-labelledby="book-heading">
+            <CardHead
+              kind="status"
+              icon="calendar"
+              tone="accent"
+              title="Book a conversation"
+              titleId="book-heading"
+              note="What it’s about"
+              aside={
+                <button type="button" className="text-button" onClick={() => setHow(true)}>
+                  How this works
+                </button>
+              }
+            />
+            <CardRows className="topic-list">
+              {conversationTypes.map((type) => (
+                <AppointmentsTopicRow
+                  key={type.id}
+                  type={type}
+                  mark="E"
+                  band={band === type.id ? "start" : null}
+                  onChoose={(entry, node) => openBooking(entry, node)}
+                />
+              ))}
+            </CardRows>
+          </Card>
+
+          <Card className={current.length > 0 && !conversationsOpen ? "collapsed" : ""} aria-labelledby="conversations-heading">
+            <CardHead
+              kind="status"
+              icon="users"
+              title="Your conversations"
+              titleId="conversations-heading"
+              count={current.length > 0 ? current.length : undefined}
+              open={conversationsOpen}
+              onToggle={current.length > 0 ? () => toggleGroup("conversations") : undefined}
+              controls="appointments-conversations"
+            />
+
+            {current.length === 0 ? (
+              <StateCard
+                icon="calendar"
+                title="Nothing booked yet"
+                action={{
+                  label: "Book a conversation",
+                  icon: "arrow",
+                  onClick: (event: React.MouseEvent<HTMLButtonElement>) => openBooking(conversationTypes[0], event.currentTarget),
+                }}
+              >
+                You haven’t booked time with any of {tenant.shortName}’s teams. Picking a topic and a time books
+                it straight away. If you are not sure who to ask, ask Edward — he can point you to the right
+                team.
+              </StateCard>
+            ) : (
+              <CardRows className="appointment-list" id="appointments-conversations" hidden={!conversationsOpen}>
+                {current.map((appointment) => (
+                  <AppointmentsRow
+                    key={appointment.id}
+                    appointment={appointment}
+                    type={typeById(appointment.type)}
+                    tenant={tenant}
+                    now={now}
+                    onOpen={openAppointment}
+                    onBookAgain={bookAgain}
+                  />
+                ))}
+              </CardRows>
+            )}
+          </Card>
+
+          {record.length > 0 && (
+            <Card className={groups.record ? "" : "collapsed"} aria-labelledby="record-heading">
+              <CardHead
+                kind="status"
+                icon="clock"
+                tone="locked"
+                title="Past and cancelled"
+                titleId="record-heading"
+                count={record.length}
+                open={groups.record}
+                onToggle={() => toggleGroup("record")}
+                controls="appointments-record"
+              />
+              <CardRows className="appointment-list" id="appointments-record" hidden={!groups.record}>
+                {record.map((appointment) => (
+                  <AppointmentsRow
+                    key={appointment.id}
+                    appointment={appointment}
+                    type={typeById(appointment.type)}
+                    tenant={tenant}
+                    now={now}
+                    onOpen={openAppointment}
+                    onBookAgain={bookAgain}
+                  />
+                ))}
+              </CardRows>
+            </Card>
+          )}
+        </>
+      )}
+
+      {booking && (
+        <AppointmentsBookingDrawer
+          type={booking.type}
+          tenant={tenant}
+          now={now}
+          prefill={booking.prefill}
+          onBooked={booked}
+          onClose={closeBooking}
+        />
+      )}
+
+      {openRecord && (
+        <AppointmentsDrawer
+          appointment={openRecord}
+          type={typeById(openRecord.type)}
+          tenant={tenant}
+          now={now}
+          onClose={closeAppointment}
+          onBookAgain={(appointment) => bookAgain(appointment)}
+        />
+      )}
+
+      {how && <InfoModal variant="booking" onClose={() => setHow(false)} />}
+
+      <ToastStack toasts={toasts} onDismiss={dismiss} />
+    </PortalShell>
+  );
 }

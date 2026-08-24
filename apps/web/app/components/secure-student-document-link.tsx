@@ -2,9 +2,8 @@
 
 import type { StudentDocument } from "@vv/contracts";
 import { useState } from "react";
-import {
-  getStudentDocumentContent,
-} from "../lib/api-client";
+import Icon from "../design-system/Icon.jsx";
+import { getStudentDocumentContent } from "../lib/api-client";
 import { getApiErrorMessage } from "../hooks/use-api-resource";
 
 /**
@@ -59,15 +58,19 @@ export function SecureStudentDocumentLink({
   return (
     <span className="secure-document-link">
       <button
-        className="document-record__open"
+        className="link-button"
         type="button"
         disabled={status === "loading"}
         onClick={() => void openDocument()}
       >
-        {status === "loading" ? "Opening protected document…" : label} {" "}
-        <span aria-hidden="true">↗</span>
+        <Icon name={status === "loading" ? "spinner" : "download"} size={14} />{" "}
+        {status === "loading" ? "Opening the protected file…" : label}
       </button>
-      {error ? <span className="field-error" role="alert">{error}</span> : null}
+      {error ? (
+        <span className="field-error" role="alert">
+          <Icon name="alert" size={13} /> {error}
+        </span>
+      ) : null}
     </span>
   );
 }

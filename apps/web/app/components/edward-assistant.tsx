@@ -3,16 +3,14 @@
 import type {
   AskEdwardResponse,
   AssistantConversationMessage,
-  AssistantResponseBlock,
-  EdwardActionWidget,
-  EdwardChatMessage,
-  EdwardContextReceipt,
 } from "@vv/contracts";
 import { usePathname } from "next/navigation";
 import { TenantLink as Link } from "./tenant-link";
 import {
   type FormEvent,
   type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
   useCallback,
   useEffect,
   useMemo,
@@ -20,13 +18,22 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import Icon from "../design-system/Icon.jsx";
+import { IconButton } from "../design-system/primitives/Button.jsx";
+import { onEdwardOpen, type EdwardDoorContext } from "../design-lib/door.js";
+import { DESTINATIONS, GROUPS } from "../design-lib/navigation.js";
+import {
+  TWO_PANE_QUERY,
+  useIsSheet,
+  useMedia,
+  useOverlay,
+} from "../design-lib/overlay.js";
 import { useActivityTracking } from "../hooks/use-activity-tracking";
 import { useEdwardVoice } from "../hooks/use-edward-voice";
 import {
   ApiClientError,
   askEdward,
   createAssistantConversation,
-  createDepositPayment,
   getAssistantConversationMessages,
 } from "../lib/api-client";
 import {
@@ -34,7 +41,17 @@ import {
   type EdwardCanonicalVoiceResponse,
 } from "../lib/edward-voice";
 import { AssistantBlocks } from "./assistant-blocks";
+import { ActionWidget } from "./edward-action-widget";
+import { EdwardComposer } from "./edward-composer";
+import { EdwardHistory } from "./edward-history";
 import { EdwardResponseFeedback } from "./edward-response-feedback";
+import {
+  EDWARD,
+  EdwardThread,
+  contextSourceLabels,
+  type EdwardDisplayMessage,
+  type EdwardSuggestionGroup,
+} from "./edward-thread";
 import { useTenant } from "./tenant-provider";
 import styles from "./edward-assistant.module.css";
 
@@ -45,16 +62,43 @@ const quickPrompts = [
   "What financial-aid item needs attention?",
 ];
 
-type DisplayMessage = EdwardChatMessage & {
-  id: string;
-  inputMode?: "text" | "voice";
-  actions?: AskEdwardResponse["suggestedActions"];
-  provider?: AskEdwardResponse["provider"];
-  contextReceipts?: AskEdwardResponse["contextReceipts"];
-  widgets?: EdwardActionWidget[];
-  blocks?: AssistantResponseBlock[];
-  traceId?: string;
-};
+type DisplayMessage = EdwardDisplayMessage;
+
+const suggestionGroups: EdwardSuggestionGroup[] = [
+  {
+    id: "start",
+    label: "To get started",
+    items: quickPrompts.map((text, index) => ({ id: `start-${index}`, text })),
+  },
+];
+
+/**
+ * `My Financials · Payments` — the composer's chip names the page the student
+ * is on, read from the design model's destinations so it can never name a
+ * page the navigation does not have. A tenant-prefixed path is tried without
+ * its first segment as well.
+ */
+function pageContextLabel(pathname: string): string | null {
+  const clean = pathname.replace(/\/+$/, "") || "/";
+  const candidates = [clean, clean.replace(/^\/[^/]+/, "") || "/"];
+  let best: (typeof DESTINATIONS)[number] | null = null;
+  for (const candidate of candidates) {
+    for (const destination of DESTINATIONS) {
+      if (
+        candidate === destination.route ||
+        candidate.startsWith(`${destination.route}/`)
+      ) {
+        if (!best || destination.route.length > best.route.length) {
+          best = destination;
+        }
+      }
+    }
+  }
+  if (!best) return null;
+  return best.group
+    ? `${GROUPS[best.group] ?? best.group} · ${best.label}`
+    : best.label;
+}
 
 type Conversation = {
   id: string;
@@ -187,136 +231,6 @@ function voiceCapabilitySnapshot() {
   );
 }
 
-const contextSourceLabels: Record<EdwardContextReceipt["source"], string> = {
-  dashboard: "Enrollment summary",
-  profile: "Profile",
-  documents: "Documents",
-  onboarding: "Onboarding",
-  payments: "Payments",
-  academics: "Academic plan",
-  financials: "Financial plan",
-  financial_aid: "Financial aid",
-  housing: "Housing",
-  holds: "Holds",
-  registration: "Registration",
-  deadlines: "Deadlines",
-  appointments: "Appointments",
-  policies: "University policies",
-  account: "Account balance",
-  messages: "Messages",
-  campus_life: "Campus life",
-};
-
-function ActionWidget({
-  widget,
-  onCompleted,
-}: {
-  widget: EdwardActionWidget;
-  onCompleted: (message: string) => void;
-}) {
-  const { track } = useActivityTracking();
-  const [status, setStatus] = useState<
-    "idle" | "submitting" | "complete" | "error"
-  >(widget.type === "deposit_payment" && widget.status === "completed"
-    ? "complete"
-    : "idle");
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    track("ui.edward_action_widget_viewed.v1", {
-      widget_type: widget.type,
-      page_context: window.location.pathname,
-    });
-  }, [track, widget.type]);
-
-  if (widget.type === "deposit_payment") {
-    const pay = async () => {
-      if (!["idle", "error"].includes(status)) return;
-      setStatus("submitting");
-      setError(null);
-      try {
-        await createDepositPayment(
-          { offerId: widget.offerId },
-          crypto.randomUUID(),
-        );
-        setStatus("complete");
-        track("ui.edward_action_completed.v1", {
-          widget_type: widget.type,
-          outcome: "succeeded",
-        });
-        onCompleted(
-          "Your enrollment deposit is recorded. Enrollment and financial balances have been refreshed.",
-        );
-      } catch (caught) {
-        setStatus("error");
-        setError(
-          caught instanceof Error
-            ? caught.message
-            : "The deposit could not be recorded.",
-        );
-        track("ui.edward_action_completed.v1", {
-          widget_type: widget.type,
-          outcome: "failed",
-        });
-      }
-    };
-
-    return (
-      <section className="edward-widget" aria-label={widget.title}>
-        <div className="edward-widget__heading">
-          <span aria-hidden="true">$</span>
-          <div>
-            <strong>{widget.title}</strong>
-            <small>Secure action</small>
-          </div>
-          <b>
-            {new Intl.NumberFormat("en-US", {
-              style: "currency",
-              currency: "USD",
-              maximumFractionDigits: 0,
-            }).format(widget.amountCents / 100)}
-          </b>
-        </div>
-        <p>{widget.description}</p>
-        {error ? <p className="edward-widget__error">{error}</p> : null}
-        <button
-          className="button button--accent"
-          type="button"
-          disabled={status === "submitting" || status === "complete"}
-          onClick={() => void pay()}
-        >
-          {status === "submitting"
-            ? "Recording deposit…"
-            : status === "complete"
-              ? "✓ Deposit recorded"
-              : status === "error"
-                ? "Try again"
-                : "Pay deposit"}
-        </button>
-        <small>No real card is charged in this development environment.</small>
-      </section>
-    );
-  }
-
-  return (
-    <section className="edward-widget" aria-label={widget.title}>
-      <div className="edward-widget__heading">
-        <span aria-hidden="true">{widget.type === "document_upload" ? "↑" : "◷"}</span>
-        <div>
-          <strong>{widget.title}</strong>
-          <small>
-            {widget.type === "document_upload" ? "Document workflow" : "Live support"}
-          </small>
-        </div>
-      </div>
-      <p>{widget.description}</p>
-      <Link className="button button--accent" href={widget.href}>
-        {widget.type === "document_upload" ? "Choose a document" : "Choose a time"}
-      </Link>
-    </section>
-  );
-}
-
 /** Developer observability hook: one call per completed text turn. */
 export interface EdwardTurnEvent {
   question: string;
@@ -372,9 +286,44 @@ export function EdwardAssistant({
   );
   const [persistence, setPersistence] =
     useState<ConversationPersistence>("unknown");
-  const compactInput = useRef<HTMLInputElement>(null);
+  const floatingInput = useRef<HTMLTextAreaElement>(null);
   const workspaceInput = useRef<HTMLTextAreaElement>(null);
   const transcript = useRef<HTMLDivElement>(null);
+  const bottom = useRef<HTMLDivElement>(null);
+  const launcher = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
+  // The floating window's forms: the conversation, or the history pane.
+  const [view, setView] = useState<"conversation" | "history">("conversation");
+  // What a door brought in — the chip's label and the hint. See `door.js`.
+  const [doorContext, setDoorContext] = useState<EdwardDoorContext | null>(null);
+  const [contextOn, setContextOn] = useState(true);
+  const [focusPending, setFocusPending] = useState(false);
+  // The last question that failed to send, so "Try again" can resend it.
+  const [failedAsk, setFailedAsk] = useState<string | null>(null);
+  const isSheet = useIsSheet();
+  const twoPane = useMedia(TWO_PANE_QUERY);
+  // "Play answer" — the browser reads an answer aloud. Real speech synthesis,
+  // offered only where the browser has it.
+  const [playing, setPlaying] = useState<string | null>(null);
+  const canSpeak = useSyncExternalStore(
+    subscribeToVoiceCapability,
+    () => "speechSynthesis" in window,
+    () => false,
+  );
+  const play = (id: string, text: string) => {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    if (playing === id) {
+      setPlaying(null);
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = navigator.language || "en-US";
+    utterance.onend = () => setPlaying((current) => (current === id ? null : current));
+    utterance.onerror = () => setPlaying((current) => (current === id ? null : current));
+    window.speechSynthesis.speak(utterance);
+    setPlaying(id);
+  };
   const recognition = useRef<SpeechRecognitionInstance | null>(null);
   const voiceRecovery = useRef<HTMLButtonElement>(null);
   const conversationCreation = useRef<Promise<string | null> | null>(null);
@@ -385,6 +334,10 @@ export function EdwardAssistant({
     () => ({ path: pathname, label: `${tenant.shortName} student portal` }),
     [pathname, tenant.shortName],
   );
+  const pageLabel = useMemo(() => pageContextLabel(pathname), [pathname]);
+  const contextLabel = contextOn
+    ? (doorContext?.label ?? pageLabel ?? `${tenant.shortName} student portal`)
+    : null;
   /**
    * Whether the platform offers LiveKit voice sessions. Like conversation
    * persistence, a 404 settles it; browser speech remains the fallback.
@@ -524,12 +477,34 @@ export function EdwardAssistant({
     };
   }, []);
 
+  // The floating window's first focus is `useOverlay`'s (its first control),
+  // as in the reference; the door is the one path that lands in the field.
   useEffect(() => {
-    if (!open) return;
-    (variant === "embedded"
-      ? workspaceInput.current
-      : compactInput.current
-    )?.focus();
+    if (!open || variant !== "embedded") return;
+    workspaceInput.current?.focus();
+  }, [open, variant]);
+
+  // The door wrote the question; the caret goes to its end so she can fix it.
+  useEffect(() => {
+    if (!open || !focusPending) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      const field = floatingInput.current;
+      if (field) {
+        field.focus();
+        const end = field.value.length;
+        field.setSelectionRange(end, end);
+      }
+      setFocusPending(false);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, focusPending]);
+
+  // The pill is not in the DOM while the window is open, so the focus
+  // hand-back is ours rather than `useOverlay`'s.
+  useEffect(() => {
+    if (variant !== "floating") return;
+    if (wasOpen.current && !open) launcher.current?.focus();
+    wasOpen.current = open;
   }, [open, variant]);
 
   // Warm the LiveKit client bundle while the student is looking at the panel
@@ -556,7 +531,13 @@ export function EdwardAssistant({
       top: transcript.current.scrollHeight,
       behavior: "smooth",
     });
-  }, [activeConversationId, messages, sending, voice.caption, voice.state]);
+    // An empty conversation is read from the top: the greeting and the
+    // suggestions are the content. Only a conversation follows its own tail.
+    const thread = bottom.current?.parentElement;
+    if (thread && messages.length > 1) {
+      thread.scrollTo({ top: thread.scrollHeight });
+    }
+  }, [activeConversationId, messages, sending, voice.caption, voice.state, open, view]);
 
   const updateConversation = (
     conversationId: string,
@@ -639,6 +620,7 @@ export function EdwardAssistant({
       id: crypto.randomUUID(),
       role: "user",
       content: normalized,
+      ...(variant === "floating" && contextLabel ? { context: contextLabel } : {}),
     };
     const history = messages
       .slice(-6)
@@ -654,6 +636,7 @@ export function EdwardAssistant({
     }));
     setDraft("");
     setError(null);
+    setFailedAsk(null);
     setSending(true);
     const sendStartedAt = performance.now();
     try {
@@ -721,6 +704,9 @@ export function EdwardAssistant({
           ? caught.message
           : "Edward could not answer just now. Please try again.";
       setError(message);
+      setFailedAsk(normalized);
+      // The question stays in the box below, exactly as the reference promises.
+      setDraft((current) => (current.trim() ? current : normalized));
       onTurn?.({
         question: normalized,
         response: null,
@@ -796,7 +782,7 @@ export function EdwardAssistant({
       await voice.endVoice();
       (variant === "embedded"
         ? workspaceInput.current
-        : compactInput.current
+        : floatingInput.current
       )?.focus();
       return;
     }
@@ -850,14 +836,28 @@ export function EdwardAssistant({
     void send(draft);
   };
 
-  const startNewConversation = () => {
-    if (sending) return;
+  const focusInput = () =>
+    (variant === "embedded"
+      ? workspaceInput.current
+      : floatingInput.current
+    )?.focus();
+
+  const conversationIsEmpty =
+    messages.length === 1 &&
+    activeConversation?.title === "New conversation" &&
+    !activeConversation?.serverId;
+
+  /** A fresh thread — or the current one, when nothing has been said in it yet. */
+  const beginConversation = () => {
     if (voiceSessionOpen) void voice.endVoice();
-    if (messages.length === 1 && activeConversation?.title === "New conversation") {
-      setHistoryOpen(false);
-      workspaceInput.current?.focus();
-      return;
-    }
+    setDraft("");
+    setError(null);
+    setFailedAsk(null);
+    setHistoryOpen(false);
+    setView("conversation");
+    setContextOn(true);
+    setDoorContext(null);
+    if (conversationIsEmpty) return;
     const id = crypto.randomUUID();
     setConversations((current) => [
       {
@@ -868,24 +868,150 @@ export function EdwardAssistant({
       ...current,
     ]);
     setActiveConversationId(id);
-    setDraft("");
-    setError(null);
-    setHistoryOpen(false);
-    window.requestAnimationFrame(() => workspaceInput.current?.focus());
+  };
+
+  const startNewConversation = () => {
+    if (sending) return;
+    beginConversation();
+    window.requestAnimationFrame(focusInput);
   };
 
   const selectConversation = (conversationId: string) => {
     if (sending || conversationId === activeConversationId) {
       setHistoryOpen(false);
+      if (!twoPane) setView("conversation");
       return;
     }
     if (voiceSessionOpen) void voice.endVoice();
     setActiveConversationId(conversationId);
     setDraft("");
     setError(null);
+    setFailedAsk(null);
     setHistoryOpen(false);
-    window.requestAnimationFrame(() => workspaceInput.current?.focus());
+    setDoorContext(null);
+    if (!twoPane) setView("conversation");
+    window.requestAnimationFrame(focusInput);
   };
+
+  const retry = () => {
+    if (!failedAsk) return;
+    void send(failedAsk);
+  };
+
+  const closeFloating = () => {
+    if (voiceSessionOpen) void voice.endVoice();
+    setOpen(false);
+  };
+
+  // The door — a screen opens Edward with the question written and *not*
+  // sent: a fresh conversation (or the current empty one), the chip naming
+  // the item, the input focused with the caret at the end.
+  const openDoor = (detail: { question?: string; context?: EdwardDoorContext | null }) => {
+    if (variant !== "floating") return;
+    if (!sending) beginConversation();
+    setDoorContext(detail.context ?? null);
+    setContextOn(true);
+    setDraft(detail.question ?? "");
+    setError(null);
+    setView("conversation");
+    setOpen(true);
+    setFocusPending(true);
+  };
+  const doorHandler = useRef(openDoor);
+  useEffect(() => {
+    doorHandler.current = openDoor;
+  });
+  useEffect(() => onEdwardOpen((detail) => doorHandler.current(detail)), []);
+
+  const liveVoiceControls =
+    allowLiveVoice && (voiceSessionOpen || voice.problem) ? (
+      <section
+        className="edward-live-voice"
+        data-state={voice.state}
+        aria-label="Edward voice controls"
+      >
+        <div
+          className="edward-live-voice__summary"
+          role="status"
+          aria-live="polite"
+        >
+          <span aria-hidden="true">
+            {voice.microphoneActive ? "◉" : "○"}
+          </span>
+          <div>
+            <strong>{EDWARD_VOICE_STATE_LABELS[voice.state]}</strong>
+            <small>
+              {voice.microphoneActive
+                ? "Microphone active · you can keep typing"
+                : "Text Edward remains available"}
+            </small>
+          </div>
+        </div>
+        {voice.problem ? (
+          <div className="edward-live-voice__problem" role="alert">
+            <strong>{voice.problem.message}</strong>
+            <p>{voice.problem.recovery}</p>
+          </div>
+        ) : null}
+        <div className="edward-live-voice__controls">
+          {voice.problem?.code === "VOICE_AUDIO_PLAYBACK_BLOCKED" ? (
+            <button
+              ref={voiceRecovery}
+              type="button"
+              onClick={() => void voice.enableAudioPlayback()}
+            >
+              Enable audio
+            </button>
+          ) : voice.problem?.canRetry ? (
+            <button
+              ref={voiceRecovery}
+              type="button"
+              onClick={() => void voice.retryVoice()}
+            >
+              {voice.problem.sessionExpired
+                ? "Begin another voice session"
+                : [
+                      "VOICE_LIVEKIT_DISCONNECTED",
+                      "VOICE_WORKER_UNAVAILABLE",
+                      "VOICE_EVENT_UNREADABLE",
+                    ].includes(voice.problem.code)
+                  ? "Reconnect voice"
+                  : "Try again"}
+            </button>
+          ) : null}
+          {voiceSessionOpen ? (
+            <>
+              <button
+                type="button"
+                disabled={voice.state !== "assistant_speaking"}
+                onClick={() => void voice.stopSpeaking()}
+              >
+                Stop assistant speech
+              </button>
+              <button
+                type="button"
+                onClick={() => void startOrEndLiveVoice()}
+              >
+                End voice session
+              </button>
+            </>
+          ) : null}
+        </div>
+      </section>
+    ) : null;
+
+  const browserVoiceOnly =
+    !allowLiveVoice || liveVoiceUnavailable || persistence === "unavailable";
+  const micDisabled = sending || (browserVoiceOnly && !voiceSupported);
+  const micLabel = voiceSessionOpen
+    ? "End Edward voice session"
+    : listening
+      ? "Stop listening"
+      : browserVoiceOnly
+        ? voiceSupported
+          ? "Ask Edward by voice"
+          : "Voice input is unavailable"
+        : "Start voice with Edward";
 
   const panel = (
     <section
@@ -1051,81 +1177,7 @@ export function EdwardAssistant({
         ) : null}
       </div>
 
-      {allowLiveVoice && (voiceSessionOpen || voice.problem) ? (
-        <section
-          className="edward-live-voice"
-          data-state={voice.state}
-          aria-label="Edward voice controls"
-        >
-          <div
-            className="edward-live-voice__summary"
-            role="status"
-            aria-live="polite"
-          >
-            <span aria-hidden="true">
-              {voice.microphoneActive ? "◉" : "○"}
-            </span>
-            <div>
-              <strong>{EDWARD_VOICE_STATE_LABELS[voice.state]}</strong>
-              <small>
-                {voice.microphoneActive
-                  ? "Microphone active · you can keep typing"
-                  : "Text Edward remains available"}
-              </small>
-            </div>
-          </div>
-          {voice.problem ? (
-            <div className="edward-live-voice__problem" role="alert">
-              <strong>{voice.problem.message}</strong>
-              <p>{voice.problem.recovery}</p>
-            </div>
-          ) : null}
-          <div className="edward-live-voice__controls">
-            {voice.problem?.code === "VOICE_AUDIO_PLAYBACK_BLOCKED" ? (
-              <button
-                ref={voiceRecovery}
-                type="button"
-                onClick={() => void voice.enableAudioPlayback()}
-              >
-                Enable audio
-              </button>
-            ) : voice.problem?.canRetry ? (
-              <button
-                ref={voiceRecovery}
-                type="button"
-                onClick={() => void voice.retryVoice()}
-              >
-                {voice.problem.sessionExpired
-                  ? "Begin another voice session"
-                  : [
-                        "VOICE_LIVEKIT_DISCONNECTED",
-                        "VOICE_WORKER_UNAVAILABLE",
-                        "VOICE_EVENT_UNREADABLE",
-                      ].includes(voice.problem.code)
-                    ? "Reconnect voice"
-                    : "Try again"}
-              </button>
-            ) : null}
-            {voiceSessionOpen ? (
-              <>
-                <button
-                  type="button"
-                  disabled={voice.state !== "assistant_speaking"}
-                  onClick={() => void voice.stopSpeaking()}
-                >
-                  Stop assistant speech
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void startOrEndLiveVoice()}
-                >
-                  End voice session
-                </button>
-              </>
-            ) : null}
-          </div>
-        </section>
-      ) : null}
+      {liveVoiceControls}
 
       {messages.length === 1 ? (
         <div
@@ -1152,29 +1204,17 @@ export function EdwardAssistant({
           Ask about your student journey
         </label>
         <div>
-          {variant === "embedded" ? (
-            <textarea
-              ref={workspaceInput}
-              id={`edward-message-${variant}`}
-              value={draft}
-              rows={1}
-              maxLength={2_000}
-              autoComplete="off"
-              placeholder="Message Edward"
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={handleComposerKeyDown}
-            />
-          ) : (
-            <input
-              ref={compactInput}
-              id={`edward-message-${variant}`}
-              value={draft}
-              maxLength={2_000}
-              autoComplete="off"
-              placeholder="Ask about enrollment, classes, aid, or campus…"
-              onChange={(event) => setDraft(event.target.value)}
-            />
-          )}
+          <textarea
+            ref={workspaceInput}
+            id={`edward-message-${variant}`}
+            value={draft}
+            rows={1}
+            maxLength={2_000}
+            autoComplete="off"
+            placeholder="Message Edward"
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={handleComposerKeyDown}
+          />
           <button
             className={`edward-voice-button${
               listening || voice.microphoneActive ? " is-listening" : ""
@@ -1325,24 +1365,205 @@ export function EdwardAssistant({
     );
   }
 
+  if (!open) {
+    return (
+      <button
+        className="edward-launcher"
+        ref={launcher}
+        type="button"
+        aria-expanded="false"
+        aria-controls="edward-panel"
+        onClick={() => setOpen(true)}
+      >
+        <span className="edward-mark small" aria-hidden="true">
+          {EDWARD.mark}
+        </span>
+        Ask {EDWARD.name}
+      </button>
+    );
+  }
+
+  const showHistory = view === "history";
+  const showThread = !showHistory || twoPane;
+  const greeting = messages.find(({ id }) => id === "welcome") ?? null;
+  const greetingBody = greeting
+    ? {
+        ...greeting,
+        content: greeting.content.replace(/^Hi [^—]+—\s*/, ""),
+      }
+    : null;
+  const thread = messages.filter(({ id }) => id !== "welcome");
+  const historyItems = conversations.map((conversation) => ({
+    id: conversation.id,
+    title: conversation.title,
+    count: conversation.messages.filter(({ id }) => id !== "welcome").length,
+    saved: Boolean(conversation.serverId) && persistence === "active",
+  }));
+  const micListening = listening || voice.microphoneActive;
+  const composerNote: ReactNode = listening ? (
+    <p className="edward-mic-note" role="status">
+      <Icon name="info" size={12} /> Listening — ask your question naturally.
+    </p>
+  ) : voiceReplies ? (
+    <p className="edward-mic-note" role="status">
+      <Icon name="sound" size={12} /> Voice replies are on.
+      <button
+        type="button"
+        className="text-button"
+        onClick={() => {
+          window.speechSynthesis?.cancel();
+          setVoiceReplies(false);
+        }}
+      >
+        Turn off
+      </button>
+    </p>
+  ) : null;
+
+  return (
+    <EdwardWindow
+      isSheet={isSheet}
+      wide={showHistory && twoPane}
+      historyOnly={showHistory && !showThread}
+      onClose={closeFloating}
+    >
+      <header className="edward-head">
+        {showHistory && !twoPane ? (
+          <IconButton
+            name="back"
+            size={18}
+            label="Back to the conversation"
+            tip="Back"
+            onClick={() => setView("conversation")}
+          />
+        ) : null}
+        <span className="edward-mark small" aria-hidden="true">
+          {EDWARD.mark}
+        </span>
+        <div className="edward-title">
+          <strong>{EDWARD.name}</strong>
+          <span>{tenant.shortName}’s AI assistant</span>
+        </div>
+        {showThread ? (
+          <IconButton
+            className={showHistory ? "active" : undefined}
+            name="clock"
+            size={18}
+            label="Your conversations"
+            aria-pressed={showHistory}
+            onClick={() => setView(showHistory ? "conversation" : "history")}
+          />
+        ) : null}
+        <IconButton
+          name="pen"
+          size={18}
+          label="New conversation"
+          disabled={sending}
+          onClick={startNewConversation}
+        />
+        <IconButton
+          name="close"
+          size={18}
+          label="Close Edward"
+          tip="Close"
+          onClick={closeFloating}
+        />
+      </header>
+
+      <div className="edward-body">
+        {showHistory ? (
+          <EdwardHistory
+            conversations={historyItems}
+            activeId={activeConversationId}
+            disabled={sending}
+            onOpen={selectConversation}
+            onNew={startNewConversation}
+          />
+        ) : null}
+
+        {showThread ? (
+          <div className="edward-main">
+            <EdwardThread
+              studentName={studentName}
+              greeting={greetingBody}
+              messages={thread}
+              suggestions={suggestionGroups}
+              thinking={sending}
+              error={error}
+              canRetry={Boolean(failedAsk) && !sending}
+              caption={voice.caption ?? null}
+              playing={playing}
+              onPlay={canSpeak ? play : null}
+              onAsk={(item) => void send(item.text)}
+              onRetry={retry}
+              onWidgetCompleted={addSystemMessage}
+              bottomRef={bottom}
+            />
+            <EdwardComposer
+              draft={draft}
+              onDraft={setDraft}
+              onSend={(value) => void send(value)}
+              context={contextLabel}
+              onDropContext={() => setContextOn(false)}
+              listening={micListening}
+              micLabel={micLabel}
+              micDisabled={micDisabled}
+              onMic={handleVoiceButton}
+              disabled={sending}
+              note={composerNote}
+              inputRef={floatingInput}
+            >
+              {liveVoiceControls}
+            </EdwardComposer>
+          </div>
+        ) : null}
+      </div>
+    </EdwardWindow>
+  );
+}
+
+/**
+ * Split out so the dialog element mounts and unmounts as one unit — the
+ * overlay hook keys its focus handling to that lifetime. Non-modal on a
+ * desktop (the page stays live behind it); a modal sheet with a scrim below
+ * the sheet breakpoint.
+ */
+function EdwardWindow({
+  isSheet,
+  wide,
+  historyOnly,
+  onClose,
+  children,
+}: {
+  isSheet: boolean;
+  wide: boolean;
+  historyOnly: boolean;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const panel: RefObject<HTMLElement | null> = useRef<HTMLElement>(null);
+  useOverlay(panel, { onClose, modal: isSheet, returnFocus: false });
+
   return (
     <>
-      <button
-        className={`edward-launcher${open ? " edward-launcher--open" : ""}`}
-        type="button"
-        aria-expanded={open}
-        aria-controls="edward-panel"
-        onClick={() => setOpen((current) => !current)}
+      {isSheet ? (
+        <button
+          type="button"
+          className="modal-scrim edward-scrim"
+          aria-label="Close Edward"
+          onClick={onClose}
+        />
+      ) : null}
+      <aside
+        id="edward-panel"
+        className={`edward-panel${wide ? " wide" : ""}${historyOnly ? " history-only" : ""}`}
+        ref={panel}
+        role="dialog"
+        aria-modal={isSheet ? "true" : undefined}
+        aria-label="Edward, your AI assistant"
       >
-        <span className="edward-avatar" aria-hidden="true">
-          E
-        </span>
-        <span>
-          <strong>Ask Edward</strong>
-          <small>AI student guide</small>
-        </span>
-      </button>
-      {open ? panel : null}
+        {children}
+      </aside>
     </>
   );
 }

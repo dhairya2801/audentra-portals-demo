@@ -1,14 +1,23 @@
 "use client";
 
-import type { FerpaPortalScope, StudentExperienceUpdate } from "@vv/contracts";
+import type {
+  FerpaPortalScope,
+  StudentExperienceUpdate,
+  StudentMessage,
+  StudentRequirementDetail,
+} from "@vv/contracts";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useActivityTracking } from "../hooks/use-activity-tracking";
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
 import {
   decideStudentExperienceUpdate,
   deferStudentExperienceUpdates,
   getStudentBootstrap,
+  getStudentMessages,
+  getStudentRequirements,
+  markStudentMessageRead,
   signOutFerpaDelegate,
 } from "../lib/api-client";
 import {
@@ -19,16 +28,24 @@ import {
 import { EdwardAssistant } from "./edward-assistant";
 import { ErrorState, LoadingState } from "./portal-ui";
 import { RewardCelebration } from "./reward-celebration";
-import { StudentNotificationCenter } from "./student-notification-center";
 import { connectStudentRealtime } from "./student-realtime";
 import { TenantLink as Link } from "./tenant-link";
 import { useTenant } from "./tenant-provider";
-import { formatTenantMoney } from "../lib/tenant";
 import { isParentPortalPath, parentPortalHref } from "../lib/parent-portal-routes";
+import Icon from "../design-system/Icon.jsx";
+import Avatar from "../design-system/primitives/Avatar.jsx";
+import { IconButton } from "../design-system/primitives/Button.jsx";
+import AudentraMark from "../design-system/marks/AudentraMark.jsx";
+import Popover from "../design-system/patterns/Popover.jsx";
 import {
-  StudentPortalIcon,
-  type StudentPortalIconName,
-} from "./student-portal-icon";
+  NAV,
+  PROFILE_ID,
+  UTILITY_ID,
+  destinationById,
+} from "../design-lib/navigation.js";
+import { NotificationPanel } from "./notification-panel";
+import { PointsInfoModal, PointsPopover } from "./points-popover";
+import { PageShell, type HeroCopy } from "./page-shell";
 
 export type PortalSection =
   | "dashboard"
@@ -48,125 +65,43 @@ export type PortalSection =
   | "housing"
   | "clubs";
 
-const navigation: {
-  key: PortalSection;
-  label: string;
-  shortLabel: string;
-  href: string;
-  icon: StudentPortalIconName;
-  group: "primary" | "financials" | "campus" | "after_groups" | "record" | "utility";
-}[] = [
-  {
-    key: "enrollment",
-    label: "My Enrollment",
-    shortLabel: "Enroll",
-    href: "/enrollment",
-    icon: "checklist",
-    group: "primary",
-  },
-  {
-    key: "appointments",
-    label: "Appointments",
-    shortLabel: "Meet",
-    href: "/appointments",
-    icon: "calendar",
-    group: "primary",
-  },
-  {
-    key: "classrooms",
-    label: "My Degree",
-    shortLabel: "Degree",
-    href: "/classrooms",
-    icon: "degree",
-    group: "primary",
-  },
-  {
-    key: "health",
-    label: "My Health and Wellness",
-    shortLabel: "Health",
-    href: "/health",
-    icon: "health",
-    group: "primary",
-  },
-  {
-    key: "financials",
-    label: "Overview",
-    shortLabel: "Finance",
-    href: "/financials",
-    icon: "wallet",
-    group: "financials",
-  },
-  {
-    key: "financial_aid",
-    label: "Financial aid",
-    shortLabel: "Aid",
-    href: "/financials/aid",
-    icon: "spark",
-    group: "financials",
-  },
-  {
-    key: "payments",
-    label: "Payments",
-    shortLabel: "Pay",
-    href: "/payments",
-    icon: "card",
-    group: "financials",
-  },
-  {
-    key: "campus_life",
-    label: "Events",
-    shortLabel: "Events",
-    href: "/campus-life",
-    icon: "ticket",
-    group: "campus",
-  },
-  {
-    key: "clubs",
-    label: "Clubs",
-    shortLabel: "Clubs",
-    href: "/campus-life?view=clubs",
-    icon: "users",
-    group: "campus",
-  },
-  {
-    key: "housing",
-    label: "Housing",
-    shortLabel: "Housing",
-    href: "/housing",
-    icon: "home",
-    group: "after_groups",
-  },
-  {
-    key: "help",
-    label: "Help",
-    shortLabel: "Help",
-    href: "/help",
-    icon: "help",
-    group: "utility",
-  },
-  {
-    key: "profile",
-    label: "Profile",
-    shortLabel: "Profile",
-    href: "/profile",
-    icon: "profile",
-    group: "utility",
-  },
-  /* Existing production destinations remain addressable, but the design puts
-     them behind page entry points rather than in the primary sidebar. */
-  { key: "dashboard", label: "Dashboard", shortLabel: "Home", href: "/dashboard", icon: "home", group: "record" },
-  { key: "messages", label: "Messages", shortLabel: "Messages", href: "/messages", icon: "message", group: "record" },
-  { key: "edward", label: "Edward AI", shortLabel: "Edward", href: "/edward", icon: "spark", group: "record" },
-  { key: "documents", label: "My Documents", shortLabel: "Documents", href: "/documents", icon: "file", group: "record" },
-];
+/** The production section a page names → the destination the design model knows it as. */
+const destinationOf: Partial<Record<PortalSection, string>> = {
+  enrollment: "my-enrollment",
+  appointments: "appointments",
+  classrooms: "my-classrooms",
+  health: "health",
+  housing: "housing",
+  financials: "financials-overview",
+  financial_aid: "financials-aid",
+  payments: "financials-payments",
+  campus_life: "events",
+  clubs: "clubs",
+  help: "help",
+  profile: "profile",
+  documents: "profile-documents",
+};
 
-const navigationGroups: Array<{
-  id: Exclude<(typeof navigation)[number]["group"], "primary" | "utility">;
-  label: string;
-}> = [
-  { id: "financials", label: "My Financials" },
-  { id: "campus", label: "My Campus Life" },
-];
+/** The delegate scope a section is read under. */
+function scopeOf(section: PortalSection): FerpaPortalScope {
+  return (section === "financial_aid" ? "financials" : section === "clubs" ? "campus_life" : section) as FerpaPortalScope;
+}
+
+const sectionOfDestination: Record<string, PortalSection> = Object.fromEntries(
+  Object.entries(destinationOf).map(([section, id]) => [id, section as PortalSection]),
+);
+
+const GROUP_STORE = "aster.nav.open";
+
+function readOpenGroups(): Record<string, boolean> {
+  try {
+    const raw = window.localStorage.getItem(GROUP_STORE);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
 
 function initials(fullName: string) {
   return fullName
@@ -182,6 +117,8 @@ function relationshipLabel(value: string) {
     ? "Partner"
     : value.charAt(0).toUpperCase() + value.slice(1).replaceAll("_", " ");
 }
+
+const terminalStatuses = new Set(["completed", "waived", "not_applicable"]);
 
 const experienceKindLabels: Record<StudentExperienceUpdate["kind"], string> = {
   onboarding: "Onboarding",
@@ -266,10 +203,11 @@ function ExperienceUpdateDialog({
   };
 
   return (
-    <div className="dialog-backdrop experience-update-backdrop">
+    <div className="center-modal-wrap experience-update-backdrop" role="presentation">
+      <div className="modal-scrim" aria-hidden="true" />
       <section
         ref={dialog}
-        className="confirmation-dialog experience-update-dialog"
+        className="info-modal experience-update-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="experience-update-title"
@@ -278,24 +216,16 @@ function ExperienceUpdateDialog({
         tabIndex={-1}
         onKeyDown={trapFocus}
       >
-        <span className="confirmation-dialog__symbol" aria-hidden="true">
-          !
+        <span className="modal-kicker">
+          <Icon name="bell" size={16} />{" "}
+          {isBundle ? "Enrollment & onboarding" : experienceKindLabels[primaryUpdate.kind]}
+          {" · "}
+          {isBundle
+            ? `${updates.length} updates together`
+            : primaryUpdate.status === "deferred"
+              ? "Saved reminder"
+              : `An update from ${institutionName}`}
         </span>
-        <div className="experience-update-dialog__meta">
-          <span>
-            {isBundle
-              ? "Enrollment & onboarding"
-              : experienceKindLabels[primaryUpdate.kind]}
-          </span>
-          <small>
-            {isBundle
-              ? `${updates.length} updates together`
-              : primaryUpdate.status === "deferred"
-                ? "Saved reminder"
-                : "New update"}
-          </small>
-        </div>
-        <p className="eyebrow">An update from {institutionName}</p>
         <h2 id="experience-update-title">
           {isBundle
             ? "Your enrollment and onboarding have updates"
@@ -307,57 +237,97 @@ function ExperienceUpdateDialog({
             : primaryUpdate.description}
         </p>
         {isBundle ? (
-          <ul className="experience-update-dialog__list">
+          <div className="signal-grid experience-update-dialog__list">
             {updates.map((update) => (
-              <li key={update.id}>
-                <div>
-                  <small>{experienceKindLabels[update.kind]}</small>
-                  <h3>{update.title}</h3>
-                  <p>{update.description}</p>
-                </div>
+              <div key={update.id}>
+                <span>{experienceKindLabels[update.kind]}</span>
+                <strong>{update.title}</strong>
+                <p>{update.description}</p>
                 <button
-                  className="experience-update-dialog__handle"
+                  className="secondary-button"
                   type="button"
                   disabled={busy}
                   onClick={() => void onHandleNow(update)}
                 >
-                  Handle now
+                  Handle now <Icon name="arrow" size={15} />
                 </button>
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         ) : null}
-        <p className="experience-update-dialog__guidance">
+        <div className="modal-note">
+          <Icon name="info" size={18} />
           {isBundle
             ? "Open any update now, or save this set for your next portal visit."
             : "You can take care of this now or save it for your next portal visit."}
-        </p>
+        </div>
         {error ? (
           <p className="inline-error" role="alert">
             {error}
           </p>
         ) : null}
-        <div className="dialog-actions experience-update-dialog__actions">
+        <div className="drawer-actions experience-update-dialog__actions">
           <button
-            className="button button--secondary"
+            className="secondary-button"
             type="button"
             disabled={busy}
             onClick={() => void onDefer()}
           >
             {busy ? "Saving…" : "Remind me later"}
           </button>
-          <button
-            className="button"
-            type="button"
-            hidden={isBundle}
-            disabled={busy}
-            onClick={() => void onHandleNow(primaryUpdate)}
-          >
-            {busy ? "Opening…" : "Handle now"}
-          </button>
+          {!isBundle ? (
+            <button
+              className="primary-button"
+              type="button"
+              disabled={busy}
+              onClick={() => void onHandleNow(primaryUpdate)}
+            >
+              {busy ? "Opening…" : "Handle now"} <Icon name="arrow" size={16} />
+            </button>
+          ) : null}
         </div>
       </section>
     </div>
+  );
+}
+
+/** One destination, as a row — the design system's `NavItem`, routed through the tenant. */
+function NavRow({
+  id,
+  activeId,
+  count,
+  countLabel,
+  onNavigate,
+}: {
+  id: string;
+  activeId: string | null;
+  count?: number;
+  countLabel?: string;
+  onNavigate: () => void;
+}) {
+  const item = destinationById(id);
+  if (!item) return null;
+  const active = item.id === activeId;
+  return (
+    <li>
+      <Link
+        className={`nav-item${active ? " active" : ""}`}
+        href={item.route}
+        aria-current={active ? "page" : undefined}
+        onClick={onNavigate}
+      >
+        <span className="nav-icon" aria-hidden="true">
+          <Icon name={item.icon} weight={active ? "fill" : "regular"} />
+        </span>
+        <span className="nav-label">{item.label}</span>
+        {count && count > 0 ? (
+          <span className="nav-count">
+            <span aria-hidden="true">{count}</span>
+            <span className="sr-only">{countLabel}</span>
+          </span>
+        ) : null}
+      </Link>
+    </li>
   );
 }
 
@@ -366,32 +336,33 @@ export function PortalShell({
   eyebrow,
   title,
   description,
+  hero,
+  summary,
+  summaryLabel,
+  notice,
+  tabs,
+  rail,
   actions,
   children,
 }: {
   active: PortalSection;
-  eyebrow: string;
-  title: string;
-  description: string;
-  actions?: React.ReactNode;
-  children: React.ReactNode;
+  /** Legacy hero copy, used only by pages the design model has no destination for. */
+  eyebrow?: string;
+  title?: string;
+  description?: string;
+  /** Overrides on top of the destination's own hero copy. */
+  hero?: HeroCopy;
+  summary?: ReactNode;
+  summaryLabel?: string;
+  notice?: ReactNode;
+  tabs?: ReactNode;
+  rail?: ReactNode;
+  actions?: ReactNode;
+  children: ReactNode;
 }) {
   const tenantRuntime = useTenant();
   const pathname = usePathname() || "/";
   const { tenant } = tenantRuntime;
-  const advisorContact =
-    tenant.contacts.admissions ??
-    tenant.contacts.financialAid ??
-    tenant.contacts.support;
-  const tenantNavigation = navigation.filter((item) => {
-    if (item.key === "campus_life" || item.key === "clubs") {
-      return tenant.capabilities.campusLife !== false;
-    }
-    if (item.key === "edward") {
-      return tenant.capabilities.assistant !== false;
-    }
-    return true;
-  });
   const publicFooterLinks: { label: string; href: string }[] = [];
   if (tenant.publicLinks.privacy) {
     publicFooterLinks.push({ label: "Privacy", href: tenant.publicLinks.privacy });
@@ -409,16 +380,15 @@ export function PortalShell({
     });
   }
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pointsModal, setPointsModal] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   const navigationPanel = useRef<HTMLElement>(null);
-  const [openNavigationGroups, setOpenNavigationGroups] = useState<
-    Record<string, boolean>
-  >(() => {
-    const activeGroup = navigation.find((item) => item.key === active)?.group;
-    return activeGroup && !["primary", "utility"].includes(activeGroup)
-      ? { [activeGroup]: true }
-      : {};
-  });
+  // Groups closed by default, the one holding the page you are on opened for
+  // you, and what she opens after that remembered. The sidebar only renders
+  // once the bootstrap has loaded on the client, so storage is readable here.
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() =>
+    typeof window === "undefined" ? {} : readOpenGroups(),
+  );
   const [experienceUpdates, setExperienceUpdates] = useState<
     StudentExperienceUpdate[]
   >([]);
@@ -440,26 +410,26 @@ export function PortalShell({
     identity.status === "ready" && identity.data.actor?.type === "delegate"
       ? identity.data.actor
       : null;
-  const visibleNavigation = navigation.filter((item) => {
-    if (delegateActor) {
-      const delegatedSection = item.key === "financial_aid" ? "financials" : item.key;
-      return delegateActor.scopes.includes(delegatedSection as FerpaPortalScope);
-    }
-    return tenantNavigation.some((candidate) => candidate.key === item.key);
-  });
-  const activeNavigationItem = navigation.find((item) => item.key === active);
-  const primaryNavigation = visibleNavigation.filter(
-    (item) => item.group === "primary",
+  const activeDestinationId = destinationOf[active] ?? null;
+  const sidebarActiveId =
+    activeDestinationId?.startsWith("profile") ? "profile" : activeDestinationId;
+  const canSee = useCallback(
+    (destinationId: string) => {
+      const section = sectionOfDestination[destinationId];
+      if (!section) return false;
+      if (section === "campus_life" || section === "clubs") {
+        if (tenant.capabilities.campusLife === false) return false;
+      }
+      if (delegateActor) return delegateActor.scopes.includes(scopeOf(section));
+      return true;
+    },
+    [delegateActor, tenant.capabilities.campusLife],
   );
-  const utilityNavigation = visibleNavigation.filter(
-    (item) => item.group === "utility",
-  );
-  const afterGroupNavigation = visibleNavigation.filter(
-    (item) => item.group === "after_groups",
-  );
-  const portalHome = visibleNavigation[0]?.href ?? "/help";
-  const activeAllowed =
-    !delegateActor || delegateActor.scopes.includes((active === "financial_aid" ? "financials" : active) as FerpaPortalScope);
+  const firstVisible = NAV.flatMap((entry: { kind: string; id: string; items?: string[] }) =>
+    entry.kind === "link" ? [entry.id] : entry.items ?? [],
+  ).find((id: string) => canSee(id));
+  const portalHome = firstVisible ? destinationById(firstVisible)!.route : "/help";
+  const activeAllowed = !delegateActor || delegateActor.scopes.includes(scopeOf(active));
   const needsOnboarding =
     !delegateActor && identity.data?.onboarding?.required &&
     identity.data.onboarding.status !== "completed";
@@ -470,6 +440,92 @@ export function PortalShell({
     identity.status === "ready" && !delegateActor
       ? studentExperienceUpdateSessionKey(tenant.id, identity.data.student.id)
       : null;
+
+  // The sidebar's counts and the points ledger read the same requirement list
+  // My Enrollment renders — never a copy of it.
+  const canReadRequirements =
+    identity.status === "ready" &&
+    !needsOnboarding &&
+    !needsSignIn &&
+    (!delegateActor || delegateActor.scopes.includes("enrollment"));
+  const loadRequirements = useCallback(
+    (signal: AbortSignal) =>
+      canReadRequirements
+        ? getStudentRequirements(signal)
+        : Promise.resolve({ items: [] as StudentRequirementDetail[], total: 0 }),
+    [canReadRequirements],
+  );
+  const requirements = useApiResource(loadRequirements);
+  const refreshRequirements = requirements.refresh;
+  const openSteps =
+    requirements.status === "ready"
+      ? requirements.data.items.filter(
+          (item) => !terminalStatuses.has(item.status) && item.status !== "blocked" && item.status !== "submitted" && item.status !== "under_review",
+        ).length
+      : null;
+  const awarded = useMemo(
+    () =>
+      requirements.status === "ready"
+        ? requirements.data.items.filter((item) => item.reward?.earned)
+        : [],
+    [requirements.data, requirements.status],
+  );
+
+  // What changed — the bell reads the platform's message list.
+  const canReadMessages =
+    identity.status === "ready" &&
+    !needsOnboarding &&
+    !needsSignIn &&
+    (!delegateActor || delegateActor.scopes.includes("messages"));
+  const loadMessages = useCallback(
+    (signal: AbortSignal) =>
+      canReadMessages
+        ? getStudentMessages(signal)
+        : Promise.resolve({ items: [] as StudentMessage[], unreadCount: 0 }),
+    [canReadMessages],
+  );
+  const messages = useApiResource(loadMessages);
+  const refreshMessages = messages.refresh;
+  const [optimisticReadIds, setOptimisticReadIds] = useState<Set<string>>(() => new Set());
+  const isRead = useCallback(
+    (message: StudentMessage) => Boolean(message.readAt) || optimisticReadIds.has(message.id),
+    [optimisticReadIds],
+  );
+  const feed = messages.status === "ready" ? messages.data.items : [];
+  const unreadMessages = feed.filter((message) => !isRead(message));
+  const unreadTotal =
+    messages.status === "ready"
+      ? unreadMessages.length
+      : identity.status === "ready"
+        ? identity.data.unreadMessageCount
+        : 0;
+  const unreadNeedsYou = unreadMessages.some((message) => Boolean(message.href));
+
+  const markRead = useCallback(
+    async (message: StudentMessage) => {
+      if (message.readAt || optimisticReadIds.has(message.id)) return;
+      setOptimisticReadIds((current) => new Set(current).add(message.id));
+      try {
+        await markStudentMessageRead(message.id);
+        refreshMessages();
+      } catch {
+        setOptimisticReadIds((current) => {
+          const next = new Set(current);
+          next.delete(message.id);
+          return next;
+        });
+      }
+    },
+    [optimisticReadIds, refreshMessages],
+  );
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(GROUP_STORE, JSON.stringify(openGroups));
+    } catch {
+      // A portal that cannot remember a preference still has to navigate.
+    }
+  }, [openGroups]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -676,7 +732,10 @@ export function PortalShell({
 
   useEffect(() => {
     const interval = window.setInterval(refreshIdentity, 15_000);
-    const refreshAfterStudentAction = () => refreshIdentity();
+    const refreshAfterStudentAction = () => {
+      refreshIdentity();
+      refreshRequirements();
+    };
     window.addEventListener(
       "vv:student-record-changed",
       refreshAfterStudentAction,
@@ -688,7 +747,15 @@ export function PortalShell({
         refreshAfterStudentAction,
       );
     };
-  }, [refreshIdentity]);
+  }, [refreshIdentity, refreshRequirements]);
+
+  useEffect(() => {
+    const poll = () => {
+      if (document.visibilityState === "visible") refreshMessages();
+    };
+    const interval = window.setInterval(poll, 8_000);
+    return () => window.clearInterval(interval);
+  }, [refreshMessages]);
 
   useEffect(() => {
     if (
@@ -699,11 +766,13 @@ export function PortalShell({
     ) return;
     return connectStudentRealtime((event) => {
       refreshIdentity();
+      refreshRequirements();
+      refreshMessages();
       window.dispatchEvent(
         new CustomEvent("vv:student-realtime", { detail: event }),
       );
     });
-  }, [identity.data, identity.status, needsOnboarding, needsSignIn, refreshIdentity]);
+  }, [identity.data, identity.status, needsOnboarding, needsSignIn, refreshIdentity, refreshMessages, refreshRequirements]);
 
   if (identity.status === "loading" || needsSignIn || needsOnboarding) {
     return (
@@ -721,373 +790,345 @@ export function PortalShell({
     );
   }
 
-  const presentedTitle =
-    active === "enrollment" && title === "Your requirements"
-      ? `You’re in, ${identity.data.student.preferredName}. Here’s what’s left.`
-        : active === "financials" || active === "financial_aid"
-        ? "What the year costs, and what covers it."
-        : active === "classrooms"
-          ? "What your degree asks of you."
-          : active === "appointments"
-            ? "Book time with the people who can help."
-            : active === "campus_life"
-              ? "Find your people."
-              : active === "help"
-                ? `Get unstuck, ${identity.data.student.preferredName}.`
-                : active === "profile"
-                  ? `What ${tenant.shortName} knows about you.`
-                  : title;
-  const presentedDescription =
-    active === "enrollment" && title === "Your requirements"
-      ? "Your next steps are in the order that keeps things moving. Start with the first one, or pick any task you can do now."
-      : active === "financials" || active === "financial_aid"
-        ? "What the year costs, what’s covering it, and what still needs you—all from your current student account."
-        : active === "classrooms"
-          ? "Every requirement your program sets, the courses that satisfy each one, and the current reading of your record."
-          : active === "appointments"
-            ? "Schedule focused time with the people who can unblock a step or answer a question."
-            : active === "campus_life"
-              ? `Events, clubs, and the people who run them, published for ${tenant.shortName} students.`
-              : active === "help"
-                ? `${tenant.shortName} guides and a direct route to the support team that owns your question.`
-                : active === "profile"
-                  ? "Some details are yours to change. The rest belong to the office responsible for your official record."
-                  : description;
+  const student = identity.data.student;
+  const person = { name: student.fullName, initials: initials(student.fullName) };
+  const standing = delegateActor ? relationshipLabel(delegateActor.relationship) : "Incoming student";
+  const help = destinationById(UTILITY_ID)!;
+  const profile = destinationById(PROFILE_ID)!;
+  const rewards = !delegateActor ? identity.data.rewards : undefined;
+  const destination = activeDestinationId ? destinationById(activeDestinationId) : null;
+  const heroCopy: HeroCopy = destination
+    ? {
+        ...(destination.id === "my-enrollment"
+          ? { title: `You’re in, ${student.preferredName}. Here’s what’s left.`, kicker: tenant.name }
+          : destination.id === "help"
+            ? { title: `Get unstuck, ${student.preferredName}.` }
+            : {}),
+        ...hero,
+      }
+    : { kicker: eyebrow, title, lede: description, motif: null, ...hero };
 
   return (
-    <div className="aster-shell app-shell">
-      <a className="skip-link" href="#main-content">
+    <div className="app-shell">
+      <a className="skip-to-content" href="#main-content">
         Skip to main content
       </a>
-
-      <section className="workspace">
-      <header className="aster-topbar topbar">
-        <button
-          ref={menuButton}
-          className="aster-menu-button mobile-menu icon-button"
-          type="button"
-          aria-label={menuOpen ? "Close portal menu" : "Open portal menu"}
-          aria-expanded={menuOpen}
-          aria-controls="portal-navigation"
-          onClick={() => setMenuOpen((current) => !current)}
-        >
-          <StudentPortalIcon name={menuOpen ? "close" : "menu"} />
-        </button>
-        <Link
-          className="aster-mobile-brand mobile-school"
-          href={portalHome}
-          aria-label={`${tenant.name} student portal`}
-        >
-          {tenant.shortName}
-        </Link>
-        <div className="aster-topbar__section" aria-hidden="true">
-          {activeNavigationItem?.label ?? "Student portal"}
-        </div>
-        <div className="aster-topbar__right topbar-actions">
-          {!delegateActor && identity.data.rewards ? (
-            <details className="aster-points-popover popover">
-              <summary
-                className="aster-points-balance topbar-chip points-chip"
-                aria-label={`Your momentum, ${identity.data.rewards.lifetimePoints.toLocaleString()} points`}
-                title="Open your momentum"
-              >
-                <span aria-hidden="true"><StudentPortalIcon name="spark" size={17} /></span>
-                <strong className="chip-figure">{identity.data.rewards.lifetimePoints.toLocaleString()}</strong>
-                <small className="chip-unit">pts</small>
-              </summary>
-              <section className="section-card pop-panel points-balance-panel" aria-label="Your momentum">
-                <div className="anchor-card balance-card">
-                  <span className="balance-mark" aria-hidden="true"><StudentPortalIcon name="spark" size={18} /></span>
-                  <span className="panel-label">Your momentum</span>
-                  <strong>{identity.data.rewards.lifetimePoints.toLocaleString()} <small>pts</small></strong>
-                  <p>Points come from completed enrollment steps and never replace an outstanding required action.</p>
-                </div>
-                <div className="points-balance-details">
-                  <div><span>Bookstore credit</span><strong>{formatTenantMoney(identity.data.rewards.bookstoreCreditCents, tenant)}</strong></div>
-                  <div><span>Point program</span><strong>{identity.data.rewards.pointName}</strong></div>
-                </div>
-                <Link className="secondary-button points-balance-link" href="/enrollment#momentum">See how points work <StudentPortalIcon name="chevron" size={14} /></Link>
-              </section>
-            </details>
-          ) : null}
-          {!delegateActor || delegateActor.scopes.includes("messages") ? (
-            <StudentNotificationCenter
-              fallbackUnreadCount={identity.data.unreadMessageCount}
-              suppressTransient={experienceUpdates.length > 0}
-            />
-          ) : null}
-          {(!delegateActor || delegateActor.scopes.includes("profile")) ? <Link
-            className="aster-student"
-            href="/profile"
-            aria-label={`Open profile for ${identity.data.student.fullName}`}
-          >
-            <span aria-hidden="true">
-              {initials(identity.data.student.fullName)}
-            </span>
-            <div>
-              <strong>{identity.data.student.preferredName}</strong>
-                <small>{delegateActor ? relationshipLabel(delegateActor.relationship) : "Student"}</small>
-            </div>
-          </Link> : (
-            <div className="aster-student" aria-label={`Viewing ${identity.data.student.fullName}`}>
-              <span aria-hidden="true">{initials(identity.data.student.fullName)}</span>
-              <div><strong>{identity.data.student.preferredName}</strong><small>{relationshipLabel(delegateActor!.relationship)}</small></div>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {delegateActor ? (
-        <section className="delegate-session-banner" aria-label="Delegated portal session">
-          <span aria-hidden="true">◆</span>
-          <div>
-            <strong>
-              Viewing {delegateActor.studentName} as {relationshipLabel(delegateActor.relationship)}
-            </strong>
-            <small>
-              You can use only the pages the student shared. FERPA settings remain student-controlled.
-            </small>
-          </div>
-          <button
-            type="button"
-            disabled={delegateSignOut.status === "loading"}
-            onClick={() => {
-              void delegateSignOut.run().then(() => {
-                window.location.replace(tenantRuntime.href("/sign-in"));
-              }).catch(() => undefined);
-            }}
-          >
-            {delegateSignOut.status === "loading" ? "Signing out…" : "End delegated session"}
-          </button>
-        </section>
-      ) : null}
-
-      {menuOpen ? (
-        <button
-          className="aster-nav-backdrop nav-scrim"
-          type="button"
-          aria-label="Close portal menu"
-          onClick={() => setMenuOpen(false)}
-        />
-      ) : null}
 
       <aside
         ref={navigationPanel}
         id="portal-navigation"
-        className={`aster-sidebar sidebar${menuOpen ? " aster-sidebar--open sidebar-open" : ""}`}
+        className={`sidebar${menuOpen ? " sidebar-open" : ""}`}
         role={menuOpen ? "dialog" : undefined}
         aria-modal={menuOpen ? "true" : undefined}
-        aria-label={menuOpen ? "Student portal navigation" : undefined}
+        aria-label="Primary navigation"
       >
-        <div className="aster-sidebar__brand-row brand-row">
-          <Link
-            className="aster-brand"
-            href={portalHome}
-            aria-label={`${tenant.name} student portal`}
-            onClick={() => setMenuOpen(false)}
-          >
-            <span className="brand-mark" aria-hidden="true">
-              <img className="audentra-a-mark" src="/a-mark-only.png" width="40" height="40" alt="" />
-            </span>
-            <span className="brand-name">
-              <strong>{tenant.shortName}</strong>
-              <span>New Student Portal</span>
-            </span>
-          </Link>
-          <button
-            className="aster-sidebar__close nav-close icon-button compact"
-            type="button"
-            aria-label="Close portal menu"
-            onClick={() => setMenuOpen(false)}
-          >
-            <StudentPortalIcon name="close" size={19} />
-          </button>
-        </div>
-        <nav className="main-nav" aria-label="Student portal sections">
-          <div className="aster-nav-group aster-nav-group--primary nav-list">
-            {primaryNavigation.map((item) => (
-              <Link
-                className={`nav-item${active === item.key ? " aster-nav-link--active active" : ""}`}
-                href={item.href}
-                aria-current={active === item.key ? "page" : undefined}
-                onClick={() => setMenuOpen(false)}
-                key={item.key}
-              >
-                <span className="nav-icon" aria-hidden="true"><StudentPortalIcon name={item.icon} /></span>
-                <span className="nav-label">{item.label}</span>
-              </Link>
-            ))}
+        <div className="brand-row">
+          <span className="brand-mark" aria-hidden="true">
+            {/* eslint-disable-next-line @next/next/no-img-element -- the tenant's mark is a plain asset URL */}
+            <img
+              className="brand-mark-image"
+              src={tenant.branding.logoUrl}
+              width="40"
+              height="40"
+              alt=""
+            />
+          </span>
+          <div className="brand-name">
+            <strong>{tenant.name}</strong>
+            <span>New Student Portal</span>
           </div>
-          {navigationGroups.map((group) => {
-            const items = visibleNavigation.filter((item) => item.group === group.id);
-            if (items.length === 0) return null;
-            const holdsActive = items.some((item) => item.key === active);
-            const groupOpen = Boolean(openNavigationGroups[group.id] || holdsActive);
-            return (
-              <section className="aster-nav-group nav-group" key={group.id}>
-                <button
-                  className={`nav-group-toggle${holdsActive ? " holds-active" : ""}`}
-                  type="button"
-                  aria-expanded={groupOpen}
-                  aria-controls={`portal-nav-group-${group.id}`}
-                  onClick={() =>
-                    setOpenNavigationGroups((current) => ({
-                      ...current,
-                      [group.id]: !current[group.id],
-                    }))
-                  }
-                >
-                  <span>{group.label}</span>
-                  <span className={`group-chevron${groupOpen ? " open" : ""}`}>
-                    <StudentPortalIcon name="chevron" size={14} />
-                  </span>
-                </button>
-                <div className="nav-sublist" id={`portal-nav-group-${group.id}`} hidden={!groupOpen}>
-                  {items.map((item) => (
-                    <Link
-                      className={`nav-item${active === item.key ? " aster-nav-link--active active" : ""}`}
-                      href={item.href}
-                      aria-current={active === item.key ? "page" : undefined}
-                      onClick={() => setMenuOpen(false)}
-                      key={item.key}
-                    >
-                      <span className="nav-icon" aria-hidden="true"><StudentPortalIcon name={item.icon} /></span>
-                      <span className="nav-label">{item.label}</span>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            );
-          })}
-          {afterGroupNavigation.length > 0 ? (
-            <div className="nav-list aster-nav-after-groups">
-              {afterGroupNavigation.map((item) => (
-                <Link
-                  className={`nav-item${active === item.key ? " aster-nav-link--active active" : ""}`}
-                  href={item.href}
-                  aria-current={active === item.key ? "page" : undefined}
-                  onClick={() => setMenuOpen(false)}
-                  key={item.key}
-                >
-                  <span className="nav-icon" aria-hidden="true"><StudentPortalIcon name={item.icon} /></span>
-                  <span className="nav-label">{item.label}</span>
-                </Link>
-              ))}
-            </div>
+          <IconButton
+            className="nav-close"
+            name="close"
+            size={18}
+            label="Close navigation"
+            tip="Close"
+            onClick={() => setMenuOpen(false)}
+          />
+        </div>
+
+        <nav className="main-nav" aria-label="Primary">
+          <ul className="nav-list">
+            {NAV.map((entry: { kind: string; id: string; label?: string; items?: string[] }) => {
+              if (entry.kind === "link") {
+                if (!canSee(entry.id)) return null;
+                return (
+                  <NavRow
+                    key={entry.id}
+                    id={entry.id}
+                    activeId={sidebarActiveId}
+                    count={entry.id === "my-enrollment" && openSteps ? openSteps : undefined}
+                    countLabel={openSteps === 1 ? "1 step still open" : `${openSteps} steps still open`}
+                    onNavigate={() => setMenuOpen(false)}
+                  />
+                );
+              }
+              const items = (entry.items ?? []).filter(canSee);
+              if (items.length === 0) return null;
+              const holdsActive = items.includes(sidebarActiveId ?? "");
+              // A closed group never hides where the student is: until she
+              // toggles it herself, the group holding the page is open.
+              const open = openGroups[entry.id] ?? holdsActive;
+              const toggleId = `nav-group-${entry.id}`;
+              const listId = `nav-group-list-${entry.id}`;
+              return (
+                <li className="nav-group" key={entry.id}>
+                  <button
+                    type="button"
+                    className={`nav-group-toggle${holdsActive && !open ? " holds-active" : ""}`}
+                    id={toggleId}
+                    aria-expanded={open}
+                    aria-controls={listId}
+                    onClick={() =>
+                      setOpenGroups((current) => ({ ...current, [entry.id]: !open }))
+                    }
+                  >
+                    {entry.label}
+                    <span className={`group-chevron${open ? " open" : ""}`} aria-hidden="true">
+                      <Icon name="chevron" size={14} />
+                    </span>
+                  </button>
+                  <ul className="nav-sublist" id={listId} aria-labelledby={toggleId} hidden={!open}>
+                    {items.map((id) => (
+                      <NavRow
+                        key={id}
+                        id={id}
+                        activeId={sidebarActiveId}
+                        onNavigate={() => setMenuOpen(false)}
+                      />
+                    ))}
+                  </ul>
+                </li>
+              );
+            })}
+          </ul>
+          {requirements.status === "error" ? (
+            <p className="nav-note">
+              <Icon name="info" size={14} /> Some counts are unavailable. The sections still open.
+            </p>
           ) : null}
         </nav>
-        <div className="aster-sidebar__bottom sidebar-bottom">
-          {(!delegateActor || delegateActor.scopes.includes("help") || delegateActor.scopes.includes("appointments")) ? <div className="aster-sidebar__support">
-            <span aria-hidden="true"><StudentPortalIcon name="help" size={17} /></span>
-            <div>
-              <strong>Your student support team</strong>
-              <p>
-                {advisorContact.hours || `${tenant.shortName} advisors are available to help.`}
-              </p>
-              <div className="aster-sidebar__support-links">
-                {!delegateActor || delegateActor.scopes.includes("help")
-                  ? advisorContact.email
-                    ? <a href={`mailto:${advisorContact.email}`}>{advisorContact.email}</a>
-                    : advisorContact.url
-                      ? <a href={tenantRuntime.href(advisorContact.url)}>{advisorContact.label}</a>
-                      : null
-                  : null}
-                {!delegateActor || delegateActor.scopes.includes("appointments") ? (
-                  <Link href="/appointments">Book an advisor</Link>
-                ) : null}
-              </div>
+
+        <div className="sidebar-bottom">
+          {canSee(help.id) ? (
+            <Link
+              className={`nav-item${sidebarActiveId === help.id ? " active" : ""}`}
+              href={help.route}
+              aria-current={sidebarActiveId === help.id ? "page" : undefined}
+              onClick={() => setMenuOpen(false)}
+            >
+              <span className="nav-icon" aria-hidden="true">
+                <Icon name={help.icon} weight={sidebarActiveId === help.id ? "fill" : "regular"} />
+              </span>
+              <span className="nav-label">{help.label}</span>
+            </Link>
+          ) : null}
+          {canSee(profile.id) ? (
+            <Link
+              className={`profile-chip${sidebarActiveId === profile.id ? " active" : ""}`}
+              href={profile.route}
+              aria-current={sidebarActiveId === profile.id ? "page" : undefined}
+              onClick={() => setMenuOpen(false)}
+            >
+              <Avatar person={person} size="md" />
+              <span className="profile-name">
+                <strong>{student.preferredName}</strong>
+                <span>{standing}</span>
+              </span>
+              <span className="chip-chevron" aria-hidden="true">
+                <Icon name="chevron" size={16} />
+              </span>
+            </Link>
+          ) : (
+            <div className="profile-chip" aria-label={`Viewing ${student.fullName}`}>
+              <Avatar person={person} size="md" />
+              <span className="profile-name">
+                <strong>{student.preferredName}</strong>
+                <span>{standing}</span>
+              </span>
             </div>
-          </div> : null}
-          <div className="aster-sidebar__utilities">
-            {utilityNavigation.map((item) => (
-              <Link
-            className={`${item.key === "profile" ? "profile-chip" : "nav-item"}${active === item.key ? " aster-nav-link--active active" : ""}`}
-                href={item.href}
-                aria-current={active === item.key ? "page" : undefined}
-                onClick={() => setMenuOpen(false)}
-                key={item.key}
-              >
-                {item.key === "profile" ? (
-                  <img
-                    className="avatar avatar-md"
-                    src="/people/maya-johnson.webp"
-                    width="40"
-                    height="40"
-                    alt=""
-                  />
-                ) : (
-                  <span aria-hidden="true"><StudentPortalIcon name={item.icon} /></span>
-                )}
-                <span className={item.key === "profile" ? "profile-name" : undefined}>
-                  <strong>{item.key === "profile" ? identity.data.student.preferredName : item.label}</strong>
-                  {item.key === "profile" ? <span>{delegateActor ? relationshipLabel(delegateActor.relationship) : "Student"}</span> : null}
-                </span>
-                {item.key === "profile" ? <span className="chip-chevron" aria-hidden="true"><StudentPortalIcon name="chevron" size={16} /></span> : null}
-              </Link>
-            ))}
-          </div>
-          <p className="aster-powered-by powered-by">
-            <span>Powered by</span>
-            <span className="audentra-powered-logo" aria-hidden="true">
-              <img src="/main-logo.png" width="84" height="84" alt="" />
-            </span>
+          )}
+          <p className="powered-by">
+            Powered by <AudentraMark height={13} /> <strong>Audentra</strong>
           </p>
         </div>
       </aside>
 
-      <main id="main-content" className="aster-main content-wrap">
-        <header className="aster-page-heading page-hero">
-          <div className="aster-page-heading__copy hero-copy">
-            <p className="eyebrow">{tenantRuntime.copy(eyebrow)}</p>
-            <h1>{tenantRuntime.copy(presentedTitle)}</h1>
-            <p className="hero-lede">{tenantRuntime.copy(presentedDescription)}</p>
+      {menuOpen ? (
+        <button
+          className="nav-scrim"
+          type="button"
+          aria-label="Close navigation"
+          onClick={() => setMenuOpen(false)}
+        />
+      ) : null}
+
+      <section className="workspace">
+        <header className="topbar">
+          <IconButton
+            className="mobile-menu"
+            name="menu"
+            ref={menuButton}
+            label="Open navigation"
+            tip="Menu"
+            aria-expanded={menuOpen}
+            aria-controls="portal-navigation"
+            onClick={() => setMenuOpen(true)}
+          />
+          <div className="topbar-title">
+            <span className="mobile-school">{tenant.shortName}</span>
           </div>
-          <div className="aster-page-heading__figure hero-motif" aria-hidden="true">
-            <i className="aster-orbit-ring aster-orbit-ring--outer orbit-ring ring-one" />
-            <i className="aster-orbit-ring aster-orbit-ring--inner orbit-ring ring-two" />
-            <span className="orbit-core"><StudentPortalIcon name={activeNavigationItem?.icon ?? "home"} size={30} /></span>
-            <b className="aster-orbit-dot aster-orbit-dot--one spark-dot one" />
-            <b className="aster-orbit-dot aster-orbit-dot--two spark-dot two" />
-            <b className="aster-orbit-dot aster-orbit-dot--three spark-dot three" />
-          </div>
-          {actions ? <div className="aster-page-actions">{actions}</div> : null}
-        </header>
-        {activeAllowed ? children : (
-          <section className="delegate-restricted-state" role="alert">
-            <span aria-hidden="true">◇</span>
-            <p className="eyebrow">Restricted page</p>
-            <h2>This page is not shared</h2>
-            <p>
-              {delegateActor?.studentName || "The student"} has not granted this
-              section to your delegated session. FERPA access can only be changed by the student.
-            </p>
-            <Link className="button button--primary" href={portalHome}>
-              Open an available page
-            </Link>
-          </section>
-        )}
-        <footer className="aster-footer">
-          <p>© {new Date().getFullYear()} {tenant.legalName}</p>
-          <nav aria-label="Portal policies">
-            {publicFooterLinks.map((link) =>
-              link.href.startsWith("/") && !link.href.startsWith("//") ? (
-                <Link href={link.href} key={link.label}>{link.label}</Link>
-              ) : (
-                <a href={link.href} key={link.label}>{link.label}</a>
-              ),
-            )}
-            {!delegateActor || delegateActor.scopes.includes("help") ? (
-              <Link href="/help">Student support</Link>
+          <div className="topbar-actions">
+            {actions}
+            {rewards ? (
+              <Popover
+                className="topbar-chip points-chip"
+                tip="Your momentum"
+                ariaLabel={`Your momentum, ${rewards.lifetimePoints.toLocaleString()} points`}
+                panelLabel="Your momentum"
+                panelClass="points-pop"
+                trigger={
+                  <>
+                    <Icon name="spark" size={17} />
+                    <span className="chip-figure">{rewards.lifetimePoints.toLocaleString()}</span>
+                    <span className="chip-unit">pts</span>
+                  </>
+                }
+              >
+                {(close: () => void) => (
+                  <PointsPopover
+                    rewards={rewards}
+                    awarded={awarded}
+                    awardsState={
+                      requirements.status === "ready"
+                        ? "ready"
+                        : requirements.status === "error"
+                          ? "error"
+                          : "loading"
+                    }
+                    onOpenPoints={() => setPointsModal(true)}
+                    onClose={close}
+                  />
+                )}
+              </Popover>
             ) : null}
-          </nav>
-        </footer>
-      </main>
+
+            {canReadMessages ? (
+              <Popover
+                className="topbar-chip bell-chip"
+                tip="What changed"
+                ariaLabel={unreadTotal ? `What changed, ${unreadTotal} unread` : "What changed"}
+                panelLabel="What changed"
+                panelClass="note-pop"
+                onOpen={refreshMessages}
+                trigger={<Icon name="bell" size={19} weight={unreadTotal ? "fill" : "regular"} />}
+                badge={
+                  unreadTotal > 0 ? (
+                    <span className={`bell-count ${unreadNeedsYou ? "needs-you" : ""}`}>
+                      <span aria-hidden="true">{unreadTotal}</span>
+                    </span>
+                  ) : null
+                }
+              >
+                {(close: () => void) => (
+                  <NotificationPanel
+                    feed={feed}
+                    state={
+                      messages.status === "ready"
+                        ? "ready"
+                        : messages.status === "error"
+                          ? "error"
+                          : "loading"
+                    }
+                    isRead={isRead}
+                    onOpen={(message) => void markRead(message)}
+                    onMarkAll={() => {
+                      unreadMessages.forEach((message) => void markRead(message));
+                    }}
+                    onRetry={messages.reload}
+                    onClose={close}
+                  />
+                )}
+              </Popover>
+            ) : null}
+
+            <Link className="mobile-avatar" href={profile.route} aria-label="Profile">
+              <Avatar person={person} size="sm" />
+            </Link>
+          </div>
+        </header>
+
+        {delegateActor ? (
+          <div className="page-notice delegate-session-banner" aria-label="Delegated portal session">
+            <div className="notice quiet">
+              <span className="notice-mark" aria-hidden="true">
+                <Icon name="users" size={16} />
+              </span>
+              <span className="notice-copy">
+                <strong>
+                  Viewing {delegateActor.studentName} as {relationshipLabel(delegateActor.relationship)}.
+                </strong>{" "}
+                You can use only the pages the student shared. FERPA settings remain student-controlled.
+              </span>
+              <button
+                type="button"
+                className="notice-action"
+                disabled={delegateSignOut.status === "loading"}
+                onClick={() => {
+                  void delegateSignOut.run().then(() => {
+                    window.location.replace(tenantRuntime.href("/sign-in"));
+                  }).catch(() => undefined);
+                }}
+              >
+                {delegateSignOut.status === "loading" ? "Signing out…" : "End delegated session"}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <main className="content-wrap" id="main-content" tabIndex={-1}>
+          <PageShell
+            destination={destination}
+            hero={heroCopy}
+            summary={summary}
+            summaryLabel={summaryLabel}
+            notice={notice}
+            tabs={tabs}
+            rail={rail}
+            footerLinks={[
+              ...publicFooterLinks,
+              ...(!delegateActor || delegateActor.scopes.includes("help")
+                ? [{ label: "Help", href: "/help" }]
+                : []),
+            ]}
+          >
+            {activeAllowed ? children : (
+              <div className="state-card error" role="alert">
+                <span className="state-mark" aria-hidden="true">
+                  <Icon name="lock" size={22} weight="duotone" />
+                </span>
+                <h3>This page is not shared</h3>
+                <p>
+                  {delegateActor?.studentName || "The student"} has not granted this section to your
+                  delegated session. FERPA access can only be changed by the student.
+                </p>
+                <Link className="primary-button" href={portalHome}>
+                  Open an available page <Icon name="arrow" size={16} />
+                </Link>
+              </div>
+            )}
+          </PageShell>
+        </main>
       </section>
+
+      {pointsModal && rewards ? (
+        <PointsInfoModal rewards={rewards} onClose={() => setPointsModal(false)} />
+      ) : null}
 
       {active !== "edward" && tenant.capabilities.assistant !== false &&
       (!delegateActor || delegateActor.scopes.includes("edward")) ? (
         <EdwardAssistant
-          studentName={identity.data.student.preferredName}
+          studentName={student.preferredName}
           variant="floating"
           allowLiveVoice={!delegateActor}
         />
@@ -1104,12 +1145,12 @@ export function PortalShell({
         />
       ) : null}
 
-      {experienceUpdates.length === 0 && identity.data.rewards && !delegateActor ? (
+      {experienceUpdates.length === 0 && rewards && !delegateActor ? (
         <RewardCelebration
           tenantSlug={tenant.slug}
-          studentId={identity.data.student.id}
-          pointName={identity.data.rewards.pointName}
-          lifetimePoints={identity.data.rewards.lifetimePoints}
+          studentId={student.id}
+          pointName={rewards.pointName}
+          lifetimePoints={rewards.lifetimePoints}
         />
       ) : null}
     </div>

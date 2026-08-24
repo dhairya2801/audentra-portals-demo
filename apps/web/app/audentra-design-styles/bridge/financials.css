@@ -1,0 +1,18 @@
+/* Production-only bridge rules for the financials pages. Restate a design decision here only
+   when a legacy or production-only element has no design-system shape; never restyle
+   a reference class. */
+
+/* The payment-plan chooser is production-only: the reference names the plan and
+   hands "Change plan" to the billing portal. It opens as `.card-rows` under the
+   plan row, in the middle of the card rather than at its foot, so it keeps the
+   row's radius and the card's rhythm instead of bleeding into the schedule. */
+.app-shell .plan-chooser {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-row);
+  margin: 0 0 var(--space-8);
+}
+
+.app-shell .plan-chooser .action-feedback {
+  margin: 0;
+  padding: var(--space-5) var(--card-pad);
+}

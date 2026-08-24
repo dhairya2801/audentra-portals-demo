@@ -5,6 +5,14 @@ import ts from "typescript";
 
 process.env.NEXT_PUBLIC_API_BASE_URL ??= "http://localhost:4000";
 
+/** Source text of several files joined, for a behaviour that spans a page and its components. */
+async function readSources(...paths) {
+  const sources = await Promise.all(
+    paths.map((path) => readFile(new URL(path, import.meta.url), "utf8")),
+  );
+  return sources.join("\n");
+}
+
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
@@ -186,7 +194,7 @@ test("tenant runtime gates pages on the public bootstrap and keeps managed CRUD 
 });
 
 test("tenant branding and capabilities load from the server-configured institution", async () => {
-  const [tenant, provider, shell, help, signIn, profile, onboarding, edward] =
+  const [tenant, provider, shell, help, signIn, profile, onboarding, edward, enrollment] =
     await Promise.all([
       readFile(new URL("../app/lib/tenant.ts", import.meta.url), "utf8"),
       readFile(
@@ -197,14 +205,19 @@ test("tenant branding and capabilities load from the server-configured instituti
         new URL("../app/components/portal-shell.tsx", import.meta.url),
         "utf8",
       ),
-      readFile(new URL("../app/help/page.tsx", import.meta.url), "utf8"),
+      readSources("../app/help/page.tsx", "../app/components/help-rail.tsx"),
       readFile(
         new URL("../app/sign-in/sign-in-client.tsx", import.meta.url),
         "utf8",
       ),
-      readFile(new URL("../app/profile/page.tsx", import.meta.url), "utf8"),
+      readSources(
+        "../app/profile/page.tsx",
+        "../app/components/profile-logic.ts",
+        "../app/components/profile-rail.tsx",
+      ),
       readFile(new URL("../app/onboarding/page.tsx", import.meta.url), "utf8"),
       readFile(new URL("../app/edward/page.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/enrollment/page.tsx", import.meta.url), "utf8"),
     ]);
 
   assert.doesNotMatch(tenant, /defaultTenantSlug|tenantSlugFromPathname|tenantHref/);
@@ -212,32 +225,81 @@ test("tenant branding and capabilities load from the server-configured instituti
   assert.doesNotMatch(provider, /Choose your institution from the portal entry page/);
   assert.match(provider, /querySelector<HTMLLinkElement>\(faviconSelector\)\?\.remove\(\)/);
 
-  assert.match(shell, /tenant\.capabilities\.campusLife !== false/);
+  assert.match(shell, /tenant\.capabilities\.campusLife === false\) return false/);
   assert.match(shell, /tenant\.capabilities\.assistant !== false/);
   assert.match(shell, /tenant\.publicLinks\.privacy/);
   assert.match(shell, /tenant\.publicLinks\.accessibility/);
   assert.match(shell, /tenant\.publicLinks\.institution/);
-  assert.match(shell, /tenantRuntime\.href\(advisorContact\.url\)/);
-  assert.match(help, /tenantRuntime\.href\(support\.url\)/);
+  // The advisor bar moved from the shell into the enrollment page; its contact
+  // link still goes through the tenant runtime.
+  assert.match(enrollment, /tenant\.contacts\.admissions \?\? tenant\.contacts\.support/);
+  assert.match(enrollment, /window\.location\.assign\(href\(contact\.url\)\)/);
+  assert.match(help, /href=\{runtime\.href\}/);
+  assert.match(help, /href=\{href\(support\.url\)\}/);
   assert.match(signIn, /tenantRuntime\.href\(support\.url\)/);
-  assert.match(profile, /tenantRuntime\.href\(tenant\.contacts\.support\.url\)/);
+  // The support office on the profile rail carries the tenant's own contact and
+  // links it through the runtime.
+  assert.match(profile, /const support = tenant\.contacts\.support;/);
+  assert.match(profile, /url: support\.url,/);
+  assert.match(profile, /href=\{href\(office\.url\)\}/);
   assert.match(onboarding, /tenantRuntime\.href\(admissionsContact\.url\)/);
   assert.match(edward, /tenant\.capabilities\.assistant === false/);
 });
 
 test("student money and dates use tenant localization", async () => {
   const [financials, payments, onboarding, appointments] = await Promise.all([
-    readFile(new URL("../app/financials/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/payments/page.tsx", import.meta.url), "utf8"),
+    readSources(
+      "../app/financials/page.tsx",
+      "../app/components/financials-frame.tsx",
+      "../app/components/financials-logic.ts",
+      "../app/components/financials-overview.tsx",
+      "../app/components/financials-aid.tsx",
+      "../app/components/financials-payments.tsx",
+    ),
+    readSources(
+      "../app/payments/page.tsx",
+      "../app/components/financials-logic.ts",
+      "../app/components/financials-payments.tsx",
+    ),
     readFile(new URL("../app/onboarding/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/appointments/page.tsx", import.meta.url), "utf8"),
+    readSources(
+      "../app/appointments/page.tsx",
+      "../app/components/appointments-logic.ts",
+    ),
   ]);
+  // Every student-facing formatter that moved into a component or logic module
+  // reads the tenant's locale and time zone the same way the pages do.
+  const helpers = await Promise.all(
+    [
+      "../app/components/campus-logic.ts",
+      "../app/components/enrollment-model.ts",
+      "../app/components/health-logic.ts",
+      "../app/components/housing-logic.ts",
+      "../app/components/help-logic.ts",
+      "../app/components/points-popover.tsx",
+      "../app/components/requirement-extract-review.tsx",
+      "../app/components/notification-panel.tsx",
+      "../app/messages/page.tsx",
+      "../app/lib/tenant.ts",
+    ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
+  );
 
   for (const source of [financials, payments, onboarding, appointments]) {
     assert.match(source, /formatTenantDate/);
     assert.match(source, /useTenant/);
+  }
+  for (const source of [financials, payments, onboarding, appointments, ...helpers]) {
     assert.doesNotMatch(source, /Intl\.DateTimeFormat\("en-US"/);
+    assert.doesNotMatch(source, /Intl\.DateTimeFormat\("en"/);
+    assert.doesNotMatch(source, /getUTC(Month|Date|Day|FullYear)\(\)/);
+  }
+  // `neutralTenant` may default its own configuration to UTC; no formatter may pin it.
+  for (const source of [financials, payments, onboarding, appointments, ...helpers.slice(0, -1)]) {
     assert.doesNotMatch(source, /timeZone:\s*"UTC"/);
+  }
+  assert.match(helpers.at(-1), /timeZone: options\.timeZone \?\? tenant\.localization\.timeZone/);
+  for (const source of helpers.slice(0, -3)) {
+    assert.match(source, /formatTenantDate/);
   }
   for (const source of [financials, payments, onboarding]) {
     assert.match(source, /formatTenantMoney/);
@@ -313,16 +375,17 @@ test("keeps transcript review and exemption insights in the enrollment workspace
     ),
   ]);
 
+  // The transcript's course-matching promise and its parsed record sit in the
+  // requirement's context column, not inline under the uploader.
+  assert.match(requirementPage, /label="Course matching"/);
+  assert.match(requirementPage, /Begins after upload/);
+  assert.match(requirementPage, /versioned prompt evaluates the catalog/);
   assert.match(
     requirementPage,
-    /Upload your transcript to discover potential course exemptions/,
-  );
-  assert.match(
-    requirementPage,
-    /reviewPlacement=\{kind === "transcript" \? "context" : "inline"\}/,
+    /\{isTranscript \? \([\s\S]{0,40}<TranscriptPreview[\s\S]{0,400}<TranscriptRecordPanel/,
   );
   assert.match(requirementPage, /Your transcript view/);
-  assert.match(requirementPage, /Parsed transcript/);
+  assert.match(requirementPage, /label="Courses found"/);
   assert.doesNotMatch(
     requirementPage,
     /Confirm transcript and sync courses/,
@@ -352,11 +415,11 @@ test("keeps housing and deposit actions inside their enrollment tasks", async ()
   assert.match(requirementPage, /ExpandedUpdateStudentHousingPlanInput/);
   assert.match(
     requirementPage,
-    /Residence and room details can be[\s\S]*decided later/,
+    /residence unselected to save your on-campus plan and[\s\S]*decide later/,
   );
   assert.match(
     requirementPage,
-    /On-campus housing selected [^"]* residence not selected yet/,
+    /On campus\. A specific residence can be chosen later\./,
   );
   assert.doesNotMatch(
     requirementPage,
@@ -375,9 +438,9 @@ test("connects business actions and non-blocking tracking to the API", async () 
       new URL("../app/hooks/use-activity-tracking.ts", import.meta.url),
       "utf8",
     ),
-    readFile(
-      new URL("../app/components/edward-assistant.tsx", import.meta.url),
-      "utf8",
+    readSources(
+      "../app/components/edward-assistant.tsx",
+      "../app/components/edward-action-widget.tsx",
     ),
   ]);
 
@@ -1278,13 +1341,13 @@ test("coordinates recoverable server state and composes the dashboard calendar",
   assert.match(coordinator, /visibilitychange/);
   assert.match(requirementPage, /Check now/);
   const restoreGate = requirementPage.indexOf('documents.status === "loading"');
-  const gatedUploader = requirementPage.indexOf("<DocumentUpload", restoreGate);
+  const gatedUploader = requirementPage.indexOf("<RequirementUpload", restoreGate);
   assert.ok(restoreGate >= 0, "document restore must expose an initial loading gate");
   assert.ok(
     gatedUploader > restoreGate,
     "the uploader must not render before the existing-document lookup resolves",
   );
-  assert.match(requirementPage, /Checking for an existing upload/);
+  assert.match(requirementPage, /Checking for something you already sent/);
   assert.match(requirementPage, /could not restore your existing document record/);
   assert.match(requirementPage, /onRetry=\{documents\.reload\}/);
   assert.match(uploader, /retry automatically/);
@@ -1556,9 +1619,11 @@ test("onboarding restores identity extraction state and bounds upload waits", as
 });
 
 test("document views retain retry authority and expose failed extraction alerts", async () => {
+  // My Documents lives under Profile now: the panel draws the record, the
+  // profile page owns the list, its projections and the `?document=` opener.
   const [documentsPage, uploader, extractionReview, contextMatches, requirementPage] =
     await Promise.all([
-      readFile(new URL("../app/documents/page.tsx", import.meta.url), "utf8"),
+      readSources("../app/components/documents-panel.tsx", "../app/profile/page.tsx"),
       readFile(
         new URL("../app/components/document-upload.tsx", import.meta.url),
         "utf8",
@@ -1590,19 +1655,22 @@ test("document views retain retry authority and expose failed extraction alerts"
   assert.match(documentsPage, /const changed = await confirm\.run/);
   assert.match(documentsPage, /onDocumentChanged\(changed\)/);
   assert.match(documentsPage, /documentProjections/);
-  assert.match(documentsPage, /pendingDocumentKey/);
+  assert.match(documentsPage, /preferredDocumentProjection/);
   assert.match(documentsPage, /beginDocumentExtractionProjection/);
   assert.match(documentsPage, /reconcileDocumentExtractionProjection/);
+  assert.match(documentsPage, /extraction\?\.status === "processing"/);
+  assert.match(documentsPage, /window\.setInterval\(refresh, 2_500\)/);
   assert.match(documentsPage, /useSearchParams/);
-  assert.match(documentsPage, /submitted-document--highlighted/);
-  assert.match(documentsPage, /scrollIntoView/);
+  assert.match(documentsPage, /params\.get\("document"\)/);
+  assert.match(documentsPage, /openId=\{openDocumentId\}/);
+  assert.match(documentsPage, /item\.document\?\.id === openId/);
   assert.match(
     documentsPage,
-    /key=\{`\$\{document\.id\}:\$\{document\.extraction\?\.status/,
+    /key=\{`\$\{subject\.id\}:\$\{subject\.extraction\.status/,
   );
   assert.match(
     documentsPage,
-    /extraction-state extraction-state--error" role="alert"/,
+    /role=\{extraction\.status === "failed" \? "alert" : undefined\}/,
   );
   assert.match(
     extractionReview,
@@ -1631,13 +1699,17 @@ test("document views retain retry authority and expose failed extraction alerts"
 test("DSM feedback surfaces remain connected to portal data and safe fallbacks", async () => {
   const [financials, campusLife, edward, shell, enrollment] =
     await Promise.all([
-      readFile(
-        new URL("../app/financials/page.tsx", import.meta.url),
-        "utf8",
+      readSources(
+        "../app/financials/page.tsx",
+        "../app/components/financials-frame.tsx",
+        "../app/components/financials-logic.ts",
+        "../app/components/financials-overview.tsx",
+        "../app/components/financials-payments.tsx",
       ),
-      readFile(
-        new URL("../app/campus-life/page.tsx", import.meta.url),
-        "utf8",
+      readSources(
+        "../app/campus-life/page.tsx",
+        "../app/components/campus-life-view.tsx",
+        "../app/components/campus-logic.ts",
       ),
       readFile(
         new URL(
@@ -1650,36 +1722,41 @@ test("DSM feedback surfaces remain connected to portal data and safe fallbacks",
         new URL("../app/components/portal-shell.tsx", import.meta.url),
         "utf8",
       ),
-      readFile(
-        new URL("../app/enrollment/page.tsx", import.meta.url),
-        "utf8",
+      readSources(
+        "../app/enrollment/page.tsx",
+        "../app/components/enrollment-model.ts",
+        "../app/components/enrollment-task-card.tsx",
       ),
     ]);
 
-  assert.match(financials, /award\.type === "work_study" \? 0/);
+  // Accepted aid is the platform's own figure; work-study is named as wages, never as a credit.
+  assert.match(financials, /aidAccepted: data\.acceptedAidCents/);
+  assert.match(financials, /work_study: "Work-study · earned by working"/);
   assert.match(financials, /Accepted financial aid/);
-  assert.match(financials, /Not counted until awarded/);
+  assert.match(financials, /Not counted below until it is awarded/);
   assert.match(financials, /Documents that need you/);
   assert.match(financials, /document\.documentId/);
+  assert.match(financials, /safePortalDestination\(document\.href/);
+  assert.match(financials, /href=\{documentHref\(document\)\}/);
   assert.match(financials, /selectFinancialPaymentPlan/);
-  assert.match(financials, /Payment plans/);
-  assert.match(campusLife, /const categories/);
+  assert.match(financials, /Choose a plan/);
+  assert.match(campusLife, /categoriesOf\(clubs\)/);
   assert.match(campusLife, /Filter clubs by category/);
   assert.match(edward, /webkitSpeechRecognition/);
   assert.match(edward, /speechSynthesis\.speak/);
   assert.match(edward, /Microphone access was blocked/);
-  assert.match(shell, /contacts\.admissions/);
+  assert.match(enrollment, /contacts\.admissions/);
   assert.match(enrollment, /Your next steps/);
   assert.match(enrollment, /Coming up later/);
-  assert.match(enrollment, /Your enrollment advisor/);
+  assert.match(enrollment, /Your admissions contact/);
   assert.match(enrollment, /Start here/);
   assert.match(enrollment, /In review/);
   assert.match(enrollment, /Completed/);
-  assert.match(enrollment, /priorityOf\(right\)/);
+  assert.match(enrollment, /PRIORITY_ORDER\[priorityOf\(a\)\] - PRIORITY_ORDER\[priorityOf\(b\)\]/);
 });
 
 test("student routes enforce bootstrap gating and expose no dead static links", async () => {
-  const [guard, shell, bootstrapRouter, signIn, routeFiles] = await Promise.all([
+  const [guard, shell, bootstrapRouter, signIn, routeFiles, navigation, enrollmentModel] = await Promise.all([
     readFile(
       new URL("../app/components/student-route-guard.tsx", import.meta.url),
       "utf8",
@@ -1705,8 +1782,16 @@ test("student routes enforce bootstrap gating and expose no dead static links", 
         "../app/payments/page.tsx",
         "../app/profile/page.tsx",
         "../app/help/page.tsx",
+        "../app/financials/page.tsx",
+        "../app/housing/page.tsx",
+        "../app/health/page.tsx",
+        "../app/classrooms/page.tsx",
+        "../app/campus-life/page.tsx",
+        "../app/edward/page.tsx",
       ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
     ),
+    readFile(new URL("../app/design-lib/navigation.js", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/enrollment-model.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(guard, /getStudentBootstrap/);
@@ -1719,8 +1804,10 @@ test("student routes enforce bootstrap gating and expose no dead static links", 
     /window\.location\.replace\(tenantRuntime\.href\("\/sign-in"\)\)/,
   );
   assert.match(shell, /onboarding\?\.required/);
-  assert.match(shell, /label: "My Documents"/);
-  assert.match(shell, /href: "\/documents"/);
+  // My Documents is a section of Profile in the navigation model, not a sidebar row.
+  assert.match(navigation, /label: 'My documents'/);
+  assert.match(navigation, /route: '\/profile\?section=documents'/);
+  assert.doesNotMatch(shell, /label: "My Documents"/);
   assert.match(bootstrapRouter, /initialRoute/);
   assert.match(signIn, /getStudentBootstrap/);
   assert.match(signIn, /signInStudent/);
@@ -1755,7 +1842,7 @@ test("student routes enforce bootstrap gating and expose no dead static links", 
     "/profile",
     "/sign-in",
   ]);
-  const source = [shell, signIn, ...routeFiles].join("\n");
+  const source = [shell, signIn, ...routeFiles, enrollmentModel].join("\n");
   assert.doesNotMatch(source, />Open task</);
   assert.match(source, /Upload transcript/);
   assert.match(source, /Choose housing/);
@@ -1765,33 +1852,52 @@ test("student routes enforce bootstrap gating and expose no dead static links", 
 });
 
 test("tenant points stay visible and enrollment tasks advertise their reward", async () => {
-  const [shell, enrollment, apiClient, styles] = await Promise.all([
+  const [shell, enrollment, apiClient, chromeStyles, enrollmentStyles] = await Promise.all([
+    readSources(
+      "../app/components/portal-shell.tsx",
+      "../app/components/points-popover.tsx",
+    ),
+    readSources(
+      "../app/enrollment/page.tsx",
+      "../app/components/enrollment-task-card.tsx",
+      "../app/components/enrollment-rail.tsx",
+    ),
+    readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
     readFile(
-      new URL("../app/components/portal-shell.tsx", import.meta.url),
+      new URL("../app/audentra-design-styles/chrome.css", import.meta.url),
       "utf8",
     ),
-    readFile(new URL("../app/enrollment/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readSources(
+      "../app/audentra-design-styles/features/enrollment.css",
+      "../app/audentra-design-styles/patterns.css",
+    ),
   ]);
 
   assert.match(shell, /rewards\.lifetimePoints/);
   assert.match(shell, /rewards\.pointName/);
   assert.match(shell, /bookstoreCreditCents/);
-  assert.match(shell, /aster-points-popover/);
-  assert.match(shell, /href="\/enrollment#momentum"/);
+  assert.match(shell, /className="topbar-chip points-chip"/);
+  assert.match(shell, /panelClass="points-pop"/);
+  assert.match(shell, /<PointsInfoModal/);
   assert.match(enrollment, /item\.reward\.points/);
   assert.match(enrollment, /pts today/);
+  assert.match(enrollment, /<MomentumCard/);
   assert.match(apiClient, /vv:student-record-changed/);
-  assert.match(styles, /\.aster-points-balance/);
-  assert.match(styles, /\.aster-sidebar__rewards/);
-  assert.match(styles, /\.enrollment-reward--earned/);
+  assert.match(chromeStyles, /\.points-chip/);
+  assert.match(enrollmentStyles, /\.point-reward/);
+  assert.match(enrollmentStyles, /\.momentum-card/);
 });
 
 test("campus event visuals are data-driven, accessible, and preserve canonical registration", async () => {
   const [campusPage, contracts] =
     await Promise.all([
-      readFile(new URL("../app/campus-life/page.tsx", import.meta.url), "utf8"),
+      readSources(
+        "../app/campus-life/page.tsx",
+        "../app/components/campus-life-view.tsx",
+        "../app/components/campus-event-row.tsx",
+        "../app/components/campus-drawer.tsx",
+        "../app/components/campus-logic.ts",
+      ),
       readFile(
         new URL("../../../packages/contracts/src/index.ts", import.meta.url),
         "utf8",
@@ -1799,7 +1905,7 @@ test("campus event visuals are data-driven, accessible, and preserve canonical r
     ]);
 
   assert.match(contracts, /visualTheme\?: "festival" \| "discovery"/);
-  assert.match(campusPage, /function dateParts/);
+  assert.match(campusPage, /function dateTile/);
   assert.match(campusPage, /event\.category/);
   assert.match(campusPage, /event\.location/);
   assert.match(campusPage, /Refresh current events/);
@@ -2290,10 +2396,10 @@ test("generic requirement interactions submit typed, idempotent responses", asyn
   assert.match(action, /createStudentRequirementAppointment/);
   assert.match(action, /requirementId=\{requirement\.id\}/);
   assert.doesNotMatch(action, /Paste.*appointment|appointment UUID/i);
-  assert.match(action, /live\s+connection is not configured yet/);
+  assert.match(action, /live\s+connection is not configured\./);
   assert.match(action, /configuredForm\(requirement\)/);
   assert.match(action, /visibleConfiguredFields\(page\?\.fields \?\? \[\], currentValues\)/);
-  assert.match(action, /requirement-response__page-progress/);
+  assert.match(action, /Step \{pageIndex \+ 1\} of \{form\.pages\.length\}/);
   assert.match(action, /pageIndex < form\.pages\.length - 1/);
   assert.match(action, /valuesFromForm\([\s\S]{0,100}visibleFields/);
   assert.match(action, /visibleFields\.map/);
@@ -2305,11 +2411,11 @@ test("generic requirement interactions submit typed, idempotent responses", asyn
   assert.match(requirementPage, /dependency\.slug/);
   assert.match(
     requirementPage,
-    /requirement\.code === "profile_verification"[\s\S]{0,100}kind === "profile"[\s\S]{0,100}requirement\.interactionType === "form"/,
+    /requirement\.code === "profile_verification" &&\s*requirement\.interactionType === "form"/,
   );
   assert.match(
     requirementPage,
-    /requirement\.code === "housing_preference"[\s\S]{0,100}kind === "housing"[\s\S]{0,120}\["form", "selection_flow"\]\.includes\(requirement\.interactionType\)/,
+    /requirement\.code === "housing_preference" &&\s*\["form", "selection_flow"\]\.includes\(requirement\.interactionType\)/,
   );
   assert.match(
     requirementPage,
@@ -2317,7 +2423,7 @@ test("generic requirement interactions submit typed, idempotent responses", asyn
   );
   assert.match(
     requirementPage,
-    /requirement\.code === "enrollment_deposit"[\s\S]{0,100}kind === "payment"[\s\S]{0,100}requirement\.interactionType === "payment"/,
+    /requirement\.code === "enrollment_deposit" &&\s*requirement\.submissionType === "payment" &&\s*requirement\.interactionType === "payment"/,
   );
   assert.match(contracts, /type StudentRequirementInteractionType/);
   assert.match(contracts, /interface SubmitStudentRequirementResponseInput/);
@@ -2370,7 +2476,7 @@ test("FERPA binary views retain the delegate session and schedule only after att
   const [client, documentPage, documentLink, requirementPage, responseAction] =
     await Promise.all([
       readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
-      readFile(new URL("../app/documents/page.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/components/documents-panel.tsx", import.meta.url), "utf8"),
       readFile(
         new URL("../app/components/secure-student-document-link.tsx", import.meta.url),
         "utf8",
@@ -2415,7 +2521,7 @@ test("FERPA binary views retain the delegate session and schedule only after att
     responseAction,
     /await submit\(\{ appointmentId: appointment\.id \}\);[\s\S]{0,200}pendingAppointmentRef\.current = null[\s\S]{0,200}appointmentKey\.current = null/,
   );
-  assert.match(responseAction, /Retry to attach the existing appointment/);
+  assert.match(responseAction, /Try again to attach the existing appointment/);
   assert.match(responseAction, /void submit\(\{ appointmentId \}\)\.catch/);
 });
 
@@ -2674,7 +2780,7 @@ test("student requirement pages create durable, requirement-linked help requests
     ),
     readFile(
       new URL(
-        "../app/components/requirement-help-request.module.css",
+        "../app/audentra-design-styles/bridge/enrollment.css",
         import.meta.url,
       ),
       "utf8",
@@ -2693,11 +2799,15 @@ test("student requirement pages create durable, requirement-linked help requests
   assert.match(helpWidget, /request\.message\.includes\(requirementReference/);
   assert.match(helpWidget, /Requirement code:/);
   assert.match(helpWidget, /Requirement page:/);
-  assert.match(helpWidget, /Request help/);
+  assert.match(helpWidget, /Write to them/);
+  assert.match(helpWidget, /Send to the enrollment team/);
   assert.match(helpWidget, /Try again/);
   assert.match(helpWidget, /role="alert"/);
-  assert.match(helpStyles, /var\(--tenant-primary/);
-  assert.match(helpStyles, /var\(--tenant-accent/);
+  // The widget is drawn with the design system's primitives and the bridge
+  // sheet only positions it — colour comes from the shared tokens.
+  assert.match(helpWidget, /kind="primary"/);
+  assert.match(helpStyles, /\.app-shell \.requirement-page-card \.card-foot \.requirement-help/);
+  assert.doesNotMatch(helpStyles, /#[0-9a-f]{3,6}\b/i);
   assert.match(contracts, /requirementId\?: string/);
   assert.match(contracts, /workItemId\?: string \| null/);
   assert.match(client, /error\.code !== "VALIDATION_ERROR"/);

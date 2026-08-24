@@ -1,0 +1,261 @@
+/* Production-only bridge rules for the profile pages. Restate a design decision here only
+   when a legacy or production-only element has no design-system shape; never restyle
+   a reference class. */
+
+/* A field opened in place — the reference only toasted about editing; production
+   saves it. The form sits where the value was, inside the row's own column. */
+.app-shell .field-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 420px;
+}
+
+.app-shell .field-edit .field {
+  margin: 0;
+}
+
+.app-shell .field-edit .field-note {
+  margin: 0;
+}
+
+.app-shell .field-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4) var(--space-6);
+}
+
+.app-shell .field-edit-actions .link-button {
+  margin-left: auto;
+}
+
+.app-shell .field-choice fieldset:disabled label,
+.app-shell .field-choice:disabled label {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* The rail's session card, when signing out did not go through. */
+.app-shell .session-card .session-error {
+  color: var(--stop-ink, var(--amber-ink));
+}
+
+/* Who can see what — the production authorization carries a secure link per
+   person and lets the student add one; the reference only narrowed and ended. */
+.app-shell .grant-link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-6) 0 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.app-shell .grant-link > p {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+.app-shell .grant-link > p svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--faint);
+}
+
+.app-shell .grant-link-reveal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  border: 1px solid var(--purple-line);
+  border-radius: var(--radius-tile);
+  background: var(--purple-wash);
+}
+
+.app-shell .grant-link-reveal label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.app-shell .grant-link-reveal label span {
+  color: var(--purple-ink);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-semi);
+}
+
+.app-shell .grant-link-reveal input {
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-tile);
+  background: var(--ink-0);
+  color: var(--ink);
+  font-family: var(--font-mono, inherit);
+  font-size: var(--fs-small);
+}
+
+.app-shell .grant-link-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4) var(--space-6);
+}
+
+.app-shell .grant-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4) var(--space-6);
+  padding: var(--space-7) var(--space-9) 0;
+}
+
+.app-shell .grant-add small {
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+.app-shell .grant-new {
+  border-top: 1px solid var(--line-soft);
+}
+
+.app-shell .grant-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-6);
+}
+
+.app-shell .grant-fields .field {
+  margin: 0;
+}
+
+.app-shell .grant-fields select {
+  width: 100%;
+  min-height: 42px;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-tile);
+  background: var(--ink-0);
+  color: var(--ink);
+  font: inherit;
+}
+
+.app-shell .grant-new .field-error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--stop-ink, var(--amber-ink));
+  font-size: var(--fs-small);
+}
+
+/* The unsigned authorization keeps its production editor inside the section. */
+.app-shell .access-editor {
+  padding: 0 var(--space-9) var(--space-8);
+}
+
+/* The general upload inside the document drawer is the production dropzone. */
+.app-shell .document-drawer .document-upload .document-dropzone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.app-shell .document-drawer .document-dropzone > label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-9);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-tile);
+  text-align: center;
+  cursor: pointer;
+}
+
+.app-shell .document-drawer .document-dropzone > label[data-dragging] {
+  border-color: var(--purple);
+  background: var(--purple-wash);
+}
+
+.app-shell .document-drawer .document-dropzone > label input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.app-shell .document-drawer .document-dropzone > label small,
+.app-shell .document-drawer .document-dropzone p {
+  color: var(--muted);
+  font-size: var(--fs-small);
+  margin: 0;
+}
+
+.app-shell .document-drawer .document-dropzone ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-size: var(--fs-small);
+}
+
+.app-shell .document-drawer .document-dropzone ul button {
+  margin-left: var(--space-3);
+  border: 0;
+  background: none;
+  color: var(--purple);
+  font: inherit;
+  cursor: pointer;
+}
+
+.app-shell .document-drawer .document-dropzone .field-error {
+  color: var(--stop-ink, var(--amber-ink));
+}
+
+/* The drawer's extraction review re-uses the production warning list. */
+.app-shell .document-drawer .extraction-warnings {
+  margin: 0;
+  padding-left: var(--space-8);
+  color: var(--amber-ink);
+  font-size: var(--fs-small);
+}
+
+.app-shell .document-drawer .extract-field input[readonly] {
+  color: var(--ink);
+}
+
+/* Origins: an empty record still sits in a card. */
+.app-shell .origin-card > .state-card {
+  margin: var(--space-8) var(--space-9);
+}
+
+/* The production dropzone's own submit, drawn as the drawer's primary button. */
+.app-shell .document-drawer .document-dropzone > .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 42px;
+  padding: var(--space-4) var(--space-8);
+  border: 0;
+  border-radius: var(--radius-tile);
+  background: var(--purple);
+  color: var(--ink-0);
+  font: inherit;
+  font-weight: var(--fw-semi);
+  cursor: pointer;
+}
+
+.app-shell .document-drawer .document-dropzone > .button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

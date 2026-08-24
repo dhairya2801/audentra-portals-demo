@@ -1,0 +1,340 @@
+/* Production-only bridge rules for the enrollment pages. Restate a design decision here only
+   when a legacy or production-only element has no design-system shape; never restyle
+   a reference class. */
+
+/* `globals.css` still carries a legacy `.text-button` (underlined, forest) and `.why-card`
+   (dashed, serif) from the old checklist. They outrank the reference rules by source
+   order, so the reference's own values are restated here under the shell. */
+.app-shell .text-button {
+  width: auto;
+  padding: 0;
+  color: var(--muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semi);
+  text-decoration: none;
+}
+
+.app-shell .why-card {
+  margin-top: 0;
+  padding: var(--space-7);
+  border: 0;
+  border-radius: var(--radius-tile);
+  background: var(--canvas);
+  gap: var(--space-5);
+}
+
+.app-shell .why-card > span {
+  width: 29px;
+  height: 29px;
+  border: 0;
+  border-radius: var(--radius-chip);
+  background: var(--purple-tint);
+  color: var(--purple-hover);
+  font-family: inherit;
+}
+
+.app-shell .why-card strong {
+  font-family: inherit;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-semi);
+}
+
+.app-shell .why-card p {
+  margin: var(--space-2) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+}
+
+/* requirement page */
+/* The requirement detail page is the reference TaskDrawer stood up as the main
+   card: the head is the drawer header's anatomy, the body is `.drawer-content`.
+   Only what the drawer's own selectors scope to the drawer is restated here. */
+.app-shell .requirement-page-card .requirement-page-head {
+  width: auto;
+  align-items: center;
+  gap: var(--space-5);
+  display: flex;
+}
+
+.app-shell .requirement-page-card .requirement-page-head .drawer-label {
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.app-shell .requirement-body {
+  padding-top: var(--space-9);
+}
+
+.app-shell .requirement-body > h2 {
+  letter-spacing: var(--ls-hero);
+  margin: var(--space-8) 0 var(--space-4);
+  font-size: var(--fs-title);
+  font-weight: var(--fw-regular);
+}
+
+.app-shell .requirement-body .why-card strong,
+.app-shell .requirement-body .drawer-reward strong {
+  font-weight: var(--fw-bold);
+}
+
+/* The legacy stylesheet still owns a `.field` (a grid, a heavy green label,
+   a required asterisk). Inside this card the reference primitive's own values
+   are restated so the two do not blend. */
+.app-shell .requirement-page-card .field {
+  gap: 0;
+  margin-bottom: var(--space-8);
+  display: block;
+}
+
+.app-shell .requirement-page-card .field:last-child {
+  margin-bottom: 0;
+}
+
+.app-shell .requirement-page-card .field > .field-label {
+  color: var(--muted);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  margin: 0 0 var(--space-4);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+  display: block;
+}
+
+.app-shell .requirement-page-card .field > .field-label::after {
+  content: none;
+}
+
+.app-shell .requirement-page-card .field.invalid > .field-label {
+  color: var(--crimson-ink);
+}
+
+.app-shell .requirement-page-card .field input,
+.app-shell .requirement-page-card .field select,
+.app-shell .requirement-page-card .field textarea {
+  min-height: 0;
+  color: var(--ink);
+  background: var(--surface-sunk);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-tile);
+  width: 100%;
+  padding: var(--space-6) var(--space-7);
+  font-family: var(--font-geist-sans);
+  font-size: var(--fs-body);
+}
+
+.app-shell .requirement-page-card .field input:focus-visible,
+.app-shell .requirement-page-card .field select:focus-visible,
+.app-shell .requirement-page-card .field textarea:focus-visible {
+  background: var(--surface);
+  border-color: var(--purple);
+  outline: 0;
+  box-shadow: 0 0 0 3px var(--purple-tint);
+}
+
+.app-shell .requirement-page-card .field.invalid input {
+  border-color: var(--crimson);
+  box-shadow: 0 0 0 3px var(--crimson-soft);
+}
+
+.app-shell .requirement-page-card .field small.field-hint {
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+.app-shell .requirement-page-card .field small.field-error,
+.app-shell .requirement-page-card .field-error {
+  color: var(--crimson-ink);
+  background: none;
+  border: 0;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semi);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.app-shell .requirement-form {
+  margin-top: var(--space-8);
+}
+
+.app-shell .requirement-form > .stated-field {
+  margin-bottom: var(--space-8);
+}
+
+.app-shell .requirement-form .form-help,
+.app-shell .requirement-form .field-label {
+  margin-top: var(--space-6);
+}
+
+.app-shell .requirement-form .field .field-label,
+.app-shell .requirement-form .field-label:first-child,
+.app-shell .requirement-form .choice-fieldset .field-label {
+  margin-top: 0;
+}
+
+.app-shell .requirement-form .choice-fieldset {
+  border: 0;
+  margin: 0 0 var(--space-8);
+  padding: 0;
+  min-width: 0;
+}
+
+.app-shell .requirement-form .field-optional {
+  text-transform: none;
+  letter-spacing: 0;
+  font-style: normal;
+  font-weight: var(--fw-regular);
+}
+
+/* The primitive styles `.field input`; the forms here also hold a select and a
+   textarea, and they are the same sunk slab. */
+.app-shell .field select,
+.app-shell .field textarea {
+  color: var(--ink);
+  background: var(--surface-sunk);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-tile);
+  width: 100%;
+  padding: var(--space-6) var(--space-7);
+  font-family: var(--font-geist-sans);
+  font-size: var(--fs-body);
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+
+.app-shell .field textarea {
+  resize: vertical;
+  line-height: var(--lh-body);
+}
+
+.app-shell .field select:focus-visible,
+.app-shell .field textarea:focus-visible {
+  background: var(--surface);
+  border-color: var(--purple);
+  outline: 0;
+  box-shadow: 0 0 0 3px var(--purple-tint);
+}
+
+.app-shell .requirement-body .skip-link + .skip-link {
+  margin-top: var(--space-3);
+}
+
+.app-shell .requirement-body .document-brief {
+  margin-top: var(--space-8);
+}
+
+.app-shell .requirement-body .document-check {
+  margin-top: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.app-shell .requirement-body .action-panel > .notice,
+.app-shell .requirement-body .requirement-form > .notice,
+.app-shell .requirement-body .external-panel > .notice {
+  margin-top: var(--space-6);
+}
+
+.app-shell .requirement-body .upload-zone.dragging {
+  border-color: var(--purple);
+  background: var(--purple-wash);
+}
+
+.app-shell .requirement-body .extract-field input[readonly] {
+  color: var(--ink);
+}
+
+.app-shell .requirement-body .extract-verdict.right[type='button'] {
+  cursor: pointer;
+  background: none;
+  border: 0;
+  font: inherit;
+}
+
+.app-shell .requirement-body .prototype-note {
+  margin-top: var(--space-4);
+}
+
+.app-shell .requirement-page-card .card-foot .requirement-help .help-note {
+  margin-top: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+}
+
+.app-shell .requirement-page-card .card-foot .requirement-help .requirement-form {
+  margin-top: 0;
+}
+
+.app-shell .requirement-page-card .card-foot .requirement-help .upload-failed-actions {
+  margin-top: var(--space-6);
+}
+
+.app-shell .requirement-page-card .card-foot > .notice {
+  padding: 0;
+}
+
+/* The rail's ID preview: the portrait Edward found, or initials until then. */
+.app-shell .identity-preview {
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-6) 0 var(--space-2);
+  display: flex;
+}
+
+.app-shell .identity-preview > div {
+  flex-direction: column;
+  gap: var(--space-1);
+  display: flex;
+  min-width: 0;
+}
+
+.app-shell .identity-preview strong {
+  font-size: var(--fs-meta);
+}
+
+.app-shell .identity-preview small {
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+.app-shell .identity-preview small.mono {
+  font-family: var(--font-geist-mono);
+  letter-spacing: var(--ls-caps);
+  font-size: var(--fs-micro);
+}
+
+.app-shell .page-rail .section-card .reject-remedies {
+  margin: var(--space-6) 0 0;
+}
+
+.app-shell .page-rail .compact-meta {
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+@media (width<=620px) {
+  .app-shell .requirement-page-card .requirement-page-head {
+    flex-wrap: wrap;
+  }
+}
+
+/* The housing section's residence drawer strips the tile to draw a place
+   photo; the step tile is the checklist row's tile and keeps its shape. */
+.app-shell .requirement-body > .drawer-icon.housing {
+  background: var(--teal-soft);
+  width: 49px;
+  height: 49px;
+}
+
+.app-shell .requirement-page-card .card-foot .help-note .link-button {
+  white-space: nowrap;
+  display: inline-flex;
+}

@@ -126,3 +126,25 @@ export function formatTenantDate(
     timeZone: options.timeZone ?? tenant.localization.timeZone,
   }).format(value instanceof Date ? value : new Date(value));
 }
+
+const DAY_MS = 86_400_000;
+
+/**
+ * The calendar day a moment falls on in the tenant's own time zone, as a day
+ * count since the epoch — what "today", "in 3 days" and "this week" mean for
+ * a student of that institution. Latin digits and the Gregorian calendar are
+ * forced so the parts can be read back as numbers whatever the locale.
+ */
+export function tenantDayIndex(value: string | Date, tenant: TenantConfig) {
+  const date = value instanceof Date ? value : new Date(value);
+  const parts = new Intl.DateTimeFormat(tenant.localization.locale, {
+    timeZone: tenant.localization.timeZone,
+    calendar: "gregory",
+    numberingSystem: "latn",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(date);
+  const get = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+  return Math.round(Date.UTC(get("year"), get("month") - 1, get("day")) / DAY_MS);
+}

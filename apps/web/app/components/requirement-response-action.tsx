@@ -13,10 +13,14 @@ import type {
 } from "@vv/contracts";
 import {
   type FormEvent,
+  type ReactNode,
   useCallback,
   useRef,
   useState,
 } from "react";
+import Icon from "../design-system/Icon.jsx";
+import Button from "../design-system/primitives/Button.jsx";
+import Notice from "../design-system/patterns/Notice.jsx";
 import {
   createStudentRequirementAppointment,
   getStudentRequirementAppointments,
@@ -27,10 +31,84 @@ import {
   useApiAction,
   useApiResource,
 } from "../hooks/use-api-resource";
-import { ActionFeedback } from "./portal-ui";
 import { visibleConfiguredFields } from "./requirement-response-model";
+import { useTenant } from "./tenant-provider";
 
 type SubmitResponse = (payload: StudentRequirementResponsePayload) => Promise<void>;
+
+/** The reference `Field` anatomy around an uncontrolled control — the forms
+ *  here read `FormData` on submit, so the primitive's controlled input is the
+ *  wrong half; the classes are the same and so is the way an error is said. */
+export function FieldShell({
+  label,
+  hint,
+  optional = false,
+  children,
+}: {
+  label: ReactNode;
+  hint?: ReactNode;
+  optional?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <label className="field">
+      <span className="field-label">
+        {label}
+        {optional ? <em className="field-optional"> · optional</em> : null}
+      </span>
+      <span className="field-control">{children}</span>
+      {hint ? <small className="field-hint">{hint}</small> : null}
+    </label>
+  );
+}
+
+export function ChoiceOption({
+  name,
+  value,
+  type,
+  title,
+  note,
+  required,
+  defaultChecked,
+  checked,
+  onChange,
+}: {
+  name: string;
+  value: string;
+  type: "radio" | "checkbox";
+  title: ReactNode;
+  note?: ReactNode;
+  required?: boolean;
+  defaultChecked?: boolean;
+  checked?: boolean;
+  onChange?: (checked: boolean) => void;
+}) {
+  const [localChecked, setLocalChecked] = useState(Boolean(defaultChecked));
+  const chosen = checked ?? localChecked;
+  return (
+    <label className={chosen ? "chosen" : ""}>
+      <input
+        type={type}
+        name={name}
+        value={value}
+        required={required}
+        checked={checked}
+        defaultChecked={checked === undefined ? defaultChecked : undefined}
+        onChange={(event) => {
+          if (checked === undefined) setLocalChecked(event.target.checked);
+          onChange?.(event.target.checked);
+        }}
+      />
+      <span>
+        <strong>{title}</strong>
+        {note ? <small>{note}</small> : null}
+      </span>
+      <span className="radio-mark">
+        <Icon name="check" size={14} />
+      </span>
+    </label>
+  );
+}
 
 function configuredFields(requirement: StudentRequirementDetail) {
   const fields =
@@ -65,19 +143,24 @@ function ConfiguredField({
 }) {
   if (field.field_type === "checkbox") {
     return (
-      <label className="requirement-response__checkbox">
-        <input name={field.id} type="checkbox" required={field.required} defaultChecked={currentValue === true} />
-        {field.title}
-      </label>
+      <div className="choice-panel tight" role="group" aria-label={field.title}>
+        <ChoiceOption
+          type="checkbox"
+          name={field.id}
+          value="true"
+          required={field.required}
+          title={field.title}
+          defaultChecked={currentValue === true}
+        />
+      </div>
     );
   }
   if (field.field_type === "single_select") {
     return (
-      <label>
-        {field.title}
+      <FieldShell label={field.title} optional={!field.required}>
         <select name={field.id} required={field.required} defaultValue={typeof currentValue === "string" ? currentValue : ""}>
           <option value="" disabled>
-            Select an option
+            Choose one
           </option>
           {(field.options ?? []).map((option) => (
             <option key={option} value={option}>
@@ -85,29 +168,34 @@ function ConfiguredField({
             </option>
           ))}
         </select>
-      </label>
+      </FieldShell>
     );
   }
   if (field.field_type === "multiple_select") {
+    const selected = Array.isArray(currentValue) ? currentValue.map(String) : [];
     return (
-      <label>
-        {field.title}
-        <select name={field.id} required={field.required} multiple defaultValue={Array.isArray(currentValue) ? currentValue.map(String) : []}>
+      <fieldset className="choice-fieldset">
+        <legend className="field-label">
+          {field.title}
+          {field.maximum_selections ? ` · up to ${field.maximum_selections}` : ""}
+        </legend>
+        <div className="choice-panel tight" role="group" aria-label={field.title}>
           {(field.options ?? []).map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
+            <ChoiceOption
+              key={option}
+              type="checkbox"
+              name={field.id}
+              value={option}
+              title={option}
+              defaultChecked={selected.includes(option)}
+            />
           ))}
-        </select>
-        {field.maximum_selections ? (
-          <small>Select up to {field.maximum_selections}.</small>
-        ) : null}
-      </label>
+        </div>
+      </fieldset>
     );
   }
   return (
-    <label>
-      {field.title}
+    <FieldShell label={field.title} optional={!field.required}>
       <input
         name={field.id}
         type={field.field_type === "phone" ? "tel" : field.field_type}
@@ -121,7 +209,7 @@ function ConfiguredField({
             : ""
         }
       />
-    </label>
+    </FieldShell>
   );
 }
 
@@ -181,16 +269,17 @@ function GenericValuesForm({
   const visibleFields = visibleConfiguredFields(page?.fields ?? [], currentValues);
   if (fields.length === 0) {
     return (
-      <div>
-        <p>No additional information is required for this step.</p>
-        <button
-          className="button button--primary"
-          type="button"
-          disabled={loading}
+      <div className="requirement-form">
+        <p className="form-help">No additional information is needed for this step.</p>
+        <Button
+          kind="primary"
+          icon="arrow"
+          full
+          pending={loading}
           onClick={() => void submit({ values: {} }).catch(() => undefined)}
         >
-          {loading ? "Submitting..." : "Complete step"}
-        </button>
+          Complete this step
+        </Button>
       </div>
     );
   }
@@ -219,34 +308,50 @@ function GenericValuesForm({
       );
     }
   };
+  const last = pageIndex === form.pages.length - 1;
   return (
     <form
-      className="requirement-response__multipage-form"
+      className="requirement-form"
       onChange={(event) =>
         setCurrentValues(valuesForPage(new FormData(event.currentTarget), false))
       }
       onSubmit={(event) => void onSubmit(event)}
     >
-      {form.pages.length > 1 ? (
-        <div className="requirement-response__page-progress" aria-label={`Step ${pageIndex + 1} of ${form.pages.length}`}>
-          <span>Step {pageIndex + 1} of {form.pages.length}</span>
-          <div>{form.pages.map((candidate, index) => <i className={index <= pageIndex ? "is-complete" : undefined} key={candidate.id} />)}</div>
-        </div>
-      ) : null}
-      <header className="requirement-response__page-heading">
+      <div className="form-page-head">
+        {form.pages.length > 1 ? (
+          <span className="field-label" aria-label={`Step ${pageIndex + 1} of ${form.pages.length}`}>
+            Step {pageIndex + 1} of {form.pages.length}
+          </span>
+        ) : null}
         <h3>{page?.title}</h3>
-        {page?.description ? <p>{page.description}</p> : null}
-      </header>
+        {page?.description ? <p className="form-help">{page.description}</p> : null}
+      </div>
       {visibleFields.map((field) => (
         <ConfiguredField key={field.id} field={field} currentValue={currentValues[field.id]} />
       ))}
-      <div className="requirement-response__page-actions">
-        {pageIndex > 0 ? <button className="button button--secondary" type="button" disabled={loading} onClick={() => setPageIndex((current) => current - 1)}>Back</button> : null}
-        <button className="button button--primary" type="submit" disabled={loading}>
-          {loading ? "Submitting..." : pageIndex === form.pages.length - 1 ? "Submit response" : "Continue"}
+      <Button kind="primary" icon="arrow" full pending={loading} type="submit">
+        {last ? "Submit my response" : "Continue"}
+      </Button>
+      {pageIndex > 0 ? (
+        <button
+          className="skip-link"
+          type="button"
+          disabled={loading}
+          onClick={() => setPageIndex((current) => current - 1)}
+        >
+          Back to step {pageIndex}
         </button>
-      </div>
+      ) : null}
     </form>
+  );
+}
+
+function Unavailable() {
+  const { tenant } = useTenant();
+  return (
+    <Notice tone="working" icon="clock" title="This choice is temporarily unavailable">
+      {tenant.shortName} is updating it. You do not need to do anything yet.
+    </Notice>
   );
 }
 
@@ -260,19 +365,11 @@ function SingleSelectForm({
   loading: boolean;
 }) {
   const options = requirement.inputConfig.options ?? [];
-  if (options.length < 2) {
-    return (
-      <div className="requirement-next-action" role="status">
-        <span aria-hidden="true">i</span>
-        <div>
-          <strong>This choice is temporarily unavailable.</strong>
-          <p>The university is updating it. You do not need to take action yet.</p>
-        </div>
-      </div>
-    );
-  }
+  const [chosen, setChosen] = useState<string | null>(null);
+  if (options.length < 2) return <Unavailable />;
   return (
     <form
+      className="requirement-form"
       onSubmit={(event) => {
         event.preventDefault();
         const selectedOption = String(
@@ -281,18 +378,24 @@ function SingleSelectForm({
         void submit({ selectedOption }).catch(() => undefined);
       }}
     >
-      <fieldset>
-        <legend>Choose one option</legend>
+      <p className="field-label">Choose one</p>
+      <div className="choice-panel" role="radiogroup" aria-label={requirement.title}>
         {options.map((option) => (
-          <label key={option} className="requirement-response__choice">
-            <input name="selectedOption" type="radio" value={option} required />
-            {option}
-          </label>
+          <ChoiceOption
+            key={option}
+            type="radio"
+            name="selectedOption"
+            value={option}
+            required
+            title={option}
+            checked={chosen === option}
+            onChange={() => setChosen(option)}
+          />
         ))}
-      </fieldset>
-      <button className="button button--primary" type="submit" disabled={loading}>
-        {loading ? "Submitting..." : "Save selection"}
-      </button>
+      </div>
+      <Button kind="primary" icon="arrow" full pending={loading} type="submit" disabled={!chosen}>
+        Save my choice
+      </Button>
     </form>
   );
 }
@@ -310,19 +413,11 @@ function MultipleSelectForm({
 }) {
   const options = requirement.inputConfig.options ?? [];
   const maximum = requirement.inputConfig.maximumSelections ?? options.length;
-  if (options.length < 2) {
-    return (
-      <div className="requirement-next-action" role="status">
-        <span aria-hidden="true">i</span>
-        <div>
-          <strong>This choice is temporarily unavailable.</strong>
-          <p>The university is updating it. You do not need to take action yet.</p>
-        </div>
-      </div>
-    );
-  }
+  const [chosen, setChosen] = useState<string[]>([]);
+  if (options.length < 2) return <Unavailable />;
   return (
     <form
+      className="requirement-form"
       onSubmit={(event) => {
         event.preventDefault();
         const selectedOptions = new FormData(event.currentTarget)
@@ -336,18 +431,34 @@ function MultipleSelectForm({
         void submit({ selectedOptions }).catch(() => undefined);
       }}
     >
-      <fieldset>
-        <legend>Choose up to {maximum}</legend>
+      <p className="field-label">Choose up to {maximum}</p>
+      <div className="choice-panel" role="group" aria-label={requirement.title}>
         {options.map((option) => (
-          <label key={option} className="requirement-response__choice">
-            <input name="selectedOptions" type="checkbox" value={option} />
-            {option}
-          </label>
+          <ChoiceOption
+            key={option}
+            type="checkbox"
+            name="selectedOptions"
+            value={option}
+            title={option}
+            checked={chosen.includes(option)}
+            onChange={(checked) =>
+              setChosen((current) =>
+                checked
+                  ? [...current.filter((value) => value !== option), option]
+                  : current.filter((value) => value !== option),
+              )
+            }
+          />
         ))}
-      </fieldset>
-      <button className="button button--primary" type="submit" disabled={loading}>
-        {loading ? "Submitting..." : "Save selections"}
-      </button>
+      </div>
+      <p className="form-help">
+        {chosen.length === 0
+          ? "Nothing chosen yet."
+          : `${chosen.length} of ${maximum} chosen.`}
+      </p>
+      <Button kind="primary" icon="arrow" full pending={loading} type="submit">
+        Save my choices
+      </Button>
     </form>
   );
 }
@@ -359,8 +470,11 @@ function BuiltInSignatureForm({
   submit: SubmitResponse;
   loading: boolean;
 }) {
+  const { tenant } = useTenant();
+  const [accepted, setAccepted] = useState(false);
   return (
     <form
+      className="requirement-form"
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
@@ -371,24 +485,30 @@ function BuiltInSignatureForm({
         }).catch(() => undefined);
       }}
     >
-      <label>
-        Full legal name
+      <FieldShell label="Full legal name" hint="Exactly as it appears on your application.">
         <input name="signerName" required autoComplete="name" />
-      </label>
-      <label>
-        Signature method
+      </FieldShell>
+      <FieldShell label="How you sign">
         <select name="signatureMethod" defaultValue="typed">
           <option value="typed">Typed signature</option>
           <option value="drawn">Drawn signature acknowledgement</option>
         </select>
-      </label>
-      <label className="requirement-response__checkbox">
-        <input name="accepted" type="checkbox" required />
-        I confirm this electronic signature represents me.
-      </label>
-      <button className="button button--primary" type="submit" disabled={loading}>
-        {loading ? "Signing..." : "Sign and complete"}
-      </button>
+      </FieldShell>
+      <div className="choice-panel tight" role="group" aria-label="Signature confirmation">
+        <ChoiceOption
+          type="checkbox"
+          name="accepted"
+          value="true"
+          required
+          title="I confirm this electronic signature represents me."
+          note={`${tenant.shortName} records it with today’s date.`}
+          checked={accepted}
+          onChange={setAccepted}
+        />
+      </div>
+      <Button kind="primary" icon="pen" full pending={loading} type="submit" disabled={!accepted}>
+        Sign and complete
+      </Button>
     </form>
   );
 }
@@ -402,6 +522,7 @@ function SchedulingForm({
   submit: SubmitResponse;
   loading: boolean;
 }) {
+  const { tenant } = useTenant();
   const appointmentForm = useRef<HTMLFormElement>(null);
   const appointmentKey = useRef<string | null>(null);
   const pendingAppointmentRef = useRef<StudentAppointment | null>(null);
@@ -412,6 +533,7 @@ function SchedulingForm({
     "idle" | "loading" | "success" | "error"
   >("idle");
   const [scheduleMessage, setScheduleMessage] = useState<string | null>(null);
+  const [newOpen, setNewOpen] = useState<boolean | null>(null);
   const loadAppointments = useCallback(
     (signal: AbortSignal) =>
       getStudentRequirementAppointments(requirementId, signal),
@@ -468,27 +590,36 @@ function SchedulingForm({
       setScheduleStatus("error");
       setScheduleMessage(
         pendingAppointment
-          ? "Your appointment is scheduled, but it could not be attached to this requirement. Retry to attach the existing appointment."
+          ? "Your appointment is scheduled, but it could not be attached to this step. Try again to attach the existing appointment."
           : getApiErrorMessage(cause),
       );
     }
   };
-  if (appointments.status === "loading") return <p>Loading your appointments...</p>;
+  if (appointments.status === "loading") {
+    return (
+      <Notice tone="working" icon="clock">
+        Checking your appointments…
+      </Notice>
+    );
+  }
   if (appointments.status === "error") {
     return (
-      <div>
-        <p role="alert">{appointments.error}</p>
-        <button className="button button--secondary" type="button" onClick={appointments.reload}>
-          Try again
-        </button>
-      </div>
+      <Notice
+        tone="urgent"
+        icon="alert"
+        title="Your appointments could not be loaded"
+        action={{ label: "Try again", icon: "refresh", onClick: appointments.reload }}
+      >
+        {appointments.error}
+      </Notice>
     );
   }
   const scheduled = appointments.data.items.filter(
     (appointment: StudentAppointment) => appointment.status === "scheduled",
   );
+  const showNew = newOpen ?? scheduled.length === 0;
   return (
-    <div className="requirement-scheduling">
+    <div className="requirement-form">
       {scheduled.length > 0 ? (
         <form
           onSubmit={(event) => {
@@ -499,8 +630,7 @@ function SchedulingForm({
             void submit({ appointmentId }).catch(() => undefined);
           }}
         >
-          <label>
-            Use a scheduled appointment
+          <FieldShell label="Use an appointment you already have">
             <select name="appointmentId" required defaultValue="">
               <option value="" disabled>Choose an appointment</option>
               {scheduled.map((appointment) => (
@@ -509,57 +639,70 @@ function SchedulingForm({
                 </option>
               ))}
             </select>
-          </label>
-          <button className="button button--primary" type="submit" disabled={loading}>
-            {loading ? "Submitting..." : "Attach appointment"}
-          </button>
+          </FieldShell>
+          <Button kind="primary" icon="arrow" full pending={loading} type="submit">
+            Attach this appointment
+          </Button>
         </form>
       ) : (
-        <p>No scheduled appointment is available yet. Choose a time below.</p>
+        <p className="form-help">
+          You have no scheduled appointment yet. Choose a time below and{" "}
+          {tenant.shortName} holds it for you.
+        </p>
       )}
 
-      <details open={scheduled.length === 0}>
-        <summary>Schedule a new advisor appointment</summary>
-        <form ref={appointmentForm} onSubmit={(event) => void scheduleAndAttach(event)}>
-          <label>
-            Conversation type
+      {scheduled.length > 0 ? (
+        <button
+          className="skip-link"
+          type="button"
+          aria-expanded={showNew}
+          onClick={() => setNewOpen(!showNew)}
+        >
+          {showNew ? "Keep an existing appointment instead" : "Schedule a new appointment instead"}
+        </button>
+      ) : null}
+
+      {showNew ? (
+        <form ref={appointmentForm} className="requirement-form" onSubmit={(event) => void scheduleAndAttach(event)}>
+          <FieldShell label="What it is about">
             <select name="type" defaultValue="enrollment_support" required>
               <option value="enrollment_support">Enrollment support</option>
               <option value="admissions_counseling">Admissions counseling</option>
               <option value="financial_aid">Financial aid</option>
             </select>
-          </label>
-          <label>
-            Date and time
+          </FieldShell>
+          <FieldShell label="Date and time">
             <input name="startsAt" type="datetime-local" required />
-          </label>
-          <label>
-            What would you like to discuss? <small>Optional</small>
+          </FieldShell>
+          <FieldShell label="What you would like to discuss" optional>
             <textarea name="notes" rows={3} maxLength={500} />
-          </label>
-          {appointmentError ? <p className="field-error" role="alert">{appointmentError}</p> : null}
-          <ActionFeedback
-            status={scheduleStatus}
-            error={scheduleMessage}
-            success="Your appointment is scheduled and attached."
-          />
-          <button
-            className="button button--primary"
+          </FieldShell>
+          {appointmentError ? (
+            <p className="field-error" role="alert">
+              <Icon name="alert" size={13} /> {appointmentError}
+            </p>
+          ) : null}
+          {scheduleStatus === "error" && scheduleMessage ? (
+            <Notice tone="urgent" icon="alert">{scheduleMessage}</Notice>
+          ) : scheduleStatus === "success" ? (
+            <Notice tone="done" icon="check">Your appointment is scheduled and attached to this step.</Notice>
+          ) : null}
+          <Button
+            kind="primary"
+            icon="calendar"
+            full
             type="submit"
-            disabled={loading || scheduleStatus === "loading"}
+            disabled={loading}
+            pending={scheduleStatus === "loading"}
           >
-            {scheduleStatus === "loading"
+            {scheduleStatus === "error"
               ? pendingAppointment
-                ? "Attaching..."
-                : "Scheduling..."
-              : scheduleStatus === "error"
-                ? pendingAppointment
-                  ? "Retry attachment"
-                  : "Retry scheduling"
-                : "Schedule and attach"}
-          </button>
+                ? "Try attaching again"
+                : "Try scheduling again"
+              : "Schedule and attach"}
+          </Button>
         </form>
-      </details>
+      ) : null}
     </div>
   );
 }
@@ -578,30 +721,32 @@ function RequirementResponseContent({
   switch (requirement.interactionType) {
     case "information":
       return (
-        <div>
-          <p>Confirm that you have read this information.</p>
-          <button
-            className="button button--primary"
-            type="button"
-            disabled={loading}
+        <div className="requirement-form">
+          <p className="form-help">Confirm that you have read the information above.</p>
+          <Button
+            kind="primary"
+            icon="check"
+            full
+            pending={loading}
             onClick={() => void onSubmit({ acknowledged: true }).catch(() => undefined)}
           >
-            {loading ? "Recording..." : "Mark as read"}
-          </button>
+            I have read this
+          </Button>
         </div>
       );
     case "approval":
       return (
-        <div>
-          <p>Review the details above before approving this step.</p>
-          <button
-            className="button button--primary"
-            type="button"
-            disabled={loading}
+        <div className="requirement-form">
+          <p className="form-help">Review the details above before approving this step.</p>
+          <Button
+            kind="primary"
+            icon="check"
+            full
+            pending={loading}
             onClick={() => void onSubmit({ approved: true }).catch(() => undefined)}
           >
-            {loading ? "Approving..." : "Approve and continue"}
-          </button>
+            Approve and continue
+          </Button>
         </div>
       );
     case "form":
@@ -634,13 +779,11 @@ function RequirementResponseContent({
     case "signature":
       if (requirement.inputConfig.signatureProvider === "docusign") {
         return (
-          <div>
-            <p>
-              Your institution selected DocuSign for this step, but the live
-              connection is not configured yet.
-            </p>
-            <p>Contact Enrollment Services for an updated signing option.</p>
-          </div>
+          <Notice tone="working" icon="pen" title="Signing is not open yet">
+            Your institution chose DocuSign for this step, but the live
+            connection is not configured. Enrollment Services can offer an
+            updated way to sign.
+          </Notice>
         );
       }
       return <BuiltInSignatureForm submit={onSubmit} loading={loading} />;
@@ -696,13 +839,9 @@ export function RequirementResponseAction({
 
   if (["completed", "waived", "not_applicable", "expired"].includes(requirement.status)) {
     return (
-      <div className="requirement-next-action" role="status">
-        <span aria-hidden="true">✓</span>
-        <div>
-          <strong>This response is recorded.</strong>
-          <p>No further action is required for this step.</p>
-        </div>
-      </div>
+      <Notice tone="done" icon="check" title="Your response is recorded">
+        Nothing more is needed for this step.
+      </Notice>
     );
   }
 
@@ -722,7 +861,7 @@ export function RequirementResponseAction({
   }
 
   return (
-    <section className="requirement-response-card" aria-label="Requirement response">
+    <div className="requirement-response" aria-label="Your response">
       <RequirementResponseContent
         requirement={requirement}
         onSubmit={submit}
@@ -731,14 +870,18 @@ export function RequirementResponseAction({
       />
       {validationError ? (
         <p className="field-error" role="alert">
-          {validationError}
+          <Icon name="alert" size={13} /> {validationError}
         </p>
       ) : null}
-      <ActionFeedback
-        status={submitAction.status}
-        error={submitAction.message}
-        success="Your response is recorded and your enrollment checklist has been refreshed."
-      />
-    </section>
+      {submitAction.status === "error" ? (
+        <Notice tone="urgent" icon="alert" title="That did not save">
+          {submitAction.message}
+        </Notice>
+      ) : submitAction.status === "success" ? (
+        <Notice tone="done" icon="check" title="Recorded">
+          Your response is saved and your checklist has been refreshed.
+        </Notice>
+      ) : null}
+    </div>
   );
 }
