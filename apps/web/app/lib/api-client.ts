@@ -245,12 +245,12 @@ async function parseError(response: Response): Promise<ApiClientError> {
   }
 
   return new ApiClientError(
-    payload?.error.message || "We couldn’t complete that request. Please try again.",
+    payload?.error?.message || "We couldn’t complete that request. Please try again.",
     {
       status: response.status,
-      code: payload?.error.code || "request_failed",
+      code: payload?.error?.code || "request_failed",
       requestId:
-        payload?.error.requestId || response.headers.get("x-request-id") || undefined,
+        payload?.error?.requestId || response.headers.get("x-request-id") || undefined,
     },
   );
 }
