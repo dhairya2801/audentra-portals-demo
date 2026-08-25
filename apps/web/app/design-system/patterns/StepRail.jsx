@@ -69,6 +69,7 @@ export default function StepRail({
   steps = [],
   currentName,
   advisor,
+  help,
   vendor = true,
   onOpen,
 }) {
@@ -171,6 +172,27 @@ export default function StepRail({
           })}
         </ol>
       </nav>
+
+      {/* One entry point to help, and it opens the ladder rather than naming a
+          person — `features/edward/door.js` records the rule it obeys: no route
+          to a person appears before Edward. A rail that printed an office email
+          would be rung three, drawn where rung one belongs. `advisor` is the
+          older shape and is kept for callers that genuinely mean "this is the
+          person who holds your file", which is not what a help block means. */}
+      {help ? (
+        <div className="rail-help">
+          <p className="rail-label">{help.label}</p>
+          <button type="button" className="rail-help-open" onClick={help.onOpen}>
+            <span className="rail-help-mark" aria-hidden="true">
+              <Icon name="help" size={18} weight="duotone" />
+            </span>
+            <span className="rail-help-body">
+              <strong>Ask for help</strong>
+              <small>{help.line ?? 'Edward answers first, then a person.'}</small>
+            </span>
+          </button>
+        </div>
+      ) : null}
 
       {advisor ? (
         <div className="rail-advisor">

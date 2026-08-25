@@ -606,27 +606,13 @@
  * here is the list of rules under it.
  * ==========================================================================*/
 
-.photo-rules {
-  margin: var(--space-9) 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.photo-rules li {
-  color: var(--muted);
-  align-items: flex-start;
-  gap: var(--space-5);
-  padding: var(--space-4) 0;
-  font-size: var(--fs-copy);
-  line-height: var(--lh-body);
-  display: flex;
-}
-
-.photo-rules svg {
-  color: var(--green);
-  flex: none;
-  margin-top: 2px;
-}
+/* `.photo-rules` used to be defined here as well as in `patterns.css`, and this
+   file is imported after that one, so this copy is what rendered and the copy
+   the rebuild wrote never did. What you actually saw was 8px of padding on
+   every row and a green check on every rule — green reading as "satisfied" on a
+   list of things that have not been checked yet. Deleted 2026-08-24, ENR-216,
+   so the rule in `patterns.css` is the only one. Eight more selectors in this
+   file still shadow `patterns.css` the same way; see the card. */
 
 /* ============================================================================
  * The finish — two counts, never one.
@@ -807,4 +793,20 @@
   .step-back {
     margin: 0;
   }
+}
+
+/* The signing document, drawn as its page image inside the read panel. */
+.sign-doc-page {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+}
+
+/* A value read back can be one unbreakable token — an email, a number — and
+   the row's second column has to give rather than the page. */
+.onboarding .review-row dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }

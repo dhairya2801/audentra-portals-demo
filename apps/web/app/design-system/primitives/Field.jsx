@@ -36,6 +36,7 @@ export default function Field({
   type = 'text',
   autoComplete,
   onChange,
+  ...rest
 }) {
   const id = useId();
   const hintId = `${id}-hint`;
@@ -60,6 +61,7 @@ export default function Field({
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy || undefined}
           onChange={(event) => onChange(event.target.value)}
+          {...rest}
         />
         {error ? <Icon name="alert" size={15} /> : null}
       </span>

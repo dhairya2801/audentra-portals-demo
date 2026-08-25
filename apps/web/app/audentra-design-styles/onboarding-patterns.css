@@ -1,0 +1,1480 @@
+/* ------------------------------------------------------------------ *
+ * The onboarding redesign's four shapes — 2026-08-24.
+ *
+ * All-new selectors, appended: nothing here can tie with a rule above it,
+ * so position decides nothing and moving this block later would be safe.
+ * `.info-modal` is untouched — the frame it now composes renders the same
+ * DOM it rendered before, under the same class.
+ * ------------------------------------------------------------------ */
+
+/* The decision modal: a body that scrolls, a foot that does not. */
+.modal-panel {
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  width: min(530px, 100%);
+  /* `.wide` is the frame's one width variant - ENR-218. A dialog that has two
+     things to put side by side rather than one column of things. 530 stays the
+     default, because a decision to read is a reading measure. */
+  max-height: calc(100vh - 36px);
+  background: var(--surface);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-float);
+  animation: var(--dur-fast) both modalIn;
+  overflow: hidden;
+}
+
+.modal-panel.wide {
+  width: min(900px, 100%);
+}
+
+.modal-body {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-11);
+  overflow: auto;
+}
+
+.modal-foot {
+  flex: none;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  padding: var(--space-9);
+}
+
+/* The signature — ADR 0020. */
+.signature {
+  display: grid;
+  gap: var(--space-7);
+}
+
+.signature-line {
+  color: var(--muted);
+  margin: calc(var(--space-4) * -1) 0 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+/* A document to reach the end of. It reports scrolled, never read. */
+.read-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-row);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.read-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  padding: var(--space-7) var(--space-9);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.read-panel-head h3 {
+  margin: 0;
+  font-size: var(--fs-h4);
+  line-height: var(--lh-heading);
+}
+
+.read-panel-figure {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  color: var(--muted);
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.read-panel.done .read-panel-figure {
+  color: var(--green);
+}
+
+.read-panel-body {
+  max-height: 260px;
+  padding: var(--space-9);
+  overflow: auto;
+  color: var(--ink-2);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.read-panel-body > p {
+  margin: 0 0 var(--space-7);
+}
+
+.read-panel-body > p:last-child {
+  margin-bottom: 0;
+}
+
+.read-panel-meter {
+  height: 3px;
+  background: var(--line-soft);
+}
+
+.read-panel-meter span {
+  display: block;
+  height: 100%;
+  background: var(--purple);
+  transition: width var(--dur-fast);
+}
+
+.read-panel.done .read-panel-meter span {
+  background: var(--green);
+}
+
+/* The code Aster texted. */
+.code-entry {
+  display: grid;
+  gap: var(--space-6);
+  justify-items: start;
+}
+
+.code-entry-sent {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.code-entry-sent strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.code-entry-change {
+  margin-top: calc(var(--space-4) * -1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--purple-hover);
+  font: inherit;
+  font-size: var(--fs-copy);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.code-entry-boxes {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.code-box {
+  width: 44px;
+  height: 52px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-tile);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-semi);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.code-box:focus-visible {
+  border-color: var(--purple);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--purple-soft);
+}
+
+.code-entry.invalid .code-box {
+  border-color: var(--crimson);
+}
+
+.code-entry-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: var(--fs-copy);
+}
+
+.code-entry-resend {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--purple-hover);
+  font: inherit;
+  font-size: var(--fs-copy);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.code-entry-resend:disabled {
+  color: var(--ink-400);
+  text-decoration: none;
+  cursor: default;
+}
+
+@media (width <= 620px) {
+  .modal-body {
+    padding: var(--space-9);
+  }
+  .code-box {
+    width: 100%;
+    height: 48px;
+  }
+  .code-entry-boxes {
+    width: 100%;
+  }
+}
+
+/* The one destructive answer. Crimson because the product already spends
+   crimson on "this is wrong or this is lost" and nowhere else, so a second
+   destructive colour would be a second vocabulary. It is a peer of the safe
+   answer, never quieter than it: a student who is not coming should not have to
+   hunt for the way to say so. */
+.danger-button {
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 36px;
+  padding: 0 var(--space-7);
+  border: 1px solid var(--crimson-200);
+  border-radius: var(--radius-chip);
+  background: var(--crimson-wash, var(--ink-0));
+  color: var(--crimson);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-heavy);
+  white-space: nowrap;
+  transition: all .17s;
+}
+
+.danger-button:hover {
+  background: var(--crimson);
+  border-color: var(--crimson);
+  color: var(--on-ink);
+}
+
+.danger-button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+/* ------------------------------------------------------------------ *
+ * The onboarding redesign — 2026-08-24.
+ *
+ * All-new selectors, appended, so nothing above can tie with them. Everything
+ * here comes from tokens: a raw value in a rule is a bug the same way a raw hex
+ * is.
+ * ------------------------------------------------------------------ */
+
+/* A choice list with no card around any of it. The rule between rows is the
+   only separation, because a border around each option is what stops the
+   options being compared. */
+/* No rule between rows — ENR-216. Options that exist to be compared are
+   separated by spacing alone: a line pushes them apart and turns a set you
+   read together into three things you read one at a time. The padding stays,
+   smaller, because the label is the click target and it should still be one
+   comfortably. 20px between rows, down from 29px and a hairline. */
+.choice-list {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-6);
+  padding: var(--space-2) 0;
+  cursor: pointer;
+}
+
+.choice input {
+  margin: 1px 0 0;
+  width: 17px;
+  height: 17px;
+  flex: none;
+}
+
+.choice-text {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.choice-label {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semi);
+  line-height: var(--lh-heading);
+}
+
+.choice-line {
+  color: var(--muted);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.choice.off {
+  cursor: default;
+}
+
+.choice.off .choice-label,
+.choice.off .choice-line {
+  color: var(--ink-400);
+}
+
+/* Step 1 — the offer as read matter. Label and value rows, no control in it. */
+/* The card holds one decision and it has to be visible with both answers at
+   once, at 1440 x 780 (ADR 0024). Its own padding is untouched: the facts moving
+   across the width, the third notice going and the action bar going bought about
+   200px more than the screen needed, and the review's own order puts the space
+   around the card last, after the repetition and the layout. There was no call
+   to reach it. */
+.onboarding .offer-card {
+  padding: var(--space-11);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.offer-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-small);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  font-weight: var(--fw-heavy);
+}
+
+.offer-degree {
+  margin: var(--space-6) 0 var(--space-10);
+  font-size: var(--fs-display);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-hero);
+}
+
+/* Across the width, not down it — ENR-217. Five values in a stacked list with a
+   hairline between each cost about 200px on the one screen that may not scroll,
+   and none of them is long enough to need a row of its own. The columns size to
+   their content so the campus line does not wrap while `$500` sits in a column
+   of its own width. */
+.onboarding .offer-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, auto));
+  justify-content: start;
+  gap: var(--space-11);
+  margin: 0;
+}
+
+.onboarding .offer-facts > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  padding: 0;
+}
+
+/* The label above the value, in the product's label vocabulary rather than a
+   second body size. */
+.onboarding .offer-facts dt {
+  color: var(--muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+}
+
+.onboarding .offer-facts dd {
+  margin: 0;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semi);
+}
+
+.onboarding .offer-facts dd small {
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--muted);
+  font-size: var(--fs-copy);
+  font-weight: var(--fw-regular);
+}
+
+/* The two answers, and the flat list of consequences under them. No container
+   around the list: it reads faster than any boxed version of itself. */
+.offer-answer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  margin-top: var(--space-9);
+}
+
+.offer-after {
+  display: grid;
+  gap: var(--space-5);
+  margin: var(--space-9) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.offer-after li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+  color: var(--muted);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.offer-after svg {
+  margin-top: 2px;
+  color: var(--ink-400);
+}
+
+/* The celebration - two columns, ENR-218. The words and the four networks on the
+   left, the composed card on the right. The card was never the wrong proportion;
+   it was in the middle of a single stack, and a stack of five things is what
+   made a modal that may not scroll, scroll. */
+.celebration-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: var(--space-11);
+  /* Centred, not top-aligned: the frame's close control sits in the panel's
+     top-right corner and the card would run under it. */
+  align-items: center;
+}
+
+.celebration-say {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.confetti {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.celebration-mark {
+  display: flex;
+}
+
+.celebration-title {
+  margin: 0;
+  font-size: var(--fs-title);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-hero);
+}
+
+.celebration-lede {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+/* The share card: composed by the design system, never a photograph and never
+   generated. The gradient, the crest, and her own name. */
+.share-card {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-11) var(--space-9);
+  border-radius: var(--radius-card);
+  background: var(--grad-purple);
+  color: var(--on-ink);
+}
+
+.share-card-crest {
+  margin-bottom: var(--space-4);
+  opacity: .92;
+}
+
+.share-card-name {
+  font-size: var(--fs-h2);
+  letter-spacing: var(--ls-hero);
+}
+
+.share-card-line {
+  font-size: var(--fs-copy);
+  color: var(--on-ink-muted);
+}
+
+.share-card-foot {
+  margin-top: var(--space-6);
+  font-size: var(--fs-small);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  color: var(--on-ink-muted);
+}
+
+.share-block {
+  margin-top: var(--space-5);
+  text-align: left;
+}
+
+.share-lede {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-7);
+  color: var(--muted);
+  font-size: var(--fs-copy);
+}
+
+/* Four networks that do not behave the same way, and are not drawn as four
+   identical buttons: each says what pressing it actually does. */
+.share-targets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.share-target {
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  gap: var(--space-1);
+  padding: var(--space-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-tile);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .17s;
+}
+
+.share-target:hover {
+  border-color: var(--purple-line);
+}
+
+.share-target svg {
+  margin-bottom: var(--space-3);
+  color: var(--ink-2);
+}
+
+.share-target-name {
+  font-size: var(--fs-copy);
+  font-weight: var(--fw-semi);
+}
+
+.share-target-kind {
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+/* A plain line under the row, ENR-218. It was a filled, padded tile, which is a
+   Notice in everything but name for a sentence that only qualifies the row above
+   it. The icon carries the state; the fill was saying it twice. */
+.share-points {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin: var(--space-7) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.share-points svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--purple);
+}
+
+/* The earned state marks itself with the check and its colour, not with a fill:
+   the line is unboxed in both states. ENR-218. */
+
+.share-points.earned svg {
+  color: var(--green);
+}
+
+.celebration-foot {
+  display: flex;
+  justify-content: center;
+}
+
+/* A modal's answers. Two peers, the destructive one never quieter. */
+.modal-answers {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-6);
+}
+
+.modal-count {
+  margin-right: auto;
+  color: var(--muted);
+  font-size: var(--fs-copy);
+  font-variant-numeric: tabular-nums;
+}
+
+.modal-kicker.alert {
+  color: var(--crimson-ink);
+  background: var(--crimson-soft);
+}
+
+.modal-panel.authorize .modal-body {
+  max-height: 58vh;
+}
+
+/* Fields two to a row, which is what keeps step 4 from scrolling. */
+.field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+}
+
+/* --- a choice from a list — `primitives/Select` ----------------------------
+ *
+ * The closed control is the same box the field beside it draws, so a row of
+ * mixed controls reads as one row. The open menu is the product's, not the
+ * operating system's — see the component for why, and for the seven products
+ * the shape comes from.
+ */
+/* `gap` is the only space between a label and its control here, so the label's
+   own bottom margin is cancelled — a stacked field was carrying both, which is
+   why a labelled select measured 75px for 21px of label and 40px of control. */
+.select-field {
+  display: grid;
+  gap: var(--space-3);
+  position: relative;
+}
+
+.select-field > .field-label { margin-bottom: 0; }
+
+.select-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 100%;
+  min-height: 40px;
+  padding: 0 var(--space-6);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-tile);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-copy);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.select-control:hover {
+  border-color: var(--purple-line);
+}
+
+.select-control.open,
+.select-control:focus-visible {
+  border-color: var(--purple);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--purple-soft);
+}
+
+/* The value is what gives, because the chevron is the affordance: a control
+   that drops its arrow to fit a long word stops reading as a control. */
+.select-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select-chevron {
+  flex: none;
+  color: var(--muted);
+  transition: rotate var(--dur-fast) var(--ease);
+}
+
+.select-control.open .select-chevron {
+  rotate: 180deg;
+}
+
+/* Placed from the trigger's own rectangle, so it is not clipped by the drawer
+   or the modal it was opened from. */
+.select-panel {
+  position: fixed;
+  z-index: var(--z-select);
+  max-height: 264px;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2);
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-tile);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+}
+
+.select-panel.flip {
+  margin: 0 0 var(--space-2);
+}
+
+.select-panel li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: 32px;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-chip);
+  color: var(--ink);
+  font-size: var(--fs-copy);
+  cursor: pointer;
+}
+
+/* Where the cursor is, not what the answer is — so it is a tint and not a fill.
+   The system's own menu paints a saturated bar the width of the panel, which
+   reads as a decision having been made. */
+.select-panel li.active {
+  background: var(--canvas);
+}
+
+.select-panel li.chosen {
+  color: var(--purple-ink);
+  font-weight: var(--fw-semi);
+}
+
+.select-panel li.chosen.active {
+  background: var(--purple-wash);
+}
+
+.select-option-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select-tick {
+  flex: none;
+  color: var(--purple);
+}
+
+.select-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-select-scrim);
+  border: 0;
+  background: none;
+  cursor: default;
+}
+
+.long-field {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.long-field textarea {
+  width: 100%;
+  padding: var(--space-6);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-tile);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  resize: vertical;
+}
+
+.long-field textarea:focus-visible {
+  border-color: var(--purple);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--purple-soft);
+}
+
+/* One sentence under a block. Never a band of its own. */
+/* A card carries the space below itself. A footnote that follows one and adds
+   its own top margin doubles it, which is 14px on every screen that closes with
+   a line under a block. ENR-217. */
+.section-card + .field-foot {
+  margin-top: 0;
+}
+
+.field-foot {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin: var(--space-7) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.field-foot svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--ink-400);
+}
+
+.contact-block {
+  display: grid;
+  gap: var(--space-6);
+  padding: var(--space-8) 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.contact-block:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.contact-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+}
+
+.contact-block-head .field-label {
+  margin: 0;
+}
+
+/* Step 5 — an authorization row says what it covers, not just who. */
+.grant-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-7);
+  padding: var(--space-8) 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.grant-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.grant-body {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.grant-body strong {
+  font-size: var(--fs-body);
+}
+
+.grant-body small {
+  color: var(--muted);
+  font-size: var(--fs-copy);
+}
+
+.grant-covers {
+  margin: var(--space-3) 0 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.grant-dates {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+/* Step 6 — the hall list, at the portal's density rather than a poorer copy. */
+.hall-list {
+  display: grid;
+}
+
+.hall-row {
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr) auto;
+  gap: var(--space-8);
+  align-items: start;
+  padding: var(--space-8) 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.hall-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.hall-image {
+  width: 116px;
+  height: 84px;
+  object-fit: cover;
+  border-radius: var(--radius-tile);
+  background: var(--surface-sunk);
+}
+
+.hall-body {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.hall-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.hall-title strong {
+  font-size: var(--fs-body);
+}
+
+/* The position, printed on the row. The positions have names, so they are named
+   rather than merely ordered. */
+.hall-rank {
+  padding: var(--space-1) var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--purple-soft);
+  color: var(--purple-hover);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+}
+
+.hall-summary {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.hall-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-7);
+  margin: var(--space-2) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+.hall-facts span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.hall-actions {
+  display: grid;
+  justify-items: end;
+  gap: var(--space-4);
+}
+
+.onboarding .rank-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.onboarding .rank-move {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-chip);
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.onboarding .rank-move:disabled {
+  color: var(--ink-300);
+  cursor: default;
+}
+
+.hall-figure {
+  margin: 0 0 var(--space-8);
+}
+
+.hall-figure img {
+  width: 100%;
+  height: 190px;
+  object-fit: cover;
+  border-radius: var(--radius-row);
+}
+
+.hall-figure figcaption {
+  margin-top: var(--space-4);
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+.drawer-subhead {
+  margin: var(--space-10) 0 var(--space-6);
+  font-size: var(--fs-h4);
+}
+
+.rate-rows {
+  display: grid;
+}
+
+.rate-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  padding: var(--space-6) 0;
+  border-top: 1px solid var(--line-soft);
+  font-size: var(--fs-copy);
+}
+
+.rate-row:first-child {
+  border-top: 0;
+}
+
+.rate-row strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.hall-includes {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hall-includes li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+  color: var(--ink-2);
+  font-size: var(--fs-copy);
+}
+
+.hall-includes svg {
+  margin-top: 2px;
+  color: var(--ink-400);
+}
+
+.hall-compare {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin: var(--space-8) 0 0;
+  padding: var(--space-6) var(--space-7);
+  border-radius: var(--radius-tile);
+  background: var(--purple-wash);
+  color: var(--ink-2);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.hall-compare svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--purple);
+}
+
+/* Step 8 — the photo, shown as it will be used. */
+.photo-preview {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-8);
+  margin: 0 0 var(--space-7);
+}
+
+.photo-frame {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 122px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-tile);
+  background: var(--surface-sunk);
+  color: var(--ink-400);
+}
+
+.photo-preview figcaption {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+}
+
+/* The replace action sits in the caption, beside the photo. A row step above it,
+   because it is a control rather than another line of the caption. */
+.photo-preview figcaption button {
+  margin-top: var(--space-4);
+}
+
+.photo-preview small {
+  color: var(--muted);
+  font-size: var(--fs-copy);
+}
+
+.photo-rules {
+  display: grid;
+  gap: var(--space-4);
+  margin: var(--space-8) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.photo-rules li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+  color: var(--ink-2);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.photo-rules svg {
+  margin-top: 2px;
+  color: var(--ink-400);
+}
+
+/* Step 9 — what she told Aster, and the packet. */
+.onboarding .review-list {
+  display: grid;
+  margin: 0;
+}
+
+.onboarding .review-row {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: var(--space-6);
+  padding: var(--space-6) 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.onboarding .review-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.onboarding .review-row dt {
+  color: var(--muted);
+  font-size: var(--fs-copy);
+}
+
+.onboarding .review-row dd {
+  margin: 0;
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+/* An empty value reads as "not answered", never as absent: a section that
+   disappears because she left it blank is a section she cannot check. */
+.onboarding .review-row.missing dd {
+  color: var(--ink-400);
+}
+
+.sign-doc {
+  display: grid;
+  gap: var(--space-6);
+  margin-bottom: var(--space-9);
+}
+
+.sign-doc:last-child {
+  margin-bottom: 0;
+}
+
+/* A locked control says why, beside itself. */
+.locked-reason {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-copy);
+}
+
+.locked-reason svg {
+  color: var(--ink-400);
+}
+
+/* Step 10 — the amount, said once. */
+/* No container of its own — ENR-216. The amount was a bordered card and the
+   question about it was a second one beside it, which is a frame drawn around
+   one number. They share one card now: the figure, then the question, then the
+   three ways to pay it. The figure is set at hero size and needs no frame to be
+   read as the number on the screen. */
+.amount-block {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.amount-figure {
+  margin: 0;
+  font-size: var(--fs-hero);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-hero);
+  line-height: var(--lh-tight);
+  font-variant-numeric: tabular-nums;
+}
+
+.amount-lines {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+}
+
+.card-payment {
+  display: grid;
+  gap: var(--space-6);
+  margin-top: var(--space-8);
+  padding-top: var(--space-8);
+  border-top: 1px solid var(--line-soft);
+}
+
+/* The help ladder. Rung one is Edward and nothing above it. */
+.ladder {
+  display: grid;
+  margin-top: var(--space-9);
+}
+
+.rung {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-7);
+  padding: var(--space-7) 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.rung.first {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.rung-mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-tile);
+  background: var(--purple-wash);
+  color: var(--purple);
+}
+
+.rung-body {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.rung-body strong {
+  font-size: var(--fs-copy);
+}
+
+.rung-body small {
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+.ladder-foot {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin: var(--space-8) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-body);
+}
+
+.ladder-foot svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+/* The rail's entry to it. */
+.rail-help {
+  padding: var(--space-9) 0 0;
+}
+
+.rail-help-open {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-6);
+  width: 100%;
+  margin-top: var(--space-5);
+  padding: var(--space-7);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-row);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .17s;
+}
+
+.rail-help-open:hover {
+  border-color: var(--purple-line);
+}
+
+.rail-help-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-tile);
+  background: var(--purple-wash);
+  color: var(--purple);
+}
+
+.rail-help-body {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.rail-help-body strong {
+  font-size: var(--fs-copy);
+}
+
+.rail-help-body small {
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+/* The closed offer. One route, and it is Admissions. */
+.onboarding.closed .flow-measure {
+  display: grid;
+  place-items: center;
+  min-height: 70vh;
+}
+
+.closed-offer {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-10);
+  max-width: 460px;
+  text-align: center;
+}
+
+/* Where the panel is gone, the column keeps its measure and the space is left
+   empty. It does not widen: a form column past a reading measure is how a
+   two-up field row stops being scannable. */
+.flow-grid.solo {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (width <= 860px) {
+  .field-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* The split is a wide-screen shape. Below the breakpoint the words come first
+     and the card follows them, and the four networks go two up rather than one,
+     because each is a short label and a stack of four is a scroll. */
+  .celebration-split {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-9);
+  }
+  .share-targets {
+    grid-template-columns: 1fr 1fr;
+  }
+  .review-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+  /* One column below the breakpoint. Four facts side by side is a wide-screen
+     shape, and 780 of height is not the constraint on a phone. */
+  .offer-facts {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-7);
+  }
+  .hall-row {
+    grid-template-columns: 84px minmax(0, 1fr);
+  }
+  .hall-image {
+    width: 84px;
+    height: 64px;
+  }
+  .hall-actions {
+    grid-column: 1 / -1;
+    justify-items: start;
+  }
+  .grant-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .grant-row .danger-button {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+/* ENR-216 — a field group is not a card.
+
+   The build review of 2026-08-24 found a bordered box with a tinted header
+   bar, an icon, a title and a subtitle around four text fields, on six
+   screens. The frame is what this replaces: a plain label, the group, and the
+   one line that qualifies it.
+
+   The rule, which lives with the component and not in anybody's memory: a
+   block with a state of its own keeps its `Card`, because a head is where a
+   state is read. A block that is a question has no state to report. */
+.field-group {
+  display: grid;
+  gap: var(--space-5);
+}
+
+/* A surfaced group is a `.section-card` and inherits its padding, its radius and
+   its bottom margin, so it needs no adjacency rules of its own: one construction
+   down the column, which is what `Card` has always required and what the
+   reference corpus does without exception. */
+
+/* `plain` is for a group already sitting on a surface — inside a modal or a
+   drawer, where the panel is the block and a card would be a surface on a
+   surface. */
+.field-group.plain + .field-group.plain,
+.field-group.plain.spaced {
+  /* A card-scale step, because this gap is inside a card. `--space-10` is the
+     page-region step and was the same misapplication the dropzone's padding
+     was. */
+  margin-top: var(--space-9);
+}
+
+/* The label and the count of what is under it, on one row. Baseline, so a
+   caps label and a sentence-case count sit on the same line rather than being
+   centred against each other. */
+.field-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-6);
+}
+
+/* `.field-label` already carries the product's label treatment: caps, small,
+   heavy, muted. The group takes back the margin, because the grid gap owns the
+   spacing here — and it takes the ink one step darker.
+
+   That second line is the thing the frame used to do. Inside a card, a block
+   was ranked above its fields by the head; without the head, `WHERE ASTER
+   WRITES` and `PERSONAL EMAIL` were the same size, the same weight and the same
+   colour, and the group stopped reading as a group. Same vocabulary, one step
+   of contrast: a group label is a label that owns the labels under it. */
+.field-group-label {
+  margin: 0;
+  color: var(--ink);
+}
+
+.field-group-aside {
+  flex: none;
+  color: var(--muted);
+  font-size: var(--fs-copy);
+  font-variant-numeric: tabular-nums;
+}
+
+.field-group-body {
+  display: grid;
+  gap: var(--space-6);
+}
+
+/* Same reasoning as the label: `.field-foot` is the shape, the grid gap is the
+   spacing. */
+.field-group-foot {
+  margin: 0;
+}
+
+/* Inside a field group the group's own gap owns the spacing, so a child that
+   carries a top margin of its own doubles it. ENR-217. */
+.field-group-body .photo-rules {
+  margin-top: 0;
+}
+

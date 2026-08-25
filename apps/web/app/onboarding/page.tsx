@@ -1,167 +1,146 @@
 "use client";
-
 import type {
-  AboutYouConfigurableField,
   AdmissionOfferSummary,
-  CampusLifeFeed,
+  CompleteStudentFerpaInput,
+  FerpaDelegateInput,
+  HousingPreference,
   OnboardingEmergencyContact,
   OnboardingStep,
+  StudentBootstrap,
   StudentDashboard,
   StudentDocument,
+  StudentDocumentCategory,
   StudentDocumentList,
+  StudentFerpaAuthorization,
+  StudentFerpaDelegate,
+  StudentHousingPlan,
+  StudentHousingResidence,
   StudentOnboarding,
   StudentOnboardingData,
-  StudentOnboardingScreenConfiguration,
   StudentPaymentList,
   StudentProfile,
-  StudentBootstrap,
-  StudentHousingPlan,
-  StudentRequirementInputField,
   UpdateStudentOnboardingInput,
 } from "@vv/contracts";
-import { DocumentExtractionReview } from "../components/document-extraction-review";
-import { DocumentUpload } from "../components/document-upload";
-import { FerpaAccessCenter } from "../components/ferpa-access-center";
-import { TenantLink as Link } from "../components/tenant-link";
-import {
-  type FormEvent,
-  type ChangeEvent,
-  type PointerEvent as ReactPointerEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Icon from "../design-system/Icon.jsx";
+import Notice from "../design-system/patterns/Notice.jsx";
+import PageHero from "../design-system/patterns/PageHero.jsx";
+import StepRail from "../design-system/patterns/StepRail.jsx";
 import { PortalMark } from "../components/portal-ui";
 import { useTenant } from "../components/tenant-provider";
+import { getApiErrorMessage, useApiAction, useApiResource } from "../hooks/use-api-resource";
 import {
-  getApiErrorMessage,
-  useApiAction,
-  useApiResource,
-} from "../hooks/use-api-resource";
-import {
+  ApiClientError,
   acceptAdmissionOffer,
+  completeStudentFerpaAuthorization,
   completeStudentOnboarding,
   createDepositPayment,
-  getStudentDashboard,
-  getStudentDocuments,
   getCampusLife,
   getStudentBootstrap,
+  getStudentDashboard,
+  getStudentDocuments,
+  getStudentFerpaAuthorization,
+  getStudentHousingPlan,
   getStudentOnboarding,
   getStudentPayments,
   getStudentProfile,
-  getStudentHousingPlan,
-  signOutFerpaDelegate,
+  issueStudentFerpaDelegateLink,
+  signOutStudent,
+  updateStudentFerpaAccess,
   updateStudentOnboarding,
+  updateStudentProfile,
 } from "../lib/api-client";
-import {
-  beginDocumentExtractionProjection,
-  type DocumentExtractionProjectionState,
-  latestDocumentForCategory,
-  reconcileDocumentExtractionProjection,
-} from "../lib/document-extraction-ui";
+import { latestDocumentForCategory } from "../lib/document-extraction-ui";
 import { formatTenantDate, formatTenantMoney } from "../lib/tenant";
 import { getPostAcceptanceRoute } from "./offer-acceptance";
+import {
+  CITIZENSHIP,
+  type ContactDraft,
+  type OnboardingDraft,
+  type ScreenId,
+  TOTAL_SCREENS,
+  allResolved,
+  contactProblem,
+  emptyContact,
+  emptyDraft,
+  firstUnresolved,
+  isReachable,
+  isSkipped,
+  LOCK_REASON,
+  meter,
+  normalizedPhone,
+  progressLine,
+  railSteps,
+  readDraft,
+  recordFrom,
+  savedCount,
+  screenById,
+  screenNumber,
+  screensFor,
+  writeDraft,
+} from "./flow";
+import {
+  coreFieldsOf,
+  customFieldProblem,
+  customPagesOf,
+  type CustomValue,
+} from "./steps/ConfiguredFields";
+import { OfferStep } from "./steps/OfferStep";
+import { DetailsStep, type DetailsProblems } from "./steps/DetailsStep";
+import { ContactStep, type ContactProblems } from "./steps/ContactStep";
+import { HousingStep } from "./steps/HousingStep";
+import { HealthStep } from "./steps/HealthStep";
+import { EmergencyStep } from "./steps/EmergencyStep";
+import { PermissionsStep } from "./steps/PermissionsStep";
+import { PhotoStep } from "./steps/PhotoStep";
+import { ReviewStep, type SigningDocument } from "./steps/ReviewStep";
+import { DepositStep } from "./steps/DepositStep";
+import { StepActions } from "./steps/StepActions";
+import { FinishCard } from "./steps/FinishCard";
+import { ClosedOffer } from "./steps/ClosedOffer";
+import { CelebrationModal } from "./overlays/CelebrationModal";
+import { DeclineModal } from "./overlays/DeclineModal";
+import { AuthorizeModal, emptyAuthorization, type AuthorizeDraft } from "./overlays/AuthorizeModal";
+import { WaiverModal } from "./overlays/WaiverModal";
+import { HallDrawer } from "./overlays/HallDrawer";
+import { HelpLadder, rungsFor } from "./overlays/HelpLadder";
 
-const onboardingSteps: {
-  key: OnboardingStep;
-  label: string;
-  title: string;
-  subtitle: string;
-  skippable?: boolean;
-}[] = [
-  {
-    key: "offer",
-    label: "Offer",
-    title: "Your place at {institution}",
-    subtitle: "Begin by confirming the admission decision that brought you here.",
-  },
-  {
-    key: "about_you",
-    label: "About you",
-    title: "Identity & home address",
-    subtitle: "Add the personal details and permanent address {institution} needs to prepare your student record.",
-  },
-  {
-    key: "housing",
-    label: "Housing",
-    title: "One personalized story",
-    subtitle: "Tell us where you imagine starting your {institution} experience.",
-  },
-  {
-    key: "campus_life",
-    label: "Campus life",
-    title: "Clubs, people & support",
-    subtitle: "Choose the communities and support you want to hear about.",
-    skippable: true,
-  },
-  {
-    key: "emergency_contacts",
-    label: "Emergency contacts",
-    title: "People in your corner",
-    subtitle: "Enter one or more people {institution} may contact in an emergency.",
-  },
-  {
-    key: "family_permissions",
-    label: "Family permissions",
-    title: "FERPA access by person",
-    subtitle: "Review who may receive information about your student record.",
-  },
-  {
-    key: "review_and_sign",
-    label: "Review & sign",
-    title: "Your document packet",
-    subtitle: "Review your choices and provide your electronic confirmation.",
-  },
-  {
-    key: "deposit",
-    label: "Deposit",
-    title: "Secure your place",
-    subtitle: "Pay now, choose a later path, or skip this step and return from enrollment.",
-    skippable: true,
-  },
+/**
+ * The platform's eight onboarding steps, in the order it enforces them. The
+ * ten screens of the flow (`./flow.ts`) map onto these; two screens share
+ * `about_you`, and the photo screen writes a document rather than a step.
+ *
+ * `skippable` is platform policy. This flow offers no skip on those steps —
+ * the deposit has a waiver instead, and the health step needs nothing that
+ * cannot be answered — but a student who set one aside in an earlier version
+ * still sees it read back as set aside.
+ */
+const onboardingSteps: ReadonlyArray<{ key: OnboardingStep; skippable?: boolean }> = [
+  // Screen 1, Your offer: accepted through the admission-offer command first.
+  { key: "offer" },
+  // Screens 2 and 3, Confirm your details and How we reach you: one record,
+  // written once from the second screen, edited from either afterwards.
+  { key: "about_you" },
+  // Screen 4, Where you will live: the preference and up to three ranked halls.
+  { key: "housing" },
+  // Screen 5, Health and accessibility: the accommodation interest; the
+  // immunization record is a document, not step data.
+  { key: "campus_life" },
+  // Screen 6, Emergency contact: one to three people to call.
+  { key: "emergency_contacts" },
+  // Screen 7, Who can see your record: the FERPA authorization writes itself;
+  // this step records that the question was answered.
+  { key: "family_permissions" },
+  // Screen 8, Your student photo, has no step. Screen 9, Review and sign.
+  { key: "review_and_sign" },
+  // Screen 10, Deposit: a payment first when paying now, then the choice.
+  { key: "deposit", skippable: true },
 ];
-
-const campusInterestOptions = [
-  ["aster_robotics", "Robotics"],
-  ["code_collective", "Code Collective"],
-  ["women_in_business", "Women in Business"],
-  ["late_night_radio", "Late Night Radio"],
-  ["pixel_league", "Pixel League"],
-  ["outdoor_aster", "Outdoor activities"],
-  ["boston_neighbors", "Local community"],
-  ["global_table", "Global Table"],
-  ["first_year_council", "First-Year Council"],
-  ["campus_rec_mix", "Campus Rec Mix"],
-] as const;
-
-const supportNeedOptions = [
-  ["academic_coaching", "Academic coaching"],
-  ["accessibility_services", "Accessibility services"],
-  ["career_planning", "Career planning"],
-  ["counseling_wellbeing", "Counseling & wellbeing"],
-  ["financial_wellness", "Financial wellness"],
-  ["first_gen_resources", "First-gen resources"],
-  ["international_student_services", "International student services"],
-  ["family_resources", "Family resources"],
-] as const;
-
-const firstMonthGoalOptions = [
-  ["friends_in_major", "Friends in my major"],
-  ["creative_outlet", "A creative outlet"],
-  ["career_connections", "Career connections"],
-  ["fitness_routine", "A fitness routine"],
-  ["shared_culture", "Shared culture"],
-  ["volunteer", "Ways to volunteer"],
-  ["something_new", "Something new"],
-] as const;
 
 /**
  * `skippedSteps` is server-managed progress metadata. It is returned with the
  * onboarding resource so the UI can label optional steps, but must never be
- * echoed back as editable step data. Keeping that boundary here prevents a
- * later optional step from being rejected after an earlier one was skipped.
+ * echoed back as editable step data.
  */
 function editableOnboardingData(data: StudentOnboardingData) {
   const editableData = { ...data };
@@ -188,1483 +167,67 @@ function realProfileName(value: string | null | undefined, placeholder: string) 
     : undefined;
 }
 
-type OnboardingPageData = {
-  onboarding: StudentOnboarding;
-  dashboard: StudentDashboard;
-  payments: StudentPaymentList;
-  profile: StudentProfile;
-  housingPlan: StudentHousingPlan;
-  campusLife: CampusLifeFeed;
-  documents: StudentDocumentList;
-};
-
-type DelegateBootstrapActor = Extract<
-  NonNullable<StudentBootstrap["actor"]>,
-  { type: "delegate" }
->;
-
-function delegateRelationshipLabel(value: string) {
-  return value
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function OnboardingProgress({
-  steps,
-  current,
-  active,
-  completed,
-  skipped,
-  onNavigate,
-}: {
-  steps: typeof onboardingSteps;
-  current: OnboardingStep;
-  active: OnboardingStep;
-  completed: OnboardingStep[];
-  skipped: OnboardingStep[];
-  onNavigate: (step: OnboardingStep) => void;
-}) {
-  const { tenant } = useTenant();
-  const activeIndex = steps.findIndex((step) => step.key === active);
-
-  return (
-    <aside className="onboarding-progress" aria-label="Onboarding progress">
-      <Link className="brand onboarding-brand" href="/onboarding">
-        <PortalMark />
-        <span>
-          <strong>{tenant.shortName}</strong>
-          <small>University</small>
-        </span>
-      </Link>
-      <div className="onboarding-progress__heading">
-        <p className="eyebrow">Getting started</p>
-        <h2>Your path to {tenant.shortName}</h2>
-        <p>{completed.length} of {steps.length} steps saved</p>
-      </div>
-      <ol>
-        {steps.map((step, index) => {
-          const isComplete = completed.includes(step.key);
-          const isCurrent = step.key === current;
-          const wasSkipped = skipped.includes(step.key);
-          const canVisit = isComplete || index <= activeIndex;
-          return (
-            <li
-              className={`${isComplete ? "onboarding-step--complete " : ""}${isCurrent ? "onboarding-step--current" : ""}`}
-              aria-current={isCurrent ? "step" : undefined}
-              key={step.key}
-            >
-              <button
-                type="button"
-                disabled={!canVisit}
-                onClick={() => onNavigate(step.key)}
-              >
-                <span aria-hidden="true">{isComplete ? "✓" : index + 1}</span>
-                <div>
-                  <strong>{step.label}</strong>
-                  <small>
-                    {isComplete
-                      ? wasSkipped
-                        ? "Skipped for now"
-                        : "Saved"
-                      : step.key === active
-                        ? "In progress"
-                        : index > activeIndex
-                          ? "Upcoming"
-                          : "Ready"}
-                  </small>
-                </div>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
-      <div className="onboarding-resume">
-        <span aria-hidden="true">↻</span>
-        <p>
-          <strong>Safe to pause</strong>
-          Your last server-confirmed step is saved.
-        </p>
-      </div>
-    </aside>
-  );
-}
-
-function Choice({
-  name,
-  value,
-  label,
-  description,
-  defaultChecked,
-  type = "checkbox",
-  required,
-  onChange,
-}: {
-  name: string;
-  value: string;
-  label: string;
-  description?: string;
-  defaultChecked?: boolean;
-  type?: "checkbox" | "radio";
-  required?: boolean;
-  onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
-}) {
-  return (
-    <label className="choice-card">
-      <input
-        type={type}
-        name={name}
-        value={value}
-        defaultChecked={defaultChecked}
-        required={required}
-        onChange={onChange}
-      />
-      <span aria-hidden="true" />
-      <div>
-        <strong>{label}</strong>
-        {description ? <small>{description}</small> : null}
-      </div>
-    </label>
-  );
-}
-
-const emptyEmergencyContact: OnboardingEmergencyContact = {
-  fullName: "",
-  relationship: "parent",
-  mobilePhone: "",
-  email: "",
-};
-
-function HousingFields({
-  data,
-  residences,
-}: {
-  data: StudentOnboardingData;
-  residences: StudentHousingPlan["residences"];
-}) {
-  const { tenant } = useTenant();
-  const [preference, setPreference] = useState(
-    data.housingPreference ?? "",
-  );
-  const [residencePreferences, setResidencePreferences] = useState<
-    Array<StudentHousingPlan["residences"][number]["value"]>
-  >(
-    data.housingResidencePreferences?.length
-      ? data.housingResidencePreferences
-      : data.housingResidenceOption
-        ? [data.housingResidenceOption]
-        : [],
-  );
-  const [roommateMatching, setRoommateMatching] = useState(
-    data.roommateMatching ?? "",
-  );
-
-  return (
-    <>
-      <fieldset className="form-section">
-        <legend>Where do you picture starting your day?</legend>
-        <p>
-          Choose a plan. {tenant.shortName} opens only the follow-up questions useful for
-          that plan.
-        </p>
-        <div className="choice-grid">
-          {[
-            ["on_campus", "On campus"],
-            ["off_campus", "Off campus"],
-            ["commuting", "Commuting"],
-            ["undecided", "I’m not sure yet"],
-            ["family", "Family or dependent housing"],
-          ].map(([value, label]) => (
-            <Choice
-              type="radio"
-              name="housingPreference"
-              value={value}
-              label={label}
-              defaultChecked={preference === value}
-              required
-              onChange={(event) => {
-                if (event.currentTarget.checked) {
-                  setPreference(
-                    event.currentTarget
-                      .value as NonNullable<
-                        StudentOnboardingData["housingPreference"]
-                      >,
-                  );
-                }
-              }}
-              key={value}
-            />
-          ))}
-        </div>
-      </fieldset>
-
-      {preference === "on_campus" ? (
-        <>
-          <fieldset className="form-section">
-            <legend>Rank the residences that feel right</legend>
-            <p>
-              Optional — add up to three choices in preference order. Housing
-              uses the ranking when your first choice is unavailable; exact
-              layouts and assignments can still vary.
-            </p>
-            {residencePreferences.map((value) => (
-              <input
-                type="hidden"
-                name="housingResidencePreferences"
-                value={value}
-                key={`ranked-${value}`}
-              />
-            ))}
-            <input
-              type="hidden"
-              name="housingResidenceOption"
-              value={residencePreferences[0] ?? ""}
-            />
-            {residencePreferences.length > 0 ? (
-              <button
-                className="text-button"
-                type="button"
-                onClick={() => setResidencePreferences([])}
-              >
-                Clear residence ranking and decide later
-              </button>
-            ) : (
-              <p className="optional-field-note">No residence ranked yet.</p>
-            )}
-            <div className="residence-option-grid">
-              {residences.map((residence) => {
-                const rank = residencePreferences.indexOf(residence.value);
-                const isRanked = rank >= 0;
-                return (
-                  <article
-                    className={`residence-option residence-option--ranked${isRanked ? " residence-option--selected" : ""}`}
-                    key={residence.id}
-                  >
-                    <img
-                      className="residence-option__photo"
-                      src={residence.imageUrl}
-                      alt={residence.imageAlt}
-                    />
-                    <span className="residence-option__content">
-                      <strong>{residence.name}</strong>
-                      <span>{residence.description}</span>
-                      <span className="residence-option__amenities">
-                        {residence.amenities.join(" · ")}
-                      </span>
-                      <small>{residence.attribution}</small>
-                    </span>
-                    <div className="residence-ranking-controls">
-                      {isRanked ? (
-                        <>
-                          <strong>Preference #{rank + 1}</strong>
-                          <div>
-                            <button
-                              type="button"
-                              disabled={rank === 0}
-                              aria-label={`Move ${residence.name} up`}
-                              onClick={() =>
-                                setResidencePreferences((current) => {
-                                  const next = [...current];
-                                  [next[rank - 1], next[rank]] = [
-                                    next[rank],
-                                    next[rank - 1],
-                                  ];
-                                  return next;
-                                })
-                              }
-                            >
-                              ↑
-                            </button>
-                            <button
-                              type="button"
-                              disabled={rank === residencePreferences.length - 1}
-                              aria-label={`Move ${residence.name} down`}
-                              onClick={() =>
-                                setResidencePreferences((current) => {
-                                  const next = [...current];
-                                  [next[rank], next[rank + 1]] = [
-                                    next[rank + 1],
-                                    next[rank],
-                                  ];
-                                  return next;
-                                })
-                              }
-                            >
-                              ↓
-                            </button>
-                            <button
-                              type="button"
-                              aria-label={`Remove ${residence.name} from residence ranking`}
-                              onClick={() =>
-                                setResidencePreferences((current) =>
-                                  current.filter(
-                                    (candidate) =>
-                                      candidate !== residence.value,
-                                  ),
-                                )
-                              }
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={residencePreferences.length >= 3}
-                          aria-label={`Add ${residence.name} as preference #${residencePreferences.length + 1}`}
-                          onClick={() =>
-                            setResidencePreferences((current) => [
-                              ...current,
-                              residence.value,
-                            ])
-                          }
-                        >
-                          Add as preference #{residencePreferences.length + 1}
-                        </button>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </fieldset>
-          <fieldset className="form-section">
-            <legend>What kind of space feels right?</legend>
-            <p>Optional — these preferences can be completed later.</p>
-            <div className="choice-grid">
-              {[
-                ["single", "Single"],
-                ["double", "Double"],
-                ["triple", "Triple"],
-                ["quad", "Quad"],
-                ["suite", "Suite"],
-                ["no_preference", "No preference"],
-              ].map(([value, label]) => (
-                <Choice
-                  type="radio"
-                  name="housingRoomType"
-                  value={value}
-                  label={label}
-                  defaultChecked={data.housingRoomType === value}
-                  key={value}
-                />
-              ))}
-            </div>
-            <div className="form-grid">
-              <label className="field">
-                <span>Bathroom preference</span>
-                <select
-                  name="bathroomPreference"
-                  defaultValue={data.bathroomPreference ?? ""}
-                >
-                  <option value="">Decide later</option>
-                  <option value="shared_floor">Shared floor bathroom</option>
-                  <option value="suite">Suite bathroom</option>
-                  <option value="private">Private bathroom</option>
-                  <option value="no_preference">No preference</option>
-                </select>
-              </label>
-              <label className="field">
-                <span>Roommate matching</span>
-                <select
-                  name="roommateMatching"
-                  defaultValue={data.roommateMatching ?? ""}
-                  onChange={(event) =>
-                    setRoommateMatching(event.currentTarget.value)
-                  }
-                >
-                  <option value="">Decide later</option>
-                  <option value="match_preferences">Match me from my preferences</option>
-                  <option value="known_roommate">I know my roommate</option>
-                  <option value="browse_later">Let me browse profiles later</option>
-                </select>
-              </label>
-            </div>
-            {roommateMatching === "known_roommate" ? (
-              <div className="form-grid">
-                <label className="field">
-                  <span>Roommate full name</span>
-                  <input
-                    name="knownRoommateName"
-                    defaultValue={data.knownRoommateName ?? ""}
-                    autoComplete="name"
-                    maxLength={160}
-                  />
-                </label>
-                <label className="field">
-                  <span>Roommate email</span>
-                  <input
-                    name="knownRoommateEmail"
-                    type="email"
-                    defaultValue={data.knownRoommateEmail ?? ""}
-                    autoComplete="email"
-                    maxLength={254}
-                  />
-                </label>
-              </div>
-            ) : null}
-          </fieldset>
-
-          <fieldset className="form-section">
-            <legend>Tell us how you actually live in a shared space</legend>
-            <p>
-              Honest routine preferences help Residential Life reduce
-              avoidable roommate friction.
-            </p>
-            <div className="form-grid">
-              {[
-                [
-                  "sleepSchedule",
-                  "Sleep schedule",
-                  [
-                    ["early", "Early bird · before 11"],
-                    ["middle", "Usually 11–1"],
-                    ["night", "Night owl · after 1"],
-                    ["changes", "It changes"],
-                  ],
-                  data.sleepSchedule,
-                ],
-                [
-                  "studyHabits",
-                  "Study habits",
-                  [
-                    ["room", "Mostly in my room"],
-                    ["elsewhere", "Mostly library / elsewhere"],
-                    ["mix", "A mix"],
-                    ["late_room", "Late-night room study"],
-                  ],
-                  data.studyHabits,
-                ],
-                [
-                  "roomNoise",
-                  "Room noise",
-                  [
-                    ["quiet", "Usually quiet"],
-                    ["headphones", "Music with headphones"],
-                    ["background", "Background sound"],
-                    ["social", "Lively and social"],
-                  ],
-                  data.roomNoise,
-                ],
-                [
-                  "cleanliness",
-                  "Cleanliness",
-                  [
-                    ["everything_in_place", "Everything in place"],
-                    ["tidy", "Tidy but lived-in"],
-                    ["relaxed", "Pretty relaxed"],
-                  ],
-                  data.cleanliness,
-                ],
-                [
-                  "guestPreference",
-                  "Guests",
-                  [
-                    ["rarely", "Rarely"],
-                    ["notice", "Sometimes, with notice"],
-                    ["active", "I like an active room"],
-                  ],
-                  data.guestPreference,
-                ],
-                [
-                  "temperaturePreference",
-                  "Temperature",
-                  [
-                    ["cool", "Cool"],
-                    ["middle", "In the middle"],
-                    ["warm", "Warm"],
-                  ],
-                  data.temperaturePreference,
-                ],
-                [
-                  "smokeVapeCompatibility",
-                  "Roommate substance preference",
-                  [
-                    ["smoke_free", "Substance-free roommate"],
-                    ["off_campus_only", "Okay if use is only off campus"],
-                    ["no_preference", "No preference"],
-                  ],
-                  data.smokeVapeCompatibility,
-                ],
-              ].map(([name, label, options, defaultValue]) => (
-                <label className="field" key={String(name)}>
-                  <span>{String(label)}</span>
-                  <select
-                    name={String(name)}
-                    defaultValue={String(defaultValue ?? "")}
-                  >
-                    <option value="">Decide later</option>
-                    {(options as string[][]).map(([value, optionLabel]) => (
-                      <option value={value} key={value}>{optionLabel}</option>
-                    ))}
-                  </select>
-                </label>
-              ))}
-            </div>
-            <div className="choice-grid choice-grid--multi">
-              <Choice
-                name="substanceFreeHousing"
-                value="yes"
-                label="Substance-free floor or community"
-                description="Separate from roommate matching: everyone assigned to this floor follows the community standard."
-                defaultChecked={data.substanceFreeHousing}
-              />
-              <Choice
-                name="genderInclusiveHousing"
-                value="yes"
-                label="Gender-inclusive housing"
-                description="Show room and community options designed for students of all gender identities."
-                defaultChecked={data.genderInclusiveHousing}
-              />
-              <Choice
-                name="accessibleHousingInformation"
-                value="yes"
-                label="Accessible housing information"
-                description="Share general housing-access information without collecting medical documents."
-                defaultChecked={data.accessibleHousingInformation}
-              />
-            </div>
-          </fieldset>
-
-          <fieldset className="form-section">
-            <legend>Would you like a themed residential community?</legend>
-            <div className="choice-grid choice-grid--multi">
-              {[
-                ["first_year_launch", "First-Year Launch", "Peer mentoring and transition programming for new students."],
-                ["honors_house", "Honors House", "An academically focused community with honors programming."],
-                ["stem_innovation", "STEM + Innovation", "Project-based community for science, engineering, and technology."],
-                ["arts_collective", "Arts Collective", "Shared creative programming for visual and performing artists."],
-                ["wellbeing_commons", "Wellbeing Commons", "A community centered on balanced routines and wellbeing."],
-                ["substance_free_living", "Substance-Free Living", "A floor or community where residents commit to a substance-free environment."],
-              ].map(([value, label, description]) => (
-                <Choice
-                  name="livingLearningCommunities"
-                  value={value}
-                  label={label}
-                  description={description}
-                  defaultChecked={data.livingLearningCommunities?.includes(value)}
-                  key={value}
-                />
-              ))}
-            </div>
-          </fieldset>
-        </>
-      ) : null}
-
-      {preference === "off_campus" ? (
-        <>
-          <fieldset className="form-section">
-            <legend>Where are you in the search?</legend>
-            <p>Optional — you can update your search status later.</p>
-            <div className="choice-grid">
-              {[
-                ["lease_signed", "I signed a lease"],
-                ["actively_looking", "I’m actively looking"],
-                ["need_roommates", "I need roommates"],
-                ["living_with_family", "I’m living with family"],
-              ].map(([value, label]) => (
-                <Choice
-                  type="radio"
-                  name="offCampusStatus"
-                  value={value}
-                  label={label}
-                  defaultChecked={data.offCampusStatus === value}
-                  key={value}
-                />
-              ))}
-            </div>
-          </fieldset>
-          <fieldset className="form-section">
-            <legend>What would make this easier?</legend>
-            <div className="choice-grid choice-grid--multi">
-              {[
-                ["verified_listings", "Verified listings"],
-                ["budget_planning", "Budget planning"],
-                ["lease_resources", "Lease resources"],
-                ["roommate_finder", "Roommate finder"],
-                ["neighborhood_guide", "Neighborhood guide"],
-                ["public_transit", "Public transit"],
-                ["furniture_exchange", "Furniture exchange"],
-              ].map(([value, label]) => (
-                <Choice
-                  name="offCampusResources"
-                  value={value}
-                  label={label}
-                  defaultChecked={data.offCampusResources?.includes(value)}
-                  key={value}
-                />
-              ))}
-            </div>
-          </fieldset>
-        </>
-      ) : null}
-
-      {preference === "commuting" ? (
-        <fieldset className="form-section">
-          <legend>Build your commuter starter pack</legend>
-          <div className="form-grid">
-            <label className="field">
-              <span>Main commute</span>
-              <select
-                name="commuteMode"
-                defaultValue={data.commuteMode ?? ""}
-              >
-                <option value="">Decide later</option>
-                <option value="drive">Drive</option>
-                <option value="public_transit">Public transit</option>
-                <option value="bike_scooter">Bike / scooter</option>
-                <option value="walk">Walk</option>
-                <option value="carpool">Carpool</option>
-              </select>
-            </label>
-            <label className="field">
-              <span>One-way time</span>
-              <select
-                name="commuteDuration"
-                defaultValue={data.commuteDuration ?? ""}
-              >
-                <option value="">Decide later</option>
-                <option value="under_20">Under 20 minutes</option>
-                <option value="20_40">20–40 minutes</option>
-                <option value="40_60">40–60 minutes</option>
-                <option value="over_60">More than an hour</option>
-              </select>
-            </label>
-          </div>
-          <div className="choice-grid choice-grid--multi">
-            {[
-              ["parking_permit", "Parking permit"],
-              ["transit_pass", "Transit pass"],
-              ["bike_storage", "Bike storage"],
-              ["commuter_lounge", "Commuter lounge"],
-              ["day_use_lockers", "Day-use lockers"],
-              ["meal_plan", "Meal plan"],
-              ["safety_escort", "Safety escort"],
-              ["commuter_events", "Commuter events"],
-            ].map(([value, label]) => (
-              <Choice
-                name="commuterResources"
-                value={value}
-                label={label}
-                defaultChecked={data.commuterResources?.includes(value)}
-                key={value}
-              />
-            ))}
-          </div>
-        </fieldset>
-      ) : null}
-
-      {preference === "undecided" || preference === "family" ? (
-        <div className="review-summary">
-          <h3>Keep your options open</h3>
-          <p>
-            A housing advisor can help compare cost, timing, family needs, and
-            availability. No housing deposit is required here.
-          </p>
-        </div>
-      ) : null}
-
-      {preference ? (
-        <fieldset className="form-section">
-          <legend>Would you like optional tuition or housing protection?</legend>
-          <p>
-            This does not purchase a policy. It only records whether you want
-            information about optional protection before enrollment.
-          </p>
-          <div className="choice-grid">
-            {[
-              ["not_now", "Not now", "Continue without insurance information."],
-              ["learn_more", "Help me compare", "Show tuition and housing options before I decide."],
-              ["tuition", "Tuition protection", "Learn about eligible tuition-loss coverage."],
-              ["housing", "Housing protection", "Learn about belongings and housing-incident coverage."],
-              ["both", "Both options", "Send information about tuition and housing protection."],
-            ].map(([value, label, description]) => (
-              <Choice
-                type="radio"
-                name="insuranceInterest"
-                value={value}
-                label={label}
-                description={description}
-                defaultChecked={data.insuranceInterest === value}
-                key={value}
-              />
-            ))}
-          </div>
-        </fieldset>
-      ) : null}
-    </>
-  );
-}
-
-function CampusLifeFields({
-  data,
-  clubs,
-}: {
-  data: StudentOnboardingData;
-  clubs: CampusLifeFeed["clubs"];
-}) {
-  const { tenant } = useTenant();
-  const visualInterestValues = new Set(clubs.slice(0, 4).map((club) => club.id));
-  return (
-    <>
-      <fieldset className="form-section">
-        <legend>Explore student clubs</legend>
-        <p>
-          Select anything you want {tenant.shortName} to place in your welcome
-          feed.
-        </p>
-        <div className="onboarding-club-showcase">
-          {clubs.slice(0, 4).map((club) => {
-            const value = club.id;
-            return (
-              <label className="onboarding-club-card" key={club.id}>
-                <input
-                  type="checkbox"
-                  name="campusInterests"
-                  value={value}
-                  defaultChecked={data.campusInterests?.includes(value)}
-                />
-                <img src={club.imageUrl} alt={club.imageAlt} />
-                <span>
-                  <small>{club.category}</small>
-                  <strong>{club.name}</strong>
-                  <span>{club.description}</span>
-                  <small>{club.imageAttribution}</small>
-                </span>
-              </label>
-            );
-          })}
-        </div>
-        <div className="choice-grid choice-grid--multi">
-          {campusInterestOptions
-            .filter(([value]) => !visualInterestValues.has(value))
-            .map(([value, label]) => (
-            <Choice
-              name="campusInterests"
-              value={value}
-              label={label}
-              defaultChecked={data.campusInterests?.includes(value)}
-              key={value}
-            />
-            ))}
-        </div>
-      </fieldset>
-      <fieldset className="form-section">
-        <legend>Your social settings</legend>
-        <label className="field">
-          <span>I feel most comfortable…</span>
-          <select name="socialComfort" defaultValue={data.socialComfort ?? ""}>
-            <option value="">Choose later</option>
-            <option value="small_groups">In small groups</option>
-            <option value="big_events">At big events</option>
-            <option value="mix">A mix</option>
-            <option value="one_on_one">One-on-one first</option>
-          </select>
-        </label>
-        <h3>In your first month, what would you love to find?</h3>
-        <div className="choice-grid choice-grid--multi">
-          {firstMonthGoalOptions.map(([value, label]) => (
-            <Choice
-              name="firstMonthGoals"
-              value={value}
-              label={label}
-              defaultChecked={data.firstMonthGoals?.includes(value)}
-              key={value}
-            />
-          ))}
-        </div>
-      </fieldset>
-      <fieldset className="form-section">
-        <legend>What support would you like to hear about?</legend>
-        <div className="choice-grid choice-grid--multi">
-          {supportNeedOptions.map(([value, label]) => (
-            <Choice
-              name="supportNeeds"
-              value={value}
-              label={label}
-              defaultChecked={data.supportNeeds?.includes(value)}
-              key={value}
-            />
-          ))}
-        </div>
-      </fieldset>
-      <fieldset className="form-section">
-        <legend>Would you like an accommodations follow-up?</legend>
-        <p>
-          Optional — this is only a private indicator for the appropriate
-          university office. Do not upload diagnoses or medical records here.
-        </p>
-        <div className="choice-grid">
-          {[
-            ["not_now", "Not now", "You can contact Accessibility Services whenever you are ready."],
-            ["housing", "Housing accommodations", "Ask Housing Accessibility to explain its separate documentation process."],
-            ["academic", "Academic accommodations", "Ask Accessibility Services to explain classroom and learning support."],
-            ["both", "Housing and academic", "Request follow-up from both support teams."],
-          ].map(([value, label, description]) => (
-            <Choice
-              type="radio"
-              name="accommodationInterest"
-              value={value}
-              label={label}
-              description={description}
-              defaultChecked={data.accommodationInterest === value}
-              key={value}
-            />
-          ))}
-        </div>
-      </fieldset>
-    </>
-  );
-}
-
-function EmergencyContactFields({ data }: { data: StudentOnboardingData }) {
-  const nextKey = useRef(1);
-  const [contacts, setContacts] = useState(() =>
-    (data.emergencyContacts?.length
-      ? data.emergencyContacts
-      : [emptyEmergencyContact]
-    ).map((value, index) => ({ key: `contact-${index}`, value })),
-  );
-
-  return (
-    <>
-      <input type="hidden" name="emergencyContactCount" value={contacts.length} />
-      {contacts.map(({ key, value }, index) => (
-        <fieldset className="form-section" key={key}>
-          <legend>
-            {index === 0
-              ? "Primary emergency contact"
-              : `Additional emergency contact ${index}`}
-          </legend>
-          {contacts.length > 1 ? (
-            <button
-              className="text-button"
-              type="button"
-              onClick={() =>
-                setContacts((current) =>
-                  current.filter((contact) => contact.key !== key),
-                )
-              }
-            >
-              Remove
-            </button>
-          ) : null}
-          <div className="form-grid">
-            <label className="field">
-              <span>Full name</span>
-              <input
-                name={`emergencyContacts.${index}.fullName`}
-                defaultValue={value.fullName}
-                maxLength={160}
-                required
-              />
-            </label>
-            <label className="field">
-              <span>Relationship</span>
-              <select
-                name={`emergencyContacts.${index}.relationship`}
-                defaultValue={value.relationship}
-                required
-              >
-                <option value="parent">Parent</option>
-                <option value="guardian">Guardian</option>
-                <option value="partner">Partner</option>
-                <option value="sibling">Sibling</option>
-                <option value="relative">Relative</option>
-                <option value="friend">Friend</option>
-                <option value="other">Other</option>
-              </select>
-            </label>
-            <label className="field">
-              <span>Mobile number</span>
-              <input
-                name={`emergencyContacts.${index}.mobilePhone`}
-                defaultValue={value.mobilePhone}
-                placeholder="+1 555 010 0300"
-                type="tel"
-                required
-              />
-            </label>
-            <label className="field">
-              <span>Email address <small>For optional FERPA portal access</small></span>
-              <input
-                name={`emergencyContacts.${index}.email`}
-                defaultValue={value.email ?? ""}
-                placeholder="parent@example.com"
-                type="email"
-                autoComplete="email"
-                maxLength={254}
-              />
-              <small>
-                This never grants access by itself. It lets you reuse a parent or guardian later when you make your FERPA choice.
-              </small>
-            </label>
-          </div>
-        </fieldset>
-      ))}
-      {contacts.length < 4 ? (
-        <button
-          className="button button--secondary"
-          type="button"
-          onClick={() => {
-            const key = `new-contact-${nextKey.current++}`;
-            setContacts((current) => [
-              ...current,
-              { key, value: emptyEmergencyContact },
-            ]);
-          }}
-        >
-          + Add another emergency contact
-        </button>
-      ) : null}
-      <div className="review-summary">
-        <h3>Emergency use only</h3>
-        <p>
-          These contacts are not invited to your portal and cannot discuss
-          your record unless you separately select them and authorize specific
-          FERPA pages.
-        </p>
-      </div>
-    </>
-  );
-}
-
-// Every institution signs the same two onboarding documents. Tenants with their
-// own branded templates are listed here; everyone else signs the standard set,
-// so the signing step is never withheld from a student.
 const TENANT_DOCUMENT_ASSET_PREFIXES = new Set(["aster", "harvard"]);
 const DEFAULT_DOCUMENT_ASSET_PREFIX = "aster";
 
-function onboardingDocumentsForTenant(tenantSlug: string) {
+/** Every institution reaches the signing step: a tenant without its own
+ *  artwork falls back to the standard templates rather than losing the fields. */
+function onboardingDocumentsForTenant(tenantSlug: string): SigningDocument[] {
   const assetPrefix = TENANT_DOCUMENT_ASSET_PREFIXES.has(tenantSlug)
     ? tenantSlug
     : DEFAULT_DOCUMENT_ASSET_PREFIX;
   return [
     {
       id: "enrollment_acknowledgment",
-      name: "Enrollment Information Acknowledgment",
-      pdf:
-        `/documents/onboarding/${assetPrefix}-enrollment-acknowledgment.pdf`,
-      preview:
-        `/documents/onboarding/${assetPrefix}-enrollment-acknowledgment-page-1.png`,
-      signatureBox: { x: 9.8, y: 44.7, width: 53, height: 5.4 },
+      title: "Enrollment Information Acknowledgment",
+      pdf: `/documents/onboarding/${assetPrefix}-enrollment-acknowledgment.pdf`,
+      preview: `/documents/onboarding/${assetPrefix}-enrollment-acknowledgment-page-1.png`,
+      apart: null,
     },
-  ] as const;
+  ];
 }
 
-function SignatureCanvas({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drawing = useRef(false);
-
-  useEffect(() => {
-    if (!value || !canvasRef.current) return;
-    const image = new Image();
-    image.onload = () => {
-      const context = canvasRef.current?.getContext("2d");
-      if (!context || !canvasRef.current) return;
-      context.clearRect(
-        0,
-        0,
-        canvasRef.current.width,
-        canvasRef.current.height,
-      );
-      context.drawImage(
-        image,
-        0,
-        0,
-        canvasRef.current.width,
-        canvasRef.current.height,
-      );
-    };
-    image.src = value;
-  }, [value]);
-
-  const point = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    const canvas = event.currentTarget;
-    const bounds = canvas.getBoundingClientRect();
-    return {
-      x: ((event.clientX - bounds.left) / bounds.width) * canvas.width,
-      y: ((event.clientY - bounds.top) / bounds.height) * canvas.height,
-    };
+function ferpaDocumentForTenant(tenantSlug: string, tenantShortName: string): SigningDocument {
+  const assetPrefix = TENANT_DOCUMENT_ASSET_PREFIXES.has(tenantSlug)
+    ? tenantSlug
+    : DEFAULT_DOCUMENT_ASSET_PREFIX;
+  return {
+    id: "ferpa_release",
+    title: `${tenantShortName} FERPA Information Release`,
+    pdf: `/documents/onboarding/${assetPrefix}-ferpa-release.pdf`,
+    preview: `/documents/onboarding/${assetPrefix}-ferpa-release-page-1.png`,
+    apart:
+      "This is the acknowledgment of the right itself. Who can see your record is where you name a person and choose what they may see.",
   };
-  const start = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    drawing.current = true;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const context = event.currentTarget.getContext("2d");
-    if (!context) return;
-    const current = point(event);
-    context.beginPath();
-    context.moveTo(current.x, current.y);
-  };
-  const move = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    if (!drawing.current) return;
-    const context = event.currentTarget.getContext("2d");
-    if (!context) return;
-    const current = point(event);
-    context.strokeStyle = "#173f31";
-    context.lineWidth = 4;
-    context.lineCap = "round";
-    context.lineJoin = "round";
-    context.lineTo(current.x, current.y);
-    context.stroke();
-  };
-  const finish = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    if (!drawing.current) return;
-    drawing.current = false;
-    onChange(event.currentTarget.toDataURL("image/png"));
-  };
-  const clear = () => {
-    const canvas = canvasRef.current;
-    canvas?.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
-    onChange("");
-  };
-
-  return (
-    <div className="signature-draw">
-      <canvas
-        ref={canvasRef}
-        width={720}
-        height={180}
-        aria-label="Draw your signature"
-        onPointerDown={start}
-        onPointerMove={move}
-        onPointerUp={finish}
-        onPointerCancel={finish}
-      />
-      <button className="text-button" type="button" onClick={clear}>
-        Clear signature
-      </button>
-    </div>
-  );
 }
 
-function ReviewAndSignFields({ data }: { data: StudentOnboardingData }) {
-  const { tenant } = useTenant();
-  const onboardingDocuments = onboardingDocumentsForTenant(tenant.slug);
-  const [activeDocument, setActiveDocument] = useState(0);
-  const [signatureMethod, setSignatureMethod] = useState<"typed" | "drawn">(
-    data.signatureMethod ?? "typed",
-  );
-  const [fullName, setFullName] = useState(
-    data.signatureFullName ??
-      `${data.firstName ?? ""} ${data.lastName ?? ""}`.trim(),
-  );
-  const [drawnSignature, setDrawnSignature] = useState(
-    data.signatureImageData ?? "",
-  );
-  const document =
-    onboardingDocuments[activeDocument] ?? onboardingDocuments[0];
-
-  return (
-    <>
-      <div className="review-summary">
-        <h3>Your saved choices</h3>
-        <dl>
-          <div>
-            <dt>Residency</dt>
-            <dd>{data.residencyStatus?.replace("_", " ") || "Not provided"}</dd>
-          </div>
-          <div>
-            <dt>Residency review</dt>
-            <dd>
-              {data.residencyVerificationPath
-                ?.replaceAll("_", " ")
-                .replace(/\b\w/g, (letter) => letter.toUpperCase()) ||
-                "Not provided"}
-            </dd>
-          </div>
-            <div>
-              <dt>Housing</dt>
-              <dd>{data.housingPreference?.replace("_", " ") || "Not provided"}</dd>
-            </div>
-            {data.housingPreference === "on_campus" ? (
-              <div>
-                <dt>Residence ranking</dt>
-                <dd>
-                  {data.housingResidencePreferences?.length
-                    ? data.housingResidencePreferences
-                        .map((value, index) =>
-                          `${index + 1}. ${value
-                            .replaceAll("_", " ")
-                            .replace(/\b\w/g, (letter) =>
-                              letter.toUpperCase(),
-                            )}`,
-                        )
-                        .join(" · ")
-                    : "Decide later"}
-                </dd>
-              </div>
-            ) : null}
-          <div>
-            <dt>Insurance information</dt>
-            <dd>
-              {data.insuranceInterest
-                ?.replaceAll("_", " ")
-                .replace(/\b\w/g, (letter) => letter.toUpperCase()) ||
-                "Not selected"}
-            </dd>
-          </div>
-          <div>
-            <dt>Accommodations follow-up</dt>
-            <dd>
-              {data.accommodationInterest
-                ?.replaceAll("_", " ")
-                .replace(/\b\w/g, (letter) => letter.toUpperCase()) ||
-                "Not selected"}
-            </dd>
-          </div>
-          <div>
-            <dt>Emergency contacts</dt>
-            <dd>{data.emergencyContacts?.length || 0} entered</dd>
-          </div>
-          <div>
-            <dt>Campus interests</dt>
-            <dd>{data.campusInterests?.length || 0} selected</dd>
-          </div>
-        </dl>
-      </div>
-      <fieldset className="form-section document-packet">
-        <legend>Read your document packet</legend>
-        <div
-          className="document-packet__tabs"
-          role="tablist"
-          aria-label="Onboarding documents"
-        >
-          {onboardingDocuments.map((candidate, index) => (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={index === activeDocument}
-              onClick={() => setActiveDocument(index)}
-              key={candidate.id}
-            >
-              <span>{index + 1}</span>
-              {candidate.name}
-            </button>
-          ))}
-        </div>
-        <div className="document-packet__stage">
-          <div className="document-packet__page">
-            <img src={document.preview} alt={`${document.name} page 1`} />
-            <div
-              className="document-signature-placement"
-              style={{
-                left: `${document.signatureBox.x}%`,
-                top: `${document.signatureBox.y}%`,
-                width: `${document.signatureBox.width}%`,
-                height: `${document.signatureBox.height}%`,
-              }}
-              aria-label="Signature placement preview"
-            >
-              {signatureMethod === "drawn" && drawnSignature ? (
-                <img src={drawnSignature} alt="Your drawn signature" />
-              ) : fullName ? (
-                <span>{fullName}</span>
-              ) : null}
-            </div>
-          </div>
-          <div className="document-packet__caption">
-            <strong>{document.name}</strong>
-            <span>Page 1 of 1 · signature location highlighted</span>
-            <a href={document.pdf} target="_blank" rel="noreferrer">
-              Open the full PDF
-            </a>
-          </div>
-        </div>
-      </fieldset>
-      <fieldset className="form-section signature-workspace">
-        <legend>Choose how you want to sign</legend>
-        <div className="choice-grid">
-          <Choice
-            type="radio"
-            name="signatureMethod"
-            value="typed"
-            label="Type my signature"
-            defaultChecked={signatureMethod === "typed"}
-            required
-            onChange={() => setSignatureMethod("typed")}
-          />
-          <Choice
-            type="radio"
-            name="signatureMethod"
-            value="drawn"
-            label="Draw my signature"
-            defaultChecked={signatureMethod === "drawn"}
-            required
-            onChange={() => setSignatureMethod("drawn")}
-          />
-        </div>
-        <label className="field">
-          <span>Full legal name</span>
-          <input
-            name="signatureFullName"
-            value={fullName}
-            onChange={(event) => setFullName(event.currentTarget.value)}
-            maxLength={240}
-            required
-          />
-        </label>
-        {signatureMethod === "drawn" ? (
-          <>
-            <SignatureCanvas
-              value={drawnSignature}
-              onChange={setDrawnSignature}
-            />
-            <input
-              type="hidden"
-              name="signatureImageData"
-              value={drawnSignature}
-            />
-          </>
-        ) : null}
-        {onboardingDocuments.map((candidate) => (
-          <input
-            type="hidden"
-            name="signedDocumentIds"
-            value={candidate.id}
-            key={candidate.id}
-          />
-        ))}
-        <label className="confirmation-check">
-          <input
-            name="signatureConsent"
-            value="yes"
-            type="checkbox"
-            defaultChecked={data.signatureConsent}
-            required
-          />
-          <span>
-            <strong>I reviewed and agree to sign these documents</strong>
-            I consent to use this electronic signature on the highlighted
-            signature fields in both named documents.
-          </span>
-        </label>
-      </fieldset>
-    </>
-  );
-}
-
-const aboutYouInputNames: Record<string, keyof StudentOnboardingData> = {
-  first_name: "firstName",
-  last_name: "lastName",
-  preferred_name: "preferredName",
-  personal_email: "personalEmail",
-  mobile_phone: "mobilePhone",
-  citizenship_status: "citizenshipStatus",
-  street_address: "streetAddress",
-  city: "city",
-  state_or_province: "stateOrProvince",
-  postal_code: "postalCode",
-  country: "country",
-  residency_verification_path: "residencyVerificationPath",
+type OnboardingPageData = {
+  onboarding: StudentOnboarding;
+  dashboard: StudentDashboard;
+  payments: StudentPaymentList;
+  profile: StudentProfile;
+  housingPlan: StudentHousingPlan;
+  documents: StudentDocumentList;
+  ferpa: StudentFerpaAuthorization | null;
 };
 
-const configuredChoiceValues: Record<string, Record<string, string>> = {
-  citizenship_status: {
-    "U.S. citizen": "us_citizen",
-    "U.S. permanent resident": "permanent_resident",
-    "Other eligible noncitizen / status": "eligible_noncitizen",
-    "International student · F-1 or J-1": "international",
-  },
-  residency_verification_path: {
-    "Review my permanent address": "home_address_review",
-    "I will provide supporting documents": "document_upload",
-    "I need an advisor review": "advisor_review",
-  },
-};
+type Overlay =
+  | { kind: "celebrate" }
+  | { kind: "decline" }
+  | { kind: "authorize" }
+  | { kind: "waiver" }
+  | { kind: "hall"; hall: StudentHousingResidence }
+  | { kind: "help" };
 
-function configuredFieldName(field: StudentRequirementInputField) {
-  return aboutYouInputNames[field.id] ?? `custom__${field.id}`;
-}
+type FlowNotice = { tone: "info" | "alert"; text: string };
 
-function configuredFieldValue(
-  field: StudentRequirementInputField,
-  data: StudentOnboardingData,
-) {
-  const coreName = aboutYouInputNames[field.id];
-  return coreName ? data[coreName] : data.customFields?.[field.id];
-}
+const DATE: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" };
+const SHORT_DATE: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
 
-function optionValue(field: StudentRequirementInputField, option: string) {
-  return configuredChoiceValues[field.id]?.[option] ?? option;
-}
+/** The one-time delegate links issued in this tab, kept across a remount. */
+const oneTimeLinks = new Map<string, Record<string, string>>();
 
-function ConfiguredAboutYouPageFields({
-  fields,
-  data,
-  title = "Your information",
-  description = "Review the fields configured by your university before continuing.",
-  active = true,
-}: {
-  fields: StudentRequirementInputField[];
-  data: StudentOnboardingData;
-  title?: string;
-  description?: string;
-  active?: boolean;
-}) {
-  return (
-    <fieldset className="form-section">
-      <legend>{title}</legend>
-      <p>{description}</p>
-      <div className="form-grid">
-        {fields.map((field) => {
-          const name = configuredFieldName(field);
-          const current = configuredFieldValue(field, data);
-          if (field.field_type === "checkbox") {
-            return (
-              <label className="confirmation-check" key={field.id}>
-                <input
-                  name={name}
-                  type="checkbox"
-                  value="yes"
-                  defaultChecked={current === true}
-                  required={active && field.required}
-                />
-                <span><strong>{field.title}</strong></span>
-              </label>
-            );
-          }
-          if (field.field_type === "multiple_select") {
-            const selected = Array.isArray(current) ? current.map(String) : [];
-            return (
-              <fieldset className="field configured-multiple-choice" key={field.id}>
-                <legend>{field.title}{field.required ? " *" : ""}</legend>
-                {(field.options ?? []).map((option, index) => {
-                  const value = optionValue(field, option);
-                  return (
-                    <label key={option}>
-                      <input
-                        name={name}
-                        type="checkbox"
-                        value={value}
-                        defaultChecked={selected.includes(value)}
-                        required={active && field.required && index === 0 && selected.length === 0}
-                      />
-                      {option}
-                    </label>
-                  );
-                })}
-              </fieldset>
-            );
-          }
-          if (field.field_type === "single_select") {
-            return (
-              <label className="field" key={field.id}>
-                <span>{field.title}</span>
-                <select
-                  name={name}
-                  defaultValue={typeof current === "string" ? current : ""}
-                  required={active && field.required}
-                >
-                  <option value="" disabled>Choose one</option>
-                  {(field.options ?? []).map((option) => (
-                    <option key={option} value={optionValue(field, option)}>{option}</option>
-                  ))}
-                </select>
-              </label>
-            );
-          }
-          return (
-            <label className="field" key={field.id}>
-              <span>{field.title}</span>
-              <input
-                name={name}
-                type={field.field_type === "phone" ? "tel" : field.field_type}
-                defaultValue={typeof current === "string" ? current : ""}
-                required={active && field.required}
-                maxLength={field.field_type === "email" ? 254 : 180}
-              />
-            </label>
-          );
-        })}
-      </div>
-    </fieldset>
-  );
-}
-
-function ConfiguredAboutYouFields({
-  fields,
-  form,
-  data,
-}: {
-  fields: StudentRequirementInputField[];
-  form?: StudentOnboardingScreenConfiguration["form"];
-  data: StudentOnboardingData;
-}) {
-  const pages = form?.version === 1 && form.pages.length > 0
-    ? form.pages
-    : [{ id: "student_details", title: "Your information", description: "Review the fields configured by your university before continuing.", fields }];
-  const [pageIndex, setPageIndex] = useState(0);
-  const pageRoot = useRef<HTMLDivElement>(null);
-  const finalPage = pageIndex === pages.length - 1;
-  const continueToNextPage = () => {
-    const controls = Array.from(
-      pageRoot.current?.querySelectorAll<HTMLInputElement | HTMLSelectElement>(
-        "input, select, textarea",
-      ) ?? [],
-    );
-    const invalid = controls.find((control) => !control.checkValidity());
-    if (invalid) {
-      invalid.reportValidity();
-      invalid.focus();
-      return;
-    }
-    setPageIndex((current) => Math.min(pages.length - 1, current + 1));
-  };
-
-  return (
-    <div className={`configured-about-you-form${pages.length > 1 ? " is-multipage" : ""}${finalPage ? " is-final" : ""}`}>
-      {pages.length > 1 ? (
-        <div className="configured-about-you-form__progress" aria-label={`Form step ${pageIndex + 1} of ${pages.length}`}>
-          <span>Part {pageIndex + 1} of {pages.length}</span>
-          <div>{pages.map((page, index) => <i className={index <= pageIndex ? "is-complete" : undefined} key={page.id} />)}</div>
-        </div>
-      ) : null}
-      {pages.map((page, index) => (
-        <div ref={index === pageIndex ? pageRoot : undefined} hidden={index !== pageIndex} key={page.id}>
-          <ConfiguredAboutYouPageFields
-            fields={page.fields}
-            data={data}
-            title={page.title}
-            description={page.description}
-            active={index === pageIndex}
-          />
-        </div>
-      ))}
-      {pages.length > 1 ? (
-        <div className="configured-about-you-form__actions">
-          {pageIndex > 0 ? <button className="button button--secondary" type="button" onClick={() => setPageIndex((current) => Math.max(0, current - 1))}>Back</button> : <span />}
-          {!finalPage ? <button className="button button--primary" type="button" onClick={continueToNextPage}>Continue</button> : null}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-type IdentityPrefillCandidates = Partial<
-  Record<
-    | "firstName"
-    | "lastName"
-    | "preferredName"
-    | "mobilePhone"
-    | "streetAddress"
-    | "city"
-    | "stateOrProvince"
-    | "postalCode"
-    | "country",
-    string
-  >
->;
-
-function identityPrefillCandidates(
-  document: StudentDocument | null,
-): IdentityPrefillCandidates {
+function identityPrefill(document: StudentDocument | null): Partial<StudentOnboardingData> {
   const extraction = document?.extraction;
   if (
     document?.status === "rejected" ||
@@ -1674,122 +237,335 @@ function identityPrefillCandidates(
     return {};
   }
   const values = new Map(
-    extraction.fields.map((field) => [
-      field.key,
-      String(field.value ?? "").trim(),
-    ]),
+    extraction.fields.map((field) => [field.key, String(field.value ?? "").trim()]),
   );
   const fullName = extraction.studentName?.trim() ?? "";
-  const nameParts = fullName.split(/\s+/).filter(Boolean);
-  const inferredFirst = values.get("first_name") || nameParts[0] || "";
-  const inferredLast =
-    values.get("last_name") ||
-    (nameParts.length > 1 ? nameParts.slice(1).join(" ") : "");
-  return {
-    firstName: inferredFirst,
-    lastName: inferredLast,
-    preferredName: values.get("preferred_name") || inferredFirst,
-    mobilePhone: values.get("mobile_phone") || "",
+  const parts = fullName.split(/\s+/).filter(Boolean);
+  const candidate: Partial<StudentOnboardingData> = {
+    firstName: values.get("first_name") || parts[0] || "",
+    lastName: values.get("last_name") || (parts.length > 1 ? parts.slice(1).join(" ") : ""),
     streetAddress: values.get("street_address") || "",
     city: values.get("city") || "",
     stateOrProvince: values.get("state_or_province") || "",
     postalCode: values.get("postal_code") || "",
     country: values.get("country") || "",
   };
+  return Object.fromEntries(Object.entries(candidate).filter(([, value]) => value));
 }
 
-function restoredIdentityMessage(document: StudentDocument | null) {
+function identityMessage(document: StudentDocument | null) {
   const extraction = document?.extraction;
-  if (document?.status === "rejected") {
-    return "This stored ID was not accepted. Add a replacement file or contact Enrollment Services if you need help.";
-  }
+  if (!document) return null;
+  if (document.status === "rejected") return null;
   if (extraction?.status === "processing") {
-    return "Your ID is uploaded. We will prefill available details when parsing finishes.";
+    return "Your ID is stored. Any details it carries are filled in for you once it has been read.";
   }
-  if (extraction?.status === "failed") {
-    return "Your ID is safely stored, but automatic parsing needs attention. Use Retry parsing below without uploading it again.";
-  }
-  if (extraction?.status === "pending_configuration") {
-    return "Your ID is safely stored, but automatic parsing is not configured yet. You can retry below when the service is available.";
+  if (extraction?.status === "failed" || extraction?.status === "pending_configuration") {
+    return "Your ID is stored, and it could not be read automatically. Type anything missing yourself; a person reviews the original.";
   }
   if (extraction?.status === "completed" && extraction.documentType === "identity") {
-    return "Available identity details were prefilled from your stored ID. Please review them before continuing.";
+    return "Details from your ID were filled in where a field was empty. Check them before you carry on.";
   }
   if (extraction?.status === "completed") {
-    return "The file is safely stored, but it was not recognized as an identity document. Add the correct ID file or ask staff to review it.";
-  }
-  if (document) {
-    return "Your ID is safely stored. Enter any missing details manually or ask staff to review the original.";
+    return "The file is stored, but it was not recognised as an identity document. Send the ID itself, or ask for help.";
   }
   return null;
 }
 
-function StepFields({
-  step,
-  data,
-  offer,
-  depositPaid,
+function OnboardingFlow({
+  initial,
+  dashboard,
+  initialPayments,
   housingPlan,
-  campusLife,
-  screenConfiguration,
-  identityDocument,
-  onIdentityDocumentChanged,
-  onFerpaCompletionChange,
-  onFerpaSaved,
+  initialDocuments,
+  initialFerpa,
+  profile,
+  reload,
 }: {
-  step: OnboardingStep;
-  data: StudentOnboardingData;
-  offer: AdmissionOfferSummary;
-  depositPaid: boolean;
+  initial: StudentOnboarding;
+  dashboard: StudentDashboard;
+  initialPayments: StudentPaymentList;
   housingPlan: StudentHousingPlan;
-  campusLife: CampusLifeFeed;
-  screenConfiguration?: StudentOnboardingScreenConfiguration;
-  identityDocument: StudentDocument | null;
-  onIdentityDocumentChanged: (document: StudentDocument) => void;
-  onFerpaCompletionChange: (complete: boolean) => void;
-  onFerpaSaved: () => void;
+  initialDocuments: StudentDocumentList;
+  initialFerpa: StudentFerpaAuthorization | null;
+  profile: StudentProfile;
+  reload: () => void;
 }) {
-  const { tenant } = useTenant();
-  const formatMoney = (cents: number) => formatTenantMoney(cents, tenant);
-  const aboutYouRoot = useRef<HTMLDivElement>(null);
-  const identityQuickUploadEnabled =
-    screenConfiguration?.identityQuickUpload !== false;
-  const restoredPrefill = identityQuickUploadEnabled
-    ? identityPrefillCandidates(identityDocument)
-    : {};
-  // Account creation intentionally does not collect a legal name. The
-  // credential bootstrap uses this harmless internal placeholder until the
-  // required About you step supplies the real identity; never show it as a
-  // student-entered value.
-  const hasProvisionalAccountName =
-    data.firstName === "Student" &&
-    data.lastName === "Account" &&
-    data.preferredName === "Student";
-  const prefilledData: StudentOnboardingData = {
-    ...data,
-    firstName: hasProvisionalAccountName
-      ? restoredPrefill.firstName
-      : data.firstName || restoredPrefill.firstName,
-    lastName: hasProvisionalAccountName
-      ? restoredPrefill.lastName
-      : data.lastName || restoredPrefill.lastName,
-    preferredName: hasProvisionalAccountName
-      ? restoredPrefill.preferredName
-      : data.preferredName || restoredPrefill.preferredName,
-    mobilePhone: data.mobilePhone || restoredPrefill.mobilePhone,
-    streetAddress: data.streetAddress || restoredPrefill.streetAddress,
-    city: data.city || restoredPrefill.city,
-    stateOrProvince: data.stateOrProvince || restoredPrefill.stateOrProvince,
-    postalCode: data.postalCode || restoredPrefill.postalCode,
-    country: data.country || restoredPrefill.country,
-  };
-  const [identityPrefillMessage, setIdentityPrefillMessage] = useState<
-    string | null
-  >(() =>
-    identityQuickUploadEnabled ? restoredIdentityMessage(identityDocument) : null,
+  const tenantRuntime = useTenant();
+  const { tenant } = tenantRuntime;
+  const institution = tenant.shortName;
+  const admissionsContact = tenant.contacts.admissions ?? tenant.contacts.support;
+  const admissionsHref = admissionsContact.url
+    ? tenantRuntime.href(admissionsContact.url)
+    : admissionsContact.email
+      ? `mailto:${admissionsContact.email}`
+      : null;
+
+  const [onboarding, setOnboarding] = useState(initial);
+  const [offer, setOffer] = useState<AdmissionOfferSummary>(dashboard.offer);
+  const [draft, setDraft] = useState<OnboardingDraft>(() =>
+    typeof window === "undefined" ? emptyDraft() : readDraft(initial.studentId),
   );
-  const requiredFields = new Set<AboutYouConfigurableField>(
-    screenConfiguration?.requiredFields ?? [
+  const [documents, setDocuments] = useState<StudentDocument[]>(initialDocuments.items);
+  const [ferpa, setFerpa] = useState(initialFerpa);
+  const [profileVersion, setProfileVersion] = useState(profile.version);
+  const [depositPayment, setDepositPayment] = useState(() =>
+    initialPayments.items.find((payment) => payment.status === "succeeded") ?? null,
+  );
+
+  const deadline = formatTenantDate(offer.responseDeadline, tenant, DATE);
+  // A university may rename a built-in screen from the journey builder. The
+  // configured label, title and description win over the flow's own words;
+  // `about_you` is two screens, and its configuration names the first.
+  const screenConfigurations = onboarding.screenConfigurations;
+  const screens = useMemo(
+    () =>
+      screensFor({ institution, deadline }).map((candidate) => {
+        if (!candidate.step || candidate.id === "contact") return candidate;
+        const configured = screenConfigurations?.[candidate.step];
+        if (!configured) return candidate;
+        return {
+          ...candidate,
+          name: configured.label || candidate.name,
+          question: tenantRuntime.copy(configured.title || candidate.question),
+          lede: tenantRuntime.copy(configured.description || candidate.lede),
+        };
+      }),
+    [institution, deadline, screenConfigurations, tenantRuntime],
+  );
+  const record = useMemo(() => recordFrom(onboarding, draft.local), [onboarding, draft.local]);
+  const data = useMemo<StudentOnboardingData>(
+    () => ({ ...onboarding.data, ...draft.data }),
+    [onboarding.data, draft.data],
+  );
+
+  const [screenId, setScreenId] = useState<ScreenId>(() => firstUnresolved(screens, record));
+  const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+  const [conflict, setConflict] = useState(false);
+  const [notice, setNotice] = useState<FlowNotice | null>(null);
+  const [resumeShown, setResumeShown] = useState(true);
+  const [attempted, setAttempted] = useState(false);
+  const [overlay, setOverlay] = useState<Overlay | null>(null);
+  const [authorizing, setAuthorizing] = useState<AuthorizeDraft | null>(null);
+  const [authorizeError, setAuthorizeError] = useState<string | null>(null);
+  const [ferpaBusy, setFerpaBusy] = useState(false);
+  const [revealedLinks, setRevealedLinks] = useState<Record<string, string>>(
+    () => (initialFerpa ? oneTimeLinks.get(initialFerpa.id) ?? {} : {}),
+  );
+  const [copied, setCopied] = useState<string | null>(null);
+  const [helpReached, setHelpReached] = useState(0);
+  const [accepting, setAccepting] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [card, setCard] = useState({ number: "", expiry: "", cvc: "" });
+  const [signature, setSignature] = useState("");
+
+  const heading = useRef<HTMLElement>(null);
+  const lastScreen = useRef<ScreenId | null>(null);
+  const offerKey = useRef<string | null>(null);
+  const depositKey = useRef<string | null>(null);
+  const completeKey = useRef<string | null>(null);
+  const ferpaKeys = useRef<Record<string, string>>({});
+  const prefilledFrom = useRef<string | null>(null);
+
+  const save = useApiAction(
+    useCallback((input: UpdateStudentOnboardingInput) => updateStudentOnboarding(input), []),
+  );
+  const complete = useApiAction(
+    useCallback(
+      (expectedVersion: number, key: string) => completeStudentOnboarding({ expectedVersion }, key),
+      [],
+    ),
+  );
+
+  useEffect(() => {
+    writeDraft(onboarding.studentId, draft);
+  }, [draft, onboarding.studentId]);
+
+  useEffect(() => {
+    if (onboarding.status === "completed" && complete.status !== "success") {
+      window.location.replace(tenantRuntime.href("/dashboard"));
+    }
+  }, [onboarding.status, complete.status, tenantRuntime]);
+
+  useEffect(() => {
+    if (lastScreen.current !== null && lastScreen.current !== screenId) heading.current?.focus();
+    lastScreen.current = screenId;
+  }, [screenId]);
+
+  /* What the ID says fills in what is still empty, once per document. */
+  const absorbIdentity = useCallback(
+    (document: StudentDocument | null) => {
+      if (!document || document.category !== "identity") return;
+      if (prefilledFrom.current === document.id) return;
+      if (document.extraction?.status !== "completed") return;
+      prefilledFrom.current = document.id;
+      const candidate = identityPrefill(document);
+      setDraft((current) => {
+        const merged = { ...onboarding.data, ...current.data };
+        const patch: Partial<StudentOnboardingData> = {};
+        for (const [key, value] of Object.entries(candidate) as Array<[keyof StudentOnboardingData, string]>) {
+          if (!String(merged[key] ?? "").trim()) (patch as Record<string, unknown>)[key] = value;
+        }
+        return Object.keys(patch).length ? { ...current, data: { ...current.data, ...patch } } : current;
+      });
+    },
+    [onboarding.data],
+  );
+
+  /* The platform opens the FERPA authorization when the journey reaches it,
+     so the screens that read it ask again on arrival rather than trusting the
+     copy loaded with the page. */
+  useEffect(() => {
+    if (screenId !== "permissions" && screenId !== "review") return undefined;
+    let cancelled = false;
+    getStudentFerpaAuthorization()
+      .then((envelope) => {
+        if (cancelled) return;
+        setFerpa((current) => {
+          const next = envelope.authorization;
+          if (!next) return current;
+          if (current && current.id === next.id && current.version > next.version) return current;
+          return next;
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [screenId]);
+
+  /* Documents still being read are polled until they are not. */
+  const processingIds = documents
+    .filter((document) => document.extraction?.status === "processing")
+    .map((document) => document.id)
+    .join(",");
+  useEffect(() => {
+    if (!processingIds) return undefined;
+    let attempts = 0;
+    const timer = window.setInterval(() => {
+      attempts += 1;
+      if (attempts > 30) {
+        window.clearInterval(timer);
+        return;
+      }
+      getStudentDocuments()
+        .then((list) => {
+          setDocuments(list.items);
+          absorbIdentity(latestDocumentForCategory(list.items, "identity"));
+        })
+        .catch(() => undefined);
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [processingIds, absorbIdentity]);
+
+  const identityDocument = latestDocumentForCategory(documents, "identity");
+  const residencyDocument = latestDocumentForCategory(documents, "residency");
+  const immunizationDocument = latestDocumentForCategory(documents, "health");
+  const photoDocument = latestDocumentForCategory(documents, "other");
+
+  const sentOn = (document: StudentDocument | null) =>
+    document ? formatTenantDate(document.createdAt, tenant, SHORT_DATE) : null;
+
+  const screen = screenById(screens, screenId) ?? screens[0];
+  const closed = offer.status === "declined" || offer.status === "expired";
+  const finished = allResolved(screens, record);
+  const preferred =
+    data.preferredName?.trim() ||
+    data.firstName?.trim() ||
+    realProfileName(dashboard.student.preferredName, "Student") ||
+    "there";
+  const legalName = [data.firstName, data.lastName].filter((part) => part?.trim()).join(" ");
+  const today = formatTenantDate(new Date(), tenant, DATE);
+  const classYear = `Class of ${dashboard.student.classYear}`;
+
+  const patch = (values: Partial<StudentOnboardingData>) =>
+    setDraft((current) => ({ ...current, data: { ...current.data, ...values } }));
+  const patchCustom = (id: string, value: CustomValue) =>
+    setDraft((current) => ({
+      ...current,
+      data: {
+        ...current.data,
+        customFields: { ...(onboarding.data.customFields ?? {}), ...(current.data.customFields ?? {}), [id]: value },
+      },
+    }));
+
+  const contacts: ContactDraft[] = useMemo(() => {
+    if (draft.contacts?.length) return draft.contacts;
+    const saved = onboarding.data.emergencyContacts ?? [];
+    return saved.length
+      ? saved.map((contact) => ({
+          fullName: contact.fullName,
+          relationship: contact.relationship,
+          mobilePhone: contact.mobilePhone,
+          email: contact.email ?? "",
+        }))
+      : [emptyContact()];
+  }, [draft.contacts, onboarding.data.emergencyContacts]);
+  const setContacts = (next: ContactDraft[]) =>
+    setDraft((current) => ({ ...current, contacts: next }));
+
+  const openHelp = () => {
+    setHelpReached(0);
+    setOverlay({ kind: "help" });
+  };
+
+  function goTo(id: ScreenId) {
+    setNotice(null);
+    setFailed(null);
+    setAttempted(false);
+    setScreenId(id);
+    window.scrollTo({
+      top: 0,
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
+  }
+
+  function openScreen(id: ScreenId) {
+    const target = screenById(screens, id);
+    if (!target) return;
+    const stepOrder = onboardingSteps.map((step) => step.key);
+    const behindPlatform =
+      !target.step || stepOrder.indexOf(target.step) <= stepOrder.indexOf(onboarding.currentStep);
+    if (behindPlatform && isReachable(screens, target, record, screenId)) {
+      goTo(id);
+      return;
+    }
+    setNotice({
+      tone: "alert",
+      text:
+        target.id !== "offer" && !record.offerAnswered
+          ? `${target.name} isn’t open yet. It ${LOCK_REASON.replace(/^Opens/, "opens")}.`
+          : `Finish the step you are on first. ${target.name} comes after it.`,
+    });
+  }
+
+  const withScreenConfiguration = (result: StudentOnboarding): StudentOnboarding => ({
+    ...result,
+    configurationVersion: result.configurationVersion ?? onboarding.configurationVersion,
+    screenConfigurations: result.screenConfigurations ?? onboarding.screenConfigurations,
+  });
+
+  /** The only path by which a platform step becomes saved. */
+  async function putStep(step: OnboardingStep, values: Partial<StudentOnboardingData>) {
+    const nextData = editableOnboardingData({ ...onboarding.data, ...values });
+    const result = await save.run({
+      expectedVersion: onboarding.version,
+      currentStep: step,
+      data: nextData,
+    });
+    const next = withScreenConfiguration(result);
+    setOnboarding(next);
+    return next;
+  }
+
+  /* ---- what each screen needs before it can be saved ------------------- */
+
+  const aboutYouConfiguration = onboarding.screenConfigurations?.about_you;
+  const coreFields = useMemo(() => coreFieldsOf(aboutYouConfiguration), [aboutYouConfiguration]);
+  const customPages = useMemo(() => customPagesOf(aboutYouConfiguration), [aboutYouConfiguration]);
+  const requiredCore = new Set<keyof StudentOnboardingData>(
+    aboutYouConfiguration?.requiredFields ?? [
       "firstName",
       "lastName",
       "preferredName",
@@ -1798,756 +574,283 @@ function StepFields({
       "citizenshipStatus",
     ],
   );
-  const fieldRequired = (field: AboutYouConfigurableField) => requiredFields.has(field);
-  const prefillIdentity = useCallback((document: StudentDocument) => {
-    onIdentityDocumentChanged(document);
-    const extraction = document.extraction;
-    if (extraction?.status === "processing") {
-      setIdentityPrefillMessage("Your ID is uploaded. We will prefill available details when parsing finishes.");
-      return;
+  for (const [column, field] of coreFields) if (field.required) requiredCore.add(column);
+
+  const detailsProblems: DetailsProblems = {
+    firstName: !data.firstName?.trim() ? "Add your first name." : undefined,
+    lastName: !data.lastName?.trim() ? "Add your last name." : undefined,
+    citizenshipStatus: !data.citizenshipStatus ? "Choose one. It decides which ID is accepted." : undefined,
+  };
+  const customProblems: Record<string, string | null> = {};
+  for (const page of customPages) {
+    for (const field of page.fields) {
+      customProblems[field.id] = customFieldProblem(field, data.customFields?.[field.id]);
     }
-    if (extraction?.status !== "completed" || extraction.documentType !== "identity") {
-      setIdentityPrefillMessage(restoredIdentityMessage(document));
-      return;
-    }
-    const candidates = identityPrefillCandidates(document);
-    let filled = 0;
-    for (const [name, value] of Object.entries(candidates)) {
-      const input = aboutYouRoot.current?.querySelector<HTMLInputElement>(`[name="${name}"]`);
-      if (input && !input.value.trim() && value) {
-        input.value = value;
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-        filled += 1;
-      }
-    }
-    setIdentityPrefillMessage(
-      filled > 0
-        ? `${filled} field${filled === 1 ? " was" : "s were"} prefilled from your ID. Please review before continuing.`
-        : "Your ID was parsed. Review the details below and fill any fields that remain empty.",
-    );
-  }, [onIdentityDocumentChanged]);
-  switch (step) {
-    case "offer":
-      return (
-        <>
-          <div className="onboarding-offer">
-            <p className="eyebrow">Admission offer</p>
-            <h3>{offer.programName}</h3>
-            <p>{offer.termName} · {offer.campusName}</p>
-            <dl>
-              <div>
-                <dt>Respond by</dt>
-                <dd>
-                  {formatTenantDate(offer.responseDeadline, tenant, {
-                    month: "long",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </dd>
-              </div>
-              <div>
-                <dt>Deposit</dt>
-                <dd>{formatMoney(offer.depositAmountCents)}</dd>
-              </div>
-            </dl>
-          </div>
-          {offer.status === "offered" ? (
-            <label className="confirmation-check">
-              <input name="offerAccepted" type="checkbox" required />
-              <span>
-                <strong>
-                  Yes—start my {tenant.shortName} enrollment
-                </strong>
-                I accept my offer of admission and understand this decision
-                will be recorded in my official admissions record.
-              </span>
-            </label>
-          ) : (
-            <p className="confirmed-line">
-              <span aria-hidden="true">✓</span>
-              Your admission offer is {offer.status}.
-            </p>
-          )}
-        </>
-      );
-    case "about_you":
-      return (
-        <div className="onboarding-about-you" ref={aboutYouRoot}>
-          {identityQuickUploadEnabled ? (
-            <section className="form-section onboarding-id-prefill" aria-labelledby="identity-prefill-title">
-              <div>
-                <p className="eyebrow">Quick fill · optional</p>
-                <h2 id="identity-prefill-title">Use an ID to fill identity details</h2>
-                <p>
-                  Upload a passport, national ID, or driver&apos;s license. We fill only
-                  details the parser can read, and you review every value before saving.
-                </p>
-              </div>
-              <DocumentUpload
-                activeDocument={identityDocument}
-                categoryHint="identity"
-                expectedLabel="an ID image or PDF"
-                onUploaded={prefillIdentity}
-              />
-              {identityDocument?.status === "rejected" ? (
-                <div className="extraction-state extraction-state--error" role="alert">
-                  <strong>This ID needs a replacement</strong>
-                  <p>
-                    The original remains in your student record, but it was not
-                    accepted. Add a clearer or correct identity document above.
-                  </p>
-                </div>
-              ) : identityDocument ? (
-                <DocumentExtractionReview
-                  key={`${identityDocument.id}:${identityDocument.extraction?.status ?? "stored"}`}
-                  document={identityDocument}
-                  onDocumentChanged={prefillIdentity}
-                />
-              ) : null}
-              {identityPrefillMessage ? (
-                <p className="action-feedback" role="status">{identityPrefillMessage}</p>
-              ) : null}
-            </section>
-          ) : null}
-          {screenConfiguration?.fields?.length ? (
-            <ConfiguredAboutYouFields
-              fields={screenConfiguration.fields}
-              form={screenConfiguration.form}
-              data={prefilledData}
-            />
-          ) : (
-            <>
-          <fieldset className="form-section">
-            <legend>We know a lot already. Make sure it still feels like you.</legend>
-            <p>
-              We prefilled available details from your student record. Review
-              and edit anything that has changed before continuing.
-            </p>
-            <div className="form-grid">
-              <label className="field">
-                <span>Legal first name</span>
-                <input
-                  name="firstName"
-                  required={fieldRequired("firstName")}
-                  maxLength={120}
-                  autoComplete="given-name"
-                  defaultValue={prefilledData.firstName ?? ""}
-                />
-              </label>
-              <label className="field">
-                <span>Legal last name</span>
-                <input
-                  name="lastName"
-                  required={fieldRequired("lastName")}
-                  maxLength={120}
-                  autoComplete="family-name"
-                  defaultValue={prefilledData.lastName ?? ""}
-                />
-              </label>
-              <label className="field">
-                <span>What should we call you?</span>
-                <input
-                  name="preferredName"
-                  required={fieldRequired("preferredName")}
-                  maxLength={120}
-                  autoComplete="nickname"
-                  defaultValue={prefilledData.preferredName ?? ""}
-                />
-              </label>
-              <label className="field">
-                <span>Personal email</span>
-                <input
-                  name="personalEmail"
-                  type="email"
-                  required={fieldRequired("personalEmail")}
-                  maxLength={254}
-                  autoComplete="email"
-                  defaultValue={data.personalEmail ?? ""}
-                />
-              </label>
-              <label className="field">
-                <span>Mobile number <small>Include country code</small></span>
-                <input
-                  name="mobilePhone"
-                  type="tel"
-                  required={fieldRequired("mobilePhone")}
-                  maxLength={32}
-                  autoComplete="tel"
-                  inputMode="tel"
-                  placeholder="+1 555 010 0300"
-                  defaultValue={prefilledData.mobilePhone ?? ""}
-                />
-              </label>
-              <label className="field">
-                <span>Citizenship / student status</span>
-                <select
-                  name="citizenshipStatus"
-                  defaultValue={data.citizenshipStatus ?? ""}
-                  required={fieldRequired("citizenshipStatus")}
-                >
-                  <option value="" disabled>Choose one</option>
-                  <option value="us_citizen">U.S. citizen</option>
-                  <option value="permanent_resident">U.S. permanent resident</option>
-                  <option value="eligible_noncitizen">Other eligible noncitizen / status</option>
-                  <option value="international">International student · F-1 or J-1</option>
-                </select>
-              </label>
-            </div>
-          </fieldset>
-          <fieldset className="form-section">
-            <legend>
-              Your permanent home address
-              {!([
-                "streetAddress",
-                "city",
-                "stateOrProvince",
-                "postalCode",
-                "country",
-              ] as AboutYouConfigurableField[]).some(fieldRequired) ? " · optional" : ""}
-            </legend>
-            <p>
-              This helps {tenant.shortName} prepare your initial tuition
-              classification.
-              Residency is determined under institutional and state policy,
-              not by this address alone.
-            </p>
-            <div className="form-grid">
-              <label className="field">
-                <span>Street address</span>
-                <input
-                  name="streetAddress"
-                  defaultValue={prefilledData.streetAddress ?? ""}
-                  autoComplete="street-address"
-                  maxLength={180}
-                  required={fieldRequired("streetAddress")}
-                />
-              </label>
-              <label className="field">
-                <span>Apartment, unit or building · optional</span>
-                <input
-                  name="addressLine2"
-                  defaultValue={data.addressLine2 ?? ""}
-                  maxLength={180}
-                />
-              </label>
-              <label className="field">
-                <span>City</span>
-                <input
-                  name="city"
-                  defaultValue={prefilledData.city ?? ""}
-                  autoComplete="address-level2"
-                  maxLength={120}
-                  required={fieldRequired("city")}
-                />
-              </label>
-              <label className="field">
-                <span>State / province</span>
-                <input
-                  name="stateOrProvince"
-                  defaultValue={prefilledData.stateOrProvince ?? ""}
-                  autoComplete="address-level1"
-                  maxLength={120}
-                  required={fieldRequired("stateOrProvince")}
-                />
-              </label>
-              <label className="field">
-                <span>ZIP / postal code</span>
-                <input
-                  name="postalCode"
-                  defaultValue={prefilledData.postalCode ?? ""}
-                  autoComplete="postal-code"
-                  maxLength={32}
-                  required={fieldRequired("postalCode")}
-                />
-              </label>
-              <label className="field">
-                <span>Country</span>
-                <select
-                  name="country"
-                  defaultValue={prefilledData.country ?? ""}
-                  autoComplete="country-name"
-                  required={fieldRequired("country")}
-                >
-                  <option value="" disabled>Choose one</option>
-                  <option value="United States">United States</option>
-                  <option value="Canada">Canada</option>
-                  <option value="China">China</option>
-                  <option value="India">India</option>
-                  <option value="Mexico">Mexico</option>
-                  <option value="Türkiye">Türkiye</option>
-                  <option value="United Kingdom">United Kingdom</option>
-                  <option value="Another country">Another country</option>
-                </select>
-              </label>
-            </div>
-          </fieldset>
-          <fieldset className="form-section">
-            <legend>
-              How should residency be verified?
-              {!fieldRequired("residencyVerificationPath") ? " · optional" : ""}
-            </legend>
-            <p>
-              Choose the review path that fits your situation. A selection
-              starts review but does not determine residency by itself.
-            </p>
-            <div className="choice-grid">
-              {[
-                [
-                  "home_address_review",
-                  "Review my permanent address",
-                  "Use the address above for an initial institutional residency review.",
-                ],
-                [
-                  "document_upload",
-                  "I will provide supporting documents",
-                  "Add a residency-document task to my enrollment follow-up.",
-                ],
-                [
-                  "advisor_review",
-                  "I need an advisor review",
-                  "Ask Enrollment Services to contact me before classification.",
-                ],
-              ].map(([value, label, description]) => (
-                <Choice
-                  type="radio"
-                  name="residencyVerificationPath"
-                  value={value}
-                  label={label}
-                  description={description}
-                  defaultChecked={data.residencyVerificationPath === value}
-                  required={fieldRequired("residencyVerificationPath")}
-                  key={value}
-                />
-              ))}
-            </div>
-          </fieldset>
-            </>
-          )}
-        </div>
-      );
-    case "housing":
-      return (
-        <HousingFields data={data} residences={housingPlan.residences} />
-      );
-    case "campus_life":
-      return <CampusLifeFields data={data} clubs={campusLife.clubs} />;
-    case "emergency_contacts":
-      return <EmergencyContactFields data={data} />;
-    case "family_permissions":
-      return (
-        <FerpaAccessCenter
-          mode="task"
-          context="onboarding"
-          onCompletionChange={onFerpaCompletionChange}
-          onSaved={onFerpaSaved}
-        />
-      );
-    case "review_and_sign":
-      return <ReviewAndSignFields data={data} />;
-    case "deposit":
-      return (
-        <>
-          <div className="deposit-callout">
-            <span>Enrollment deposit</span>
-            <strong>{formatMoney(offer.depositAmountCents)}</strong>
-            <p>
-              {depositPaid
-                ? `Payment received through ${tenant.shortName}’s secure processor.`
-                : "Choose whether to pay now, pay later, or request a waiver or deferral."}
-            </p>
-          </div>
-          <fieldset className="form-section">
-            <legend>How would you like to handle it?</legend>
-            <div className="choice-grid">
-              <Choice
-                type="radio"
-                name="depositChoice"
-                value="pay_now"
-                label={
-                  depositPaid
-                    ? "Payment already received"
-                    : `Pay ${formatMoney(offer.depositAmountCents)} securely now`
-                }
-                defaultChecked={
-                  depositPaid || data.depositChoice === "pay_now"
-                }
-                required
-              />
-              {!depositPaid ? (
-                <>
-                  <Choice
-                    type="radio"
-                    name="depositChoice"
-                    value="pay_later"
-                    label={`Accept now, pay by ${formatTenantDate(offer.responseDeadline, tenant, {
-                      month: "long",
-                      day: "numeric",
-                    })}`}
-                    defaultChecked={data.depositChoice === "pay_later"}
-                    required
-                  />
-                  <Choice
-                    type="radio"
-                    name="depositChoice"
-                    value="waiver_or_deferral"
-                    label="Request a waiver or deferral"
-                    defaultChecked={
-                      data.depositChoice === "waiver_or_deferral"
-                    }
-                    required
-                  />
-                </>
-              ) : null}
-            </div>
-          </fieldset>
-        </>
-      );
   }
-}
+  const detailsValid =
+    !Object.values(detailsProblems).some(Boolean) &&
+    !Object.values(customProblems).some(Boolean);
 
-function optionalFormString(values: FormData, name: string) {
-  const value = String(values.get(name) ?? "").trim();
-  return value || undefined;
-}
+  const domestic = data.citizenshipStatus ? CITIZENSHIP[data.citizenshipStatus].domestic : true;
+  const contactProblems: ContactProblems = {
+    personalEmail: !data.personalEmail?.includes("@") ? "Add an email address you read." : undefined,
+    mobilePhone: !data.mobilePhone?.trim() ? "Add a mobile number." : undefined,
+    streetAddress: requiredCore.has("streetAddress") && !data.streetAddress?.trim() ? "Add your street address." : undefined,
+    city: requiredCore.has("city") && !data.city?.trim() ? "Add your city." : undefined,
+    stateOrProvince: requiredCore.has("stateOrProvince") && !data.stateOrProvince?.trim() ? "Add your state or province." : undefined,
+    postalCode: requiredCore.has("postalCode") && !data.postalCode?.trim() ? "Add your postal code." : undefined,
+    country: requiredCore.has("country") && !data.country?.trim() ? "Choose your country." : undefined,
+    residencyVerificationPath:
+      domestic && !data.residencyVerificationPath ? "Choose how the Registrar confirms your address." : undefined,
+  };
+  const contactValid =
+    !Object.values(contactProblems).some(Boolean) && Boolean(data.communicationPreference);
 
-function normalizedPhone(values: FormData, name: string) {
-  const value = String(values.get(name) ?? "")
-    .trim()
-    .replace(/[ ()-]/g, "");
-  return value && !value.startsWith("+") ? `+${value}` : value;
-}
+  const contactIssues = contacts.map((contact, index) => contactProblem(contact, index === 0));
+  const emergencyValid = !contactIssues.some(Boolean);
 
-function dataFromForm(
-  step: OnboardingStep,
-  form: HTMLFormElement,
-  current: StudentOnboardingData,
-  screenConfiguration?: StudentOnboardingScreenConfiguration,
-): StudentOnboardingData {
-  const values = new FormData(form);
-  const next = { ...current };
-
-  switch (step) {
-    case "offer":
-      return next;
-    case "about_you":
-      {
-        const citizenshipStatus = values.has("citizenshipStatus")
-          ? (values.get("citizenshipStatus") as StudentOnboardingData["citizenshipStatus"])
-          : next.citizenshipStatus;
-        const customFields = { ...next.customFields };
-        for (const field of screenConfiguration?.fields ?? []) {
-          if (aboutYouInputNames[field.id]) continue;
-          const name = `custom__${field.id}`;
-          customFields[field.id] =
-            field.field_type === "multiple_select"
-              ? values.getAll(name).map(String)
-              : field.field_type === "checkbox"
-                ? values.get(name) === "yes"
-                : String(values.get(name) ?? "").trim();
-        }
-      return {
-        ...next,
-        firstName: values.has("firstName")
-          ? String(values.get("firstName") ?? "").trim()
-          : next.firstName,
-        lastName: values.has("lastName")
-          ? String(values.get("lastName") ?? "").trim()
-          : next.lastName,
-        preferredName: values.has("preferredName")
-          ? String(values.get("preferredName") ?? "").trim()
-          : next.preferredName,
-        personalEmail: values.has("personalEmail")
-          ? String(values.get("personalEmail") ?? "").trim().toLowerCase()
-          : next.personalEmail,
-        mobilePhone: values.has("mobilePhone")
-          ? normalizedPhone(values, "mobilePhone")
-          : next.mobilePhone,
-        citizenshipStatus,
-        communicationPreference: next.communicationPreference ?? "email",
-        residencyStatus: values.has("citizenshipStatus")
-          ? citizenshipStatus === "international"
-            ? "international"
-            : "domestic"
-          : next.residencyStatus,
-        residencyVerificationPath: values.has("residencyVerificationPath")
-          ? (optionalFormString(values, "residencyVerificationPath") as StudentOnboardingData["residencyVerificationPath"])
-          : next.residencyVerificationPath,
-        streetAddress: values.has("streetAddress")
-          ? optionalFormString(values, "streetAddress")
-          : next.streetAddress,
-        addressLine2: values.has("addressLine2")
-          ? optionalFormString(values, "addressLine2")
-          : next.addressLine2,
-        city: values.has("city") ? optionalFormString(values, "city") : next.city,
-        stateOrProvince: values.has("stateOrProvince")
-          ? optionalFormString(values, "stateOrProvince")
-          : next.stateOrProvince,
-        postalCode: values.has("postalCode")
-          ? optionalFormString(values, "postalCode")
-          : next.postalCode,
-        country: values.has("country")
-          ? optionalFormString(values, "country")
-          : next.country,
-        customFields,
-      };
-      }
-    case "housing":
-      {
-        const housingResidencePreferences = values
-          .getAll("housingResidencePreferences")
-          .map(String) as NonNullable<
-            StudentOnboardingData["housingResidencePreferences"]
-          >;
-      return {
-        ...next,
-        housingPreference: values.get(
-          "housingPreference",
-        ) as StudentOnboardingData["housingPreference"],
-        housingResidenceOption: housingResidencePreferences[0] ?? null,
-        housingResidencePreferences,
-        insuranceInterest: optionalFormString(
-          values,
-          "insuranceInterest",
-        ) as StudentOnboardingData["insuranceInterest"],
-        housingRoomType: optionalFormString(values, "housingRoomType"),
-        bathroomPreference: optionalFormString(values, "bathroomPreference"),
-        roommateMatching: optionalFormString(values, "roommateMatching"),
-        knownRoommateName: optionalFormString(values, "knownRoommateName"),
-        knownRoommateEmail: optionalFormString(
-          values,
-          "knownRoommateEmail",
-        )?.toLowerCase(),
-        sleepSchedule: optionalFormString(values, "sleepSchedule"),
-        studyHabits: optionalFormString(values, "studyHabits"),
-        roomNoise: optionalFormString(values, "roomNoise"),
-        cleanliness: optionalFormString(values, "cleanliness"),
-        guestPreference: optionalFormString(values, "guestPreference"),
-        temperaturePreference: optionalFormString(
-          values,
-          "temperaturePreference",
-        ),
-        smokeVapeCompatibility: optionalFormString(
-          values,
-          "smokeVapeCompatibility",
-        ),
-        substanceFreeHousing: values.get("substanceFreeHousing") === "yes",
-        genderInclusiveHousing:
-          values.get("genderInclusiveHousing") === "yes",
-        accessibleHousingInformation:
-          values.get("accessibleHousingInformation") === "yes",
-        livingLearningCommunities: values
-          .getAll("livingLearningCommunities")
-          .map(String),
-        offCampusStatus: optionalFormString(values, "offCampusStatus"),
-        offCampusResources: values.getAll("offCampusResources").map(String),
-        commuteMode: optionalFormString(values, "commuteMode"),
-        commuteDuration: optionalFormString(values, "commuteDuration"),
-        commuterResources: values.getAll("commuterResources").map(String),
-      };
-      }
-    case "campus_life":
-      return {
-        ...next,
-        campusInterests: values.getAll("campusInterests").map(String),
-        supportNeeds: values.getAll("supportNeeds").map(String),
-        socialComfort: optionalFormString(values, "socialComfort"),
-        firstMonthGoals: values.getAll("firstMonthGoals").map(String),
-        accommodationInterest: optionalFormString(
-          values,
-          "accommodationInterest",
-        ) as StudentOnboardingData["accommodationInterest"],
-      };
-    case "emergency_contacts":
-      {
-        const contactCount = Number(
-          values.get("emergencyContactCount") ?? 0,
-        );
-      return {
-        ...next,
-        emergencyContacts: Array.from(
-          { length: contactCount },
-          (_, index) => ({
-            fullName: String(
-              values.get(`emergencyContacts.${index}.fullName`) ?? "",
-            ).trim(),
-            relationship: String(
-              values.get(`emergencyContacts.${index}.relationship`) ??
-                "other",
-            ) as OnboardingEmergencyContact["relationship"],
-            mobilePhone: normalizedPhone(
-              values,
-              `emergencyContacts.${index}.mobilePhone`,
-            ),
-            email: optionalFormString(
-              values,
-              `emergencyContacts.${index}.email`,
-            )?.toLowerCase(),
-          }),
-        ),
-      };
-      }
-    case "family_permissions":
-      // FERPA contacts and page scopes are saved by the canonical FERPA API.
-      // Never overwrite that aggregate with the legacy onboarding projection.
-      return next;
-    case "review_and_sign":
-      return {
-        ...next,
-        signatureFullName: String(
-          values.get("signatureFullName") ?? "",
-        ).trim(),
-        signatureMethod: values.get(
-          "signatureMethod",
-        ) as StudentOnboardingData["signatureMethod"],
-        signatureImageData: optionalFormString(
-          values,
-          "signatureImageData",
-        ),
-        signatureConsent: values.get("signatureConsent") === "yes",
-        signedDocumentIds: values.getAll("signedDocumentIds").map(String),
-      };
-    case "deposit":
-      return {
-        ...next,
-        depositChoice: values.get(
-          "depositChoice",
-        ) as StudentOnboardingData["depositChoice"],
-      };
-  }
-}
-
-function OnboardingFlow({
-  initial,
-  dashboard,
-  initialPayments,
-  housingPlan,
-  campusLife,
-  initialDocuments,
-  reload,
-  readOnly,
-  delegateActor,
-}: {
-  initial: StudentOnboarding;
-  dashboard: StudentDashboard;
-  initialPayments: StudentPaymentList;
-  housingPlan: StudentHousingPlan;
-  campusLife: CampusLifeFeed;
-  initialDocuments: StudentDocumentList;
-  reload: () => void;
-  readOnly: boolean;
-  delegateActor: DelegateBootstrapActor | null;
-}) {
-  const tenantRuntime = useTenant();
-  const { tenant } = tenantRuntime;
-  const admissionsContact = tenant.contacts.admissions ?? tenant.contacts.support;
-  const delegateSignOut = useApiAction(signOutFerpaDelegate);
-  const [onboarding, setOnboarding] = useState(initial);
-  const [viewingStep, setViewingStep] = useState<OnboardingStep>(
-    initial.currentStep,
-  );
-  const [ferpaComplete, setFerpaComplete] = useState(false);
-  const [offer, setOffer] = useState(dashboard.offer);
-  const [depositPaid, setDepositPaid] = useState(
-    initialPayments.items.some((payment) => payment.status === "succeeded"),
-  );
-  const serverIdentityDocument = latestDocumentForCategory(
-    initialDocuments.items,
-    "identity",
-  );
-  const [identityDocumentProjection, setIdentityDocumentProjection] =
-    useState<DocumentExtractionProjectionState | null>(null);
-  const identityDocument = useMemo(() => {
-    if (!identityDocumentProjection) return serverIdentityDocument;
-    if (!serverIdentityDocument) return identityDocumentProjection.document;
-    if (serverIdentityDocument.id !== identityDocumentProjection.document.id) {
-      return Date.parse(serverIdentityDocument.createdAt) >
-        Date.parse(identityDocumentProjection.document.createdAt)
-        ? serverIdentityDocument
-        : identityDocumentProjection.document;
+  const signingDocuments: SigningDocument[] = useMemo(() => {
+    const docs = [...onboardingDocumentsForTenant(tenant.slug)];
+    if (
+      ferpa &&
+      ferpa.flowKind === "onboarding" &&
+      ferpa.document.status !== "signed" &&
+      ferpa.capabilities.canSign
+    ) {
+      docs.unshift(ferpaDocumentForTenant(tenant.slug, tenant.shortName));
     }
-    return reconcileDocumentExtractionProjection(
-      identityDocumentProjection,
-      serverIdentityDocument,
-    ).document;
-  }, [identityDocumentProjection, serverIdentityDocument]);
-  const rememberIdentityDocument = useCallback(
-    (document: StudentDocument) => {
-      setIdentityDocumentProjection((current) =>
-        beginDocumentExtractionProjection(
-          document,
-          current?.document.id === document.id
-            ? current.document
-            : serverIdentityDocument?.id === document.id
-              ? serverIdentityDocument
-              : null,
-        ),
-      );
-    },
-    [serverIdentityDocument],
-  );
-  const [error, setError] = useState<string | null>(null);
-  const completeKey = useRef<string | null>(null);
-  const offerKey = useRef<string | null>(null);
-  const depositKey = useRef<string | null>(null);
-  const saveAction = useCallback(
-    (input: UpdateStudentOnboardingInput) => updateStudentOnboarding(input),
-    [],
-  );
-  const save = useApiAction(saveAction);
-  const completeAction = useCallback(
-    (expectedVersion: number, key: string) =>
-      completeStudentOnboarding({ expectedVersion }, key),
-    [],
-  );
-  const complete = useApiAction(completeAction);
-  const configuredSteps = onboardingSteps.map((candidate) => {
-    const configured = onboarding.screenConfigurations?.[candidate.key];
+    return docs;
+  }, [ferpa, tenant.slug, tenant.shortName]);
+  const signatureMatches =
+    signature.trim().length > 0 &&
+    signature.trim().toLowerCase() === legalName.trim().toLowerCase();
+
+  const depositPaid = Boolean(depositPayment);
+  const depositValid =
+    depositPaid ||
+    (data.depositChoice === "pay_now"
+      ? card.number.replace(/\s/g, "").length >= 12 && card.expiry.trim() && card.cvc.trim()
+      : Boolean(data.depositChoice));
+
+  function problemFor(id: ScreenId): string | null {
+    switch (id) {
+      case "details":
+        return detailsValid ? null : "A field above still needs an answer.";
+      case "contact":
+        return contactValid
+          ? null
+          : !data.communicationPreference
+            ? `Choose where ${institution} should write first.`
+            : "A field above still needs an answer.";
+      case "housing":
+        return data.housingPreference ? null : "Choose where you will live. Every answer is a complete one.";
+      case "emergency":
+        return emergencyValid ? null : contactIssues.find(Boolean) ?? null;
+      case "review":
+        return signatureMatches
+          ? null
+          : signature.trim()
+            ? "Type your name exactly as it appears in the locked field above."
+            : "Scroll the document to the end, then type your legal name to sign.";
+      case "deposit":
+        return depositValid
+          ? null
+          : data.depositChoice === "pay_now"
+            ? "Complete the card details, or choose another way to pay."
+            : "Choose how you will pay the deposit.";
+      default:
+        return null;
+    }
+  }
+
+  /* ---- writing ---------------------------------------------------------- */
+
+  function aboutYouPayload(): Partial<StudentOnboardingData> {
+    const customFields = { ...(onboarding.data.customFields ?? {}), ...(data.customFields ?? {}) };
     return {
-      ...candidate,
-      label: configured?.label || candidate.label,
-      title: tenantRuntime.copy(configured?.title || candidate.title),
-      subtitle: tenantRuntime.copy(configured?.description || candidate.subtitle),
+      firstName: data.firstName?.trim(),
+      lastName: data.lastName?.trim(),
+      preferredName: data.preferredName?.trim() || data.firstName?.trim(),
+      personalEmail: data.personalEmail?.trim().toLowerCase(),
+      mobilePhone: normalizedPhone(data.mobilePhone ?? ""),
+      citizenshipStatus: data.citizenshipStatus,
+      communicationPreference: data.communicationPreference ?? "email",
+      residencyStatus: data.citizenshipStatus === "international" ? "international" : "domestic",
+      residencyVerificationPath: domestic ? data.residencyVerificationPath : undefined,
+      streetAddress: data.streetAddress?.trim() || undefined,
+      addressLine2: data.addressLine2?.trim() || undefined,
+      city: data.city?.trim() || undefined,
+      stateOrProvince: data.stateOrProvince?.trim() || undefined,
+      postalCode: data.postalCode?.trim() || undefined,
+      country: data.country?.trim() || undefined,
+      customFields,
     };
-  });
-  const withScreenConfiguration = (result: StudentOnboarding): StudentOnboarding => ({
-    ...result,
-    configurationVersion: result.configurationVersion ?? onboarding.configurationVersion,
-    screenConfigurations: result.screenConfigurations ?? onboarding.screenConfigurations,
-  });
-  const stepIndex = configuredSteps.findIndex(
-    (step) => step.key === viewingStep,
-  );
-  const step = configuredSteps[stepIndex] || configuredSteps[0];
-  const viewingActiveStep = viewingStep === onboarding.currentStep;
-  const allStepsSaved = configuredSteps.every(({ key }) =>
-    onboarding.completedSteps.includes(key),
-  );
-  const offerCannotAdvance =
-    viewingStep === "offer" &&
-    offer.status !== "offered" &&
-    offer.status !== "accepted";
+  }
 
-  useEffect(() => {
-    if (!readOnly && onboarding.status === "completed") {
-      window.location.replace(tenantRuntime.href("/dashboard"));
-    }
-  }, [onboarding.status, readOnly, tenantRuntime]);
-
-  const submitStep = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError(null);
-    save.reset();
-    const nextData = editableOnboardingData(
-      dataFromForm(
-        viewingStep,
-        event.currentTarget,
-        onboarding.data,
-        onboarding.screenConfigurations?.[viewingStep],
-      ),
-    );
-
+  async function savePronouns() {
+    if (draft.pronouns === undefined || draft.pronouns === profile.pronouns) return;
     try {
-      if (viewingStep === "offer" && offer.status === "offered") {
+      const updated = await updateStudentProfile({
+        expectedVersion: profileVersion,
+        pronouns: draft.pronouns,
+      });
+      setProfileVersion(updated.version);
+    } catch {
+      // Pronouns live on the profile and can be set there later; a refusal
+      // here must not hold up the step that owns the record.
+    }
+  }
+
+  function afterSave(next: StudentOnboarding, local = draft.local) {
+    setDraft((current) => ({ ...current, data: {}, contacts: undefined, local }));
+    setResumeShown(false);
+    setNotice(null);
+    setAttempted(false);
+    const following = firstUnresolved(screens, recordFrom(next, local));
+    setScreenId(following);
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }
+
+  function markLocal(kind: "done" | "skipped", id: ScreenId) {
+    const local = {
+      done: kind === "done" ? [...new Set([...draft.local.done, id])] : draft.local.done.filter((item) => item !== id),
+      skipped: kind === "skipped" ? [...new Set([...draft.local.skipped, id])] : draft.local.skipped.filter((item) => item !== id),
+    };
+    setDraft((current) => ({ ...current, local }));
+    setNotice(null);
+    setAttempted(false);
+    setScreenId(firstUnresolved(screens, recordFrom(onboarding, local)));
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }
+
+  async function signFerpaWithoutDelegates() {
+    if (!ferpa || ferpa.document.status === "signed" || !ferpa.capabilities.canSign) return;
+    const key = ferpaKeys.current.review ||= crypto.randomUUID();
+    const input: CompleteStudentFerpaInput = {
+      expectedVersion: ferpa.version,
+      signature: { accepted: true, signerName: signature.trim(), signatureMethod: "typed" },
+      accessDecision: ferpa.delegates.length ? "grant" : "no_access",
+      delegates: ferpa.delegates.map(delegateInput),
+    };
+    const result = await completeStudentFerpaAuthorization(ferpa.requirementId, input, key);
+    ferpaKeys.current.review = "";
+    if (result.authorization) setFerpa(result.authorization);
+  }
+
+  async function commit() {
+    if (saving) return;
+    setAttempted(true);
+    const problem = problemFor(screen.id);
+    if (problem) {
+      setFailed(null);
+      setNotice({ tone: "alert", text: problem });
+      return;
+    }
+    setSaving(true);
+    setFailed(null);
+    setConflict(false);
+    save.reset();
+    try {
+      switch (screen.id) {
+        case "details": {
+          if (onboarding.completedSteps.includes("about_you")) {
+            await savePronouns();
+            afterSave(await putStep("about_you", aboutYouPayload()));
+          } else {
+            markLocal("done", "details");
+          }
+          break;
+        }
+        case "contact": {
+          await savePronouns();
+          const next = await putStep("about_you", aboutYouPayload());
+          afterSave(next, {
+            ...draft.local,
+            done: draft.local.done.filter((item) => item !== "details"),
+          });
+          break;
+        }
+        case "housing": {
+          const preference = data.housingPreference as HousingPreference;
+          const ranking = preference === "on_campus" ? data.housingResidencePreferences ?? [] : [];
+          afterSave(
+            await putStep("housing", {
+              housingPreference: preference,
+              housingResidencePreferences: ranking,
+              housingResidenceOption: ranking[0] ?? null,
+            }),
+          );
+          break;
+        }
+        case "health": {
+          afterSave(
+            await putStep("campus_life", {
+              accommodationInterest: data.accommodationInterest ?? "not_now",
+            }),
+          );
+          break;
+        }
+        case "emergency": {
+          const emergencyContacts: OnboardingEmergencyContact[] = contacts
+            .filter((contact) => contact.fullName.trim() && contact.relationship)
+            .map((contact) => ({
+              fullName: contact.fullName.trim(),
+              relationship: contact.relationship as OnboardingEmergencyContact["relationship"],
+              mobilePhone: normalizedPhone(contact.mobilePhone),
+              ...(contact.email.trim() ? { email: contact.email.trim().toLowerCase() } : {}),
+            }));
+          afterSave(await putStep("emergency_contacts", { emergencyContacts }));
+          break;
+        }
+        case "permissions": {
+          afterSave(await putStep("family_permissions", {}));
+          break;
+        }
+        case "photo": {
+          markLocal("done", "photo");
+          break;
+        }
+        case "review": {
+          await signFerpaWithoutDelegates();
+          afterSave(
+            await putStep("review_and_sign", {
+              signatureFullName: signature.trim(),
+              signatureMethod: "typed",
+              signatureConsent: true,
+              signedDocumentIds: onboardingDocumentsForTenant(tenant.slug).map((doc) => doc.id),
+            }),
+          );
+          break;
+        }
+        case "deposit": {
+          const choice = depositPaid ? "pay_now" : data.depositChoice;
+          if (choice === "pay_now" && !depositPaid) {
+            const key = depositKey.current ?? (depositKey.current = crypto.randomUUID());
+            const payment = await createDepositPayment({ offerId: offer.id }, key);
+            depositKey.current = null;
+            setDepositPayment(payment);
+          }
+          afterSave(await putStep("deposit", { depositChoice: choice }));
+          break;
+        }
+        default:
+          break;
+      }
+    } catch (caught) {
+      if (caught instanceof ApiClientError && caught.status === 409) setConflict(true);
+      setFailed(getApiErrorMessage(caught));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function acceptOffer() {
+    if (accepting) return;
+    setAccepting(true);
+    setFailed(null);
+    try {
+      const wasOffered = offer.status === "offered";
+      if (wasOffered) {
         const key = offerKey.current ?? (offerKey.current = crypto.randomUUID());
         const acceptance = await acceptAdmissionOffer(offer.id, key);
         offerKey.current = null;
@@ -2558,326 +861,683 @@ function OnboardingFlow({
         }
         setOffer((current) => ({ ...current, status: "accepted" }));
       }
-      if (
-        viewingStep === "deposit" &&
-        nextData.depositChoice === "pay_now" &&
-        !depositPaid
-      ) {
-        const key =
-          depositKey.current ?? (depositKey.current = crypto.randomUUID());
-        await createDepositPayment({ offerId: offer.id }, key);
-        depositKey.current = null;
-        setDepositPaid(true);
+      if (!onboarding.completedSteps.includes("offer")) {
+        const next = await putStep("offer", {});
+        setDraft((current) => ({ ...current, data: {} }));
+        setResumeShown(false);
+        if (wasOffered) {
+          setOverlay({ kind: "celebrate" });
+        } else {
+          setScreenId(firstUnresolved(screens, recordFrom(next, draft.local)));
+        }
+      } else {
+        goTo("details");
       }
-      const result = await save.run({
-        expectedVersion: onboarding.version,
-        currentStep: viewingStep,
-        data: nextData,
-      });
-      setOnboarding(withScreenConfiguration(result));
-      if (viewingActiveStep) {
-        setViewingStep(result.currentStep);
-      }
-      window.scrollTo({
-        top: 0,
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-          ? "auto"
-          : "smooth",
-      });
     } catch (caught) {
-      setError(getApiErrorMessage(caught));
+      setFailed(getApiErrorMessage(caught));
+    } finally {
+      setAccepting(false);
     }
-  };
+  }
 
-  const finish = async () => {
-    setError(null);
+  async function finish() {
+    setFailed(null);
     complete.reset();
-    const key =
-      completeKey.current ?? (completeKey.current = crypto.randomUUID());
+    const key = completeKey.current ?? (completeKey.current = crypto.randomUUID());
     try {
       const result = await complete.run(onboarding.version, key);
       completeKey.current = null;
       setOnboarding(withScreenConfiguration(result));
+      window.location.replace(tenantRuntime.href("/dashboard"));
     } catch (caught) {
-      setError(getApiErrorMessage(caught));
+      if (caught instanceof ApiClientError && caught.status === 409) setConflict(true);
+      setFailed(getApiErrorMessage(caught));
     }
-  };
+  }
 
-  const skipStep = async () => {
-    setError(null);
-    save.reset();
+  async function leave() {
+    setLeaving(true);
     try {
-      const result = await save.run({
-        expectedVersion: onboarding.version,
-        currentStep: viewingStep,
-        data: editableOnboardingData(onboarding.data),
-        skip: true,
-      });
-      setOnboarding(withScreenConfiguration(result));
-      setViewingStep(result.currentStep);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      await signOutStudent();
+      window.location.replace(tenantRuntime.href("/sign-in"));
     } catch (caught) {
-      setError(getApiErrorMessage(caught));
+      setLeaving(false);
+      setFailed(getApiErrorMessage(caught));
     }
+  }
+
+  /* ---- record access ---------------------------------------------------- */
+
+  function delegateInput(delegate: StudentFerpaDelegate): FerpaDelegateInput {
+    return {
+      id: delegate.id,
+      fullName: delegate.fullName,
+      relationship: delegate.relationship,
+      email: delegate.email,
+      scopes: delegate.scopes,
+    };
+  }
+
+  const linkUrl = (token: string) =>
+    `${window.location.origin}${tenantRuntime.href("/delegate")}#token=${encodeURIComponent(token)}`;
+
+  async function issueLinks(authorization: StudentFerpaAuthorization) {
+    let updated = authorization;
+    const links: Record<string, string> = {};
+    for (const delegate of authorization.delegates) {
+      if (delegate.link.status !== "not_issued") continue;
+      try {
+        const key = ferpaKeys.current[delegate.id] ||= crypto.randomUUID();
+        const result = await issueStudentFerpaDelegateLink(updated.id, delegate.id, updated.version, key);
+        ferpaKeys.current[delegate.id] = "";
+        updated = {
+          ...updated,
+          version: result.authorizationVersion,
+          delegates: updated.delegates.map((item) =>
+            item.id === delegate.id
+              ? { ...item, link: { ...item.link, status: "active", issuedAt: result.issuedAt } }
+              : item,
+          ),
+        };
+        links[delegate.id] = linkUrl(result.token);
+      } catch {
+        // A link that could not be issued is issued later from the profile.
+      }
+    }
+    if (Object.keys(links).length) {
+      const remembered = { ...(oneTimeLinks.get(authorization.id) ?? {}), ...links };
+      oneTimeLinks.set(authorization.id, remembered);
+      setRevealedLinks((current) => ({ ...current, ...links }));
+    }
+    return updated;
+  }
+
+  async function writeDelegates(delegates: FerpaDelegateInput[], signerName?: string) {
+    if (!ferpa) return;
+    const accessDecision = delegates.length ? "grant" : "no_access";
+    const result =
+      ferpa.status === "completed"
+        ? await updateStudentFerpaAccess(ferpa.id, {
+            expectedVersion: ferpa.version,
+            accessDecision,
+            delegates,
+          })
+        : await completeStudentFerpaAuthorization(
+            ferpa.requirementId,
+            {
+              expectedVersion: ferpa.version,
+              signature:
+                ferpa.document.status === "signed" || !signerName
+                  ? undefined
+                  : { accepted: true, signerName, signatureMethod: "typed" },
+              accessDecision,
+              delegates,
+            },
+            ferpaKeys.current.complete ||= crypto.randomUUID(),
+          );
+    ferpaKeys.current.complete = "";
+    if (!result.authorization) throw new Error("The updated record was not returned.");
+    const withLinks =
+      result.authorization.status === "completed" && accessDecision === "grant"
+        ? await issueLinks(result.authorization)
+        : result.authorization;
+    setFerpa(withLinks);
+    return withLinks;
+  }
+
+  async function saveAuthorization() {
+    if (!ferpa || !authorizing) return;
+    setFerpaBusy(true);
+    setAuthorizeError(null);
+    try {
+      const delegates = [
+        ...ferpa.delegates.map(delegateInput),
+        {
+          fullName: authorizing.fullName.trim(),
+          relationship: authorizing.relationship as StudentFerpaDelegate["relationship"],
+          email: authorizing.email.trim().toLowerCase(),
+          scopes: authorizing.scopes,
+        },
+      ];
+      await writeDelegates(delegates, authorizing.signature.trim());
+      const name = authorizing.fullName.trim();
+      const count = authorizing.scopes.length;
+      setAuthorizing(null);
+      setOverlay(null);
+      setNotice({
+        tone: "info",
+        text: `${name} can now see ${count} ${count === 1 ? "page" : "pages"} of your record, through their own link.`,
+      });
+    } catch (caught) {
+      setAuthorizeError(getApiErrorMessage(caught));
+    } finally {
+      setFerpaBusy(false);
+    }
+  }
+
+  async function removeGrant(delegate: StudentFerpaDelegate) {
+    if (!ferpa) return;
+    setFerpaBusy(true);
+    try {
+      await writeDelegates(ferpa.delegates.filter((item) => item.id !== delegate.id).map(delegateInput));
+      setNotice({
+        tone: "info",
+        text: `${delegate.fullName.split(" ")[0]} can no longer see anything in your record.`,
+      });
+    } catch (caught) {
+      setFailed(getApiErrorMessage(caught));
+    } finally {
+      setFerpaBusy(false);
+    }
+  }
+
+  async function copyLink(delegate: StudentFerpaDelegate, url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(delegate.id);
+      window.setTimeout(() => setCopied((current) => (current === delegate.id ? null : current)), 2500);
+    } catch {
+      window.prompt(`Copy the link for ${delegate.fullName}`, url);
+    }
+  }
+
+  /* ---- ranking ---------------------------------------------------------- */
+
+  const shortlist = data.housingResidencePreferences ?? [];
+  function rank(value: string) {
+    if (shortlist.includes(value) || shortlist.length >= 3) return;
+    patch({ housingResidencePreferences: [...shortlist, value] });
+  }
+  function dropRank(value: string) {
+    patch({ housingResidencePreferences: shortlist.filter((item) => item !== value) });
+  }
+  function moveRank(value: string, by: number) {
+    const list = [...shortlist];
+    const from = list.indexOf(value);
+    const to = from + by;
+    if (from < 0 || to < 0 || to >= list.length) return;
+    list.splice(to, 0, list.splice(from, 1)[0]);
+    patch({ housingResidencePreferences: list });
+  }
+
+  const remember = (category: StudentDocumentCategory) => (document: StudentDocument) => {
+    setDocuments((current) => [
+      document,
+      ...current.filter((item) => item.id !== document.id && !(category === "other" && item.category === "other")),
+    ]);
+    absorbIdentity(document);
   };
 
-  return (
-    <div className="onboarding-shell">
-      <OnboardingProgress
-        steps={configuredSteps}
-        current={viewingStep}
-        active={onboarding.currentStep}
-        completed={onboarding.completedSteps}
-        skipped={onboarding.data.skippedSteps ?? []}
-        onNavigate={setViewingStep}
-      />
-      <main className="onboarding-main">
-        {delegateActor ? (
-          <section
-            className="delegate-session-banner delegate-session-banner--onboarding"
-            aria-label="Delegated portal session"
-          >
-            <span aria-hidden="true">&#9670;</span>
-            <div>
-              <strong>
-                Viewing {delegateActor.studentName} as {delegateRelationshipLabel(delegateActor.relationship)}
-              </strong>
-              <small>
-                Managed by the student. This onboarding view is read-only.
-              </small>
-            </div>
-            <button
-              type="button"
-              disabled={delegateSignOut.status === "loading"}
-              onClick={() => {
-                void delegateSignOut.run().then(() => {
-                  window.location.replace(tenantRuntime.href("/sign-in"));
-                }).catch(() => undefined);
-              }}
-            >
-              {delegateSignOut.status === "loading"
-                ? "Signing out…"
-                : "End delegated session"}
-            </button>
-          </section>
-        ) : null}
-        <header className="onboarding-mobile-header">
-          <Link className="brand" href="/onboarding">
-            <PortalMark />
-            <span>
-              <strong>{tenant.shortName}</strong>
-              <small>University</small>
-            </span>
-          </Link>
-          <span>{onboarding.completedSteps.length}/{configuredSteps.length} saved</span>
-        </header>
-        <div className="onboarding-stage">
-          <header className="onboarding-title">
-            <div className="onboarding-title__count">
-              <span>Step</span>
-              <strong>{stepIndex + 1}</strong>
-              <small>of {configuredSteps.length}</small>
-            </div>
-            <div>
-              <p className="eyebrow">{step.label}</p>
-              <h1>{tenantRuntime.copy(step.title)}</h1>
-              <p>{tenantRuntime.copy(step.subtitle)}</p>
+  /* ---- what the screen says --------------------------------------------- */
+
+  const resume = useMemo(() => {
+    if (!resumeShown || finished || !onboarding.completedSteps.length) return null;
+    if (onboarding.status !== "in_progress") return null;
+    const last = [...screens].reverse().find((item) => item.step && onboarding.completedSteps.includes(item.step));
+    if (!last) return null;
+    return `Welcome back, ${preferred}. You saved through ${last.name} on ${formatTenantDate(onboarding.updatedAt, tenant, DATE)}.`;
+  }, [resumeShown, finished, onboarding, screens, preferred, tenant]);
+
+  const rungs = useMemo(() => rungsFor(tenant.contacts, tenantRuntime.href), [tenant.contacts, tenantRuntime]);
+
+  function body() {
+    if (finished) {
+      return (
+        <FinishCard
+          institution={institution}
+          saved={savedCount(screens, record)}
+          skippedScreens={screens.filter((item) => isSkipped(item, record))}
+          pending={complete.status === "loading" || complete.status === "success"}
+          href={tenantRuntime.href}
+          onFinish={finish}
+        />
+      );
+    }
+
+    switch (screen.id) {
+      case "offer":
+        return (
+          <OfferStep
+            offer={offer}
+            institution={institution}
+            deposit={formatTenantMoney(offer.depositAmountCents, tenant)}
+            accepting={accepting}
+            onAccept={acceptOffer}
+            onDecline={() => setOverlay({ kind: "decline" })}
+          />
+        );
+      case "details":
+        return (
+          <DetailsStep
+            institution={institution}
+            data={data}
+            pronouns={draft.pronouns === undefined ? profile.pronouns : draft.pronouns}
+            coreFields={coreFields}
+            customPages={customPages}
+            customProblems={attempted ? customProblems : {}}
+            problems={attempted ? detailsProblems : {}}
+            identityDocument={identityDocument}
+            identitySentOn={sentOn(identityDocument)}
+            identityMessage={identityMessage(identityDocument)}
+            onChange={patch}
+            onPronouns={(value) => setDraft((current) => ({ ...current, pronouns: value }))}
+            onCustomChange={patchCustom}
+            onUploaded={remember("identity")}
+            onAskHelp={openHelp}
+          />
+        );
+      case "contact":
+        return (
+          <ContactStep
+            institution={institution}
+            data={data}
+            coreFields={coreFields}
+            problems={attempted ? contactProblems : {}}
+            residencyDocument={residencyDocument}
+            residencySentOn={sentOn(residencyDocument)}
+            onChange={patch}
+            onUploaded={remember("residency")}
+          />
+        );
+      case "housing":
+        return (
+          <HousingStep
+            plan={data.housingPreference}
+            shortlist={shortlist}
+            residences={housingPlan.residences}
+            onChange={(housingPreference) => patch({ housingPreference })}
+            onOpenHall={(hall) => setOverlay({ kind: "hall", hall })}
+            onRank={rank}
+            onMove={moveRank}
+            onDrop={dropRank}
+          />
+        );
+      case "health":
+        return (
+          <HealthStep
+            institution={institution}
+            value={data.accommodationInterest}
+            immunization={immunizationDocument}
+            immunizationSentOn={sentOn(immunizationDocument)}
+            onChange={(accommodationInterest) => patch({ accommodationInterest })}
+            onUploaded={remember("health")}
+          />
+        );
+      case "emergency":
+        return (
+          <EmergencyStep
+            contacts={contacts}
+            institution={institution}
+            problems={attempted ? contactIssues : []}
+            onChangeContact={(index, next) => setContacts(contacts.map((item, i) => (i === index ? next : item)))}
+            onAddContact={() => setContacts([...contacts, emptyContact()])}
+            onRemoveContact={(index) => setContacts(contacts.filter((_, i) => i !== index))}
+          />
+        );
+      case "permissions":
+        return (
+          <PermissionsStep
+            institution={institution}
+            authorization={ferpa}
+            contactName={contacts[0]?.fullName.trim() ?? ""}
+            draft={authorizing}
+            revealedLinks={revealedLinks}
+            copied={copied}
+            busy={ferpaBusy}
+            signedOn={
+              ferpa?.document.status === "signed"
+                ? formatTenantDate(ferpa.document.signedAt, tenant, DATE)
+                : null
+            }
+            onAdd={() => {
+              setAuthorizing((current) => current ?? emptyAuthorization());
+              setAuthorizeError(null);
+              setOverlay({ kind: "authorize" });
+            }}
+            onResume={() => setOverlay({ kind: "authorize" })}
+            onDiscard={() => setAuthorizing(null)}
+            onRemove={removeGrant}
+            onCopyLink={copyLink}
+          />
+        );
+      case "photo":
+        return <PhotoStep photo={photoDocument} onUploaded={remember("other")} />;
+      case "review":
+        return (
+          <ReviewStep
+            institution={institution}
+            offer={offer}
+            data={data}
+            pronouns={draft.pronouns === undefined ? profile.pronouns : draft.pronouns}
+            identityDocument={identityDocument}
+            immunizationDocument={immunizationDocument}
+            photoDocument={photoDocument}
+            residences={housingPlan.residences}
+            delegates={ferpa?.delegates ?? []}
+            documents={signingDocuments}
+            legalName={legalName}
+            signature={signature}
+            signedOn={today}
+            onEdit={goTo}
+            onSign={setSignature}
+          />
+        );
+      default:
+        return (
+          <DepositStep
+            amount={formatTenantMoney(offer.depositAmountCents, tenant)}
+            deadline={deadline}
+            paid={depositPaid}
+            paidOn={depositPayment ? formatTenantDate(depositPayment.createdAt, tenant, DATE) : null}
+            value={data.depositChoice}
+            card={card}
+            onChange={(depositChoice) => patch({ depositChoice })}
+            onCard={(values) => setCard((current) => ({ ...current, ...values }))}
+            onWaiver={() => setOverlay({ kind: "waiver" })}
+          />
+        );
+    }
+  }
+
+  const working = !finished && !closed;
+  const panel = working && screen.id === "housing" && data.housingPreference === "on_campus" && shortlist.length > 0;
+
+  if (closed) {
+    return (
+      <div className="onboarding closed">
+        <main className="flow-page" id="onboarding-main">
+          <header className="topbar flow-topbar">
+            <div className="topbar-title" />
+            <div className="topbar-actions">
+              <button type="button" className="topbar-chip flow-leave" onClick={leave} disabled={leaving}>
+                Sign out
+              </button>
             </div>
           </header>
-
-          <form
-            className="onboarding-form"
-            key={`${viewingStep}-${onboarding.version}`}
-            onSubmit={readOnly ? (event) => event.preventDefault() : submitStep}
-          >
-            {readOnly ? (
-              <section className="delegate-onboarding-notice" role="note">
-                <span aria-hidden="true">◇</span>
-                <div>
-                  <p className="eyebrow">Read-only onboarding</p>
-                  <h2>Managed and completed by the student</h2>
-                  <p>
-                    You can review saved progress, answers, and document status.
-                    Only the student can continue, skip, upload, sign, accept an
-                    offer, submit a payment, or change onboarding answers.
-                  </p>
-                </div>
-              </section>
-            ) : null}
-            <fieldset className="onboarding-read-only-fields" disabled={readOnly}>
-              <StepFields
-                step={viewingStep}
-                data={onboarding.data}
+          <div className="flow-body">
+            <div className="flow-measure">
+              <ClosedOffer
                 offer={offer}
-                depositPaid={depositPaid}
-                housingPlan={housingPlan}
-                campusLife={campusLife}
-                identityDocument={identityDocument}
-                onIdentityDocumentChanged={rememberIdentityDocument}
-                onFerpaCompletionChange={setFerpaComplete}
-                onFerpaSaved={reload}
-                screenConfiguration={onboarding.screenConfigurations?.[viewingStep]}
+                institution={institution}
+                deadline={deadline}
+                admissions={{ label: admissionsContact.label, href: admissionsHref }}
               />
-            </fieldset>
-            {error || save.message || complete.message ? (
-              <p className="field-error" role="alert">
-                {error || save.message || complete.message}
-              </p>
-            ) : null}
-            {!readOnly ? <div className="onboarding-actions">
-              <p>
-                <span aria-hidden="true">✓</span>
-                Saved progress is available on any signed-in device.
-              </p>
-              {offerCannotAdvance ? (
-                <a
-                  className="button button--primary"
-                  href={
-                    (admissionsContact.url
-                      ? tenantRuntime.href(admissionsContact.url)
-                      : admissionsContact.email
-                      ? `mailto:${admissionsContact.email}`
-                      : tenantRuntime.href("/help"))
-                  }
-                >
-                  Get help with this offer <span aria-hidden="true">→</span>
-                </a>
-              ) : allStepsSaved && viewingActiveStep ? (
-                <button
-                  className="button button--primary"
-                  type="button"
-                  disabled={complete.status === "loading"}
-                  onClick={() => void finish()}
-                >
-                  {complete.status === "loading"
-                    ? "Finishing onboarding…"
-                    : complete.status === "error"
-                      ? "Retry completion"
-                      : "Finish onboarding"}
-                  <span aria-hidden="true">→</span>
-                </button>
-              ) : (
-                <div className="onboarding-actions__controls">
-                  {step.skippable ? (
-                    <button
-                      className="text-button"
-                      type="button"
-                      disabled={save.status === "loading"}
-                      onClick={() => void skipStep()}
-                    >
-                      Skip for now
-                    </button>
-                  ) : null}
-                  <button
-                    className="button button--primary"
-                    type="submit"
-                    disabled={
-                      save.status === "loading" ||
-                      (viewingStep === "family_permissions" && !ferpaComplete)
-                    }
-                  >
-                    {viewingStep === "family_permissions" && !ferpaComplete
-                      ? "Complete FERPA above"
-                      : save.status === "loading"
-                      ? viewingStep === "offer" &&
-                        offer.status === "offered"
-                        ? "Accepting offer…"
-                        : "Saving step…"
-                      : save.status === "error"
-                        ? "Retry step"
-                        : viewingStep === "offer" &&
-                            offer.status === "offered"
-                          ? "Accept and continue"
-                          : viewingActiveStep
-                            ? "Save and continue"
-                            : "Save changes"}
-                    <span aria-hidden="true">→</span>
-                  </button>
-                </div>
-              )}
-            </div> : null}
-            {save.status === "error" || complete.status === "error" ? (
-              <button
-                className="text-button"
-                type="button"
-                onClick={reload}
-              >
-                Reload latest saved progress
-              </button>
-            ) : null}
-          </form>
-
-          <aside className="why-card">
-            <span aria-hidden="true">i</span>
-            <div>
-              <strong>Why we ask</strong>
-              <p>
-                {tenant.shortName} uses this information only to prepare your student record,
-                personalize support, and meet university obligations. Official
-                changes are always confirmed by the server.
-              </p>
             </div>
-          </aside>
+          </div>
+        </main>
+        {overlay?.kind === "help" && (
+          <HelpLadder rungs={rungs} reached={helpReached} onDeeper={() => setHelpReached((n) => n + 1)} onClose={() => setOverlay(null)} />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="onboarding">
+      <StepRail
+        brand={{
+          mark: <PortalMark />,
+          name: tenant.name,
+          line: tenant.academicContext.academicYearLabel,
+        }}
+        greeting={finished ? `You’re all set, ${preferred}.` : `Let’s get you set up, ${preferred}.`}
+        figure={`${savedCount(screens, record)} of ${TOTAL_SCREENS} saved`}
+        note={progressLine(screens, record, institution)}
+        meter={meter(screens, record)}
+        meterLabel={`${savedCount(screens, record)} of ${TOTAL_SCREENS} steps saved`}
+        steps={railSteps(screens, record, finished ? null : screenId)}
+        currentName={finished ? "All ten resolved" : screen.name}
+        help={{ label: "Stuck on something?", line: "A person at the office that can help.", onOpen: openHelp }}
+        onOpen={openScreen}
+      />
+
+      <main className="flow-page" id="onboarding-main" aria-live="polite">
+        <header className="topbar flow-topbar">
+          <div className="topbar-title" />
+          <div className="topbar-actions">
+            <button type="button" className="topbar-chip flow-leave" onClick={leave} disabled={leaving}>
+              {leaving ? "Signing out…" : "Save and finish later"}
+            </button>
+          </div>
+        </header>
+
+        <div className="flow-body">
+          <div className="flow-measure">
+            {!finished ? (
+              <PageHero
+                ref={heading}
+                focusable
+                kicker={`Step ${screenNumber(screens, screen.id)} of ${TOTAL_SCREENS}${screen.required ? "" : " · optional"}`}
+                title={screen.question}
+                lede={screen.lede}
+                motif={screen.icon}
+              />
+            ) : (
+              <PageHero
+                kicker={`${TOTAL_SCREENS} of ${TOTAL_SCREENS} resolved`}
+                title={`You’re all set, ${preferred}.`}
+                lede={`${institution} has what it needs to open your record. From here, everything lives in the portal.`}
+                motif="check"
+              />
+            )}
+
+            {(notice || resume) && (
+              <div className="page-notice">
+                {notice ? (
+                  <Notice
+                    tone={notice.tone === "alert" ? "working" : "done"}
+                    icon={notice.tone === "alert" ? "lock" : "check"}
+                  >
+                    {notice.text}
+                  </Notice>
+                ) : (
+                  <Notice
+                    tone="quiet"
+                    icon="clock"
+                    action={{ label: "Dismiss", icon: "close", onClick: () => setResumeShown(false) }}
+                  >
+                    {resume}
+                  </Notice>
+                )}
+              </div>
+            )}
+
+            <div className={panel ? "flow-grid" : "flow-grid solo"}>
+              <div className="flow-content">
+                {body()}
+
+                {failed && (
+                  <p className="step-failed" role="alert">
+                    <Icon name="alert" size={16} />
+                    <span>
+                      <strong>That didn’t reach {institution}.</strong>
+                      {failed} Nothing was lost, and what you typed is still here.
+                      {conflict ? (
+                        <>
+                          {" "}
+                          <button type="button" className="text-button" onClick={reload}>
+                            Reload latest saved progress
+                          </button>
+                        </>
+                      ) : null}
+                    </span>
+                  </p>
+                )}
+              </div>
+
+              {panel && (
+                <aside className="flow-aside" aria-label="Your ranked halls" aria-live="off">
+                  <RankPanel shortlist={shortlist} residences={housingPlan.residences} />
+                </aside>
+              )}
+
+              {working && screen.id !== "offer" && (
+                <StepActions
+                  screen={screen}
+                  first={screenNumber(screens, screen.id) === 1}
+                  saving={saving}
+                  saveLabel={failed ? "Try again" : "Save and continue"}
+                  onBack={() => goTo(screens[screenNumber(screens, screen.id) - 2].id)}
+                  onSkip={() => markLocal("skipped", screen.id)}
+                  onSave={() => void commit()}
+                />
+              )}
+            </div>
+          </div>
         </div>
       </main>
+
+      {overlay?.kind === "celebrate" && (
+        <CelebrationModal
+          name={preferred}
+          institution={institution}
+          classYear={classYear}
+          term={offer.termName}
+          siteUrl={typeof window === "undefined" ? "" : window.location.origin}
+          onClose={() => {
+            setOverlay(null);
+            goTo("details");
+          }}
+          onContinue={() => {
+            setOverlay(null);
+            goTo("details");
+          }}
+        />
+      )}
+
+      {overlay?.kind === "decline" && (
+        <DeclineModal
+          institution={institution}
+          admissions={{ label: admissionsContact.label, href: admissionsHref }}
+          onClose={() => setOverlay(null)}
+        />
+      )}
+
+      {overlay?.kind === "authorize" && ferpa && (
+        <AuthorizeModal
+          draft={authorizing ?? emptyAuthorization()}
+          legalName={legalName}
+          today={today}
+          institution={institution}
+          allowedScopes={ferpa.configuration.portalScopes}
+          needsSignature={ferpa.document.status !== "signed"}
+          saving={ferpaBusy}
+          error={authorizeError}
+          onChange={setAuthorizing}
+          onSave={() => void saveAuthorization()}
+          onClose={() => setOverlay(null)}
+        />
+      )}
+
+      {overlay?.kind === "waiver" && (
+        <WaiverModal
+          onClose={() => setOverlay(null)}
+          onSend={() => {
+            patch({ depositChoice: "waiver_or_deferral" });
+            setOverlay(null);
+          }}
+        />
+      )}
+
+      {overlay?.kind === "hall" && (
+        <HallDrawer
+          hall={overlay.hall}
+          rank={shortlist.indexOf(overlay.hall.value) + 1}
+          canAdd={shortlist.length < 3}
+          onRank={(value) => {
+            rank(value);
+            setOverlay(null);
+          }}
+          onDrop={(value) => {
+            dropRank(value);
+            setOverlay(null);
+          }}
+          onClose={() => setOverlay(null)}
+        />
+      )}
+
+      {overlay?.kind === "help" && (
+        <HelpLadder
+          rungs={rungs}
+          reached={helpReached}
+          onDeeper={() => setHelpReached((n) => n + 1)}
+          onClose={() => setOverlay(null)}
+        />
+      )}
     </div>
   );
 }
 
-function OnboardingResource({
-  readOnly,
-  delegateActor,
+/** The one side panel the flow keeps: the ranking, read back in order. */
+function RankPanel({
+  shortlist,
+  residences,
 }: {
-  readOnly: boolean;
-  delegateActor: DelegateBootstrapActor | null;
+  shortlist: string[];
+  residences: StudentHousingResidence[];
 }) {
+  const names = shortlist
+    .map((value) => residences.find((hall) => hall.value === value)?.name)
+    .filter((name): name is string => Boolean(name));
+  const line =
+    names.length === 3
+      ? "Three ranked. This is a complete shortlist."
+      : `${names.length} of 3 ranked. A partial shortlist is saved, and Residential Life reads it as partial.`;
+  return (
+    <section className="section-card step-panel">
+      <div className="card-body">
+        <p className="field-label field-group-label">Your ranked halls</p>
+        <dl className="review-list">
+          {names.map((name, index) => (
+            <div key={name} className="review-row">
+              <dt>{["1st choice", "2nd choice", "3rd choice"][index]}</dt>
+              <dd>{name}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="field-foot">{line}</p>
+      </div>
+    </section>
+  );
+}
+
+function OnboardingResource() {
   const tenantRuntime = useTenant();
   const { tenant } = tenantRuntime;
   const loadOnboarding = useCallback(
     async (signal: AbortSignal): Promise<OnboardingPageData> => {
-      const [
-        onboarding,
-        dashboard,
-        payments,
-        profile,
-        housingPlan,
-        campusLife,
-        documents,
-      ] = await Promise.all([
-        getStudentOnboarding(signal),
-        getStudentDashboard(signal),
-        getStudentPayments(signal),
-        getStudentProfile(signal),
-        getStudentHousingPlan(signal),
-        getCampusLife(signal),
-        getStudentDocuments(signal),
-      ]);
+      const [onboarding, dashboard, payments, profile, housingPlan, documents, ferpaEnvelope] =
+        await Promise.all([
+          getStudentOnboarding(signal),
+          getStudentDashboard(signal),
+          getStudentPayments(signal),
+          getStudentProfile(signal),
+          getStudentHousingPlan(signal),
+          getStudentDocuments(signal),
+          getStudentFerpaAuthorization(signal),
+        ]);
+      // Campus life is read so the platform's own cache of it is warm for the
+      // checklist that follows; nothing in the flow renders it.
+      void getCampusLife(signal).catch(() => undefined);
       return {
         onboarding: {
           ...onboarding,
           data: {
             ...onboarding.data,
-            firstName:
-              onboarding.data.firstName || realProfileName(profile.firstName, "Student"),
-            lastName:
-              onboarding.data.lastName || realProfileName(profile.lastName, "Account"),
+            firstName: onboarding.data.firstName || realProfileName(profile.firstName, "Student"),
+            lastName: onboarding.data.lastName || realProfileName(profile.lastName, "Account"),
             preferredName:
-              onboarding.data.preferredName ||
-              realProfileName(profile.preferredName, "Student"),
-            personalEmail:
-              onboarding.data.personalEmail || profile.email || undefined,
-            mobilePhone:
-              onboarding.data.mobilePhone ||
-              profile.mobilePhone ||
-              undefined,
+              onboarding.data.preferredName || realProfileName(profile.preferredName, "Student"),
+            personalEmail: onboarding.data.personalEmail || profile.email || undefined,
+            mobilePhone: onboarding.data.mobilePhone || profile.mobilePhone || undefined,
           },
         },
         dashboard,
         payments,
         profile,
         housingPlan,
-        campusLife,
         documents,
+        ferpa: ferpaEnvelope.authorization,
       };
     },
     [],
@@ -2891,7 +1551,7 @@ function OnboardingResource({
           <PortalMark />
           <p className="eyebrow">{tenant.name}</p>
           <h1>Resuming your onboarding</h1>
-          <p>We’re opening your last server-confirmed step.</p>
+          <p>Opening your last saved step.</p>
           <span className="loader" aria-hidden="true" />
         </div>
       </main>
@@ -2906,11 +1566,7 @@ function OnboardingResource({
           <p className="eyebrow">{tenant.name}</p>
           <h1>Your onboarding couldn’t open</h1>
           <p>{onboarding.error}</p>
-          <button
-            className="button button--primary"
-            type="button"
-            onClick={onboarding.reload}
-          >
+          <button className="button button--primary" type="button" onClick={onboarding.reload}>
             Try again
           </button>
           {tenant.contacts.support.email || tenant.contacts.support.url ? (
@@ -2936,12 +1592,10 @@ function OnboardingResource({
       dashboard={onboarding.data.dashboard}
       initialPayments={onboarding.data.payments}
       housingPlan={onboarding.data.housingPlan}
-      campusLife={onboarding.data.campusLife}
       initialDocuments={onboarding.data.documents}
+      initialFerpa={onboarding.data.ferpa}
+      profile={onboarding.data.profile}
       reload={onboarding.reload}
-      readOnly={readOnly}
-      delegateActor={delegateActor}
-      key={onboarding.data.onboarding.version}
     />
   );
 }
@@ -2949,16 +1603,11 @@ function OnboardingResource({
 export default function OnboardingPage() {
   const tenantRuntime = useTenant();
   const { tenant } = tenantRuntime;
-  const loadBootstrap = useCallback(
-    (signal: AbortSignal) => getStudentBootstrap(signal),
-    [],
-  );
+  const loadBootstrap = useCallback((signal: AbortSignal) => getStudentBootstrap(signal), []);
   const bootstrap = useApiResource(loadBootstrap);
   const onboardingSummary = bootstrap.data?.onboarding;
-  const isDelegate = bootstrap.data?.actor?.type === "delegate";
-  const alreadyComplete =
-    !isDelegate &&
-    onboardingSummary?.status === "completed";
+  const isDelegate = (bootstrap.data as StudentBootstrap | null)?.actor?.type === "delegate";
+  const alreadyComplete = !isDelegate && onboardingSummary?.status === "completed";
   const needsSignIn =
     bootstrap.status === "error" &&
     (bootstrap.errorStatus === 401 || bootstrap.errorStatus === 403);
@@ -2967,8 +1616,7 @@ export default function OnboardingPage() {
     if (needsSignIn) {
       window.location.replace(tenantRuntime.href("/sign-in"));
     } else if (isDelegate) {
-      // Parent and guardian access always uses the normal student portal. The
-      // onboarding data, when shared, is shown within My Enrollment instead.
+      // Parent and guardian access always uses the normal student portal.
       window.location.replace(tenantRuntime.href("/enrollment"));
     } else if (alreadyComplete) {
       window.location.replace(tenantRuntime.href("/dashboard"));
@@ -2982,7 +1630,7 @@ export default function OnboardingPage() {
           <PortalMark />
           <p className="eyebrow">{tenant.name}</p>
           <h1>Checking your onboarding</h1>
-          <p>We’re opening the right place for your saved progress.</p>
+          <p>Opening the right place for your saved progress.</p>
           <span className="loader" aria-hidden="true" />
         </div>
       </main>
@@ -2995,13 +1643,9 @@ export default function OnboardingPage() {
         <div className="load-state__card" role="alert">
           <PortalMark />
           <p className="eyebrow">{tenant.name}</p>
-          <h1>We couldn’t confirm your onboarding</h1>
+          <h1>Your onboarding couldn’t be confirmed</h1>
           <p>{bootstrap.error}</p>
-          <button
-            className="button button--primary"
-            type="button"
-            onClick={bootstrap.reload}
-          >
+          <button className="button button--primary" type="button" onClick={bootstrap.reload}>
             Try again
           </button>
         </div>
@@ -3009,10 +1653,5 @@ export default function OnboardingPage() {
     );
   }
 
-  return (
-    <OnboardingResource
-      readOnly={false}
-      delegateActor={null}
-    />
-  );
+  return <OnboardingResource />;
 }
