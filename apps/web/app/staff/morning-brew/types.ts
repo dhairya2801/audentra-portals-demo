@@ -13,6 +13,9 @@
  */
 
 import type {
+  StaffActionCenterQuery,
+  StaffBrewCapacitySeverity,
+  StaffBrewCapacitySignalKind,
   StaffBrewCohortRef,
   StaffBrewDestination,
   StaffBrewSeverity,
@@ -57,6 +60,15 @@ export type BrewInsightDetailId = "headline" | "impact" | "full";
 
 /** Staff workspace views the briefing can hand the reader off to. */
 export type MorningBrewDestination = StaffBrewDestination;
+
+/**
+ * Hand-off from the briefing to the workspace. When a `boardQuery` is present
+ * the destination is the task board, opened with that query already applied.
+ */
+export type MorningBrewNavigate = (
+  destination: MorningBrewDestination,
+  boardQuery?: StaffActionCenterQuery | null,
+) => void;
 
 export type BrewAccent = "purple" | "blue" | "teal" | "navy" | "amber";
 
@@ -259,6 +271,45 @@ export interface BrewPriority {
   steps: string[];
   window: string;
   count: number;
+  /** Opens the task board pre-filtered on the items behind this queue. */
+  boardQuery: StaffActionCenterQuery | null;
+}
+
+/** One rule-based people signal: who is absent, over cap, or has room. */
+export interface BrewCapacitySignal {
+  id: string;
+  kind: StaffBrewCapacitySignalKind;
+  severity: StaffBrewCapacitySeverity;
+  title: string;
+  detail: string;
+  action: string;
+  count: number;
+  destination: MorningBrewDestination;
+  boardQuery: StaffActionCenterQuery | null;
+}
+
+export interface BrewCapacityOffice {
+  component: string;
+  open: number;
+  overdue: number;
+  unassigned: number;
+  stale: number;
+  oldestOverdueDays: number | null;
+}
+
+/**
+ * People & capacity — a short ranked read, not a per-person dashboard. When
+ * `available` is false only `basis` is shown.
+ */
+export interface BrewCapacity {
+  topic: BrewTopicId;
+  available: boolean;
+  /** "88 staff · 1 on leave · …" composed only from the counts the API sent. */
+  summaryLine: string | null;
+  signals: BrewCapacitySignal[];
+  signalsOmitted: number;
+  offices: BrewCapacityOffice[];
+  basis: string;
 }
 
 export interface BrewQuickLink {
@@ -297,6 +348,10 @@ export interface BrewBriefing {
     unsupported: { metric: string; reason: string }[];
   };
   engagementScanAvailable: boolean;
+  /** False when the tenant records no portal activity, so inactivity cannot be read. */
+  engagementActivitySignal: boolean;
+  /** Null when the reader switched signals off or does not follow the topic. */
+  capacity: BrewCapacity | null;
 }
 
 /** The raw payload, re-exported so components can name the source shape. */

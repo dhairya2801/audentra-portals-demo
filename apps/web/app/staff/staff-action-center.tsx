@@ -26,6 +26,7 @@ import {
   updateStaffStudentPreferences,
   updateStaffWorkItem,
 } from "../lib/api-client";
+import { ownerRiskLabel } from "./task-board-utils";
 import { TenantLink as Link } from "../components/tenant-link";
 import { PortalMark } from "../components/portal-ui";
 import { useTenant } from "../components/tenant-provider";
@@ -125,11 +126,40 @@ export function WorkItemCard({
         <span>{item.component}</span>
         <span>Due {formatDate(item.dueAt)}</span>
       </span>
+      <WorkItemSignals item={item} />
       <span className="staff-work-card__footer">
         <span>{item.assignee?.name ?? "Unassigned"}</span>
         {item.escalated ? <strong>Escalated</strong> : null}
       </span>
     </button>
+  );
+}
+
+/** Compact operational badges derived server-side: overdue, stale, owner availability. */
+export function WorkItemSignals({ item }: { item: StaffWorkItem }) {
+  const signals = item.signals;
+  if (!signals) return null;
+  const ownerRisk = ownerRiskLabel(item);
+  if (!signals.overdue && !signals.stale && !signals.unassigned && !ownerRisk) return null;
+  return (
+    <span className="staff-work-card__signals" aria-label="Work item signals">
+      {signals.overdue ? (
+        <span className="staff-signal staff-signal--overdue">
+          Overdue{signals.overdueDays !== null ? ` ${signals.overdueDays}d` : ""}
+        </span>
+      ) : null}
+      {signals.stale ? (
+        <span className="staff-signal staff-signal--stale">
+          Stale{signals.staleDays !== null ? ` ${signals.staleDays}d` : ""}
+        </span>
+      ) : null}
+      {ownerRisk ? (
+        <span className="staff-signal staff-signal--owner">{ownerRisk}</span>
+      ) : null}
+      {signals.unassigned ? (
+        <span className="staff-signal staff-signal--unassigned">Unassigned</span>
+      ) : null}
+    </span>
   );
 }
 
@@ -1095,7 +1125,8 @@ function StaffWorkspace({
 
 export default function LegacyStaffActionCenter() {
   const loadCenter = useCallback(
-    (signal: AbortSignal) => getStaffActionCenter(signal),
+    (signal: AbortSignal) =>
+      getStaffActionCenter({ status: "all", limit: 200 }, signal),
     [],
   );
   const center = useApiResource(loadCenter, {

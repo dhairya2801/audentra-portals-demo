@@ -4,16 +4,20 @@ import type {
   CampusEvent,
   CatalogCourse,
   CreateStaffWorkItemInput,
+  StaffActionCenter,
+  StaffActionCenterQuery,
+  StaffActionCenterSort,
   StaffActionType,
   StaffCorePlay,
   StaffInquiry,
   StaffKnowledgeCard,
   StaffManagedConfiguration,
   StaffManagedConfigurationKind,
+  StaffMemberSummary,
   StaffOperationsWorkspace,
+  StaffWorkItem,
   StaffWorkItemPriority,
   StaffWorkItemStatus,
-  StaffWorkItemType,
   StudentClub,
 } from "@vv/contracts";
 import {
@@ -36,6 +40,7 @@ import {
   createStaffKnowledgeCard,
   createStaffWorkItem,
   draftStaffConfigurationWithEdward,
+  getStaffActionCenter,
   getStaffInquiryThread,
   getStaffOperationsWorkspace,
   signOutStaff,
@@ -61,11 +66,18 @@ import { MyDeskView } from "./my-desk";
 import { NotificationCenter } from "./notification-center";
 import { connectStaffRealtime, type StaffRealtimeEvent } from "./staff-realtime";
 import {
+  buildActionCenterQuery,
   emptyTaskBoardFilters,
-  filterAndSortStaffWorkItems,
+  filtersFromActionCenterQuery,
+  groupWorkItemsByStatus,
   hasActiveTaskBoardFilters,
+  staffAvailabilityNote,
+  TASK_BOARD_MAX_LIMIT,
+  TASK_BOARD_PAGE_SIZE,
+  visibleWorkStatuses,
   type TaskBoardFilters,
   type TaskDueWindow,
+  type TaskStatusFilter,
 } from "./task-board-utils";
 
 type StaffView =
@@ -656,66 +668,222 @@ function TaskBoardView({
   workspace,
   refresh,
   initialWorkItemId = null,
+  initialQuery = null,
   onDetailClosed,
 }: {
   workspace: StaffOperationsWorkspace;
   refresh: () => void;
   initialWorkItemId?: string | null;
+  initialQuery?: StaffActionCenterQuery | null;
   onDetailClosed?: () => void;
 }) {
-  const center = workspace.actionCenter;
   const [openDetailId, setOpenDetailId] = useState<string | null>(initialWorkItemId);
   const [createOpen, setCreateOpen] = useState(false);
-  const [filters, setFilters] = useState<TaskBoardFilters>({
-    ...emptyTaskBoardFilters,
-  });
+  const [filters, setFilters] = useState<TaskBoardFilters>(() =>
+    filtersFromActionCenterQuery(initialQuery),
+  );
+  const [debouncedQuery, setDebouncedQuery] = useState(filters.query);
   const draggedId = useRef<string | null>(null);
   const [dropTarget, setDropTarget] =
     useState<StaffWorkItemStatus | null>(null);
   const [boardMessage, setBoardMessage] = useState<string | null>(null);
-  const components = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          workspace.currentStaff.component,
-          ...center.staff.map((staff) => staff.component),
-          ...center.items.map((item) => item.component),
-        ]),
-      ).sort((left, right) => left.localeCompare(right)),
-    [center.items, center.staff, workspace.currentStaff.component],
+
+  // The board is server-paged. `board` is the last page envelope (counts,
+  // facets, page) and `items` is everything loaded so far, in server order.
+  const [board, setBoard] = useState<StaffActionCenter>(workspace.actionCenter);
+  const [items, setItems] = useState<StaffWorkItem[]>([]);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadedCount = useRef(0);
+  const requestSequence = useRef(0);
+  const activeController = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(filters.query), 300);
+    return () => window.clearTimeout(timer);
+  }, [filters.query]);
+
+  const activeFilters = useMemo(
+    () => ({ ...filters, query: debouncedQuery }),
+    [filters, debouncedQuery],
   );
+  const activeQueryKey = JSON.stringify(buildActionCenterQuery(activeFilters, { offset: 0 }));
+
+  /**
+   * Re-fetch everything the reader has loaded so far (at least one page), in
+   * bounded requests, and replace the list atomically when the last one lands.
+   */
+  const reloadLoaded = useCallback(
+    async (options: { silent?: boolean } = {}) => {
+      const sequence = ++requestSequence.current;
+      activeController.current?.abort();
+      const controller = new AbortController();
+      activeController.current = controller;
+      if (!options.silent) setLoadState("loading");
+      const target = Math.max(TASK_BOARD_PAGE_SIZE, loadedCount.current);
+      const collected: StaffWorkItem[] = [];
+      try {
+        let envelope: StaffActionCenter | null = null;
+        for (let offset = 0; offset < target; offset += TASK_BOARD_MAX_LIMIT) {
+          const limit = Math.min(TASK_BOARD_MAX_LIMIT, target - offset);
+          envelope = await getStaffActionCenter(
+            buildActionCenterQuery(activeFilters, { limit, offset }),
+            controller.signal,
+          );
+          collected.push(...envelope.items);
+          if (!envelope.page.hasMore) break;
+        }
+        if (sequence !== requestSequence.current || !envelope) return;
+        setBoard(envelope);
+        setItems(collected);
+        loadedCount.current = collected.length;
+        setLoadError(null);
+        setLoadState("ready");
+      } catch (error) {
+        if (controller.signal.aborted || sequence !== requestSequence.current) return;
+        setLoadError(
+          error instanceof Error ? error.message : "The task board could not be loaded.",
+        );
+        setLoadState("error");
+      }
+    },
+    [activeFilters],
+  );
+
+  // A new query starts again from the first page.
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      loadedCount.current = 0;
+      void reloadLoaded();
+    });
+    return () => {
+      cancelled = true;
+      activeController.current?.abort();
+    };
+    // activeQueryKey is the serialized form of activeFilters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeQueryKey]);
+
+  // The workspace poll and realtime events refresh the workspace every ~10s;
+  // piggyback on that to keep the loaded pages current without a second timer.
+  const workspaceStamp = workspace.actionCenter.generatedAt;
+  const lastStamp = useRef(workspaceStamp);
+  useEffect(() => {
+    if (lastStamp.current === workspaceStamp) return;
+    lastStamp.current = workspaceStamp;
+    if (loadState !== "ready" || loadingMore) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void reloadLoaded({ silent: true });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceStamp, loadState, loadingMore, reloadLoaded]);
+
+  const loadMore = async () => {
+    if (loadingMore || !board.page.hasMore) return;
+    const sequence = ++requestSequence.current;
+    activeController.current?.abort();
+    const controller = new AbortController();
+    activeController.current = controller;
+    setLoadingMore(true);
+    try {
+      const envelope = await getStaffActionCenter(
+        buildActionCenterQuery(activeFilters, {
+          limit: TASK_BOARD_PAGE_SIZE,
+          offset: items.length,
+        }),
+        controller.signal,
+      );
+      if (sequence !== requestSequence.current) return;
+      setBoard(envelope);
+      setItems((current) => {
+        const seen = new Set(current.map((item) => item.id));
+        const next = current.concat(envelope.items.filter((item) => !seen.has(item.id)));
+        loadedCount.current = next.length;
+        return next;
+      });
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      setBoardMessage(
+        error instanceof Error ? error.message : "More tasks could not be loaded.",
+      );
+    } finally {
+      if (sequence === requestSequence.current) setLoadingMore(false);
+    }
+  };
+
+  const counts = board.counts;
+  const facets = board.facets ?? workspace.actionCenter.facets;
+  const staffDirectory = board.staff.length ? board.staff : workspace.actionCenter.staff;
+  const grouped = useMemo(() => groupWorkItemsByStatus(items), [items]);
+  const itemsById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
+  const visibleColumns = useMemo(() => {
+    const statuses = new Set(visibleWorkStatuses(filters.status));
+    return workColumns.filter((column) => statuses.has(column.status));
+  }, [filters.status]);
+
+  const components = useMemo(() => {
+    const byName = new Map<string, number | null>();
+    for (const facet of facets?.components ?? []) byName.set(facet.component, facet.open);
+    if (!byName.has(workspace.currentStaff.component)) {
+      byName.set(workspace.currentStaff.component, null);
+    }
+    if (filters.component !== "all" && !byName.has(filters.component)) {
+      byName.set(filters.component, null);
+    }
+    return Array.from(byName.entries())
+      .map(([component, open]) => ({ component, open }))
+      .sort((left, right) => left.component.localeCompare(right.component));
+  }, [facets, filters.component, workspace.currentStaff.component]);
+  const componentNames = useMemo(
+    () => components.map((entry) => entry.component),
+    [components],
+  );
+
   const assignees = useMemo(() => {
-    const byId = new Map(
-      [workspace.currentStaff, ...center.staff].map((staff) => [staff.id, staff]),
-    );
-    const current = byId.get(workspace.currentStaff.id);
+    const openByStaff = new Map<string, number>();
+    const byId = new Map<string, StaffMemberSummary>();
+    for (const facet of facets?.assignees ?? []) {
+      if (!facet.staff) continue;
+      openByStaff.set(facet.staff.id, facet.open);
+      byId.set(facet.staff.id, facet.staff);
+    }
+    for (const staff of staffDirectory) if (!byId.has(staff.id)) byId.set(staff.id, staff);
+    const current = byId.get(workspace.currentStaff.id) ?? workspace.currentStaff;
     byId.delete(workspace.currentStaff.id);
-    return [
-      ...(current ? [current] : []),
-      ...Array.from(byId.values()).sort((left, right) =>
-        left.name.localeCompare(right.name),
-      ),
-    ];
-  }, [center.staff, workspace.currentStaff]);
-  const filtered = useMemo(
-    () =>
-      filterAndSortStaffWorkItems(
-        center.items,
-        filters,
-        workspace.currentStaff.id,
-      ),
-    [center.items, filters, workspace.currentStaff.id],
+    const rest = Array.from(byId.values()).sort((left, right) =>
+      left.name.localeCompare(right.name),
+    );
+    return [current, ...rest].map((staff) => ({
+      staff,
+      open: openByStaff.get(staff.id) ?? null,
+    }));
+  }, [facets, staffDirectory, workspace.currentStaff]);
+  const assigneeSummaries = useMemo(
+    () => assignees.map((entry) => entry.staff),
+    [assignees],
   );
+
   const updateFilter = <Key extends keyof TaskBoardFilters>(
     key: Key,
     value: TaskBoardFilters[Key],
   ) => setFilters((current) => ({ ...current, [key]: value }));
 
+  const afterMutation = () => {
+    refresh();
+    void reloadLoaded({ silent: true });
+  };
+
   const moveItem = async (
     itemId: string,
     status: StaffWorkItemStatus,
   ) => {
-    const item = center.items.find((candidate) => candidate.id === itemId);
+    const item = itemsById.get(itemId);
     if (!item || item.status === status) return;
     if (!["todo", "in_progress"].includes(status)) {
       setOpenDetailId(item.id);
@@ -734,19 +902,32 @@ function TaskBoardView({
       setBoardMessage(
         `${item.key} moved to ${status.replaceAll("_", " ")}.`,
       );
-      refresh();
     } catch (error) {
       setBoardMessage(
         error instanceof Error
           ? error.message
           : "The task could not be moved.",
       );
-      refresh();
     } finally {
       draggedId.current = null;
       setDropTarget(null);
+      afterMutation();
     }
   };
+
+  const total = board.page?.total ?? items.length;
+  const columnCount = (status: StaffWorkItemStatus) =>
+    status === "todo"
+      ? counts.todo
+      : status === "in_progress"
+        ? counts.inProgress
+        : status === "follow_up_required"
+          ? counts.followUpRequired
+          : status === "blocked"
+            ? counts.blocked
+            : status === "done"
+              ? counts.done
+              : counts.cancelled;
 
   return (
     <>
@@ -795,7 +976,9 @@ function TaskBoardView({
             ))}
           </div>
           <strong aria-live="polite">
-            {filtered.length} of {center.items.length} tasks
+            {loadState === "loading"
+              ? "Loading tasks…"
+              : `Showing ${items.length} of ${total} tasks`}
           </strong>
         </div>
         <div className="staff-task-filter-grid">
@@ -809,30 +992,18 @@ function TaskBoardView({
               }}
             >
               <option value="all">Anyone</option>
-              {assignees.map((staff) => (
-                <option value={staff.id} key={staff.id}>
-                  {staff.id === workspace.currentStaff.id
-                    ? `@me · ${staff.name}`
-                    : staff.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>Task type</span>
-            <select
-              value={filters.workType}
-              onChange={(event) =>
-                updateFilter(
-                  "workType",
-                  event.target.value as "all" | StaffWorkItemType,
-                )
-              }
-            >
-              <option value="all">All types</option>
-              <option value="enrollment">Enrollment</option>
-              <option value="document_review">Document review</option>
-              <option value="communication">Communication</option>
+              {assignees.map(({ staff, open }) => {
+                const note = staffAvailabilityNote(staff);
+                return (
+                  <option value={staff.id} key={staff.id}>
+                    {staff.id === workspace.currentStaff.id
+                      ? `@me · ${staff.name}`
+                      : staff.name}
+                    {open !== null ? ` (${open} open)` : ""}
+                    {note ? ` · ${note}` : ""}
+                  </option>
+                );
+              })}
             </select>
           </label>
           <label>
@@ -858,12 +1029,11 @@ function TaskBoardView({
             <select
               value={filters.status}
               onChange={(event) =>
-                updateFilter(
-                  "status",
-                  event.target.value as "all" | StaffWorkItemStatus,
-                )
+                updateFilter("status", event.target.value as TaskStatusFilter)
               }
             >
+              <option value="open">Open work</option>
+              <option value="closed">Closed work</option>
               <option value="all">All statuses</option>
               {workColumns.map((column) => (
                 <option value={column.status} key={column.status}>
@@ -879,9 +1049,10 @@ function TaskBoardView({
               onChange={(event) => updateFilter("component", event.target.value)}
             >
               <option value="all">All teams</option>
-              {components.map((value) => (
-                <option value={value} key={value}>
-                  {value}
+              {components.map(({ component, open }) => (
+                <option value={component} key={component}>
+                  {component}
+                  {open !== null ? ` (${open} open)` : ""}
                 </option>
               ))}
             </select>
@@ -901,6 +1072,21 @@ function TaskBoardView({
               <option value="no_due">No due date</option>
             </select>
           </label>
+          <label>
+            <span>Sort</span>
+            <select
+              value={filters.sort}
+              onChange={(event) =>
+                updateFilter("sort", event.target.value as StaffActionCenterSort)
+              }
+            >
+              <option value="priority">Priority</option>
+              <option value="due">Due date</option>
+              <option value="updated">Recently updated</option>
+              <option value="created">Recently created</option>
+              <option value="stale">Longest untouched</option>
+            </select>
+          </label>
           <button
             className="staff-clear-task-filters"
             type="button"
@@ -910,21 +1096,44 @@ function TaskBoardView({
             Clear filters
           </button>
         </div>
+        <div className="staff-task-signal-toggles" aria-label="Signal filters">
+          <button
+            type="button"
+            className={filters.stale ? "is-active" : undefined}
+            aria-pressed={filters.stale}
+            onClick={() => updateFilter("stale", !filters.stale)}
+          >
+            Stale{counts.stale !== undefined ? ` · ${counts.stale}` : ""}
+          </button>
+          <button
+            type="button"
+            className={filters.ownerRisk ? "is-active" : undefined}
+            aria-pressed={filters.ownerRisk}
+            onClick={() => updateFilter("ownerRisk", !filters.ownerRisk)}
+          >
+            Owner unavailable{counts.ownerRisk !== undefined ? ` · ${counts.ownerRisk}` : ""}
+          </button>
+          <span>
+            {counts.overdue !== undefined ? `${counts.overdue} overdue · ` : ""}
+            {counts.unassigned !== undefined ? `${counts.unassigned} unassigned` : ""}
+          </span>
+        </div>
       </section>
       <p className="staff-board-announcement" aria-live="polite">
-        {boardMessage ??
-          "Select a task for full details. Drag between columns to update simple statuses."}
+        {loadState === "error"
+          ? loadError
+          : (boardMessage ??
+            "Select a task for full details. Drag between columns to update simple statuses.")}
       </p>
 
       <div className="staff-workspace staff-task-workspace">
         <div
           className="staff-board staff-task-board"
           aria-label="Enrollment work board"
+          aria-busy={loadState === "loading"}
         >
-          {workColumns.map((column) => {
-            const items = filtered.filter(
-              (item) => item.status === column.status,
-            );
+          {visibleColumns.map((column) => {
+            const columnItems = grouped[column.status];
             return (
               <section
                 className={`staff-board-column${
@@ -958,12 +1167,19 @@ function TaskBoardView({
                 <header>
                   <div>
                     <h2>{column.title}</h2>
-                    <p>{column.description}</p>
+                    <p>
+                      {column.description}
+                      {columnItems.length !== columnCount(column.status)
+                        ? ` · ${columnItems.length} loaded`
+                        : ""}
+                    </p>
                   </div>
-                  <span>{items.length}</span>
+                  <span title={`${columnCount(column.status)} on the whole board`}>
+                    {columnCount(column.status)}
+                  </span>
                 </header>
                 <div>
-                  {items.map((item) => (
+                  {columnItems.map((item) => (
                     <WorkItemCard
                       item={item}
                       selected={openDetailId === item.id}
@@ -988,8 +1204,10 @@ function TaskBoardView({
                       key={item.id}
                     />
                   ))}
-                  {items.length === 0 ? (
-                    <p className="staff-column-empty">No matching work here.</p>
+                  {columnItems.length === 0 ? (
+                    <p className="staff-column-empty">
+                      {loadState === "loading" ? "Loading…" : "No matching work here."}
+                    </p>
                   ) : null}
                 </div>
               </section>
@@ -997,17 +1215,33 @@ function TaskBoardView({
           })}
         </div>
       </div>
+      {board.page?.hasMore ? (
+        <div className="staff-board-pager">
+          <button
+            className="button button--secondary"
+            type="button"
+            disabled={loadingMore || loadState !== "ready"}
+            onClick={() => void loadMore()}
+          >
+            {loadingMore
+              ? "Loading more…"
+              : `Load more (${Math.min(TASK_BOARD_PAGE_SIZE, total - items.length)} of ${
+                  total - items.length
+                } remaining)`}
+          </button>
+        </div>
+      ) : null}
       {createOpen ? (
         <CreateTaskDialog
           workspace={workspace}
-          components={components}
-          assignees={assignees}
+          components={componentNames}
+          assignees={assigneeSummaries}
           onClose={() => setCreateOpen(false)}
           onCreated={(workItemId) => {
             setCreateOpen(false);
             setOpenDetailId(workItemId);
             setBoardMessage("Task created and opened.");
-            refresh();
+            afterMutation();
           }}
         />
       ) : null}
@@ -1019,7 +1253,7 @@ function TaskBoardView({
             setOpenDetailId(null);
             onDetailClosed?.();
           }}
-          onChanged={refresh}
+          onChanged={afterMutation}
         />
       ) : null}
     </>
@@ -1446,9 +1680,11 @@ function columnTitle(status: StaffWorkItemStatus) {
 function StudentsView({
   workspace,
   refresh,
+  openTaskBoard,
 }: {
   workspace: StaffOperationsWorkspace;
   refresh: () => void;
+  openTaskBoard: (query: StaffActionCenterQuery) => void;
 }) {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(
@@ -1467,6 +1703,8 @@ function StudentsView({
     workspace.cohort.find((student) => student.id === selectedId) ??
     filteredStudents[0] ??
     workspace.cohort[0];
+  // `workspace.actionCenter` is only the first page of open work, so what is
+  // connected here is a sample, never a per-student count.
   const work = workspace.actionCenter.items.filter(
     (item) => item.student.id === operation?.id,
   );
@@ -1517,10 +1755,6 @@ function StudentsView({
           </header>
           <div className="staff-student-directory__list">
             {filteredStudents.map((student) => {
-              const openItems = workspace.actionCenter.items.filter(
-                (item) =>
-                  item.student.id === student.id && item.status !== "done",
-              ).length;
               return (
                 <button
                   className={student.id === operation?.id ? "is-selected" : undefined}
@@ -1548,7 +1782,9 @@ function StudentsView({
                     >
                       {student.risk.score} risk
                     </StatusPill>
-                    <small>{openItems} open items</small>
+                    <small>
+                      {student.journey.completedTasks}/{student.journey.totalTasks} checklist
+                    </small>
                   </span>
                 </button>
               );
@@ -1624,7 +1860,20 @@ function StudentsView({
             </article>
             <article>
               <p className="eyebrow">Open work</p>
-              <h3>{work.length} connected staff tasks</h3>
+              <h3>
+                {work.length > 0
+                  ? `${work.length} connected staff task${work.length === 1 ? "" : "s"} in the current queue page`
+                  : "No connected staff tasks on the current queue page"}
+              </h3>
+              <p>
+                <button
+                  className="staff-inline-link"
+                  type="button"
+                  onClick={() => openTaskBoard({ search: operation.name, status: "all" })}
+                >
+                  Open every task for {operation.preferredName} on the board →
+                </button>
+              </p>
               <ul>
                 {work.slice(0, 3).map((item) => (
                   <li key={item.id}>
@@ -4056,6 +4305,10 @@ function StaffWorkspaceShell({
   const [view, setView] = useState<StaffView>("overview");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [requestedWorkItemId, setRequestedWorkItemId] = useState<string | null>(null);
+  const [taskBoardRequest, setTaskBoardRequest] = useState<{
+    query: StaffActionCenterQuery;
+    key: number;
+  } | null>(null);
   const [realtimeNotice, setRealtimeNotice] =
     useState<StaffRealtimeNotice | null>(null);
   const realtimeSubscribers = useRef(new Set<() => void>());
@@ -4096,8 +4349,24 @@ function StaffWorkspaceShell({
     };
   }, [readHash]);
 
-  const navigate = (next: StaffView) => {
+  /** Open the task board pre-filtered — the deep link Morning Brew and the student record use. */
+  const openTaskBoard = (query: StaffActionCenterQuery) => {
     setRequestedWorkItemId(null);
+    setTaskBoardRequest((current) => ({ query, key: (current?.key ?? 0) + 1 }));
+    setView("tasks");
+    setMobileNavOpen(false);
+    window.history.replaceState(null, "", "#tasks");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  /** Change view; a `boardQuery` opens the task board pre-filtered instead. */
+  const navigate = (next: StaffView, boardQuery?: StaffActionCenterQuery | null) => {
+    if (boardQuery) {
+      openTaskBoard(boardQuery);
+      return;
+    }
+    setRequestedWorkItemId(null);
+    if (next !== "tasks") setTaskBoardRequest(null);
     setView(next);
     setMobileNavOpen(false);
     window.history.replaceState(null, "", `#${next}`);
@@ -4234,14 +4503,15 @@ function StaffWorkspaceShell({
           <OverviewView workspace={workspace} navigate={navigate} />
         ) : view === "tasks" ? (
           <TaskBoardView
-            key={requestedWorkItemId ?? "task-board"}
+            key={requestedWorkItemId ?? `task-board-${taskBoardRequest?.key ?? 0}`}
             workspace={workspace}
             refresh={refresh}
             initialWorkItemId={requestedWorkItemId}
+            initialQuery={taskBoardRequest?.query ?? null}
             onDetailClosed={() => setRequestedWorkItemId(null)}
           />
         ) : view === "students" ? (
-          <StudentsView workspace={workspace} refresh={refresh} />
+          <StudentsView workspace={workspace} refresh={refresh} openTaskBoard={openTaskBoard} />
         ) : view === "journeys" ? (
           <JourneysView workspace={workspace} refresh={refresh} />
         ) : view === "knowledge" ? (

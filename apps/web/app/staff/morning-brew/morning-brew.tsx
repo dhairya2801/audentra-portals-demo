@@ -18,6 +18,7 @@ import type {
   BrewTopicId,
   EdwardRequest,
   MorningBrewDestination,
+  MorningBrewNavigate,
 } from "./types";
 
 type Mode = "loading" | "onboarding" | "briefing";
@@ -77,7 +78,7 @@ export function MorningBrewView({
   navigate,
 }: {
   workspace: StaffOperationsWorkspace;
-  navigate: (destination: MorningBrewDestination) => void;
+  navigate: MorningBrewNavigate;
 }) {
   const tenantRuntime = useTenant();
   const scope = `${tenantRuntime.tenant.slug}:${workspace.currentStaff.id}`;
