@@ -18,6 +18,13 @@ export interface ConversationType {
 
 export const conversationTypes: ConversationType[] = [
   {
+    id: "academic_advising",
+    category: "Your adviser",
+    label: "Academic advising",
+    blurb: "Your courses, your plan for the term, or anything your academic adviser should hear first.",
+    team: "Academic Advising",
+  },
+  {
     id: "admissions_counseling",
     category: "Your offer",
     label: "Admissions counseling",
@@ -37,6 +44,13 @@ export const conversationTypes: ConversationType[] = [
     label: "Financial aid",
     blurb: "Your package, what a figure means, or what happens to it if something changes.",
     team: "Financial Aid Office",
+  },
+  {
+    id: "international_check_in",
+    category: "Your visa",
+    label: "International check-in",
+    blurb: "Your SEVIS check-in, your I-20, or a question about your status.",
+    team: "International Student Services",
   },
 ];
 
@@ -60,14 +74,65 @@ export type AppointmentTone = "confirmed" | "done" | "cancelled";
 
 /**
  * What the row's badge says. A scheduled conversation whose time has passed is not still
- * "Confirmed" — it happened. Derived, never stored.
+ * "Confirmed" — it happened (or, when the person on the other side recorded it, it did not).
+ * A rescheduled one lives on as its replacement. Derived, never stored.
  */
 export function stateOf(appointment: StudentAppointment, now: number): { tone: AppointmentTone; label: string } {
   if (appointment.status === "cancelled") return { tone: "cancelled", label: "Cancelled" };
+  if (appointment.status === "rescheduled") return { tone: "cancelled", label: "Rescheduled" };
+  if (appointment.status === "no_show") return { tone: "done", label: "Missed" };
   if (appointment.status === "completed" || new Date(appointment.startsAt).getTime() < now) {
     return { tone: "done", label: "Completed" };
   }
   return { tone: "confirmed", label: "Confirmed" };
+}
+
+/** Who the student meets: the named person when the record has one, otherwise the team. */
+export function whoLabel(appointment: StudentAppointment, type: ConversationType) {
+  const staff = appointment.staff;
+  if (!staff) return type.team;
+  return staff.title ? `${staff.name} · ${staff.title}` : staff.name;
+}
+
+/** The short name of the person, for running text; the team when nobody is named. */
+export function whoShort(appointment: StudentAppointment, type: ConversationType) {
+  return appointment.staff?.name ?? type.team;
+}
+
+/** The slot picker groups a person's open times by local day. */
+export function groupSlotsByDay<T extends { startsAt: string }>(slots: T[], tenant: TenantConfig): Array<{ day: string; slots: T[] }> {
+  const groups = new Map<string, T[]>();
+  for (const slot of slots) {
+    const key = formatTenantDate(slot.startsAt, tenant, { weekday: "long", month: "short", day: "numeric" });
+    const list = groups.get(key) ?? [];
+    list.push(slot);
+    groups.set(key, list);
+  }
+  return [...groups].map(([day, entries]) => ({ day, slots: entries }));
+}
+
+/** What a refused booking means, in the student's words. */
+export function bookingRefusal(code: string | undefined, who: string): string | null {
+  switch (code) {
+    case "APPOINTMENT_SLOT_TAKEN":
+      return `That time was just taken on ${who}’s calendar. Pick another.`;
+    case "STAFF_UNAVAILABLE":
+      return `${who} is away at that time.`;
+    case "OUTSIDE_WORKING_HOURS":
+      return `${who} does not take appointments at that time.`;
+    case "APPOINTMENT_OFF_GRID":
+      return `That time is not one of ${who}’s appointment slots.`;
+    case "STAFF_MEMBER_ON_LEAVE":
+      return `${who} is on leave and cannot be booked right now.`;
+    case "STAFF_MEMBER_DEPARTED":
+      return `${who} is no longer at the university. Ask Edward or the office who can see you instead.`;
+    case "STAFF_NO_AVAILABILITY":
+      return `${who} has not published appointment hours yet.`;
+    case "STAFF_DOES_NOT_OFFER_TYPE":
+      return `${who} does not take this kind of appointment.`;
+    default:
+      return null;
+  }
 }
 
 /** `current` is what is still ahead; `record` is everything over or cancelled. */
@@ -132,7 +197,9 @@ export function calendarHref(appointment: StudentAppointment, type: Conversation
     "VERSION:2.0",
     "BEGIN:VEVENT",
     `DTSTART:${stamp}`,
-    `SUMMARY:${type.label} · ${type.team}`,
+    `SUMMARY:${type.label} · ${whoShort(appointment, type)}`,
+    ...(appointment.endsAt ? [`DTEND:${new Date(appointment.endsAt).toISOString().replaceAll(/[-:]/g, "").replace(".000", "")}`] : []),
+    ...(appointment.location ? [`LOCATION:${appointment.location}`] : []),
     ...(appointment.notes ? [`DESCRIPTION:${appointment.notes.replaceAll(/\r?\n/g, " ")}`] : []),
     "END:VEVENT",
     "END:VCALENDAR",

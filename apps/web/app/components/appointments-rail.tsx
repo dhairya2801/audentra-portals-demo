@@ -12,7 +12,7 @@ export function AppointmentsRail({ institution, onOpenHow }: { institution: stri
   return (
     <AnchorCard variant="booking" label="How this works">
       <p>
-        What it’s about decides which team gets it. You choose the time, and the team confirms it. Where
+        What it’s about decides who gets it — your own adviser or counsellor when you have one. You pick one of their open times, and it is booked straight away. Where
         you are not sure who to ask, Edward can point you to the right team, and their reply arrives here.
       </p>
       <div className="booking-provenance">

@@ -29,6 +29,7 @@ import {
 import { TenantLink as Link } from "../components/tenant-link";
 import { PortalMark } from "../components/portal-ui";
 import { useTenant } from "../components/tenant-provider";
+import { DemoStaffLogin } from "./demo-staff-login";
 
 const columns: Array<{
   status: StaffWorkItemStatus;
@@ -402,6 +403,7 @@ export function StaffSignIn({ onSignedIn }: { onSignedIn: () => void }) {
           Return to student sign in
         </Link>
       </section>
+      <DemoStaffLogin onSignedIn={onSignedIn} />
     </main>
   );
 }

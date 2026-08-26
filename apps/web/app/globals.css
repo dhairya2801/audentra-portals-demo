@@ -22017,3 +22017,465 @@ h1, h2, h3, h4,
   .delegate-session-banner button { grid-column: 2; justify-self: start; }
   .aster-shell:has(.delegate-session-banner) .aster-main { padding-top: 11rem; }
 }
+
+/* ---- Staff · "Log in as synthetic staff" (development only) ---- */
+.staff-demo-login {
+  width: min(100%, 720px);
+  margin: 1.5rem auto 2rem;
+}
+.staff-demo-login__controls {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+.staff-demo-login__controls input[type="search"] {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line, #d7d9e0);
+  border-radius: 10px;
+  font: inherit;
+}
+.staff-demo-login__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.staff-demo-login__filters button,
+.staff-desk-filters button {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--line, #d7d9e0);
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.staff-demo-login__filters button.is-active,
+.staff-desk-filters button.is-active {
+  background: var(--ink, #1b1f3a);
+  border-color: var(--ink, #1b1f3a);
+  color: #fff;
+}
+.staff-demo-login__status {
+  font-size: 0.8rem;
+  opacity: 0.75;
+  margin: 0.25rem 0;
+}
+.staff-demo-login__list {
+  max-height: 60vh;
+  overflow: auto;
+  border: 1px solid var(--line, #d7d9e0);
+  border-radius: 12px;
+}
+.staff-demo-login__list section h3 {
+  position: sticky;
+  top: 0;
+  margin: 0;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--panel, #f4f5f9);
+  border-bottom: 1px solid var(--line, #d7d9e0);
+}
+.staff-demo-login__list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.staff-demo-login__person {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  width: 100%;
+  padding: 0.6rem 0.9rem;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft, #eceef3);
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.staff-demo-login__person:hover:not(:disabled) {
+  background: var(--panel, #f4f5f9);
+}
+.staff-demo-login__person:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.staff-demo-login__avatar,
+.staff-desk-identity__avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--ink, #1b1f3a);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.staff-demo-login__copy {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.staff-demo-login__copy small {
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+.staff-demo-login__state {
+  margin-left: 0.5rem;
+  font-style: normal;
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #fde8e6;
+  color: #8a2a22;
+}
+.staff-demo-login__state--on_leave {
+  background: #fff3d6;
+  color: #7a5200;
+}
+.staff-demo-login__action {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* ---- Staff · My desk ---- */
+.staff-desk-identity {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.staff-desk-identity__person {
+  display: flex;
+  gap: 0.9rem;
+  align-items: center;
+}
+.staff-desk-identity__person h2 {
+  margin: 0;
+}
+.staff-desk-identity__person p {
+  margin: 0.1rem 0 0;
+}
+.staff-desk-identity__meta {
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+.staff-desk-gaps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+.staff-desk-gap {
+  padding: 0.55rem 0.8rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  border: 1px solid transparent;
+}
+.staff-desk-gap--coral {
+  background: #fde8e6;
+  border-color: #f3b9b3;
+  color: #6f1d16;
+}
+.staff-desk-gap--gold {
+  background: #fff3d6;
+  border-color: #f1d48a;
+  color: #5d3f00;
+}
+.staff-desk-section {
+  margin-top: 1rem;
+}
+.staff-desk-section h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+.staff-desk-appointments,
+.staff-desk-hours {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+.staff-desk-appointment {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--line-soft, #eceef3);
+  border-radius: 10px;
+  font-size: 0.85rem;
+}
+.staff-desk-appointment > div {
+  display: grid;
+  gap: 0.1rem;
+}
+.staff-desk-appointment small {
+  opacity: 0.75;
+}
+.staff-desk-appointment__actions {
+  display: flex;
+  gap: 0.35rem;
+}
+.staff-desk-appointment__actions button {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--line, #d7d9e0);
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.staff-desk-hours li {
+  font-size: 0.85rem;
+}
+.staff-desk-hours li.is-current {
+  font-weight: 600;
+}
+.staff-desk-hours small {
+  opacity: 0.75;
+}
+.staff-desk-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.staff-table-wrap {
+  overflow-x: auto;
+}
+.staff-desk-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.83rem;
+}
+.staff-desk-table th,
+.staff-desk-table td {
+  padding: 0.5rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line-soft, #eceef3);
+}
+.staff-desk-table th {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+.staff-desk-table td small {
+  display: block;
+  opacity: 0.7;
+}
+.staff-desk-table td small.is-overdue {
+  color: #8a2a22;
+  opacity: 1;
+}
+.staff-desk-badge {
+  display: inline-block;
+  margin: 0 0.25rem 0.25rem 0;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: var(--panel, #f4f5f9);
+}
+.staff-desk-badge--completed,
+.staff-desk-badge--ok,
+.staff-desk-badge--green {
+  background: #e3f5e8;
+  color: #1d5d32;
+}
+.staff-desk-badge--scheduled {
+  background: #e4ecfb;
+  color: #1f3f7a;
+}
+.staff-desk-badge--missed,
+.staff-desk-badge--no_show,
+.staff-desk-badge--coral {
+  background: #fde8e6;
+  color: #8a2a22;
+}
+.staff-desk-badge--none,
+.staff-desk-badge--gold,
+.staff-desk-badge--cancelled {
+  background: #fff3d6;
+  color: #7a5200;
+}
+.staff-empty {
+  opacity: 0.75;
+  font-size: 0.85rem;
+}
+
+/* ---- Student · adviser card and slot picker ---- */
+.adviser-card__body {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.25rem 0 0.5rem;
+}
+.adviser-card__person {
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-start;
+}
+.adviser-card__person p {
+  margin: 0.1rem 0 0;
+}
+.adviser-card__avatar,
+.adviser-strip__avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--ink, #1b1f3a);
+  color: #fff;
+  font-weight: 600;
+}
+.adviser-card__meta {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+.adviser-card__others {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  font-size: 0.82rem;
+}
+.adviser-card__others li {
+  display: grid;
+}
+.adviser-card__others span {
+  opacity: 0.7;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.booking-with {
+  display: grid;
+  gap: 0.1rem;
+  margin-bottom: 0.75rem;
+}
+.booking-with strong span {
+  font-weight: 400;
+  opacity: 0.8;
+}
+.booking-people {
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+.booking-person {
+  display: grid;
+  text-align: left;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--line, #d7d9e0);
+  border-radius: 10px;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.booking-person.is-selected {
+  border-color: var(--ink, #1b1f3a);
+  box-shadow: inset 0 0 0 1px var(--ink, #1b1f3a);
+}
+.booking-person small {
+  opacity: 0.75;
+}
+.booking-slots {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.booking-days {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+.booking-day {
+  flex: none;
+  display: grid;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid var(--line, #d7d9e0);
+  border-radius: 10px;
+  background: transparent;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-align: left;
+}
+.booking-day.is-active {
+  background: var(--ink, #1b1f3a);
+  border-color: var(--ink, #1b1f3a);
+  color: #fff;
+}
+.booking-day small {
+  opacity: 0.75;
+  font-size: 0.7rem;
+}
+.booking-times {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.4rem;
+}
+.booking-time {
+  display: grid;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line, #d7d9e0);
+  border-radius: 10px;
+  background: transparent;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-align: left;
+}
+.booking-time.is-selected {
+  border-color: var(--ink, #1b1f3a);
+  box-shadow: inset 0 0 0 1px var(--ink, #1b1f3a);
+}
+.booking-time small {
+  opacity: 0.7;
+  font-size: 0.7rem;
+}
+.booking-reason {
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: #fff3d6;
+  color: #5d3f00;
+}
+.appt-cancel-confirm {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line, #d7d9e0);
+  border-radius: 12px;
+}
+.adviser-strip {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
+.adviser-strip__avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 0.75rem;
+}
+.adviser-strip small {
+  display: block;
+  font-size: 0.72rem;
+  opacity: 0.75;
+}

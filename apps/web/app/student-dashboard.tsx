@@ -12,6 +12,7 @@ import {
 } from "@vv/contracts";
 import { useCallback, useEffect } from "react";
 import { PortalShell } from "./components/portal-shell";
+import { AdviserStrip } from "./components/adviser-strip";
 import { DashboardCampusEvents } from "./components/dashboard-campus-events";
 import { DashboardFinancialSnapshot } from "./components/dashboard-financial-snapshot";
 import dashboardStyles from "./components/student-dashboard-experience.module.css";
@@ -333,6 +334,7 @@ export function StudentDashboardPage() {
           <span>Class of</span>
           <strong>{dashboard.student.classYear}</strong>
         </div>
+        <AdviserStrip />
       </section>
 
       <div className={dashboardStyles.overview}>

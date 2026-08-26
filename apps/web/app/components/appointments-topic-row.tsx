@@ -46,7 +46,7 @@ export function AppointmentsTopicRow({
               <Icon name="users" size={15} /> {type.team}
             </span>
             <span>
-              <Icon name="calendar" size={15} /> You choose the time
+              <Icon name="calendar" size={15} /> Pick an open time
             </span>
           </div>
         </div>

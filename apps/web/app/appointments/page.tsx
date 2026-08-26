@@ -1,11 +1,11 @@
 "use client";
 
-import type { StudentAppointment, StudentAppointmentType } from "@vv/contracts";
+import type { StudentAdvising, StudentAppointment, StudentAppointmentType } from "@vv/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PortalShell } from "../components/portal-shell";
 import { useTenant } from "../components/tenant-provider";
 import { useApiResource } from "../hooks/use-api-resource";
-import { getStudentAppointments } from "../lib/api-client";
+import { getStudentAdvising, getStudentAppointments } from "../lib/api-client";
 import Card, { CardHead, CardRows } from "../design-system/primitives/Card.jsx";
 import InfoModal from "../design-system/patterns/InfoModal.jsx";
 import PageError from "../design-system/patterns/PageError.jsx";
@@ -54,11 +54,16 @@ function isAppointmentType(value: unknown): value is StudentAppointmentType {
   return conversationTypes.some((type) => type.id === value);
 }
 
-type Booking = { type: ConversationType; prefill: { subject?: string } | null };
+type Booking = {
+  type: ConversationType;
+  prefill: { subject?: string } | null;
+  reschedule?: StudentAppointment | null;
+};
 
 export default function AppointmentsPage() {
   const { tenant } = useTenant();
   const appointments = useApiResource(useCallback((signal: AbortSignal) => getStudentAppointments(signal), []));
+  const advising = useApiResource(useCallback((signal: AbortSignal) => getStudentAdvising(signal), []));
   const refresh = appointments.refresh;
   const { toasts, push, dismiss } = useToasts();
 
@@ -83,11 +88,14 @@ export default function AppointmentsPage() {
     }
   }, [groups]);
 
-  const openBooking = useCallback((type: ConversationType, node: HTMLElement | null, prefill: Booking["prefill"] = null) => {
-    returnFocus.current = node;
-    setOpen(null);
-    setBooking({ type, prefill });
-  }, []);
+  const openBooking = useCallback(
+    (type: ConversationType, node: HTMLElement | null, prefill: Booking["prefill"] = null, reschedule: StudentAppointment | null = null) => {
+      returnFocus.current = node;
+      setOpen(null);
+      setBooking({ type, prefill, reschedule });
+    },
+    [],
+  );
 
   // What Edward's escalation sent her here to do arrives with what she already told him: a
   // booking opens the drawer on that team with the question written. Read once, then gone.
@@ -122,8 +130,26 @@ export default function AppointmentsPage() {
 
   function booked(appointment: StudentAppointment) {
     const type = typeById(appointment.type);
-    push({ tone: "success", title: "Booked.", body: `${articled(type.team, true)} has it too.` });
+    const who = appointment.staff?.name ?? articled(type.team, true);
+    push({
+      tone: "success",
+      title: appointment.rescheduledFromId ? "Moved." : "Booked.",
+      body: `${who} has it too.`,
+    });
     refresh();
+    advising.refresh();
+  }
+
+  function cancelled(appointment: StudentAppointment) {
+    const type = typeById(appointment.type);
+    push({ tone: "info", title: "Cancelled.", body: `The time is back on ${appointment.staff?.name ?? articled(type.team)}’s calendar.` });
+    setOpen(null);
+    refresh();
+    advising.refresh();
+  }
+
+  function reschedule(appointment: StudentAppointment) {
+    openBooking(typeById(appointment.type), null, { subject: appointment.notes ?? "" }, appointment);
   }
 
   function bookAgain(appointment: StudentAppointment, node: HTMLElement | null = null) {
@@ -152,6 +178,12 @@ export default function AppointmentsPage() {
         <PageError label="your appointments" onRetry={appointments.reload} />
       ) : (
         <>
+          {advising.data ? (
+            <AdviserCard
+              advising={advising.data}
+              onBook={(node) => openBooking(typeById("academic_advising"), node)}
+            />
+          ) : null}
           <Card aria-labelledby="book-heading">
             <CardHead
               kind="status"
@@ -259,6 +291,7 @@ export default function AppointmentsPage() {
           tenant={tenant}
           now={now}
           prefill={booking.prefill}
+          reschedule={booking.reschedule ?? null}
           onBooked={booked}
           onClose={closeBooking}
         />
@@ -272,6 +305,8 @@ export default function AppointmentsPage() {
           now={now}
           onClose={closeAppointment}
           onBookAgain={(appointment) => bookAgain(appointment)}
+          onReschedule={reschedule}
+          onCancelled={cancelled}
         />
       )}
 
@@ -279,5 +314,82 @@ export default function AppointmentsPage() {
 
       <ToastStack toasts={toasts} onDismiss={dismiss} />
     </PortalShell>
+  );
+}
+
+/**
+ * Who the student's academic adviser is, what their state means for the student, and the way to
+ * book them — the standing relationship the platform now records, shown before any topic list.
+ */
+function AdviserCard({ advising, onBook }: { advising: StudentAdvising; onBook: (node: HTMLElement | null) => void }) {
+  const { tenant } = useTenant();
+  const primary = advising.primaryAdviser;
+  const gap = advising.gaps[0] ?? null;
+  const others = advising.advisers.filter((entry) => entry.role !== "primary_advisor");
+  const roleLabel: Record<string, string> = {
+    admissions_counselor: "Admissions counselor",
+    financial_aid_counselor: "Financial aid counselor",
+    international_adviser: "International adviser",
+    housing_coordinator: "Housing coordinator",
+  };
+  return (
+    <Card aria-labelledby="adviser-heading" className="adviser-card">
+      <CardHead
+        kind="status"
+        icon="users"
+        tone={gap ? "locked" : "accent"}
+        title="Your adviser"
+        titleId="adviser-heading"
+        note={
+          advising.advising.status === "completed"
+            ? "You have met"
+            : advising.advising.status === "scheduled"
+              ? "Meeting booked"
+              : advising.advising.status === "missed"
+                ? "A meeting was missed"
+                : "Not yet met"
+        }
+      />
+      <div className="adviser-card__body">
+        {primary ? (
+          <div className="adviser-card__person">
+            <span className="adviser-card__avatar" aria-hidden="true">
+              {primary.staff.name.split(" ").map((part) => part.slice(0, 1)).join("").slice(0, 2)}
+            </span>
+            <div>
+              <strong>{primary.staff.name}</strong>
+              <p>
+                {primary.staff.title ?? "Academic adviser"}
+                {primary.staff.officeLocation ? ` · ${primary.staff.officeLocation}` : ""}
+              </p>
+              <p className="adviser-card__meta">
+                {gap
+                  ? gap.message
+                  : primary.availability.nextOpenSlotAt
+                    ? `Next open time: ${new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: tenant.localization.timeZone }).format(new Date(primary.availability.nextOpenSlotAt))} · ${primary.availability.openSlotsNext14Days} open in the next two weeks`
+                    : "No open times published."}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="adviser-card__meta">{gap?.message ?? "No academic adviser has been assigned to you yet."}</p>
+        )}
+        {others.length > 0 ? (
+          <ul className="adviser-card__others">
+            {others.map((entry) => (
+              <li key={entry.role}>
+                <span>{roleLabel[entry.role] ?? entry.role}</span>
+                <strong>{entry.staff.name}</strong>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {primary && !gap ? (
+          <button type="button" className="secondary-button" onClick={(event) => onBook(event.currentTarget)}>
+            Book time with {primary.staff.name.split(" ")[0]}
+          </button>
+        ) : null}
+      </div>
+    </Card>
   );
 }

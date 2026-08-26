@@ -57,6 +57,7 @@ import { ActionCenterDetail } from "./action-center-detail";
 import { ActionRulesEditor } from "./action-rules-editor";
 import { JourneyFlowBuilder } from "./journey-flow-builder";
 import { MorningBrewView } from "./morning-brew/morning-brew";
+import { MyDeskView } from "./my-desk";
 import { NotificationCenter } from "./notification-center";
 import { connectStaffRealtime, type StaffRealtimeEvent } from "./staff-realtime";
 import {
@@ -69,6 +70,7 @@ import {
 
 type StaffView =
   | "morning_brew"
+  | "my_desk"
   | "overview"
   | "tasks"
   | "students"
@@ -175,6 +177,7 @@ function realtimeNoticeFor(event: StaffRealtimeEvent): StaffRealtimeNotice | nul
 
 const viewOrder: StaffView[] = [
   "morning_brew",
+  "my_desk",
   "overview",
   "tasks",
   "students",
@@ -201,6 +204,7 @@ const navigation: Array<{
     label: "Workspace",
     items: [
       { id: "morning_brew", label: "Morning Brew", icon: "✦" },
+      { id: "my_desk", label: "My desk", icon: "☺" },
       { id: "overview", label: "Today", icon: "⌂" },
       { id: "outreach", label: "Action center", icon: "↗" },
       { id: "tasks", label: "Task board", icon: "✓", badge: "tasks" },
@@ -271,6 +275,12 @@ const viewCopy: Record<
     title: "Morning Brew",
     description:
       "Your personalized daily briefing across enrollment, student success, and institutional operations.",
+  },
+  my_desk: {
+    eyebrow: "Your chair",
+    title: "My desk",
+    description:
+      "Who you are here, the students assigned to you, your calendar and availability, and — if people report to you — the team situations that need a decision.",
   },
   overview: {
     eyebrow: "Enrollment operations",
@@ -4218,6 +4228,8 @@ function StaffWorkspaceShell({
       <main className="staff-main staff-main--workspace">
         {view === "morning_brew" ? (
           <MorningBrewView workspace={workspace} navigate={navigate} />
+        ) : view === "my_desk" ? (
+          <MyDeskView heading={<PageHeading view="my_desk" />} />
         ) : view === "overview" ? (
           <OverviewView workspace={workspace} navigate={navigate} />
         ) : view === "tasks" ? (

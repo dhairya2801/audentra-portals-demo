@@ -37,6 +37,17 @@ import type {
   EdwardResponseFeedback,
   StudentAppointment,
   StudentAppointmentList,
+  StudentAppointmentType,
+  AppointmentAvailability,
+  CancelStudentAppointmentInput,
+  DemoStaffDirectory,
+  DemoStaffSignInInput,
+  RescheduleStudentAppointmentInput,
+  StaffAppointmentCalendar,
+  StaffCaseload,
+  StaffMe,
+  StudentAdvising,
+  UpdateStaffAppointmentInput,
   StudentAcademics,
   StudentBootstrap,
   StudentDashboard,
@@ -940,6 +951,29 @@ export function signUpStaff(input: StaffSignUpInput) {
   });
 }
 
+/**
+ * Development-only: browse the synthetic staff and open the portal as one of
+ * them. The platform 404s both routes outside development and preview and
+ * mints a real, revocable staff session for the chosen person.
+ */
+export function getDemoStaffDirectory(query: string, signal?: AbortSignal) {
+  const params = new URLSearchParams();
+  if (query.trim()) params.set("q", query.trim());
+  params.set("limit", "500");
+  return request<DemoStaffDirectory>(`/v1/auth/demo/staff/directory?${params.toString()}`, {
+    method: "GET",
+    signal,
+  });
+}
+
+export function signInDemoStaff(input: DemoStaffSignInInput) {
+  return request<StaffSession>("/v1/auth/demo/staff/sign-in-as", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
 export function signOutStaff() {
   return request<{
     authenticated: false;
@@ -954,6 +988,46 @@ export function signOutStaff() {
 const staffHeaders = {
   "X-Demo-Actor-Type": "staff",
 } as const;
+
+export function getStaffMe(signal?: AbortSignal) {
+  return request<StaffMe>("/v1/staff/me", { method: "GET", headers: staffHeaders, signal });
+}
+
+export function getStaffCaseload(role: string | null, signal?: AbortSignal) {
+  const suffix = role ? `?role=${encodeURIComponent(role)}` : "";
+  return request<StaffCaseload>(`/v1/staff/caseload${suffix}`, {
+    method: "GET",
+    headers: staffHeaders,
+    signal,
+  });
+}
+
+export function getStaffAppointments(
+  params: { staffMemberId?: string; from?: string; to?: string },
+  signal?: AbortSignal,
+) {
+  const search = new URLSearchParams();
+  if (params.staffMemberId) search.set("staffMemberId", params.staffMemberId);
+  if (params.from) search.set("from", params.from);
+  if (params.to) search.set("to", params.to);
+  const suffix = search.size > 0 ? `?${search.toString()}` : "";
+  return request<StaffAppointmentCalendar>(`/v1/staff/appointments${suffix}`, {
+    method: "GET",
+    headers: staffHeaders,
+    signal,
+  });
+}
+
+export function updateStaffAppointment(appointmentId: string, input: UpdateStaffAppointmentInput) {
+  return request<StudentAppointment>(
+    `/v1/staff/appointments/${encodeURIComponent(appointmentId)}`,
+    {
+      method: "PATCH",
+      headers: { ...staffHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
+}
 
 export function getStaffActionCenter(signal?: AbortSignal) {
   return request<StaffActionCenter>("/v1/staff/action-center", {
@@ -1728,6 +1802,53 @@ export function createStudentAppointment(
     },
     body: JSON.stringify(input),
   });
+}
+
+export function getStudentAdvising(signal?: AbortSignal) {
+  return request<StudentAdvising>("/v1/student/advising", { method: "GET", signal });
+}
+
+export function getAppointmentAvailability(
+  params: { type: StudentAppointmentType; staffMemberId?: string; from?: string; to?: string },
+  signal?: AbortSignal,
+) {
+  const search = new URLSearchParams({ type: params.type });
+  if (params.staffMemberId) search.set("staffMemberId", params.staffMemberId);
+  if (params.from) search.set("from", params.from);
+  if (params.to) search.set("to", params.to);
+  return request<AppointmentAvailability>(
+    `/v1/student/appointments/availability?${search.toString()}`,
+    { method: "GET", signal },
+  );
+}
+
+export function cancelStudentAppointment(
+  appointmentId: string,
+  input: CancelStudentAppointmentInput = {},
+) {
+  return request<StudentAppointment>(
+    `/v1/student/appointments/${encodeURIComponent(appointmentId)}/cancel`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function rescheduleStudentAppointment(
+  appointmentId: string,
+  input: RescheduleStudentAppointmentInput,
+  idempotencyKey: string,
+) {
+  return request<StudentAppointment>(
+    `/v1/student/appointments/${encodeURIComponent(appointmentId)}/reschedule`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export function getStudentRequirementAppointments(
