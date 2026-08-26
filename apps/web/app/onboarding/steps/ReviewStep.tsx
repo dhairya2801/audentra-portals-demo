@@ -77,9 +77,11 @@ export function ReviewStep({
   documents,
   legalName,
   signature,
+  signatureError,
   signedOn,
   onEdit,
   onSign,
+  onScrolled,
 }: {
   institution: string;
   offer: AdmissionOfferSummary;
@@ -93,9 +95,12 @@ export function ReviewStep({
   documents: SigningDocument[];
   legalName: string;
   signature: string;
+  signatureError?: string;
   signedOn: string;
   onEdit: (screen: ScreenId) => void;
   onSign: (value: string) => void;
+  /** How many documents have been scrolled to the end, so the page can say which is missing. */
+  onScrolled?: (count: number) => void;
 }) {
   const [scrolled, setScrolled] = useState<string[]>([]);
   const all = documents.every((doc) => scrolled.includes(doc.id));
@@ -222,7 +227,13 @@ export function ReviewStep({
               ) : null}
               <ReadPanel
                 title={doc.title}
-                onEnd={() => setScrolled((done) => [...new Set([...done, doc.id])])}
+                onEnd={() =>
+                  setScrolled((done) => {
+                    const next = [...new Set([...done, doc.id])];
+                    onScrolled?.(next.length);
+                    return next;
+                  })
+                }
               >
                 <img className="sign-doc-page" src={doc.preview} alt={`${doc.title}, page 1`} />
                 <p>
@@ -244,6 +255,7 @@ export function ReviewStep({
               legalName={legalName}
               value={signature}
               onChange={onSign}
+              error={signatureError}
               date={signedOn}
               label={both ? "Type your full legal name to sign both" : "Type your full legal name to sign"}
             />

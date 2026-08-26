@@ -342,6 +342,7 @@ function OnboardingFlow({
   const [screenId, setScreenId] = useState<ScreenId>(() => firstUnresolved(screens, record));
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
   const [notice, setNotice] = useState<FlowNotice | null>(null);
   const [resumeShown, setResumeShown] = useState(true);
@@ -359,6 +360,7 @@ function OnboardingFlow({
   const [leaving, setLeaving] = useState(false);
   const [card, setCard] = useState({ number: "", expiry: "", cvc: "" });
   const [signature, setSignature] = useState("");
+  const [reviewScrolled, setReviewScrolled] = useState(0);
 
   const heading = useRef<HTMLElement>(null);
   const lastScreen = useRef<ScreenId | null>(null);
@@ -513,6 +515,8 @@ function OnboardingFlow({
   function goTo(id: ScreenId) {
     setNotice(null);
     setFailed(null);
+    setProblem(null);
+    setReviewScrolled(0);
     setAttempted(false);
     setScreenId(id);
     window.scrollTo({
@@ -649,9 +653,11 @@ function OnboardingFlow({
       case "review":
         return signatureMatches
           ? null
-          : signature.trim()
-            ? "Type your name exactly as it appears in the locked field above."
-            : "Scroll the document to the end, then type your legal name to sign.";
+          : reviewScrolled < signingDocuments.length
+            ? `Scroll ${signingDocuments.length > 1 ? "both documents" : "the document"} to the end. The signature opens once ${signingDocuments.length > 1 ? "they have" : "it has"} been scrolled.`
+            : signature.trim()
+              ? `The signature has to match your legal name exactly: ${legalName}.`
+              : "Type your full legal name in the signature field to sign.";
       case "deposit":
         return depositValid
           ? null
@@ -705,6 +711,7 @@ function OnboardingFlow({
     setDraft((current) => ({ ...current, data: {}, contacts: undefined, local }));
     setResumeShown(false);
     setNotice(null);
+    setProblem(null);
     setAttempted(false);
     const following = firstUnresolved(screens, recordFrom(next, local));
     setScreenId(following);
@@ -740,12 +747,13 @@ function OnboardingFlow({
   async function commit() {
     if (saving) return;
     setAttempted(true);
-    const problem = problemFor(screen.id);
-    if (problem) {
+    const blocking = problemFor(screen.id);
+    if (blocking) {
       setFailed(null);
-      setNotice({ tone: "alert", text: problem });
+      setProblem(blocking);
       return;
     }
+    setProblem(null);
     setSaving(true);
     setFailed(null);
     setConflict(false);
@@ -1217,9 +1225,14 @@ function OnboardingFlow({
             documents={signingDocuments}
             legalName={legalName}
             signature={signature}
+            signatureError={attempted && signature.trim() && !signatureMatches ? `Type it exactly as it appears above: ${legalName}.` : undefined}
             signedOn={today}
             onEdit={goTo}
-            onSign={setSignature}
+            onSign={(value) => {
+              setSignature(value);
+              setProblem(null);
+            }}
+            onScrolled={setReviewScrolled}
           />
         );
       default:
@@ -1369,6 +1382,16 @@ function OnboardingFlow({
                 <aside className="flow-aside" aria-label="Your ranked halls" aria-live="off">
                   <RankPanel shortlist={shortlist} residences={housingPlan.residences} />
                 </aside>
+              )}
+
+              {problem && (
+                <p className="step-failed" role="alert">
+                  <Icon name="alert" size={16} />
+                  <span>
+                    <strong>Not quite yet.</strong>
+                    {problem}
+                  </span>
+                </p>
               )}
 
               {working && screen.id !== "offer" && (
