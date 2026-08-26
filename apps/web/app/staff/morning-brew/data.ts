@@ -1,5 +1,6 @@
 import type {
   StaffBrewAttentionItem,
+  StaffBrewCapacity,
   StaffBrewChange,
   StaffBrewDeadline,
   StaffBrewMetric,
@@ -10,6 +11,8 @@ import type {
 import { BREW_DEPTH_OPTIONS, BREW_TIMEFRAMES } from "./catalog";
 import type {
   BrewBriefing,
+  BrewCapacity,
+  BrewCapacitySignal,
   BrewChange,
   BrewDeadline,
   BrewInsight,
@@ -240,6 +243,80 @@ function toPriority(priority: StaffBrewPriority): BrewPriority {
     steps: priority.steps,
     window: priority.window,
     count: priority.count,
+    boardQuery: priority.boardQuery ?? null,
+  };
+}
+
+/* ----------------------------------------------------------------- capacity */
+
+const CAPACITY_TOPIC: BrewTopicId = "student_success";
+const CAPACITY_SIGNAL_LIMIT = 10;
+
+const plural = (count: number, noun: string, pluralNoun = `${noun}s`) =>
+  `${INT.format(count)} ${count === 1 ? noun : pluralNoun}`;
+
+/**
+ * One line a reader can say out loud: staff headcount, who is unavailable,
+ * and who is over or under capacity. Zero-valued parts are left out so the
+ * line names only what is true today; the headcount is always first.
+ */
+export function capacitySummaryLine(summary: StaffBrewCapacity["summary"]): string | null {
+  if (!summary) return null;
+  const parts = [plural(summary.staff, "staff", "staff")];
+  if (summary.onLeave > 0) parts.push(`${INT.format(summary.onLeave)} on leave`);
+  if (summary.departed > 0) parts.push(`${INT.format(summary.departed)} departed`);
+  if (summary.awayNow > 0) parts.push(`${INT.format(summary.awayNow)} away today`);
+  if (summary.overCap > 0) parts.push(`${INT.format(summary.overCap)} over cap`);
+  if (summary.fallingBehind > 0) parts.push(`${INT.format(summary.fallingBehind)} falling behind`);
+  if (summary.spareCapacity > 0) {
+    parts.push(`${INT.format(summary.spareCapacity)} with spare capacity`);
+  }
+  if (summary.itemsOwnedByUnavailable > 0) {
+    parts.push(
+      `${plural(summary.itemsOwnedByUnavailable, "open item")} owned by someone unavailable`,
+    );
+  }
+  if (summary.unassignedItems > 0) parts.push(`${plural(summary.unassignedItems, "item")} unassigned`);
+  if (summary.staleItems > 0) parts.push(`${plural(summary.staleItems, "stale item")}`);
+  return parts.join(" · ");
+}
+
+function toCapacitySignal(signal: StaffBrewCapacity["signals"][number]): BrewCapacitySignal {
+  return {
+    id: signal.id,
+    kind: signal.kind,
+    severity: signal.severity,
+    title: signal.title,
+    detail: signal.detail,
+    action: signal.action,
+    count: signal.count,
+    destination: signal.destination,
+    boardQuery: signal.boardQuery ?? null,
+  };
+}
+
+export function toCapacity(capacity: StaffBrewCapacity | null | undefined): BrewCapacity | null {
+  if (!capacity) return null;
+  const signals = (capacity.signals ?? []).slice(0, CAPACITY_SIGNAL_LIMIT).map(toCapacitySignal);
+  return {
+    topic: CAPACITY_TOPIC,
+    available: capacity.available,
+    summaryLine: capacity.available ? capacitySummaryLine(capacity.summary) : null,
+    signals: capacity.available ? signals : [],
+    signalsOmitted:
+      (capacity.signalsOmitted ?? 0) +
+      Math.max(0, (capacity.signals ?? []).length - signals.length),
+    offices: capacity.available
+      ? (capacity.components ?? []).map((office) => ({
+          component: office.component,
+          open: office.open,
+          overdue: office.overdue,
+          unassigned: office.unassigned,
+          stale: office.stale,
+          oldestOverdueDays: office.oldestOverdueDays,
+        }))
+      : [],
+    basis: capacity.basis,
   };
 }
 
@@ -306,6 +383,8 @@ export function buildBrewBriefing(
     .slice(0, priorityLimit(preferences))
     .map(toPriority);
 
+  const capacity = topics.has(CAPACITY_TOPIC) ? toCapacity(brew.staffCapacity) : null;
+
   const timeframes = (brew.windows.length ? brew.windows : BREW_TIMEFRAMES).map((window) => ({
     id: window.id as BrewTimeframeId,
     label: window.label,
@@ -346,6 +425,8 @@ export function buildBrewBriefing(
       unsupported: brew.coverage.unsupported,
     },
     engagementScanAvailable: brew.engagementScan.available,
+    engagementActivitySignal: brew.engagementScan.activitySignal !== false,
+    capacity: signals ? capacity : null,
   };
 }
 

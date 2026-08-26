@@ -56,7 +56,31 @@ function workItem(overrides = {}) {
     },
     source: null,
     history: [],
+    signals: {
+      overdue: false,
+      overdueDays: null,
+      stale: false,
+      staleDays: null,
+      ageDays: 0,
+      unassigned: overrides.assignee === null,
+      ownerRisk: null,
+      ...(overrides.signals ?? {}),
+    },
     ...overrides,
+    ...(overrides.signals
+      ? {
+          signals: {
+            overdue: false,
+            overdueDays: null,
+            stale: false,
+            staleDays: null,
+            ageDays: 0,
+            unassigned: false,
+            ownerRisk: null,
+            ...overrides.signals,
+          },
+        }
+      : {}),
   };
 }
 
@@ -81,41 +105,203 @@ test("task board sorts by priority, due date, created time, and key", async () =
   ]);
 });
 
-test("task board combines ownership, task, priority, status, team, and due filters", async () => {
-  const { emptyTaskBoardFilters, filterAndSortStaffWorkItems } =
-    await importTypeScriptModule("../app/staff/task-board-utils.ts");
-  const now = new Date("2026-08-09T12:00:00.000Z");
-  const items = [
-    workItem({
-      key: "MATCH-1",
-      priority: "high",
-      status: "todo",
-      dueAt: "2026-08-09T18:00:00.000Z",
-      title: "Transcript review",
-    }),
-    workItem({
-      key: "OTHER-1",
-      priority: "low",
-      assignee: null,
-      dueAt: "2026-08-12T18:00:00.000Z",
-    }),
-  ];
-  const result = filterAndSortStaffWorkItems(
-    items,
+test("toolbar filters map onto the bounded Action Center query", async () => {
+  const { emptyTaskBoardFilters, buildActionCenterQuery } = await importTypeScriptModule(
+    "../app/staff/task-board-utils.ts",
+  );
+  assert.deepEqual(buildActionCenterQuery(emptyTaskBoardFilters), {
+    status: "open",
+    priority: undefined,
+    component: undefined,
+    assignee: undefined,
+    search: undefined,
+    due: undefined,
+    stale: undefined,
+    ownerRisk: undefined,
+    sort: "priority",
+    limit: 100,
+    offset: 0,
+  });
+
+  const narrowed = buildActionCenterQuery(
     {
       ...emptyTaskBoardFilters,
-      query: "transcript",
+      query: "  transcript ",
       ownership: "mine",
-      workType: "enrollment",
       priority: "high",
-      status: "todo",
+      status: "blocked",
       component: "Enrollment Support",
       dueWindow: "today",
+      stale: true,
+      ownerRisk: true,
+      sort: "stale",
     },
-    "staff-me",
-    now,
+    { limit: 25, offset: 200 },
   );
-  assert.deepEqual(result.map((item) => item.key), ["MATCH-1"]);
+  assert.equal(narrowed.search, "transcript");
+  assert.equal(narrowed.assignee, "me");
+  assert.equal(narrowed.status, "blocked");
+  assert.equal(narrowed.due, "today");
+  assert.equal(narrowed.stale, true);
+  assert.equal(narrowed.ownerRisk, true);
+  assert.equal(narrowed.sort, "stale");
+  assert.equal(narrowed.limit, 25);
+  assert.equal(narrowed.offset, 200);
+
+  // The ownership scope wins over a stale assignee choice; a specific person is passed by id.
+  assert.equal(
+    buildActionCenterQuery({ ...emptyTaskBoardFilters, ownership: "unassigned", assigneeId: "staff-9" })
+      .assignee,
+    "unassigned",
+  );
+  assert.equal(
+    buildActionCenterQuery({ ...emptyTaskBoardFilters, assigneeId: "staff-9" }).assignee,
+    "staff-9",
+  );
+});
+
+test("query serialization omits undefined and writes booleans literally", async () => {
+  const { actionCenterQueryToParams } = await importTypeScriptModule(
+    "../app/staff/task-board-utils.ts",
+  );
+  const params = actionCenterQueryToParams({
+    status: "open",
+    priority: undefined,
+    component: "Financial Aid",
+    search: "",
+    stale: true,
+    ownerRisk: false,
+    escalated: undefined,
+    sort: "due",
+    limit: 100,
+    offset: 0,
+  });
+  assert.equal(
+    params.toString(),
+    "status=open&component=Financial+Aid&stale=true&ownerRisk=false&sort=due&limit=100&offset=0",
+  );
+});
+
+test("a deep-linked query round-trips into toolbar state", async () => {
+  const { filtersFromActionCenterQuery, buildActionCenterQuery, emptyTaskBoardFilters } =
+    await importTypeScriptModule("../app/staff/task-board-utils.ts");
+  const query = {
+    status: "all",
+    assignee: "unassigned",
+    component: "Registrar",
+    due: "overdue",
+    ownerRisk: true,
+    sort: "updated",
+    limit: 50,
+  };
+  const filters = filtersFromActionCenterQuery(query);
+  assert.equal(filters.ownership, "unassigned");
+  assert.equal(filters.assigneeId, "all");
+  assert.equal(filters.status, "all");
+  assert.equal(filters.dueWindow, "overdue");
+  assert.equal(filters.ownerRisk, true);
+  assert.equal(filters.stale, false);
+  assert.equal(filters.sort, "updated");
+  const rebuilt = buildActionCenterQuery(filters);
+  assert.equal(rebuilt.assignee, "unassigned");
+  assert.equal(rebuilt.component, "Registrar");
+  assert.equal(rebuilt.due, "overdue");
+  assert.equal(rebuilt.ownerRisk, true);
+  // A nonsense status falls back to open work rather than an unfiltered board.
+  assert.equal(filtersFromActionCenterQuery({ status: "bogus" }).status, "open");
+  assert.deepEqual(filtersFromActionCenterQuery(null), emptyTaskBoardFilters);
+});
+
+test("the board shows open columns by default and groups loaded items in one pass", async () => {
+  const { visibleWorkStatuses, groupWorkItemsByStatus } = await importTypeScriptModule(
+    "../app/staff/task-board-utils.ts",
+  );
+  assert.deepEqual(visibleWorkStatuses("open"), [
+    "todo",
+    "in_progress",
+    "follow_up_required",
+    "blocked",
+  ]);
+  assert.deepEqual(visibleWorkStatuses("closed"), ["done", "cancelled"]);
+  assert.equal(visibleWorkStatuses("all").length, 6);
+  assert.deepEqual(visibleWorkStatuses("done"), ["done"]);
+
+  const grouped = groupWorkItemsByStatus([
+    workItem({ key: "A", status: "todo" }),
+    workItem({ key: "B", status: "blocked" }),
+    workItem({ key: "C", status: "todo" }),
+  ]);
+  assert.deepEqual(grouped.todo.map((item) => item.key), ["A", "C"]);
+  assert.deepEqual(grouped.blocked.map((item) => item.key), ["B"]);
+  assert.deepEqual(grouped.done, []);
+});
+
+test("owner and availability badges are worded from the server signals", async () => {
+  const { ownerRiskLabel, staffAvailabilityNote } = await importTypeScriptModule(
+    "../app/staff/task-board-utils.ts",
+  );
+  const onLeave = {
+    id: "s1",
+    name: "Priya Shah",
+    email: "p@example.edu",
+    component: "Enrollment Support",
+    employmentStatus: "on_leave",
+    leaveUntil: "2026-09-15",
+  };
+  assert.equal(
+    ownerRiskLabel(workItem({ assignee: onLeave, signals: { ownerRisk: "on_leave" } })),
+    "Owner on leave until 2026-09-15",
+  );
+  assert.equal(
+    ownerRiskLabel(workItem({ signals: { ownerRisk: "departed" } })),
+    "Owner departed",
+  );
+  assert.equal(
+    ownerRiskLabel(
+      workItem({
+        assignee: { ...onLeave, employmentStatus: "active", leaveUntil: null, awayUntil: "2026-08-30T00:00:00.000Z" },
+        signals: { ownerRisk: "away" },
+      }),
+    ),
+    "Owner away until 2026-08-30",
+  );
+  assert.equal(ownerRiskLabel(workItem({ signals: { ownerRisk: null } })), null);
+  assert.equal(staffAvailabilityNote(onLeave), "on leave until 2026-09-15");
+  assert.equal(staffAvailabilityNote({ ...onLeave, employmentStatus: "departed" }), "departed");
+  assert.equal(staffAvailabilityNote({ ...onLeave, employmentStatus: "active", leaveUntil: null }), null);
+});
+
+test("the task board pages the server instead of filtering the workspace payload", async () => {
+  const [client, portal, card] = await Promise.all([
+    readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/staff/staff-portal.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/staff/staff-action-center.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(client, /getStaffActionCenter\(\s*query: StaffActionCenterQuery = \{\}/);
+  assert.match(client, /actionCenterQueryToParams\(query\)/);
+  assert.match(client, /`\/v1\/staff\/action-center\$\{suffix\}`/);
+
+  const board = portal.slice(
+    portal.indexOf("function TaskBoardView("),
+    portal.indexOf("function StaffDialog("),
+  );
+  assert.doesNotMatch(board, /filterAndSortStaffWorkItems/);
+  assert.doesNotMatch(board, /workspace\.actionCenter\.items/);
+  assert.match(board, /TASK_BOARD_PAGE_SIZE/);
+  assert.match(board, /Showing \$\{items\.length\} of \$\{total\} tasks/);
+  assert.match(board, /Load more/);
+  assert.match(board, /window\.setTimeout\(\(\) => setDebouncedQuery\(filters\.query\), 300\)/);
+  assert.match(board, /updateFilter\("stale", !filters\.stale\)/);
+  assert.match(board, /updateFilter\("ownerRisk", !filters\.ownerRisk\)/);
+  assert.match(board, /facets\?\.components/);
+  assert.match(board, /facets\?\.assignees/);
+  assert.match(board, /initialQuery/);
+  assert.match(card, /staff-signal staff-signal--overdue/);
+  assert.match(card, /staff-signal staff-signal--stale/);
+  assert.match(card, /staff-signal staff-signal--owner/);
+  assert.match(card, /staff-signal staff-signal--unassigned/);
+  // The student directory never counts open items from a partial page.
+  assert.doesNotMatch(portal, /open items<\/small>/);
 });
 
 test("create-task client and form use the canonical backend contract", async () => {

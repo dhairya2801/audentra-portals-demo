@@ -76,6 +76,7 @@ import type {
   RequestStaffAiRefreshInput,
   RetryStaffCallTranscriptionInput,
   StaffActionCenter,
+  StaffActionCenterQuery,
   StaffActionRule,
   StaffActionRuleList,
   StaffCorePlay,
@@ -121,6 +122,7 @@ import type {
   FerpaDelegateLinkIssueResult,
   DelegateSession,
 } from "@vv/contracts";
+import { actionCenterQueryToParams } from "../staff/task-board-utils";
 import type { EdwardExecutionMode } from "./edward-lab";
 import { isParentPortalPath } from "./parent-portal-routes";
 
@@ -1029,8 +1031,17 @@ export function updateStaffAppointment(appointmentId: string, input: UpdateStaff
   );
 }
 
-export function getStaffActionCenter(signal?: AbortSignal) {
-  return request<StaffActionCenter>("/v1/staff/action-center", {
+/**
+ * One bounded page of the staff Action Center. The board is never returned in
+ * full; page with `offset`/`limit` (max 200) or narrow with the query.
+ */
+export function getStaffActionCenter(
+  query: StaffActionCenterQuery = {},
+  signal?: AbortSignal,
+) {
+  const params = actionCenterQueryToParams(query);
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+  return request<StaffActionCenter>(`/v1/staff/action-center${suffix}`, {
     method: "GET",
     headers: staffHeaders,
     signal,

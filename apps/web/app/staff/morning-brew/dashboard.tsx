@@ -5,11 +5,13 @@ import { BREW_INCLUDES } from "./catalog";
 import { EnrollmentPulse } from "./pulse";
 import type {
   BrewBriefing,
+  BrewCapacity,
   BrewDetailRef,
   BrewPreferences,
   BrewTimeframeId,
   EdwardRequest,
   MorningBrewDestination,
+  MorningBrewNavigate,
 } from "./types";
 
 const ET = "America/New_York";
@@ -35,6 +37,122 @@ const initialsOf = (name: string) =>
     .slice(0, 2)
     .toUpperCase();
 
+const CAPACITY_SEVERITY_LABEL: Record<BrewCapacity["signals"][number]["severity"], string> = {
+  critical: "Critical",
+  high: "High",
+  medium: "Medium",
+  positive: "Capacity",
+};
+
+/**
+ * People & capacity. A summary line, a short ranked list of signals, and a
+ * compact office table — the payload is already bounded, so nothing is
+ * derived here beyond formatting.
+ */
+function CapacitySection({
+  capacity,
+  navigate,
+}: {
+  capacity: BrewCapacity;
+  navigate: MorningBrewNavigate;
+}) {
+  return (
+    <section className="brew-capacity" aria-labelledby="brew-capacity-title">
+      <header className="brew-panel-head">
+        <div>
+          <p className="brew-eyebrow" id="brew-capacity-title">
+            <span aria-hidden="true">⚇</span> People &amp; capacity
+          </p>
+          {capacity.summaryLine ? (
+            <p className="brew-capacity__summary">{capacity.summaryLine}</p>
+          ) : null}
+        </div>
+      </header>
+      {!capacity.available ? (
+        <p className="brew-capacity__basis">{capacity.basis}</p>
+      ) : (
+        <>
+          {capacity.signals.length ? (
+            <ol className="brew-capacity__signals">
+              {capacity.signals.map((signal) => (
+                <li key={signal.id} className={`brew-capacity__signal is-${signal.severity}`}>
+                  <i className={`brew-chip brew-chip--${signal.severity}`}>
+                    {CAPACITY_SEVERITY_LABEL[signal.severity]}
+                  </i>
+                  <div>
+                    <strong>{signal.title}</strong>
+                    <p>{signal.detail}</p>
+                    <small>{signal.action}</small>
+                  </div>
+                  <button
+                    className="brew-link"
+                    type="button"
+                    onClick={() => navigate(signal.destination, signal.boardQuery)}
+                  >
+                    {signal.boardQuery ? "Open on the board" : "Open"}{" "}
+                    <span aria-hidden="true">→</span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="brew-capacity__basis">No capacity signals fired today.</p>
+          )}
+          {capacity.signalsOmitted > 0 ? (
+            <p className="brew-capacity__omitted">
+              {capacity.signalsOmitted} further signal{capacity.signalsOmitted === 1 ? "" : "s"} not
+              shown.
+            </p>
+          ) : null}
+          {capacity.offices.length ? (
+            <div className="brew-capacity__offices">
+              <table>
+                <caption className="sr-only">Open work per office</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Office</th>
+                    <th scope="col">Open</th>
+                    <th scope="col">Overdue</th>
+                    <th scope="col">Unassigned</th>
+                    <th scope="col">Stale</th>
+                    <th scope="col">Oldest overdue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {capacity.offices.map((office) => (
+                    <tr key={office.component}>
+                      <th scope="row">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate("tasks", { component: office.component, status: "open" })
+                          }
+                        >
+                          {office.component}
+                        </button>
+                      </th>
+                      <td>{office.open}</td>
+                      <td className={office.overdue > 0 ? "is-negative" : undefined}>
+                        {office.overdue}
+                      </td>
+                      <td>{office.unassigned}</td>
+                      <td>{office.stale}</td>
+                      <td>
+                        {office.oldestOverdueDays !== null ? `${office.oldestOverdueDays}d` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+          <p className="brew-capacity__basis">{capacity.basis}</p>
+        </>
+      )}
+    </section>
+  );
+}
+
 function EdwardChip({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button className="brew-edward-chip" type="button" onClick={onClick}>
@@ -56,7 +174,7 @@ export function MorningBrewDashboard({
   briefing: BrewBriefing;
   preferences: BrewPreferences;
   staffName: string;
-  navigate: (destination: MorningBrewDestination) => void;
+  navigate: MorningBrewNavigate;
   onOpenDetail: (ref: BrewDetailRef) => void;
   onAskEdward: (request: EdwardRequest) => void;
   onCustomize: () => void;
@@ -321,6 +439,10 @@ export function MorningBrewDashboard({
         </section>
       ) : null}
 
+      {briefing.capacity ? (
+        <CapacitySection capacity={briefing.capacity} navigate={navigate} />
+      ) : null}
+
       <EnrollmentPulse
         kpis={briefing.kpis}
         timeframes={briefing.timeframes}
@@ -571,7 +693,10 @@ export function MorningBrewDashboard({
                       </span>
                       <p>{priority.detail}</p>
                       <span className="brew-row-actions">
-                        <button type="button" onClick={() => navigate(priority.destination)}>
+                        <button
+                          type="button"
+                          onClick={() => navigate(priority.destination, priority.boardQuery)}
+                        >
                           {priority.linkLabel} →
                         </button>
                       </span>
@@ -619,6 +744,13 @@ export function MorningBrewDashboard({
           {briefing.coverage.notes.map((note) => (
             <li key={note}>{note}</li>
           ))}
+          {!briefing.engagementActivitySignal ? (
+            <li className="brew-coverage__note--muted">
+              Portal inactivity is unknown for this institution: no portal activity has been
+              recorded in the last 30 days, so a quiet student cannot be told apart from an
+              unconnected one.
+            </li>
+          ) : null}
         </ul>
         <details className="brew-coverage__details">
           <summary>Metrics this briefing will not show ({briefing.coverage.unsupported.length})</summary>

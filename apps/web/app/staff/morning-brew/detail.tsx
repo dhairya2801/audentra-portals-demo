@@ -1,8 +1,16 @@
 "use client";
 
+import type { StaffActionCenterQuery } from "@vv/contracts";
+
 import { topicById } from "./catalog";
 import { formatBrewNumber } from "./data";
-import type { BrewBriefing, BrewDetailRef, EdwardRequest, MorningBrewDestination } from "./types";
+import type {
+  BrewBriefing,
+  BrewDetailRef,
+  EdwardRequest,
+  MorningBrewDestination,
+  MorningBrewNavigate,
+} from "./types";
 
 const DESTINATION_LABELS: Record<MorningBrewDestination, string> = {
   overview: "Enrollment dashboard",
@@ -192,15 +200,18 @@ export function MorningBrewDetail({
   detail: BrewDetailRef;
   briefing: BrewBriefing;
   onBack: () => void;
-  navigate: (destination: MorningBrewDestination) => void;
+  navigate: MorningBrewNavigate;
   onAskEdward: (request: EdwardRequest) => void;
 }) {
-  const openWorkspace = (destination?: MorningBrewDestination) =>
+  const openWorkspace = (
+    destination?: MorningBrewDestination,
+    boardQuery?: StaffActionCenterQuery | null,
+  ) =>
     destination ? (
       <button
         className="button button--primary"
         type="button"
-        onClick={() => navigate(destination)}
+        onClick={() => navigate(destination, boardQuery)}
       >
         Open {DESTINATION_LABELS[destination]} <span aria-hidden="true">→</span>
       </button>
@@ -546,7 +557,7 @@ export function MorningBrewDetail({
             <b>{formatBrewNumber(priority.count)}</b>
           </>
         }
-        actions={openWorkspace(priority.destination)}
+        actions={openWorkspace(priority.destination, priority.boardQuery)}
       >
         <p className="brew-detail__lede">{priority.detail}</p>
 

@@ -92,10 +92,30 @@ test("student SSO clears a delegate tab selector before the return path loads", 
   const parentPortalRoutesUrl = `data:text/javascript;base64,${Buffer.from(
     compiledParentPortalRoutes,
   ).toString("base64")}`;
-  const executableSource = source.replace(
-    'from "./parent-portal-routes";',
-    `from ${JSON.stringify(parentPortalRoutesUrl)};`,
+  // The client also serializes Action Center queries through the task-board
+  // utilities, which import only contract types, so they inline the same way.
+  const taskBoardUtilsSource = await readFile(
+    new URL("../app/staff/task-board-utils.ts", import.meta.url),
+    "utf8",
   );
+  const compiledTaskBoardUtils = ts.transpileModule(taskBoardUtilsSource, {
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const taskBoardUtilsUrl = `data:text/javascript;base64,${Buffer.from(
+    compiledTaskBoardUtils,
+  ).toString("base64")}`;
+  const executableSource = source
+    .replace(
+      'from "./parent-portal-routes";',
+      `from ${JSON.stringify(parentPortalRoutesUrl)};`,
+    )
+    .replace(
+      'from "../staff/task-board-utils";',
+      `from ${JSON.stringify(taskBoardUtilsUrl)};`,
+    );
   const compiled = ts.transpileModule(executableSource, {
     compilerOptions: {
       module: ts.ModuleKind.ESNext,

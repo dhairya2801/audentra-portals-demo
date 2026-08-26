@@ -290,12 +290,81 @@ function brew(overrides = {}) {
       unassigned: 1,
       assignedToMe: 1,
     },
+    staffCapacity: staffCapacity(),
     engagementScan: { available: false, snapshots: 0, lastProjectedAt: null },
     coverage: {
       source: "canonical_postgres",
       notes: ["Every figure is a count of canonical PostgreSQL rows."],
       unsupported: [{ metric: "Yield forecasts", reason: "No validated model exists." }],
     },
+    ...overrides,
+  };
+}
+
+function staffCapacity(overrides = {}) {
+  return {
+    available: true,
+    summary: {
+      staff: 88,
+      active: 86,
+      onLeave: 1,
+      departed: 1,
+      awayNow: 6,
+      overCap: 1,
+      fallingBehind: 0,
+      spareCapacity: 1,
+      itemsOwnedByUnavailable: 110,
+      staleItems: 0,
+      unassignedItems: 0,
+      acceptedWithoutAdviser: 0,
+      depositedWithoutAdviser: 0,
+      studentsWithDepartedAdviser: 4,
+      studentsWithAdviserOnLeave: 3,
+      signalKinds: ["departed_with_caseload", "on_leave_with_caseload", "spare_capacity"],
+      signalsTotal: 3,
+    },
+    signals: [
+      {
+        id: "departed:staff-7",
+        kind: "departed_with_caseload",
+        severity: "critical",
+        title: "Jordan Lee departed with 62 open items",
+        detail: "62 open items are still assigned to a departed adviser.",
+        count: 62,
+        action: "Reassign the caseload.",
+        staff: { id: "staff-7", name: "Jordan Lee", title: null, component: "Registrar", employmentStatus: "departed" },
+        component: "Registrar",
+        destination: "tasks",
+        boardQuery: { assignee: "staff-7", status: "open" },
+      },
+      {
+        id: "spare:staff-2",
+        kind: "spare_capacity",
+        severity: "positive",
+        title: "Sam Ortiz has room for more",
+        detail: "3 open items against a cap of 20.",
+        count: 3,
+        action: "Route new work here.",
+        staff: { id: "staff-2", name: "Sam Ortiz", title: null, component: "Admissions", employmentStatus: "active" },
+        component: "Admissions",
+        destination: "tasks",
+        boardQuery: null,
+      },
+    ],
+    signalsOmitted: 0,
+    components: [
+      {
+        component: "Registrar",
+        open: 140,
+        overdue: 30,
+        unassigned: 4,
+        stale: 9,
+        urgent: 2,
+        ownerRisk: 62,
+        oldestOverdueDays: 41,
+      },
+    ],
+    basis: "Counted from staff_member, staff_absence, and staff_work_item at read time.",
     ...overrides,
   };
 }
@@ -505,6 +574,94 @@ test("coverage travels with the briefing so the page can state its limits", asyn
     { metric: "Yield forecasts", reason: "No validated model exists." },
   ]);
   assert.equal(briefing.engagementScanAvailable, false);
+});
+
+test("people & capacity is mapped, summarised, and bounded from the payload", async () => {
+  const { buildBrewBriefing, capacitySummaryLine } = await load();
+  const briefing = buildBrewBriefing(brew(), await preferences(), "Priya Shah");
+  const capacity = briefing.capacity;
+  assert.ok(capacity);
+  assert.equal(capacity.available, true);
+  assert.equal(
+    capacity.summaryLine,
+    "88 staff · 1 on leave · 1 departed · 6 away today · 1 over cap · 1 with spare capacity · 110 open items owned by someone unavailable",
+  );
+  assert.equal(capacity.signals.length, 2);
+  assert.equal(capacity.signals[0].severity, "critical");
+  assert.deepEqual(capacity.signals[0].boardQuery, { assignee: "staff-7", status: "open" });
+  assert.equal(capacity.signals[1].boardQuery, null);
+  assert.deepEqual(capacity.offices, [
+    { component: "Registrar", open: 140, overdue: 30, unassigned: 4, stale: 9, oldestOverdueDays: 41 },
+  ]);
+  assert.equal(capacity.basis, staffCapacity().basis);
+  // Zero-valued parts stay out of the line; the headcount always leads.
+  assert.equal(
+    capacitySummaryLine({ ...staffCapacity().summary, onLeave: 0, departed: 0, awayNow: 0, overCap: 0, spareCapacity: 0, itemsOwnedByUnavailable: 0 }),
+    "88 staff",
+  );
+  assert.equal(capacitySummaryLine(null), null);
+
+  // More than ten signals are cut, and the cut is reported rather than hidden.
+  const many = buildBrewBriefing(
+    brew({
+      staffCapacity: staffCapacity({
+        signals: Array.from({ length: 12 }, (_, index) => ({
+          ...staffCapacity().signals[1],
+          id: `spare:${index}`,
+        })),
+        signalsOmitted: 2,
+      }),
+    }),
+    await preferences(),
+    "Priya Shah",
+  );
+  assert.equal(many.capacity.signals.length, 10);
+  assert.equal(many.capacity.signalsOmitted, 4);
+});
+
+test("people & capacity is subtract-only and honest when unavailable", async () => {
+  const { buildBrewBriefing } = await load();
+  const off = buildBrewBriefing(
+    brew(),
+    await preferences({ include: { requests: true, deadlines: true, numbers: true, signals: false, movements: true } }),
+    "Priya Shah",
+  );
+  assert.equal(off.capacity, null);
+  const otherTopic = buildBrewBriefing(brew(), await preferences({ topics: ["housing"] }), "Priya Shah");
+  assert.equal(otherTopic.capacity, null);
+
+  const unavailable = buildBrewBriefing(
+    brew({
+      staffCapacity: staffCapacity({
+        available: false,
+        summary: null,
+        signals: [],
+        components: [],
+        basis: "No staff directory is loaded for this tenant.",
+      }),
+    }),
+    await preferences(),
+    "Priya Shah",
+  );
+  assert.equal(unavailable.capacity.available, false);
+  assert.equal(unavailable.capacity.summaryLine, null);
+  assert.deepEqual(unavailable.capacity.signals, []);
+  assert.deepEqual(unavailable.capacity.offices, []);
+  assert.equal(unavailable.capacity.basis, "No staff directory is loaded for this tenant.");
+});
+
+test("priorities carry the board query and an absent activity signal is surfaced", async () => {
+  const { buildBrewBriefing } = await load();
+  const source = brew();
+  source.priorities[0].boardQuery = { status: "open", priority: "urgent" };
+  source.engagementScan = { available: true, snapshots: 12, lastProjectedAt: "2026-08-16T09:00:00.000Z", activityEvents30d: 0, activitySignal: false };
+  const briefing = buildBrewBriefing(source, await preferences(), "Priya Shah");
+  assert.deepEqual(briefing.priorities[0].boardQuery, { status: "open", priority: "urgent" });
+  assert.equal(briefing.engagementActivitySignal, false);
+  // Absent on the wire means "not asserted false", so the note stays quiet.
+  const legacy = buildBrewBriefing(brew(), await preferences(), "Priya Shah");
+  assert.equal(legacy.engagementActivitySignal, true);
+  assert.equal(legacy.priorities[0].boardQuery, null);
 });
 
 test("Edward is handed a cohort question, never a pre-written answer", async () => {
