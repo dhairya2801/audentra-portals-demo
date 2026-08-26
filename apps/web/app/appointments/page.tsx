@@ -4,6 +4,7 @@ import type { StudentAdvising, StudentAppointment, StudentAppointmentType } from
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PortalShell } from "../components/portal-shell";
 import { useTenant } from "../components/tenant-provider";
+import { formatTenantDate } from "../lib/tenant";
 import { useApiResource } from "../hooks/use-api-resource";
 import { getStudentAdvising, getStudentAppointments } from "../lib/api-client";
 import Card, { CardHead, CardRows } from "../design-system/primitives/Card.jsx";
@@ -366,7 +367,7 @@ function AdviserCard({ advising, onBook }: { advising: StudentAdvising; onBook: 
                 {gap
                   ? gap.message
                   : primary.availability.nextOpenSlotAt
-                    ? `Next open time: ${new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: tenant.localization.timeZone }).format(new Date(primary.availability.nextOpenSlotAt))} · ${primary.availability.openSlotsNext14Days} open in the next two weeks`
+                    ? `Next open time: ${formatTenantDate(primary.availability.nextOpenSlotAt, tenant, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} · ${primary.availability.openSlotsNext14Days} open in the next two weeks`
                     : "No open times published."}
               </p>
             </div>

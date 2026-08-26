@@ -22521,39 +22521,6 @@ h1, h2, h3, h4,
   color: #1f4e9c;
 }
 
-.staff-task-signal-toggles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-  padding-top: 0.6rem;
-  border-top: 1px solid #e7ebe7;
-}
-
-.staff-task-signal-toggles button {
-  padding: 0.32rem 0.7rem;
-  border: 1px solid #d5dbd2;
-  border-radius: 999px;
-  background: #fff;
-  color: #47515d;
-  font-size: 0.66rem;
-  font-weight: 750;
-  cursor: pointer;
-}
-
-.staff-task-signal-toggles button.is-active {
-  border-color: var(--staff-tenant-accent, #1f4e9c);
-  background: var(--staff-tenant-accent, #1f4e9c);
-  color: var(--staff-tenant-accent-contrast, #fff);
-}
-
-.staff-task-signal-toggles > span {
-  margin-left: auto;
-  color: #657083;
-  font-size: 0.66rem;
-  font-weight: 700;
-}
-
 .staff-board-pager {
   display: flex;
   justify-content: center;

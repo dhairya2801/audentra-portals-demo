@@ -18,6 +18,7 @@ import type {
   StaffWorkItem,
   StaffWorkItemPriority,
   StaffWorkItemStatus,
+  StaffWorkItemType,
   StudentClub,
 } from "@vv/contracts";
 import {
@@ -1007,6 +1008,23 @@ function TaskBoardView({
             </select>
           </label>
           <label>
+            <span>Task type</span>
+            <select
+              value={filters.workType}
+              onChange={(event) =>
+                updateFilter(
+                  "workType",
+                  event.target.value as "all" | StaffWorkItemType,
+                )
+              }
+            >
+              <option value="all">All types</option>
+              <option value="enrollment">Enrollment</option>
+              <option value="document_review">Document review</option>
+              <option value="communication">Communication</option>
+            </select>
+          </label>
+          <label>
             <span>Priority</span>
             <select
               value={filters.priority}
@@ -1087,6 +1105,25 @@ function TaskBoardView({
               <option value="stale">Longest untouched</option>
             </select>
           </label>
+          <label>
+            <span>Signals</span>
+            <select
+              value={filters.ownerRisk ? "owner_risk" : filters.stale ? "stale" : "all"}
+              onChange={(event) => {
+                const value = event.target.value;
+                updateFilter("stale", value === "stale");
+                updateFilter("ownerRisk", value === "owner_risk");
+              }}
+            >
+              <option value="all">Any</option>
+              <option value="stale">
+                Stale{counts.stale !== undefined ? ` (${counts.stale})` : ""}
+              </option>
+              <option value="owner_risk">
+                Owner unavailable{counts.ownerRisk !== undefined ? ` (${counts.ownerRisk})` : ""}
+              </option>
+            </select>
+          </label>
           <button
             className="staff-clear-task-filters"
             type="button"
@@ -1095,28 +1132,6 @@ function TaskBoardView({
           >
             Clear filters
           </button>
-        </div>
-        <div className="staff-task-signal-toggles" aria-label="Signal filters">
-          <button
-            type="button"
-            className={filters.stale ? "is-active" : undefined}
-            aria-pressed={filters.stale}
-            onClick={() => updateFilter("stale", !filters.stale)}
-          >
-            Stale{counts.stale !== undefined ? ` · ${counts.stale}` : ""}
-          </button>
-          <button
-            type="button"
-            className={filters.ownerRisk ? "is-active" : undefined}
-            aria-pressed={filters.ownerRisk}
-            onClick={() => updateFilter("ownerRisk", !filters.ownerRisk)}
-          >
-            Owner unavailable{counts.ownerRisk !== undefined ? ` · ${counts.ownerRisk}` : ""}
-          </button>
-          <span>
-            {counts.overdue !== undefined ? `${counts.overdue} overdue · ` : ""}
-            {counts.unassigned !== undefined ? `${counts.unassigned} unassigned` : ""}
-          </span>
         </div>
       </section>
       <p className="staff-board-announcement" aria-live="polite">

@@ -7,6 +7,7 @@ import type {
   StaffWorkItem,
   StaffWorkItemPriority,
   StaffWorkItemStatus,
+  StaffWorkItemType,
 } from "@vv/contracts";
 
 export type TaskOwnershipScope = "all" | "mine" | "unassigned";
@@ -21,6 +22,7 @@ export interface TaskBoardFilters {
   query: string;
   ownership: TaskOwnershipScope;
   assigneeId: string;
+  workType: "all" | StaffWorkItemType;
   priority: "all" | StaffWorkItemPriority;
   status: TaskStatusFilter;
   component: string;
@@ -34,6 +36,7 @@ export const emptyTaskBoardFilters: TaskBoardFilters = {
   query: "",
   ownership: "all",
   assigneeId: "all",
+  workType: "all",
   priority: "all",
   status: "open",
   component: "all",
@@ -65,6 +68,7 @@ const priorityRank: Record<StaffWorkItemPriority, number> = {
 };
 
 const workStatuses = new Set<string>(allWorkStatuses);
+const workTypes = new Set<string>(["enrollment", "document_review", "communication"]);
 const priorities = new Set<string>(Object.keys(priorityRank));
 const dueWindows = new Set<string>(["all", "overdue", "today", "seven_days", "no_due"]);
 const sorts = new Set<string>(["priority", "due", "updated", "created", "stale"]);
@@ -109,6 +113,7 @@ export function buildActionCenterQuery(
   return {
     status: filters.status,
     priority: filters.priority === "all" ? undefined : filters.priority,
+    workType: filters.workType === "all" ? undefined : filters.workType,
     component: filters.component === "all" ? undefined : filters.component,
     assignee,
     search: search || undefined,
@@ -136,6 +141,7 @@ export function filtersFromActionCenterQuery(
         ? query.assignee
         : "all",
     priority: query.priority && priorities.has(query.priority) ? query.priority : "all",
+    workType: query.workType && workTypes.has(query.workType) ? query.workType : "all",
     status:
       status && (status === "open" || status === "closed" || status === "all" || workStatuses.has(status))
         ? status

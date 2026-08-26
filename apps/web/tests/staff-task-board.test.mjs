@@ -112,6 +112,7 @@ test("toolbar filters map onto the bounded Action Center query", async () => {
   assert.deepEqual(buildActionCenterQuery(emptyTaskBoardFilters), {
     status: "open",
     priority: undefined,
+    workType: undefined,
     component: undefined,
     assignee: undefined,
     search: undefined,
@@ -128,6 +129,7 @@ test("toolbar filters map onto the bounded Action Center query", async () => {
       ...emptyTaskBoardFilters,
       query: "  transcript ",
       ownership: "mine",
+      workType: "document_review",
       priority: "high",
       status: "blocked",
       component: "Enrollment Support",
@@ -140,6 +142,7 @@ test("toolbar filters map onto the bounded Action Center query", async () => {
   );
   assert.equal(narrowed.search, "transcript");
   assert.equal(narrowed.assignee, "me");
+  assert.equal(narrowed.workType, "document_review");
   assert.equal(narrowed.status, "blocked");
   assert.equal(narrowed.due, "today");
   assert.equal(narrowed.stale, true);
@@ -202,6 +205,8 @@ test("a deep-linked query round-trips into toolbar state", async () => {
   assert.equal(filters.ownerRisk, true);
   assert.equal(filters.stale, false);
   assert.equal(filters.sort, "updated");
+  assert.equal(filters.workType, "all");
+  assert.equal(filtersFromActionCenterQuery({ workType: "enrollment" }).workType, "enrollment");
   const rebuilt = buildActionCenterQuery(filters);
   assert.equal(rebuilt.assignee, "unassigned");
   assert.equal(rebuilt.component, "Registrar");
@@ -291,8 +296,14 @@ test("the task board pages the server instead of filtering the workspace payload
   assert.match(board, /Showing \$\{items\.length\} of \$\{total\} tasks/);
   assert.match(board, /Load more/);
   assert.match(board, /window\.setTimeout\(\(\) => setDebouncedQuery\(filters\.query\), 300\)/);
-  assert.match(board, /updateFilter\("stale", !filters\.stale\)/);
-  assert.match(board, /updateFilter\("ownerRisk", !filters\.ownerRisk\)/);
+  // Stale / owner-unavailable are one select in the existing filter grid, not a new strip.
+  assert.match(board, /<span>Signals<\/span>/);
+  assert.match(board, /updateFilter\("stale", value === "stale"\)/);
+  assert.match(board, /updateFilter\("ownerRisk", value === "owner_risk"\)/);
+  assert.doesNotMatch(board, /staff-task-signal-toggles/);
+  // The Task type filter of the original board runs server-side now.
+  assert.match(board, /<span>Task type<\/span>/);
+  assert.match(board, /updateFilter\(\s*"workType"/);
   assert.match(board, /facets\?\.components/);
   assert.match(board, /facets\?\.assignees/);
   assert.match(board, /initialQuery/);
