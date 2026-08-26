@@ -19,15 +19,19 @@ test("the built portal keeps the platform document-upload contract", async () =>
   // __MAX_ACTION_BODY_SIZE global) when this app has no Server Actions. The
   // browser upload is a direct API request, so assert the emitted client
   // chunk instead of coupling this contract to that implementation detail.
-  const uploadBundle = clientFiles.find((file) =>
-    /(?:^|[\\/])document-upload-[^\\/]+\.js$/.test(file),
-  );
-  assert.ok(uploadBundle, "the document-upload client bundle was not built");
+  // The uploader is inlined into the page chunks that render it, so the guard
+  // is looked for in every emitted client chunk rather than in one named after
+  // the module.
   const clientDirectory = new URL("../dist/client/", import.meta.url);
-  const builtUploader = await readFile(
-    new URL(uploadBundle.replaceAll("\\", "/"), clientDirectory),
-    "utf8",
-  );
+  const chunks = clientFiles.filter((file) => /\.js$/.test(file));
+  assert.ok(chunks.length > 0, "no client chunks were built");
+  const builtUploader = (
+    await Promise.all(
+      chunks.map((file) =>
+        readFile(new URL(file.replaceAll("\\", "/"), clientDirectory), "utf8"),
+      ),
+    )
+  ).join("\n");
   assert.match(
     builtUploader,
     /10485760/,

@@ -103,9 +103,10 @@ belong in the sibling `Audentra-platform` repository.
   Page IDs and field IDs must be unique and stable across the whole form.
 - Form templates replace only the unsaved editor draft. Staff must still review
   and explicitly publish the resulting form.
-- The protected eight-screen first-time onboarding gate remains separate from
-  custom onboarding actions. Custom actions use the same requirement runtime as
-  enrollment after that gate is complete.
+- The protected first-time onboarding gate (ten screens over the platform's
+  eight ordered steps; see `docs/changelog/2026-08-25-onboarding-redesign.md`)
+  remains separate from custom onboarding actions. Custom actions use the same
+  requirement runtime as enrollment after that gate is complete.
 - Keep student previews derived from the same working configuration as the
   editor. Draft changes remain local until an explicit, version-checked publish.
 

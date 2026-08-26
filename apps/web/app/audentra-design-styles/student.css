@@ -8,6 +8,9 @@
 @import './base.css';
 @import './chrome.css';
 @import './patterns.css';
+/* The onboarding redesign's shapes (2026-08-24): appended after the shared
+   vocabulary, before any section, exactly as the reference repo appends them. */
+@import './onboarding-patterns.css';
 @import './features/enrollment.css';
 @import './navigation.css';
 

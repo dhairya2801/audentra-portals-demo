@@ -1133,7 +1133,6 @@ test("onboarding preserves the eight-step order and authoritative boundary actio
   assert.match(onboarding, /createDepositPayment/);
   assert.match(onboarding, /completeStudentOnboarding/);
   assert.match(onboarding, /Reload latest saved progress/);
-  assert.match(onboarding, /Why we ask/);
   assert.match(onboarding, /function editableOnboardingData/);
   assert.match(onboarding, /delete editableData\.skippedSteps/);
   assert.doesNotMatch(onboarding, /Confirm your student record/);
@@ -1144,14 +1143,11 @@ test("onboarding preserves the eight-step order and authoritative boundary actio
     onboarding,
     /key: "housing"[\s\S]{0,240}skippable: true/,
   );
-  assert.match(onboarding, /No residence ranked yet/);
-  assert.match(onboarding, /Clear residence ranking and decide later/);
+  assert.match(onboarding, /housingResidencePreferences: ranking/);
   assert.match(onboarding, /housingResidencePreferences/);
   assert.match(onboarding, /residencyVerificationPath/);
-  assert.match(onboarding, /insuranceInterest/);
   assert.match(onboarding, /accommodationInterest/);
   assert.match(onboarding, /const nextData = editableOnboardingData\(/);
-  assert.match(onboarding, /data: editableOnboardingData\(onboarding\.data\)/);
   assert.match(
     onboarding,
     /window\.location\.replace\(tenantRuntime\.href\("\/dashboard"\)\)/,
@@ -1599,16 +1595,15 @@ test("onboarding restores identity extraction state and bounds upload waits", as
   ]);
 
   assert.match(onboarding, /getStudentDocuments\(signal\)/);
-  assert.match(
-    onboarding,
-    /latestDocumentForCategory\(\s*initialDocuments\.items,\s*"identity",?\s*\)/,
-  );
-  assert.match(onboarding, /activeDocument=\{identityDocument\}/);
-  assert.match(onboarding, /DocumentExtractionReview/);
-  assert.match(onboarding, /identityQuickUploadEnabled[\s\S]*identityPrefillCandidates/);
+  // The redesigned flow reads the latest stored ID from the document list on
+  // every render, polls while an extraction is processing, and fills empty
+  // fields from what the ID says exactly once per document.
+  assert.match(onboarding, /latestDocumentForCategory\(documents, "identity"\)/);
+  assert.match(onboarding, /extraction\?\.status === "processing"/);
+  assert.match(onboarding, /window\.setInterval/);
+  assert.match(onboarding, /function identityPrefill/);
   assert.match(onboarding, /document\?\.status === "rejected"/);
-  assert.match(onboarding, /reconcileDocumentExtractionProjection/);
-  assert.match(onboarding, /rememberIdentityDocument/);
+  assert.match(onboarding, /absorbIdentity/);
   assert.match(client, /AbortSignal\.timeout\(120_000\)/);
   assert.match(client, /bundleDeadline = AbortSignal\.timeout\(300_000\)/);
   assert.match(client, /AbortSignal\.any\(\[bundleDeadline/);
@@ -2205,10 +2200,13 @@ test("staff journeys share a typed, accessible flow builder", async () => {
   assert.match(formBuilder, /disabled: true/);
   assert.doesNotMatch(formBuilder, /required: field\.required/);
   assert.match(formBuilder, /dataTransfer\.setData\("text\/plain", field\.id\)/);
-  assert.match(onboarding, /ConfiguredAboutYouFields/);
-  assert.match(onboarding, /configured-about-you-form__progress/);
-  assert.match(onboarding, /custom__\$\{field\.id\}/);
-  assert.match(onboarding, /label: configured\?\.label \|\| candidate\.label/);
+  // Staff-authored About-you fields render through the design system's field
+  // components, one group per authored page, with custom answers kept under
+  // `customFields[id]` and the configured label winning over the flow's own.
+  assert.match(onboarding, /customPagesOf\(aboutYouConfiguration\)/);
+  assert.match(onboarding, /coreFieldsOf\(aboutYouConfiguration\)/);
+  assert.match(onboarding, /customFieldProblem\(field, data\.customFields\?\.\[field\.id\]\)/);
+  assert.match(onboarding, /name: configured\.label \|\| candidate\.name/);
   assert.match(staffPortal, /staff-event-image-dropzone/);
   assert.match(staffPortal, /onDrop=\{dropImage\}/);
   assert.match(staffPortal, /maximum 5 MB/);
