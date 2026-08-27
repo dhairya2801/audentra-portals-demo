@@ -21076,7 +21076,53 @@ a {
 .brew-connect-card p { margin: 0.2rem 0 0; color: #78829a; font-size: 0.6rem; line-height: 1.45; }
 .brew-connect-card small { display: block; margin-top: 0.3rem; color: #a2abbc; font-size: 0.53rem; }
 
-/* higher ed news ------------------------------------------------------------- */
+/* curated external reporting -------------------------------------------------
+   Morning Brew does not compose provider queries in the browser. The platform
+   prepares an asynchronous, tenant-scoped read model; this compact rail only
+   renders that canonical state and keeps it visually separate from records. */
+.brew-news-rail { display: grid; gap: 0.7rem; padding: 0.9rem 1rem; border: 1px solid #dbe3ef; border-radius: 0.9rem; background: #fff; box-shadow: 0 6px 20px rgb(10 31 68 / 4%); }
+.brew-news-rail__head { display: flex; justify-content: space-between; gap: 0.8rem; align-items: end; }
+.brew-news-rail__head h2 { margin: 0.16rem 0 0; color: var(--audentra-navy); font-size: 0.95rem; letter-spacing: -0.02em; }
+.brew-news-rail__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.45rem; margin-left: auto; }
+.brew-news-rail__head time { flex: none; color: #8b94a6; font-size: 0.52rem; white-space: nowrap; }
+.brew-news-rail__refresh { display: inline-flex; align-items: center; justify-content: center; gap: 0.24rem; min-height: 1.88rem; padding: 0.36rem 0.62rem; border: 1px solid #d4ddec; border-radius: 999px; background: #fff; color: #255bd8; box-shadow: 0 2px 6px rgb(32 73 144 / 7%); font-size: 0.56rem; font-weight: 800; letter-spacing: 0.01em; white-space: nowrap; cursor: pointer; transition: border-color 150ms ease, box-shadow 150ms ease, color 150ms ease, transform 150ms ease; }
+.brew-news-rail__refresh:hover:not(:disabled) { border-color: #8fb0ee; color: #1746b4; box-shadow: 0 4px 10px rgb(32 73 144 / 12%); transform: translateY(-1px); }
+.brew-news-rail__refresh:focus-visible { outline: 3px solid rgb(40 100 230 / 22%); outline-offset: 2px; }
+.brew-news-rail__refresh:disabled { border-color: #e2e7ef; color: #97a2b4; box-shadow: none; cursor: wait; }
+.brew-news-rail__status { margin: 0; padding: 0.62rem 0.7rem; border-radius: 0.58rem; background: #f1f5fa; color: #67718a; font-size: 0.58rem; line-height: 1.5; }
+.brew-news-rail__problem, .brew-news-rail__empty { display: grid; gap: 0.2rem; padding: 0.68rem 0.75rem; border: 1px solid #ead5d2; border-radius: 0.62rem; background: #fff8f7; }
+.brew-news-rail__problem strong, .brew-news-rail__empty strong { color: var(--audentra-navy); font-size: 0.64rem; }
+.brew-news-rail__problem p, .brew-news-rail__empty p { margin: 0; color: #6f7787; font-size: 0.57rem; line-height: 1.5; }
+.brew-news-rail__problem small { color: #8b5c55; font-size: 0.5rem; line-height: 1.45; }
+.brew-news-rail__empty { border-color: #dbe3ef; background: #f8fafc; }
+.brew-news-rail__note { margin: 0; color: #8b94a6; font-size: 0.53rem; line-height: 1.5; }
+
+/* Shared source cards. Morning Brew's rail adds provider-supplied thumbnails;
+   Staff Edward intentionally keeps the stacked, text-only presentation. */
+.staff-web-sources { display: grid; gap: 0.55rem; margin: 0; padding: 0; list-style: none; }
+.staff-web-sources--rail { grid-auto-columns: minmax(17.5rem, 22rem); grid-auto-flow: column; grid-template-columns: none; overflow-x: auto; overscroll-behavior-x: contain; padding: 0.1rem 0 0.45rem; scroll-snap-type: x proximity; scrollbar-color: #cfd9e8 transparent; scrollbar-width: thin; }
+.staff-web-source { min-width: 0; padding: 0.72rem 0.78rem; border: 1px solid #dfe6f0; border-radius: 0.62rem; background: #fff; }
+.staff-web-sources--rail .staff-web-source { display: grid; grid-template-columns: 4.45rem minmax(0, 1fr); gap: 0.68rem; min-height: 7.15rem; padding: 0.62rem; scroll-snap-align: start; }
+.staff-web-source__media { display: grid; min-height: 5.9rem; overflow: hidden; align-self: stretch; border-radius: 0.5rem; background: linear-gradient(145deg, #dce9ff, #f1e9ff); box-shadow: inset 0 0 0 1px rgb(45 91 190 / 8%); }
+.staff-web-source__thumbnail { display: block; width: 100%; height: 100%; object-fit: cover; }
+.staff-web-source__thumbnail-fallback { display: grid; width: 100%; height: 100%; place-items: center; background: linear-gradient(145deg, #dce9ff, #efe6ff); color: #355fd0; font-size: 1rem; font-weight: 900; }
+.staff-web-source__body { min-width: 0; }
+.staff-web-source__meta { display: flex; flex-wrap: wrap; gap: 0.3rem 0.5rem; align-items: center; color: #8b94a6; font-size: 0.48rem; }
+.staff-web-source__meta > span:first-child { padding: 0.14rem 0.3rem; border-radius: 999px; background: #edf3ff; color: #315bc7; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; }
+.staff-web-source h4 { margin: 0.35rem 0 0; color: var(--audentra-navy); font-size: 0.65rem; line-height: 1.4; }
+.staff-web-source h4 a { color: var(--audentra-blue); text-decoration-thickness: 1px; text-underline-offset: 0.15rem; overflow-wrap: anywhere; }
+.staff-web-source h4 a:hover { color: var(--audentra-purple); }
+.staff-web-source p { margin: 0.3rem 0 0; color: #67718a; font-size: 0.55rem; line-height: 1.55; overflow-wrap: anywhere; }
+.staff-web-sources--rail .staff-web-source h4 { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.staff-web-sources--rail .staff-web-source p { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+
+.edward-web-sources { display: grid; gap: 0.55rem; margin-top: 0.65rem; padding: 0.65rem; border: 1px solid #dce5f1; border-radius: 0.62rem; background: #f7faff; }
+.edward-web-sources > header { display: grid; gap: 0.15rem; }
+.edward-web-sources > header span { color: var(--audentra-blue); font-size: 0.48rem; font-weight: 900; letter-spacing: 0.07em; text-transform: uppercase; }
+.edward-web-sources > header strong { color: var(--audentra-navy); font-size: 0.58rem; line-height: 1.4; }
+.edward-web-sources > p, .edward-message .edward-web-sources > p, .edward-message .staff-web-source p { margin: 0; padding: 0; border-radius: 0; background: transparent; box-shadow: none; color: #5f6a7e; font-size: 0.54rem; line-height: 1.5; }
+.edward-web-sources > small { color: #8993a5; font-size: 0.48rem; line-height: 1.45; }
+.edward-web-sources .staff-web-source { padding: 0.58rem 0.62rem; }
 
 /* colophon ------------------------------------------------------------------- */
 .brew-colophon { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.7rem; align-items: center; padding: 0.85rem 1.1rem; border: 1px solid var(--audentra-line); border-radius: 0.9rem; background: #fff; }
@@ -21453,6 +21499,11 @@ a {
 
   .brew-connect-card { flex-direction: column; align-items: flex-start; }
   .brew-connect-card .button { width: 100%; }
+
+  .brew-news-rail { padding: 0.82rem 0.8rem; }
+  .brew-news-rail__head { align-items: flex-start; flex-direction: column; }
+  .brew-news-rail__actions { width: 100%; justify-content: space-between; margin-left: 0; }
+  .staff-web-sources--rail { grid-auto-columns: minmax(17rem, 88vw); }
 
   .brew-action-list li { grid-template-columns: 1fr; }
   .brew-action-list li > span { justify-items: start; text-align: left; }

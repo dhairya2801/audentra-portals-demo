@@ -79,11 +79,14 @@ import type {
   StaffManagedConfiguration,
   StaffManagedConfigurationKind,
   StaffMorningBrew,
+  StaffMorningBrewExternalContext,
   StaffNotificationList,
   StaffNotificationReadResult,
   StaffOperationsWorkspace,
   StaffOutreachRun,
   StaffPortalMediaUpload,
+  StaffWebSearchInput,
+  StaffWebSearchResponse,
   StaffSession,
   StaffSignInInput,
   StaffSignUpInput,
@@ -1028,6 +1031,66 @@ export function getStaffMorningBrew(signal?: AbortSignal) {
     headers: staffHeaders,
     signal,
   });
+}
+
+/**
+ * Read the canonical external-news state prepared for the staff member's
+ * Morning Brew. The platform owns provider credentials, scheduling, and
+ * query construction; this browser request carries no search text.
+ */
+export function getStaffMorningBrewExternalContext(signal?: AbortSignal) {
+  return request<StaffMorningBrewExternalContext>(
+    "/v1/staff/morning-brew/external-context",
+    {
+      method: "GET",
+      headers: staffHeaders,
+      signal,
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+/**
+ * Ask the platform to refresh the asynchronous Morning Brew external-news
+ * context. It is intentionally input-free: no provider query or credential
+ * can originate from the browser.
+ */
+export function triggerStaffMorningBrewExternalContext(signal?: AbortSignal) {
+  return request<StaffMorningBrewExternalContext>(
+    "/v1/staff/morning-brew/external-context",
+    {
+      method: "POST",
+      headers: staffHeaders,
+      signal,
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+/**
+ * Searches public web sources through the authenticated platform boundary.
+ * The browser never talks to the search provider or receives its credential.
+ */
+export function searchStaffWeb(
+  input: StaffWebSearchInput,
+  signal?: AbortSignal,
+) {
+  return request<StaffWebSearchResponse>(
+    "/v1/staff/web-search",
+    {
+      method: "POST",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+      signal,
+    },
+    {
+      // Searching public sources does not mutate a student record.
+      notifyStudentRecordChanged: false,
+    },
+  );
 }
 
 export function getStaffManagedConfiguration(

@@ -15,10 +15,10 @@ import type {
  * What the reader can choose, and what each choice actually shows.
  *
  * Every entry here names a canonical record type rather than a vendor. The
- * earlier catalogue offered an Outlook inbox, a calendar, and a news feed; the
- * platform has none of those, so the same slots now carry the real inbound
- * channel (student support conversations) and the real dated obligations
- * (requirement due dates and offer response deadlines).
+ * earlier catalogue mixed an Outlook inbox, a calendar, and a synthetic news
+ * feed into this canonical configuration. These slots now carry the real
+ * inbound channel and dated obligations. Public sources live in a separate,
+ * explicitly triggered search so they cannot be mistaken for student data.
  */
 
 export const BREW_TOPICS: BrewTopic[] = [

@@ -1,7 +1,11 @@
 "use client";
 
-import type { AskStaffEdwardResponse } from "@vv/contracts";
+import type {
+  AskStaffEdwardResponse,
+  StaffAssistantWebSourcesBlock,
+} from "@vv/contracts";
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { StaffWebSourceList } from "../../components/staff-web-sources";
 import { askStaffEdward } from "../../lib/api-client";
 import { edwardOpeningQuestion, EDWARD_SUGGESTIONS } from "./data";
 import type { BrewBriefing, EdwardRequest } from "./types";
@@ -18,6 +22,7 @@ interface Turn {
   question: string;
   answer: string | null;
   receipts: string[];
+  webSources: StaffAssistantWebSourcesBlock[];
   error: string | null;
 }
 
@@ -54,7 +59,14 @@ export function EdwardPanel({
     const id = crypto.randomUUID();
     setThread((current) => [
       ...current,
-      { id, question: normalized, answer: null, receipts: [], error: null },
+      {
+        id,
+        question: normalized,
+        answer: null,
+        receipts: [],
+        webSources: [],
+        error: null,
+      },
     ]);
     setQuestion("");
     setSending(true);
@@ -72,6 +84,11 @@ export function EdwardPanel({
                 ...turn,
                 answer: response.message,
                 receipts: response.contextReceipts.map((receipt) => receipt.source),
+                webSources:
+                  response.blocks?.filter(
+                    (block): block is StaffAssistantWebSourcesBlock =>
+                      block.type === "web_sources",
+                  ) ?? [],
               }
             : turn,
         ),
@@ -190,6 +207,27 @@ export function EdwardPanel({
                           <p key={`${turn.id}-${index}`}>{paragraph}</p>
                         ) : null,
                       )}
+                      {turn.webSources.map((block, index) => (
+                        <section
+                          className="edward-web-sources"
+                          aria-label={`Web sources for ${block.query}`}
+                          key={`${turn.id}-web-${index}`}
+                        >
+                          <header>
+                            <span>From the web</span>
+                            <strong>{block.query}</strong>
+                          </header>
+                          {block.results.length ? (
+                            <StaffWebSourceList
+                              results={block.results}
+                              idPrefix={`${turn.id}-web-${index}`}
+                            />
+                          ) : (
+                            <p>No public sources matched this search.</p>
+                          )}
+                          <small>External sources are separate from canonical student records.</small>
+                        </section>
+                      ))}
                       {turn.receipts.length ? (
                         <aside>Read from: {turn.receipts.join(", ")}</aside>
                       ) : null}
