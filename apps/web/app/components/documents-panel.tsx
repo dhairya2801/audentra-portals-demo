@@ -174,6 +174,11 @@ function decisionOf(files: StudentDocument[]) {
   return latest?.review ?? null;
 }
 
+function decisionExplanation(review: StudentDocument["review"]) {
+  if (!review) return null;
+  return [review.reasonLabel, review.note].filter(Boolean).join(": ") || null;
+}
+
 /** The record, cut into rows the reference's `DocumentRow` can draw. */
 export function buildRows(
   requirements: readonly StudentRequirementDetail[],
@@ -228,7 +233,7 @@ export function buildRows(
                     ? `Accepted ${accepted} · ${office}`
                     : `Accepted · ${office}`
                   : `Sent back by ${office}`,
-      consequence: state === "changes-requested" ? (decision?.note ?? null) : null,
+      consequence: state === "changes-requested" ? decisionExplanation(decision ?? undefined) : null,
       requirement,
       document: null,
       files,
@@ -266,7 +271,7 @@ export function buildRows(
                     ? `Accepted ${decided} · ${office}`
                     : `Accepted · ${office}`
                   : `Sent back by ${office}`,
-      consequence: state === "changes-requested" ? (document.review?.note ?? null) : null,
+      consequence: state === "changes-requested" ? decisionExplanation(document.review) : null,
       requirement: null,
       document,
       files: [document],
@@ -608,11 +613,14 @@ function DocumentDrawer({
           <h3 id="reject-title">
             <Icon name="alert" size={17} /> Why it came back
           </h3>
+          {decision?.reasonLabel ? (
+            <strong className="reject-reason-label">{decision.reasonLabel}</strong>
+          ) : null}
           <p className="reject-reason">
             {decision?.note ?? `${row.office} asked for another copy. Send it from the same place.`}
           </p>
           <p className="reject-by">
-            {row.office}
+            {decision?.reviewerName ?? row.office}
             {decision ? ` · ${formatDate(decision.decidedAt, tenant.localization.locale)}` : ""}
           </p>
         </section>
@@ -694,6 +702,22 @@ function DocumentDrawer({
                   </span>
                 </div>
                 <p className={`history-outcome ${outcomeTone(file)}`}>{outcomeLine(file, row.office, tenant.localization.locale)}</p>
+                {(file.reviewHistory?.length ?? 0) > 0 ? (
+                  <ol className="document-decision-history" aria-label={`Decision history for ${file.fileName}`}>
+                    {file.reviewHistory?.map((review) => (
+                      <li key={review.id}>
+                        <strong>
+                          {review.decision === "accepted" ? "Accepted" : "Changes requested"}
+                          {review.reasonLabel ? ` - ${review.reasonLabel}` : ""}
+                        </strong>
+                        <span>
+                          {formatDate(review.decidedAt, tenant.localization.locale)} · {review.reviewerName}
+                        </span>
+                        {review.note ? <p>{review.note}</p> : null}
+                      </li>
+                    ))}
+                  </ol>
+                ) : null}
                 {file.contentUrl ? (
                   <SecureStudentDocumentLink document={file} label="Open the original" />
                 ) : null}
@@ -726,7 +750,8 @@ function outcomeLine(file: StudentDocument, office: string, locale: string) {
     return file.review ? `Accepted ${formatDate(file.review.decidedAt, locale)}.` : "Accepted.";
   }
   if (state === "changes-requested") {
-    return `Changes requested${file.review ? ` ${formatDate(file.review.decidedAt, locale)}` : ""}.${file.review?.note ? ` ${file.review.note}` : ""}`;
+    const explanation = decisionExplanation(file.review);
+    return `Changes requested${file.review ? ` ${formatDate(file.review.decidedAt, locale)}` : ""}.${explanation ? ` ${explanation}` : ""}`;
   }
   if (state === "needed") return "A placeholder. Nothing has been sent yet.";
   return `With ${office}. No decision yet.`;

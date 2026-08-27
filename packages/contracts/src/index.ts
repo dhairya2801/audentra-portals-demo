@@ -596,6 +596,8 @@ export interface StudentRequirementDetail extends StudentRequirementSummary {
   documentCategory: StudentDocumentCategory | null;
   responsibleOffice: string;
   dependencyCodes: string[];
+  /** Oldest-first, student-safe activity for this enrollment task. */
+  history?: StudentRequirementHistoryEvent[];
   immunizationPolicy?: {
     id: string;
     code: string;
@@ -613,6 +615,25 @@ export interface StudentRequirementDetail extends StudentRequirementSummary {
       validityDays: number | null;
     }>;
   };
+}
+
+export type StudentRequirementHistoryEventKind =
+  | "assigned"
+  | "status_changed"
+  | "response_submitted"
+  | "document_uploaded"
+  | "document_reviewed"
+  | "help_requested"
+  | "help_resolved";
+
+export interface StudentRequirementHistoryEvent {
+  id: string;
+  kind: StudentRequirementHistoryEventKind;
+  title: string;
+  detail: string | null;
+  status?: string;
+  documentId?: string;
+  occurredAt: string;
 }
 
 export type StudentRequirementResponseValue =
@@ -1033,6 +1054,19 @@ export interface StudentDocumentExtraction {
   immunizationCompliance?: ImmunizationComplianceEvaluation;
 }
 
+export interface StudentDocumentReviewDecision {
+  id: string;
+  /** A rejected database state is deliberately phrased as a student action. */
+  decision: "accepted" | "changes_requested";
+  decidedAt: string;
+  reasonCode: string | null;
+  reasonLabel: string | null;
+  /** Explicitly student-visible reviewer guidance; never an internal staff note. */
+  note: string | null;
+  reviewerName: string;
+  synthetic?: boolean;
+}
+
 export interface StudentDocument {
   id: string;
   requirementId?: string;
@@ -1051,18 +1085,10 @@ export interface StudentDocument {
     | "rejected"
     | "needs_resubmission"
     | "waived";
-  /** Present once a reviewer has ruled on the document. */
-  review?: {
-    decision:
-      | "accepted"
-      | "rejected"
-      | "needs_resubmission"
-      | "waived"
-      | "under_review";
-    decidedAt: string;
-    note: string | null;
-    synthetic?: boolean;
-  };
+  /** Present once a reviewer has ruled on this specific submission. */
+  review?: StudentDocumentReviewDecision;
+  /** Oldest-first immutable decisions for this specific submission. */
+  reviewHistory?: StudentDocumentReviewDecision[];
   sha256?: string;
   contentUrl?: string;
   extraction?: StudentDocumentExtraction;
@@ -1269,6 +1295,8 @@ export type StaffRelatedDocument = Pick<
   | "processingMode"
   | "status"
   | "contentUrl"
+  | "review"
+  | "reviewHistory"
   | "createdAt"
 >;
 
@@ -1715,14 +1743,30 @@ export interface ReviewStaffDocumentInput {
   workItemId: string;
   expectedWorkItemVersion: number;
   decision: "accepted" | "rejected";
+  /** Required for rejection and validated against the tenant's active options. */
+  reasonCode?: string;
+  /** Staff-only context. It is never included in student document/task history. */
+  internalNote?: string;
+  /** This note is student-visible review guidance. */
   note: string;
   notifyStudent: boolean;
+}
+
+export interface StaffDocumentRejectionReason {
+  code: string;
+  label: string;
+  description: string;
+}
+
+export interface StaffDocumentReviewOptions {
+  rejectionReasons: StaffDocumentRejectionReason[];
 }
 
 export interface StaffDocumentDecisionResult {
   document: StudentDocument;
   workItem: StaffWorkItem;
   notification: StudentMessage | null;
+  decision: StudentDocumentReviewDecision;
 }
 
 export type StaffManagedContentStatus = "draft" | "published" | "archived";
