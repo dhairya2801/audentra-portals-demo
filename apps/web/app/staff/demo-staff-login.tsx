@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
 import {
   ApiClientError,
+  getDemoPersonas,
   getDemoStaffDirectory,
   signInDemoStaff,
 } from "../lib/api-client";
@@ -45,10 +46,21 @@ function DemoStaffLoginPanel({ onSignedIn }: { onSignedIn: () => void }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<DemoStaffFilter>("all");
   const [opening, setOpening] = useState<string | null>(null);
+  // A release deployment names its staff personas and the panel lists exactly
+  // those, without search or filters; development browses the whole
+  // directory. Either way the platform refuses anyone outside its allowlist.
   const directory = useApiResource(
-    useCallback((signal: AbortSignal) => getDemoStaffDirectory("", signal), []),
+    useCallback(async (signal: AbortSignal) => {
+      const personas = await getDemoPersonas(signal);
+      if (personas.restricted) {
+        return { restricted: true, items: personas.staff, total: personas.staff.length };
+      }
+      const everyone = await getDemoStaffDirectory("", signal);
+      return { restricted: false, items: everyone.items, total: everyone.total };
+    }, []),
     { refreshOnAmbient: false },
   );
+  const restricted = directory.data?.restricted === true;
   const signIn = useApiAction(
     async (entry: DemoStaffDirectoryEntry) => signInDemoStaff({ staffRef: entry.id }),
     (error) =>
@@ -85,12 +97,16 @@ function DemoStaffLoginPanel({ onSignedIn }: { onSignedIn: () => void }) {
 
   return (
     <section className="auth-demo-student staff-demo-login" aria-labelledby="demo-staff-title">
-      <p className="eyebrow">Development only</p>
-      <h2 id="demo-staff-title">Log in as synthetic staff</h2>
+      <p className="eyebrow">{restricted ? "Demo access" : "Development only"}</p>
+      <h2 id="demo-staff-title">
+        {restricted ? "Continue as a demo staff member" : "Log in as synthetic staff"}
+      </h2>
       <p>
-        Open the staff portal as any person in this university’s demo staff directory. Their
-        identity, team, caseload, calendar and work are shown as-is.
+        {restricted
+          ? "Open the staff portal as one of this demo’s staff personas. Their identity, team, caseload, calendar and work are shown as-is."
+          : "Open the staff portal as any person in this university’s demo staff directory. Their identity, team, caseload, calendar and work are shown as-is."}
       </p>
+      {restricted ? null : (
       <div className="staff-demo-login__controls">
         <label className="field">
           <span className="sr-only">Search staff</span>
@@ -118,6 +134,7 @@ function DemoStaffLoginPanel({ onSignedIn }: { onSignedIn: () => void }) {
           ))}
         </div>
       </div>
+      )}
       {directory.status === "loading" ? (
         <p className="staff-demo-login__status" aria-live="polite">Loading the staff directory…</p>
       ) : directory.status === "error" ? (
@@ -126,9 +143,11 @@ function DemoStaffLoginPanel({ onSignedIn }: { onSignedIn: () => void }) {
         </p>
       ) : (
         <>
-          <p className="staff-demo-login__status" aria-live="polite">
-            {shown} of {total} staff members
-          </p>
+          {restricted ? null : (
+            <p className="staff-demo-login__status" aria-live="polite">
+              {shown} of {total} staff members
+            </p>
+          )}
           <div className="staff-demo-login__list">
             {groups.map((group) => (
               <section key={group.component} aria-label={group.component}>
@@ -198,8 +217,9 @@ function DemoStaffLoginPanel({ onSignedIn }: { onSignedIn: () => void }) {
         </p>
       ) : null}
       <small className="staff-auth-boundary">
-        Sessions opened here are real, revocable staff sessions minted by the platform’s
-        development-only route; the route does not exist in production.
+        {restricted
+          ? "Sessions opened here are real, revocable staff sessions; the platform only opens the people named in this demo’s allowlist."
+          : "Sessions opened here are real, revocable staff sessions minted by the platform’s development-only route; the route does not exist in production."}
       </small>
     </section>
   );

@@ -9,9 +9,10 @@ import {
 } from "react";
 import type { StudentSsoConfiguration } from "@vv/contracts";
 import Image from "next/image";
-import { useApiAction } from "../hooks/use-api-resource";
+import { useApiAction, useApiResource } from "../hooks/use-api-resource";
 import {
   ApiClientError,
+  getDemoPersonas,
   getStudentSsoConfiguration,
   getStudentBootstrap,
   signInDemoStudent,
@@ -545,7 +546,72 @@ function DemoStudentSignIn() {
       process.env.NEXT_PUBLIC_DEMO_STUDENT_LOGIN_ENABLED,
     NODE_ENV: process.env.NODE_ENV,
   });
+  // Which people this deployment exposes. A release deployment names one
+  // student and the panel becomes a single button; development answers
+  // "unrestricted" and keeps the type-any-reference field. The platform
+  // refuses anyone outside its allowlist regardless of what is drawn here.
+  const personas = useApiResource(
+    useCallback((signal: AbortSignal) => getDemoPersonas(signal), []),
+    { refreshOnAmbient: false },
+  );
   if (!enabled) return null;
+  if (personas.status === "loading") return null;
+
+  const openPersona = async (reference: string, name: string) => {
+    setFieldError(null);
+    setResolvedName(name);
+    try {
+      const bootstrap = await demoSignIn.run(reference);
+      window.location.assign(tenantRuntime.href(studentLandingRoute(bootstrap.initialRoute)));
+    } catch {
+      // The panel stays; the feedback line says why.
+    }
+  };
+
+  if (personas.data?.restricted) {
+    const students = personas.data.students;
+    return (
+      <section className="auth-demo-student" aria-labelledby="demo-student-title">
+        <p className="eyebrow">Demo access</p>
+        <h2 id="demo-student-title">Continue as the demo student</h2>
+        <p>
+          This demo opens {students.length === 1 ? "one student’s" : "a demo student’s"} portal.
+          Their saved progress is shown as-is; signing in never resets it.
+        </p>
+        {students.length === 0 ? (
+          <p className="field-error" role="alert">
+            The demo student is not available right now.
+          </p>
+        ) : (
+          <div className="auth-demo-student__form">
+            {students.map((student) => (
+              <button
+                key={student.id}
+                className="button button--secondary"
+                type="button"
+                disabled={demoSignIn.status === "loading"}
+                onClick={() => void openPersona(student.externalRef ?? student.id, student.preferredName)}
+              >
+                {demoSignIn.status === "loading" && resolvedName === student.preferredName
+                  ? "Opening…"
+                  : `Continue as ${student.preferredName}`}
+                {student.externalRef ? <small> · {student.externalRef}</small> : null}
+              </button>
+            ))}
+          </div>
+        )}
+        <ActionFeedback
+          status={demoSignIn.status}
+          error={demoSignIn.message}
+          success={
+            resolvedName
+              ? `Opening ${resolvedName}’s portal…`
+              : "Opening the student’s portal…"
+          }
+        />
+      </section>
+    );
+  }
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

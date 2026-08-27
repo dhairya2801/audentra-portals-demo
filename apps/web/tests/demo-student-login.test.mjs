@@ -113,3 +113,23 @@ test("the production build ships the panel behind the gate, not enabled", async 
   assert.match(source, /NODE_ENV:\s*`production`/);
   assert.doesNotMatch(source, /NODE_ENV:\s*`development`/);
 });
+
+test("a restricted deployment offers its named student, not a free-text reference", async () => {
+  const source = await readFile(
+    new URL("../app/sign-in/sign-in-client.tsx", import.meta.url),
+    "utf8",
+  );
+  // The panel asks the platform which people it exposes before drawing.
+  assert.match(source, /getDemoPersonas\(signal\)/);
+  assert.match(source, /personas\.data\?\.restricted/);
+  // Restricted: one button per allowlisted student, opened by institution
+  // reference — the same reference the platform's allowlist names.
+  assert.match(source, /Continue as \$\{student\.preferredName\}/);
+  assert.match(source, /openPersona\(student\.externalRef \?\? student\.id, student\.preferredName\)/);
+  // Open (development): the type-any-reference field remains.
+  assert.match(source, /placeholder="SYN-000042"/);
+  // The restricted branch returns before the free-text form is reached.
+  assert.ok(
+    source.indexOf("personas.data?.restricted") < source.indexOf('placeholder="SYN-000042"'),
+  );
+});

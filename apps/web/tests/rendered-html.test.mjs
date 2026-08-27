@@ -2904,3 +2904,34 @@ test("dashboard-only delegates see document summaries without cross-scope links"
     /canOpen \? \([\s\S]*?<Link[\s\S]*?: \([\s\S]*?<div className=\{dashboardStyles\.progressTask\}>/,
   );
 });
+
+test("the staff portal has no My Desk view and every navigation entry renders", async () => {
+  const [portal, css] = await Promise.all([
+    readFile(new URL("../app/staff/staff-portal.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  // Removed from the frontend experience: no view, no navigation entry, no
+  // page, no styles. The staff/advising model behind it stays on the API.
+  assert.doesNotMatch(portal, /my_desk|MyDesk|my-desk|My desk/);
+  assert.doesNotMatch(css, /staff-desk-/);
+  await assert.rejects(
+    readFile(new URL("../app/staff/my-desk.tsx", import.meta.url), "utf8"),
+    /ENOENT/,
+  );
+
+  // No dead navigation: every id the sidebar offers is a known view with a
+  // render branch, so a hash like #tasks always lands on a page.
+  const viewOrder = [...portal.match(/const viewOrder: StaffView\[\] = \[([^\]]+)\]/)[1].matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);
+  const navigationIds = [...portal.matchAll(/\{ id: "([a-z_]+)", label: "[^"]+", icon:/g)].map((m) => m[1]);
+  assert.ok(navigationIds.length >= 10, "navigation entries were not found");
+  for (const id of navigationIds) {
+    assert.ok(viewOrder.includes(id), `${id} is navigable but not a view`);
+    // Edward is the final `else` of the view chain; every other view has its
+    // own `view === "…"` branch.
+    if (id !== "edward") {
+      assert.match(portal, new RegExp(`view === "${id}"`), `${id} has no render branch`);
+    }
+  }
+  assert.match(portal, /<EdwardView staffName=\{workspace\.currentStaff\.name\} \/>/);
+  assert.ok(!viewOrder.includes("my_desk"));
+});

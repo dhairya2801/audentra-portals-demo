@@ -40,6 +40,7 @@ import type {
   StudentAppointmentType,
   AppointmentAvailability,
   CancelStudentAppointmentInput,
+  DemoPersonas,
   DemoStaffDirectory,
   DemoStaffSignInInput,
   RescheduleStudentAppointmentInput,
@@ -966,6 +967,15 @@ export function getDemoStaffDirectory(query: string, signal?: AbortSignal) {
     method: "GET",
     signal,
   });
+}
+
+/**
+ * The demo identities this deployment exposes. Development answers
+ * `restricted: false` and the panels browse everyone; a release deployment
+ * answers with its fixed student and staff personas.
+ */
+export function getDemoPersonas(signal?: AbortSignal) {
+  return request<DemoPersonas>("/v1/auth/demo/personas", { method: "GET", signal });
 }
 
 export function signInDemoStaff(input: DemoStaffSignInInput) {

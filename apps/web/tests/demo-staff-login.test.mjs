@@ -53,3 +53,15 @@ test("the directory groups by component with openable people first", async () =>
   assert.deepEqual(groupDemoStaff(entries, "leaders").flatMap((g) => g.people.map((p) => p.name)), ["Hollis Zaragoza"]);
   assert.deepEqual(groupDemoStaff(entries, "advisers").flatMap((g) => g.people.map((p) => p.name)), ["Ada Ashgrove", "Quentin Zephyrine"]);
 });
+
+test("a restricted deployment lists its staff personas without search or filters", async () => {
+  const source = await readFile(new URL("../app/staff/demo-staff-login.tsx", import.meta.url), "utf8");
+  assert.match(source, /const personas = await getDemoPersonas\(signal\)/);
+  assert.match(source, /if \(personas\.restricted\) \{\s*return \{ restricted: true, items: personas\.staff/);
+  // Search and filter controls only exist for the open directory.
+  assert.match(source, /\{restricted \? null : \(\s*<div className="staff-demo-login__controls">/);
+  assert.match(source, /restricted \? "Demo access" : "Development only"/);
+  // Either way, opening a person posts the platform's sign-in-as route, which
+  // enforces the allowlist server-side.
+  assert.match(source, /signInDemoStaff\(\{ staffRef: entry\.id \}\)/);
+});
