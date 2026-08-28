@@ -1256,8 +1256,8 @@ test("staff authentication forms survive ambient focus refreshes", async () => {
   );
 });
 
-test("Morning Brew renders a canonical briefing, not a synthetic one", async () => {
-  const [portal, container, onboarding, dashboard, edward, data, preferences, styles, catalogue, news] =
+test("Morning Brew renders the demo corpus, and says that it is one", async () => {
+  const [portal, container, onboarding, dashboard, edward, data, preferences, styles, catalogue, news, corpus, drilldown] =
     await Promise.all([
       readFile(new URL("../app/staff/staff-portal.tsx", import.meta.url), "utf8"),
       readFile(
@@ -1272,15 +1272,24 @@ test("Morning Brew renders a canonical briefing, not a synthetic one", async () 
       readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
       readFile(new URL("../app/staff/morning-brew/catalog.ts", import.meta.url), "utf8"),
       readFile(new URL("../app/staff/morning-brew/news.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/staff/morning-brew/demo-brew.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/staff/morning-brew/detail.tsx", import.meta.url), "utf8"),
     ]);
 
   assert.match(portal, /id: "morning_brew", label: "Morning Brew"/);
   assert.match(portal, /<MorningBrewView workspace={workspace} navigate={navigate}/);
 
-  // The briefing is its own canonical read with its own failure state, never a
-  // derivation of the workspace payload.
-  assert.match(container, /getStaffMorningBrew/);
-  assert.match(container, /Today&rsquo;s briefing could not be assembled/);
+  // The live read is off for the demo: the briefing is built from the corpus,
+  // and no student record is touched to produce it.
+  assert.match(container, /demoBrewSource/);
+  assert.doesNotMatch(container, /getStaffMorningBrew/);
+
+  // A page of invented figures must never carry the sentence that claims they
+  // were counted. This is the one assertion here that is about honesty rather
+  // than layout, and it is the reason the demo is safe to show.
+  assert.match(dashboard, /<b>Demo data\.<\/b>/);
+  assert.doesNotMatch(dashboard, /count of canonical records in your Audentra database/);
+  assert.match(corpus, /The numbers are invented but not arbitrary/);
 
   // Setup is two questions: what you follow, then what we bring you and how
   // much of it. There is no third screen.
@@ -1289,7 +1298,6 @@ test("Morning Brew renders a canonical briefing, not a synthetic one", async () 
   assert.doesNotMatch(onboarding, /how do you like it\?/);
   assert.match(onboarding, /Step \{step\} of 2/);
   assert.match(dashboard, /Customize your Morning Brew/);
-  assert.match(dashboard, /count of canonical records/);
 
   // Each section carries the name of the source the reader switched on, so the
   // question they answered and the band they meet share a title.
@@ -1311,6 +1319,17 @@ test("Morning Brew renders a canonical briefing, not a synthetic one", async () 
   assert.doesNotMatch(dashboard, /People &amp; capacity/);
   assert.match(edward, /askStaffEdward/);
   assert.match(data, /buildBrewBriefing/);
+
+  // The drill-down is a dialog over the brief, not a page in place of it.
+  assert.match(drilldown, /role="dialog"/);
+  assert.match(drilldown, /aria-modal="true"/);
+  assert.match(drilldown, /Escape/);
+  assert.match(styles, /\.brew-detail-layer[^}]*backdrop-filter/);
+
+  // The miniature beside setup renders the real dashboard rather than a second
+  // implementation of it, so the two can never drift apart.
+  assert.match(onboarding, /<MorningBrewDashboard/);
+  assert.match(onboarding, /inert/);
   assert.match(preferences, /audentra:morning-brew:v6/);
   assert.match(preferences, /audentra:morning-brew:v5/);
   assert.match(preferences, /audentra:morning-brew:v2/);
@@ -1322,7 +1341,7 @@ test("Morning Brew renders a canonical briefing, not a synthetic one", async () 
   // Guard the whole surface against the synthetic corpus coming back: no
   // fabricated dollar impact, no confidence score, no preview-workspace risk
   // band, and no vendor inbox.
-  const surface = [container, onboarding, dashboard, edward, data].join("\n");
+  const surface = [container, onboarding, dashboard, edward, data, corpus].join("\n");
   for (const forbidden of [
     /Confidence: /,
     /meltLikelihoodPercent/,
@@ -1338,6 +1357,10 @@ test("Morning Brew renders a canonical briefing, not a synthetic one", async () 
   // and it is only allowed on those terms: an outside feed, credited, linked,
   // held apart from the builder, and saying so on the section itself.
   assert.match(news, /outside editorial feed|curated editorial list/i);
+  // Cover art is ours; hotlinking a publisher's photography would be both a
+  // theft and a broken image the first time they moved the file.
+  assert.doesNotMatch(news, /image: "https?:/);
+  assert.match(news, /image: "\/media\/news\//);
   // It is a constant, not a read: nothing in here may reach the payload, the
   // builder, or a student record.
   assert.doesNotMatch(news, /@vv\/contracts|from "\.\/data"|StaffMorningBrew/);

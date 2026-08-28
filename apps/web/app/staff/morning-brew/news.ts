@@ -1,15 +1,20 @@
 import type { BrewNewsItem } from "./types";
 
 /**
- * Higher Education News — the one band of this brief that is not the tenant's
- * own data.
+ * Higher Education News — the one band of this brief that is not the
+ * institution's own data.
  *
- * The platform serves no news feed, so this is a curated editorial list, held
- * here as a constant and stated as such on the section itself. It is kept
- * deliberately separate from `data.ts`: nothing in here is a count of anything,
- * nothing in here is joined to a student, and no figure from a story is ever
- * mixed into a KPI. Each card carries its publisher, its date, and a link out,
- * so the reader can go and check the claim rather than take it from us.
+ * A curated editorial list, held here as a constant and stated as such on the
+ * section itself. It is kept deliberately separate from `data.ts`: nothing in
+ * here is a count of anything, nothing is joined to a student, and no figure
+ * from a story is ever mixed into a KPI. Each card carries its publisher, its
+ * date, and a link out, so a reader can go and check the claim rather than take
+ * it from us.
+ *
+ * Cover art is our own, drawn for these stories and served from
+ * `public/media/news`. Publishers' photography is theirs, and a briefing that
+ * hotlinked it would be both a bandwidth theft and a broken image the first
+ * time they moved a file.
  *
  * When a real feed arrives it replaces this constant and nothing else: the
  * section already renders whatever list it is handed.
@@ -24,10 +29,12 @@ export const HIGHER_ED_NEWS: BrewNewsItem[] = [
     publisherMark: "IHE",
     publishedLabel: "Aug 18, 2026",
     url: "https://www.insidehighered.com/",
+    image: "/media/news/enrollment-trends.svg",
+    imageAlt: "An open notebook on a desk beside a coffee cup, with an enrollment chart on the page",
     topic: "admissions",
     bearing: "Bears on your deposited-to-enrolled step.",
     implication:
-      "Your own deposited group is the cohort to watch here: the national gap opens between the deposit and the first class, which is exactly the stretch your Action Center items cover.",
+      "Your own deposited group is the cohort to watch: the national gap opens between the deposit and the first class, which is exactly the stretch your Action Center items cover.",
   },
   {
     id: "news-fafsa-october",
@@ -37,6 +44,8 @@ export const HIGHER_ED_NEWS: BrewNewsItem[] = [
     publisherMark: "HED",
     publishedLabel: "Aug 14, 2026",
     url: "https://www.highereddive.com/",
+    image: "/media/news/fafsa-pressure.svg",
+    imageAlt: "A federal building with a clock above its portico",
     topic: "financial_aid",
     bearing: "Bears on aid document turnaround.",
     implication:
@@ -50,6 +59,8 @@ export const HIGHER_ED_NEWS: BrewNewsItem[] = [
     publisherMark: "HED",
     publishedLabel: "Aug 12, 2026",
     url: "https://www.highereddive.com/",
+    image: "/media/news/verification-guidance.svg",
+    imageAlt: "A document carrying a verified seal",
     topic: "financial_aid",
     bearing: "Bears on your outstanding aid requirements.",
     implication:
@@ -63,36 +74,43 @@ export const HIGHER_ED_NEWS: BrewNewsItem[] = [
     publisherMark: "CHE",
     publishedLabel: "Aug 6, 2026",
     url: "https://www.chronicle.com/",
+    image: "/media/news/yield-strategies.svg",
+    imageAlt: "A hand holding a phone showing a rising yield chart",
     topic: "admissions",
     bearing: "Bears on your offer-to-acceptance step.",
     implication:
       "A reset changes the sticker a family compares your offer against, so it lands on acceptance rather than on applications.",
   },
   {
-    id: "news-deposit-deadline",
-    title: "More public universities push the deposit deadline past May 1",
-    summary: "Admissions officers say the extra fortnight moves the deposit, not the melt.",
+    id: "news-direct-admission",
+    title: "Four more states extend direct admission to every public four-year",
+    summary:
+      "Students receive an offer before they apply, and the application step moves after the decision.",
     publisher: "Inside Higher Ed",
     publisherMark: "IHE",
     publishedLabel: "Aug 4, 2026",
     url: "https://www.insidehighered.com/",
+    image: "/media/news/direct-admission.svg",
+    imageAlt: "Two campus buildings joined by an arc of connected points",
     topic: "admissions",
-    bearing: "Bears on your offer response deadlines.",
+    bearing: "Bears on your application volume and your admit rate.",
     implication:
-      "If peers move and you do not, your response deadline becomes the earliest one a shared applicant faces — which shows up in your Calendar section before it shows up in deposits.",
+      "Where this lands, applications rise and yield falls: the same students are admitted at more institutions, so an offer buys less commitment than it used to.",
   },
   {
-    id: "news-housing-holds",
-    title: "Housing holds are the fastest-growing block on enrolment, survey finds",
+    id: "news-advising-analytics",
+    title: "Advising teams put caseload analytics in front of every student conversation",
     summary:
-      "Registrars report more students cleared for classes but still without an assigned bed.",
+      "Directors report fewer escalations where advisers see the whole record before they pick up the phone.",
     publisher: "Higher Ed Dive",
     publisherMark: "HED",
     publishedLabel: "Jul 29, 2026",
     url: "https://www.highereddive.com/",
-    topic: "housing",
-    bearing: "Bears on your deposit-to-bed step.",
+    image: "/media/news/ai-enrollment.svg",
+    imageAlt: "An auditorium facing a screen showing a rising chart",
+    topic: "student_success",
+    bearing: "Bears on your multi-blocker cohort.",
     implication:
-      "Worth reading against your own housing step: a student who is academically clear and unhoused is counted as enrolled everywhere except where it matters.",
+      "This is the argument for working your 214 three-or-more-blocker students as one list: the gain comes from one person seeing the whole record, not from more contact.",
   },
 ];

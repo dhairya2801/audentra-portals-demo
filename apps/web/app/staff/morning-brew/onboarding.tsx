@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Icon from "../../design-system/Icon.jsx";
 import { BREW_DETAIL_LEVELS, BREW_SOURCES, BREW_TOPICS } from "./catalog";
-import { formatBrewNumber } from "./data";
+import { MorningBrewDashboard } from "./dashboard";
+import { DEFAULT_BREW_PREFERENCES } from "./preferences";
 import { SourcePreview } from "./source-previews";
 import type {
   BrewBriefing,
   BrewDetailLevelId,
+  BrewPreferences,
   BrewSourceDefinition,
   BrewSourceId,
   BrewSourcePreference,
@@ -30,8 +32,6 @@ const LEVEL_ICON: Record<BrewDetailLevelId, string> = {
   deep: "rise",
 };
 
-const Bar = ({ width }: { width: string }) => <span className="bp-bar" style={{ width }} />;
-
 /** The dark tile that carries a source's glyph, in the list and in the preview. */
 function SourceMark({ source, size = 18 }: { source: BrewSourceDefinition; size?: number }) {
   return (
@@ -43,98 +43,56 @@ function SourceMark({ source, size = 18 }: { source: BrewSourceDefinition; size?
 
 /* --------------------------------------------------------------- live preview */
 
+/** Which section of the brief a source produces, for the scroll-to on open. */
+const SECTION_OF: Record<BrewSourceId, string> = {
+  pulse: "brew-pulse-title",
+  news: "brew-news-title",
+  calendar: "brew-deadlines-title",
+  email: "brew-requests-title",
+  actions: "brew-priorities-title",
+  intelligence: "brew-insights-title",
+};
+
 /**
- * A miniature of tomorrow's edition, built from the same briefing the real page
- * renders. Bands mount and unmount as sources are switched, so a toggle
- * visibly adds or removes a stripe of the page rather than only a line of
- * description. The band the reader is currently tuning is drawn out in full;
- * the rest stay as titled placeholders, so the eye stays where the question is.
+ * Tomorrow's edition, at a third of the size.
+ *
+ * This is not a drawing of the brief — it is the brief. The same
+ * `MorningBrewDashboard` the reader meets after setup is rendered here from the
+ * in-progress draft and scaled down, so there is no second implementation to
+ * drift out of step with the first, and nothing the miniature shows can turn
+ * out not to be what arrives. It is held inert: no focus, no pointer, no
+ * navigation, and every callback a no-op.
+ *
+ * Opening a source card scrolls the miniature to the section that source
+ * produces, so the answer to "what does this do to my morning" is on screen
+ * beside the question.
  */
 function BrewLivePreview({
   briefing,
-  draft,
-  firstName,
+  preferences,
+  staffName,
   focus,
 }: {
   briefing: BrewBriefing;
-  draft: OnboardingDraft;
-  firstName: string;
-  /** The source whose card is open, drawn in full inside the miniature. */
+  preferences: BrewPreferences;
+  staffName: string;
+  /** The source whose card is open; the miniature scrolls to its section. */
   focus: BrewSourceId | null;
 }) {
-  const on = BREW_SOURCES.filter((source) => draft.sources[source.id].enabled);
+  const page = useRef<HTMLDivElement | null>(null);
 
-  const bandBody = (source: BrewSourceDefinition) => {
-    if (source.id !== focus) {
-      return (
-        <div className="bp-skeleton">
-          <Bar width="88%" />
-          <Bar width="64%" />
-        </div>
-      );
-    }
-    const level = draft.sources[source.id].detail;
-    const option = source.details[level];
-    const caption = (
-      <p className="bp-level">
-        {option.title} · {option.kicker}
-      </p>
-    );
+  useEffect(() => {
+    const container = page.current;
+    if (!container) return;
+    const target = focus ? container.querySelector<HTMLElement>(`#${SECTION_OF[focus]}`) : null;
+    // The masthead is the top of the brief, so an unfocused preview starts there.
+    const top = target
+      ? Math.max(0, target.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop - 12)
+      : 0;
+    container.scrollTo({ top, behavior: "smooth" });
+  }, [focus, briefing]);
 
-    if (source.id === "pulse") {
-      return (
-        <>
-          {caption}
-          <div className="bp-kpis">
-            {briefing.kpis.slice(0, 4).map((kpi) => {
-              const frame = kpi.frames.now ?? Object.values(kpi.frames)[0];
-              return (
-                <span key={kpi.id}>
-                  <i>{kpi.label}</i>
-                  <b>{formatBrewNumber(frame.numeric)}</b>
-                  {frame.delta ? (
-                    <em className={frame.favorable ? "is-up" : "is-down"}>
-                      {frame.direction === "down" ? "↓" : "↑"} {frame.delta}
-                    </em>
-                  ) : null}
-                  <small>{frame.comparison ?? frame.window}</small>
-                </span>
-              );
-            })}
-          </div>
-        </>
-      );
-    }
-
-    const rows =
-      source.id === "news"
-        ? briefing.news.map((item) => item.title)
-        : source.id === "calendar"
-          ? briefing.deadlines.map((item) => item.title)
-          : source.id === "email"
-            ? briefing.requests.map((item) => item.subject)
-            : source.id === "actions"
-              ? briefing.priorities.map((item) => item.title)
-              : briefing.insights.map((item) => item.title);
-
-    return (
-      <>
-        {caption}
-        {rows.length ? (
-          <ul className="bp-rows">
-            {rows.slice(0, 3).map((row) => (
-              <li key={row}>
-                <i aria-hidden="true" />
-                <span>{row}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="bp-quiet">Nothing in your topics today. The band stays out.</p>
-        )}
-      </>
-    );
-  };
+  const noop = () => {};
 
   return (
     <aside className="brew-preview" aria-label="Preview of tomorrow's Morning Brew">
@@ -153,26 +111,25 @@ function BrewLivePreview({
           <span>Morning Brew</span>
         </div>
 
-        <div className="bp-page">
-          <div className="bp-hero">
-            <p className="bp-greeting">Good morning, {firstName}</p>
-            <Bar width="82%" />
-            <Bar width="54%" />
-          </div>
-
-          {on.length ? (
-            on.map((source) => (
-              <section
-                className={source.id === focus ? "bp-band is-open" : "bp-band"}
-                key={source.id}
-              >
-                <p className="bp-eyebrow">
-                  <SourceMark source={source} size={11} />
-                  {source.title}
-                </p>
-                {bandBody(source)}
-              </section>
-            ))
+        <div className="bp-page" ref={page}>
+          {briefing.kpis.length ||
+          briefing.insights.length ||
+          briefing.news.length ||
+          briefing.deadlines.length ||
+          briefing.requests.length ||
+          briefing.priorities.length ? (
+            <div className="bp-scale" inert aria-hidden="true">
+              <MorningBrewDashboard
+                briefing={briefing}
+                preferences={preferences}
+                staffName={staffName}
+                navigate={noop}
+                onOpenDetail={noop}
+                onAskEdward={noop}
+                onCustomize={noop}
+                onManageConnections={noop}
+              />
+            </div>
           ) : (
             <p className="bp-empty">
               Nothing is switched on yet. Add a source and it appears here.
@@ -181,7 +138,9 @@ function BrewLivePreview({
         </div>
       </div>
 
-      <p className="brew-preview__foot">Changes as you choose. This is your real content, shrunk down.</p>
+      <p className="brew-preview__foot">
+        This is the real page, shrunk down — not a mock-up of it.
+      </p>
     </aside>
   );
 }
@@ -315,6 +274,7 @@ export function MorningBrewOnboarding({
   step,
   direction,
   firstName,
+  staffName,
   draft,
   preview,
   customizing,
@@ -328,6 +288,8 @@ export function MorningBrewOnboarding({
   /** 1 when moving forward, -1 when going back; drives the slide direction. */
   direction: 1 | -1;
   firstName: string;
+  /** The reader's full name; the miniature renders the real masthead. */
+  staffName: string;
   draft: OnboardingDraft;
   /** Briefing built from the in-progress draft, for the live miniature. */
   preview: BrewBriefing;
@@ -339,6 +301,18 @@ export function MorningBrewOnboarding({
   onCancel?: () => void;
 }) {
   const [expanded, setExpanded] = useState<BrewSourceId>("pulse");
+  // The miniature is the real dashboard, so it needs real preferences rather
+  // than the draft alone.
+  const previewPreferences: BrewPreferences = useMemo(
+    () => ({
+      ...DEFAULT_BREW_PREFERENCES,
+      ...draft,
+      version: 6,
+      updatedAt: "",
+      onboardingComplete: false,
+    }),
+    [draft],
+  );
   const enabledCount = BREW_SOURCES.filter((source) => draft.sources[source.id].enabled).length;
   const focus = step === 2 && draft.sources[expanded].enabled ? expanded : null;
 
@@ -447,7 +421,12 @@ export function MorningBrewOnboarding({
           )}
         </div>
 
-        <BrewLivePreview briefing={preview} draft={draft} firstName={firstName} focus={focus} />
+        <BrewLivePreview
+          briefing={preview}
+          preferences={previewPreferences}
+          staffName={staffName}
+          focus={focus}
+        />
       </div>
 
       <footer className="brew-setup__footer">

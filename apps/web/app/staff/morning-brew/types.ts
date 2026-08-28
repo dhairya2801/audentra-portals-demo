@@ -17,8 +17,6 @@ import type {
   StaffBrewCohortRef,
   StaffBrewDestination,
   StaffBrewSeverity,
-  StaffBrewWindowId,
-  StaffMorningBrew,
 } from "@vv/contracts";
 
 /** Subjects a leader can follow each morning; each maps to canonical state. */
@@ -51,9 +49,6 @@ export type BrewSourceId =
 export type BrewDetailLevelId = "glance" | "context" | "deep";
 
 export type BrewDeliveryTime = "06:00" | "06:30" | "07:00" | "07:30";
-
-/** Comparison windows the API declares it can actually support. */
-export type BrewTimeframeId = StaffBrewWindowId;
 
 /** Staff workspace views the briefing can hand the reader off to. */
 export type MorningBrewDestination = StaffBrewDestination;
@@ -177,21 +172,25 @@ export interface BrewInsight {
   };
 }
 
-export interface BrewKpiFrame {
-  /** Raw number the ticker animates toward. */
-  numeric: number;
-  /** What the value describes in this window. */
-  window: string;
-  /** Share of a denominator, replacing the notion of "progress to target". */
-  basisLabel: string | null;
-  basisPercent: number | null;
-  /** Only present where the change is reconstructable from a timestamp. */
-  delta: string | null;
+/**
+ * One comparison behind a KPI: how the figure moved against an earlier point.
+ *
+ * A KPI carries a list of these and the card cycles through them. The headline
+ * number never changes as it cycles — only the comparison beside it does, which
+ * is the honest reading: there is one current value, seen from several
+ * distances.
+ */
+export interface BrewKpiComparison {
+  id: string;
+  /** "vs yesterday", "vs last 7 days" — names the distance, not the value. */
+  label: string;
+  /** Absolute movement, already signed: "+47". */
+  delta: string;
+  /** Relative movement, or null where a percentage would mislead. */
+  percent: string | null;
   direction: "up" | "down" | "flat";
+  /** Whether up is good here; a rising withdrawal count is not. */
   favorable: boolean;
-  comparison: string | null;
-  note: string;
-  unavailable: boolean;
 }
 
 export interface BrewKpi {
@@ -199,9 +198,19 @@ export interface BrewKpi {
   topic: BrewTopicId;
   label: string;
   icon: string;
-  source: "canonical_postgres";
+  /** The current figure. One number, not one per window. */
+  value: number;
+  /** Whether the figure is a count or a rate; decides the "%" and the rounding. */
+  format: "int" | "percent";
+  /** What the figure counts, in a few words. */
+  window: string;
+  /** Share of a denominator, replacing the notion of "progress to target". */
+  basisLabel: string | null;
+  basisPercent: number | null;
   cohort: StaffBrewCohortRef;
-  frames: Record<BrewTimeframeId, BrewKpiFrame>;
+  /** Empty where nothing can be compared against; the card then says so. */
+  comparisons: BrewKpiComparison[];
+  unavailable: boolean;
   detail: {
     definition: string;
     segments: { label: string; value: number; percent: number | null }[];
@@ -219,8 +228,12 @@ export interface BrewNewsItem {
   title: string;
   summary: string;
   publisher: string;
-  /** Publisher wordmark, drawn as initials when no artwork is supplied. */
+  /** Publisher wordmark, shown as initials beside the byline. */
   publisherMark: string;
+  /** Cover artwork, served from `public/media/news`. */
+  image: string;
+  /** What the artwork shows, for anyone who cannot see it. */
+  imageAlt: string;
   publishedLabel: string;
   url: string;
   topic: BrewTopicId;
@@ -301,7 +314,6 @@ export interface BrewBriefing {
   windowLabel: string;
   deliveryLabel: string;
   students: number;
-  timeframes: { id: BrewTimeframeId; label: string; short: string }[];
   insights: BrewInsight[];
   kpis: BrewKpi[];
   news: BrewNewsItem[];
@@ -314,19 +326,13 @@ export interface BrewBriefing {
     notes: string[];
     unsupported: { metric: string; reason: string }[];
   };
-  engagementScanAvailable: boolean;
-  /** False when the tenant records no portal activity, so inactivity cannot be read. */
-  engagementActivitySignal: boolean;
 }
-
-/** The raw payload, re-exported so components can name the source shape. */
-export type BrewSource = StaffMorningBrew;
 
 /* ------------------------------------------------------------------- detail */
 
 export type BrewDetailRef =
   | { kind: "insight"; id: string }
-  | { kind: "kpi"; id: string; timeframe: BrewTimeframeId }
+  | { kind: "kpi"; id: string }
   | { kind: "deadline"; id: string }
   | { kind: "request"; id: string }
   | { kind: "priority"; id: string };

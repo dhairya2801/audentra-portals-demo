@@ -2,10 +2,8 @@
 
 import type { StaffOperationsWorkspace } from "@vv/contracts";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useApiResource } from "../../hooks/use-api-resource";
-import { getStaffMorningBrew } from "../../lib/api-client";
-import { useTenant } from "../../components/tenant-provider";
 import { buildBrewBriefing } from "./data";
+import { demoBrewSource } from "./demo-brew";
 import { MorningBrewDashboard } from "./dashboard";
 import { MorningBrewDetail } from "./detail";
 import { EdwardPanel } from "./edward-panel";
@@ -37,30 +35,6 @@ const draftFrom = (preferences: Omit<BrewPreferences, "version" | "updatedAt">):
   ) as Record<BrewSourceId, BrewSourcePreference>,
 });
 
-/**
- * The briefing is an aggregate read over the whole tenant, so it fails on its
- * own terms. Showing the last stale edition with a fabricated freshness stamp
- * would be worse than saying the read did not complete.
- */
-function BrewUnavailable({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <section className="brew-unavailable" role="alert">
-      <span className="brew-cup" aria-hidden="true" />
-      <div>
-        <h1>Today&rsquo;s briefing could not be assembled</h1>
-        <p>{message}</p>
-        <p className="brew-unavailable__note">
-          Morning Brew reads live enrollment records. Rather than show yesterday&rsquo;s numbers
-          under today&rsquo;s date, it waits for a successful read.
-        </p>
-      </div>
-      <button className="button button--primary" type="button" onClick={onRetry}>
-        Try again
-      </button>
-    </section>
-  );
-}
-
 export function MorningBrewView({
   workspace,
   navigate,
@@ -68,11 +42,11 @@ export function MorningBrewView({
   workspace: StaffOperationsWorkspace;
   navigate: MorningBrewNavigate;
 }) {
-  const tenantRuntime = useTenant();
-  const scope = `${tenantRuntime.tenant.slug}:${workspace.currentStaff.id}`;
+  const scope = `demo:${workspace.currentStaff.id}`;
 
-  const loadBrew = useCallback((signal: AbortSignal) => getStaffMorningBrew(signal), []);
-  const brew = useApiResource(loadBrew, { refreshOnAmbient: false });
+  // Resolved once per mount so the masthead clock reads as this morning every
+  // time the demo is opened, rather than as the day the corpus was written.
+  const source = useMemo(() => demoBrewSource(), []);
 
   const [mode, setMode] = useState<Mode>("loading");
   const [step, setStep] = useState<OnboardingStep>(1);
@@ -110,10 +84,9 @@ export function MorningBrewView({
   );
 
   const staffName = workspace.currentStaff.name;
-  const source = brew.data;
 
   const briefing = useMemo(
-    () => (source ? buildBrewBriefing(source, preferences, staffName) : null),
+    () => buildBrewBriefing(source, preferences, staffName),
     [source, preferences, staffName],
   );
 
@@ -121,19 +94,17 @@ export function MorningBrewView({
      reacts to a choice before it has been committed. */
   const draftBriefing = useMemo(
     () =>
-      source
-        ? buildBrewBriefing(
-            source,
-            {
-              ...DEFAULT_BREW_PREFERENCES,
-              ...draft,
-              version: 6,
-              updatedAt: "",
-              onboardingComplete: false,
-            },
-            staffName,
-          )
-        : null,
+      buildBrewBriefing(
+        source,
+        {
+          ...DEFAULT_BREW_PREFERENCES,
+          ...draft,
+          version: 6,
+          updatedAt: "",
+          onboardingComplete: false,
+        },
+        staffName,
+      ),
     [source, draft, staffName],
   );
 
@@ -189,21 +160,12 @@ export function MorningBrewView({
     scrollToTop();
   }, []);
 
-  if (mode === "loading" || brew.status === "loading") {
+  if (mode === "loading") {
     return (
       <BrewLoading
         firstName={saved ? staffName.split(" ")[0] || null : null}
         draft={saved ? draft : null}
-        students={source?.population.students ?? null}
-      />
-    );
-  }
-
-  if (brew.status === "error" || !briefing || !draftBriefing) {
-    return (
-      <BrewUnavailable
-        message={brew.error ?? "The briefing read returned no data."}
-        onRetry={brew.reload}
+        students={source.students}
       />
     );
   }
@@ -225,6 +187,7 @@ export function MorningBrewView({
         step={step}
         direction={direction}
         firstName={briefing.greetingName}
+        staffName={staffName}
         draft={draft}
         preview={draftBriefing}
         customizing={Boolean(saved?.onboardingComplete)}

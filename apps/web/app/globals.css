@@ -20885,7 +20885,7 @@ a {
    greeting, then decision-ready panels. Colours come from the Audentra staff
    token set so the brief sits inside the workspace rather than beside it. */
 
-.brew, .brew-setup, .brew-building, .brew-detail { width: min(100%, 92rem); margin: 0 auto; }
+.brew, .brew-setup, .brew-building { width: min(100%, 92rem); margin: 0 auto; }
 .brew { display: grid; gap: 0.85rem; }
 .brew-eyebrow { display: flex; gap: 0.4rem; align-items: center; margin: 0; color: var(--audentra-purple); font-size: 0.58rem; font-weight: 900; letter-spacing: 0.11em; text-transform: uppercase; }
 .brew-eyebrow > span { font-size: 0.68rem; }
@@ -21005,23 +21005,36 @@ a {
 .brew-pulse__status strong { color: var(--audentra-navy); }
 .brew-pulse__progress { overflow: hidden; height: 2px; margin-bottom: 0.75rem; border-radius: 999px; background: #eef1f6; }
 .brew-pulse__progress i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--audentra-purple), var(--audentra-blue)); animation: brew-rotate-progress linear forwards; }
-.brew-kpi-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.55rem; }
+.brew-kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.55rem; }
 .brew-kpi { display: grid; align-content: start; gap: 0.05rem; padding: 0.7rem 0.65rem 0.6rem; border: 1px solid var(--audentra-line); border-radius: 0.7rem; background: #fff; text-align: left; cursor: pointer; transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease; }
 .brew-kpi:hover { transform: translateY(-2px); border-color: #cbc4f5; box-shadow: 0 10px 22px rgb(10 31 68 / 8%); }
 .brew-kpi__head { display: flex; gap: 0.34rem; align-items: center; color: #6b7488; font-size: 0.54rem; font-weight: 800; }
 .brew-kpi__head i { display: grid; width: 1.05rem; height: 1.05rem; place-items: center; border-radius: 0.3rem; background: var(--audentra-soft-purple); color: var(--audentra-purple); font-size: 0.55rem; font-style: normal; }
-.brew-kpi__value { margin-top: 0.35rem; color: var(--audentra-navy); font-size: 1.28rem; font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: -0.045em; line-height: 1.12; }
-.brew-kpi__movement { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: baseline; margin-top: 0.12rem; }
-.brew-kpi__delta { color: #0f9174; font-size: 0.56rem; font-style: normal; font-weight: 800; animation: brew-tick 420ms ease-out; }
-.brew-kpi__delta--watch { color: #d0453a; }
-.brew-kpi__movement small { color: #98a1b3; font-size: 0.52rem; }
-.brew-kpi__window { margin-top: 0.3rem; color: #a2abbc; font-size: 0.47rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
-.brew-kpi__target { display: flex; justify-content: space-between; gap: 0.4rem; align-items: baseline; }
+/* Figure on the left, the comparison currently in the cluster on the right.
+   The row is baseline-aligned so the rotating half never nudges the number. */
+.brew-kpi__figure { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.5rem; align-items: baseline; margin-top: 0.3rem; }
+.brew-kpi__value { color: var(--audentra-navy); font-size: 1.32rem; font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: -0.045em; line-height: 1.12; }
+.brew-kpi__value em { font-size: 0.86rem; font-style: normal; font-weight: 700; }
+.brew-kpi__primary { display: block; animation: brew-move-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes brew-move-in { from { transform: translateY(0.3rem); opacity: 0; } }
+.brew-kpi__movements { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.3rem; margin-top: 0.5rem; padding-top: 0.42rem; border-top: 1px solid #f0f2f6; }
+.brew-kpi__nodelta { color: #a2abbc; font-size: 0.52rem; }
+.brew-move { display: grid; gap: 0.02rem; text-align: right; }
+.brew-kpi__movements .brew-move { text-align: left; }
+.brew-move b { color: #0f9174; font-size: 0.6rem; font-variant-numeric: tabular-nums; font-weight: 800; white-space: nowrap; }
+.brew-move b.is-watch { color: #d0453a; }
+.brew-move b i { font-size: 0.44rem; font-style: normal; }
+.brew-move small { color: #98a1b3; font-size: 0.48rem; white-space: nowrap; }
+.brew-move--primary b { font-size: 0.76rem; }
+.brew-move--primary small { font-size: 0.5rem; }
+.brew-kpi__target { display: flex; justify-content: space-between; gap: 0.4rem; align-items: baseline; margin-top: 0.5rem; }
 .brew-kpi__target small { color: #8b94a6; font-size: 0.5rem; font-weight: 700; }
 .brew-kpi__target b { color: var(--audentra-navy); font-size: 0.55rem; font-variant-numeric: tabular-nums; }
-.brew-kpi__bar { display: block; overflow: hidden; height: 3px; margin-top: 0.28rem; border-radius: 999px; background: #eef1f6; }
+.brew-kpi__bar { display: block; overflow: hidden; height: 3px; margin-top: 0.3rem; border-radius: 999px; background: #eef1f6; }
 .brew-kpi__bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--audentra-blue), var(--audentra-purple)); transition: width 620ms cubic-bezier(0.22, 1, 0.36, 1); }
-.brew-pulse__foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; margin-top: 0.75rem; padding-top: 0.6rem; border-top: 1px solid #eef0f5; color: #8b94a6; font-size: 0.54rem; }
+/* padding-bottom is stated because something upstream leaves ~76px on this
+   footer, which read as a hole between the cards and the read-time line. */
+.brew-pulse__foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; margin-top: 0.75rem; padding-top: 0.6rem; padding-bottom: 0; border-top: 1px solid #eef0f5; color: #8b94a6; font-size: 0.54rem; }
 .brew-pulse__foot i { color: var(--audentra-teal); font-style: normal; }
 
 /* since yesterday ------------------------------------------------------------ */
@@ -21070,11 +21083,7 @@ a {
 .brew-news__rail { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(13.5rem, 1fr); gap: 0.6rem; overflow-x: auto; margin: 0; padding: 0 0 0.5rem; list-style: none; scroll-snap-type: x proximity; }
 .brew-news-card { display: grid; align-content: start; gap: 0.34rem; padding: 0.55rem 0.6rem 0.6rem; border: 1px solid var(--audentra-line); border-radius: 0.7rem; background: #fff; scroll-snap-align: start; transition: border-color 150ms ease, box-shadow 150ms ease; }
 .brew-news-card:hover { border-color: #cbc4f5; box-shadow: 0 10px 24px rgb(10 31 68 / 7%); }
-.brew-news-card__cover { display: grid; height: 5.4rem; place-items: center; border-radius: 0.5rem; background: linear-gradient(150deg, #e8edf6, #f6f8fc); color: var(--audentra-navy); font-size: 0.95rem; font-weight: 900; letter-spacing: 0.04em; opacity: 0.72; }
-.brew-news-card__cover--financial_aid { background: linear-gradient(150deg, #efe9ff, #f8f6ff); color: var(--audentra-purple); }
-.brew-news-card__cover--housing { background: linear-gradient(150deg, #fdf1dd, #fefaf1); color: #9a6a08; }
-.brew-news-card__cover--student_success { background: linear-gradient(150deg, #ddf5ee, #f2fbf8); color: #0a7d64; }
-.brew-news-card__cover--registrar { background: linear-gradient(150deg, #e4ecfb, #f5f8fe); color: var(--audentra-blue); }
+.brew-news-card__cover { display: block; width: 100%; height: 6.6rem; border-radius: 0.5rem; background: #f2f4f8; object-fit: cover; }
 .brew-news-card h3 { margin: 0; color: var(--audentra-navy); font-size: 0.7rem; font-weight: 800; letter-spacing: -0.01em; line-height: 1.35; }
 .brew-news-card h3 a { color: inherit; text-decoration: none; }
 .brew-news-card h3 a:hover { color: var(--audentra-purple); text-decoration: underline; }
@@ -21088,17 +21097,17 @@ a {
 .brew-news__basis { margin: 0; color: #a2abbc; font-size: 0.52rem; line-height: 1.5; }
 
 /* the build screen ----------------------------------------------------------- */
-.brew-building { display: grid; align-content: center; justify-items: start; min-height: 60vh; padding: 2.5rem clamp(1.2rem, 6vw, 5rem); }
-.brew-building__inner { display: grid; justify-items: start; max-width: 30rem; }
+.brew-building { display: grid; place-content: center; justify-items: center; min-height: 72vh; padding: 2.5rem clamp(1.2rem, 6vw, 5rem); text-align: center; }
+.brew-building__inner { display: grid; justify-items: center; max-width: 30rem; }
 .brew-building__mark { display: grid; width: 3.1rem; height: 3.1rem; place-items: center; margin-bottom: 1.2rem; border-radius: 0.85rem; background: var(--audentra-navy); color: #fff; }
 .brew-building h1 { margin: 0; color: var(--audentra-navy); font-size: clamp(1.15rem, 2.4vw, 1.6rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.2; }
 .brew-building > .brew-building__inner > p { margin: 0.5rem 0 1.4rem; color: #8b94a6; font-size: 0.76rem; font-weight: 600; }
-.brew-building__steps { display: grid; gap: 0.62rem; margin: 0; padding: 0; list-style: none; }
+.brew-building__steps { display: grid; gap: 0.62rem; margin: 0; padding: 0; list-style: none; text-align: left; }
 .brew-building__steps li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.62rem; align-items: center; color: #cbd2df; font-size: 0.74rem; transition: color 260ms ease; }
 .brew-building__steps li > i { display: grid; width: 1.2rem; height: 1.2rem; place-items: center; border-radius: 50%; background: #f0f2f6; color: #cbd2df; transition: background 260ms ease, color 260ms ease; }
 .brew-building__steps li.is-done { color: var(--audentra-navy); }
 .brew-building__steps li.is-done > i { background: var(--audentra-soft-teal); color: #12a37f; }
-.brew-building__progress { width: min(100%, 34rem); height: 0.24rem; margin-top: 2.6rem; overflow: hidden; border-radius: 999px; background: #eef0f5; }
+.brew-building__progress { width: min(100%, 26rem); height: 0.24rem; margin-top: 2.6rem; justify-self: center; overflow: hidden; border-radius: 999px; background: #eef0f5; }
 .brew-building__progress i { display: block; height: 100%; border-radius: 999px; background: var(--audentra-navy); transition: width 300ms cubic-bezier(0.22, 1, 0.36, 1); }
 
 
@@ -21379,7 +21388,14 @@ a {
 .bp-chrome i { width: 0.28rem; height: 0.28rem; border-radius: 50%; background: #d7dce6; }
 .bp-chrome span { margin-left: 0.35rem; color: #a2abbc; font-size: 0.42rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
 
-.bp-page { display: grid; gap: 0.38rem; max-height: 34rem; overflow: hidden; padding: 0.45rem; background: #f7f9fd; mask-image: linear-gradient(180deg, #000 94%, transparent); }
+.bp-page { max-height: 38rem; overflow-y: auto; padding: 0.4rem; background: #f7f9fd; scrollbar-width: none; scroll-behavior: smooth; }
+.bp-page::-webkit-scrollbar { display: none; }
+/* One third scale, with the wrapper widened to match so the shrunk page still
+   fills the frame. `zoom` would be simpler but reflows text at fractional
+   sizes; a transform keeps the real layout and only shrinks the result. */
+.bp-scale { width: 300%; transform: scale(0.3333); transform-origin: top left; }
+.bp-scale .brew { width: 100%; gap: 0.85rem; }
+.bp-scale .brew-masthead { position: static; }
 .bp-empty { margin: 0; padding: 2.5rem 0.9rem; color: #98a1b3; font-size: 0.55rem; line-height: 1.55; text-align: center; }
 .bp-bar { display: block; height: 0.2rem; border-radius: 999px; background: #dfe4ee; }
 .bp-band, .bp-hero { animation: bp-band 320ms ease-out both; }
@@ -21434,9 +21450,23 @@ a {
 .brew-build-button:disabled { cursor: not-allowed; opacity: 0.45; }
 
 /* detail drill-downs --------------------------------------------------------- */
-.brew-detail { width: min(100%, 64rem); padding: 1.5rem clamp(1.1rem, 3vw, 2.2rem) 1.6rem; border: 1px solid var(--audentra-line); border-radius: 1.1rem; background: #fff; box-shadow: 0 10px 34px rgb(10 31 68 / 6%); }
-.brew-detail__back { display: inline-flex; gap: 0.35rem; align-items: center; margin-bottom: 1rem; padding: 0.35rem 0.6rem 0.35rem 0.45rem; border: 1px solid var(--audentra-line); border-radius: 999px; background: #fff; color: #46506a; font-size: 0.57rem; font-weight: 800; cursor: pointer; }
-.brew-detail__back:hover { border-color: #b9a5ff; color: var(--audentra-purple); }
+/* The brief stays on screen behind the panel, blurred and dimmed, so opening a
+   card reads as going deeper into it rather than leaving it. */
+.brew-detail-layer { position: fixed; z-index: 70; display: grid; place-items: center; padding: clamp(0.8rem, 4vh, 3rem) clamp(0.8rem, 4vw, 3rem); overflow-y: auto; background: rgb(10 31 68 / 34%); backdrop-filter: blur(9px) saturate(120%); -webkit-backdrop-filter: blur(9px) saturate(120%); inset: 0; animation: brew-layer-in 200ms ease-out both; }
+@keyframes brew-layer-in { from { opacity: 0; } }
+.brew-detail { width: min(100%, 58rem); max-height: min(92vh, 60rem); overflow-y: auto; padding: 1.4rem clamp(1.1rem, 3vw, 2rem) 1.5rem; border: 1px solid #fff; border-radius: 1.15rem; background: #fff; box-shadow: 0 30px 90px rgb(10 31 68 / 28%), 0 2px 8px rgb(10 31 68 / 10%); animation: brew-detail-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.brew-detail:focus { outline: none; }
+@keyframes brew-detail-in { from { transform: translateY(1.2rem) scale(0.985); opacity: 0; } }
+.brew-detail__head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.85rem; align-items: start; }
+.brew-detail__head > div { min-width: 0; }
+/* The card's own glyph, carried into the panel so the two read as one object. */
+.brew-detail__mark { display: grid; width: 2.6rem; height: 2.6rem; flex: none; place-items: center; margin-top: 0.15rem; border-radius: 0.7rem; background: var(--audentra-soft-purple); color: var(--audentra-purple); font-size: 1.05rem; }
+.brew-detail__mark--blue { background: var(--audentra-soft-blue); color: var(--audentra-blue); }
+.brew-detail__mark--teal { background: var(--audentra-soft-teal); color: #0a7d64; }
+.brew-detail__mark--navy { background: #e8edf6; color: var(--audentra-navy); }
+.brew-detail__mark--amber { background: #fdf1dd; color: #9a6a08; }
+.brew-detail__close { display: grid; width: 1.9rem; height: 1.9rem; flex: none; place-items: center; border: 1px solid var(--audentra-line); border-radius: 50%; background: #fff; color: #78829a; font-size: 0.7rem; cursor: pointer; transition: border-color 150ms ease, color 150ms ease, background 150ms ease; }
+.brew-detail__close:hover { border-color: #b9a5ff; background: #fbfaff; color: var(--audentra-purple); }
 .brew-detail__head h1 { margin: 0.45rem 0 0; color: var(--audentra-navy); font-size: clamp(1.2rem, 2.4vw, 1.7rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.18; }
 .brew-detail__meta { display: flex; flex-wrap: wrap; gap: 0.5rem 0.85rem; align-items: center; margin-top: 0.7rem; color: #78829a; font-size: 0.6rem; }
 .brew-detail__meta b { color: var(--audentra-navy); }
@@ -21444,13 +21474,21 @@ a {
 .brew-detail__body { margin-top: 1.2rem; padding-top: 1.1rem; border-top: 1px solid var(--audentra-line); }
 .brew-detail__body > p { margin: 0 0 0.8rem; color: #4d5870; font-size: 0.7rem; line-height: 1.7; }
 .brew-detail__lede { color: var(--audentra-navy) !important; font-size: 0.8rem !important; font-weight: 600; line-height: 1.6 !important; }
-.brew-detail__section { margin-top: 1.4rem; }
+.brew-move-list { display: grid; gap: 0.3rem; margin: 0; padding: 0; list-style: none; }
+.brew-move-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto 4rem; gap: 0.7rem; align-items: baseline; padding: 0.45rem 0.6rem; border: 1px solid var(--audentra-line); border-radius: 0.55rem; background: #fbfcfe; }
+.brew-move-list span { color: #67718a; font-size: 0.64rem; }
+.brew-move-list b { color: #0a7d64; font-size: 0.72rem; font-variant-numeric: tabular-nums; font-weight: 800; }
+.brew-move-list b.is-watch { color: #b3372a; }
+.brew-move-list b i { font-size: 0.54rem; font-style: normal; }
+.brew-move-list em { color: #98a1b3; font-size: 0.62rem; font-style: normal; font-variant-numeric: tabular-nums; text-align: right; }
+
+.brew-detail__section { margin-top: 1.3rem; padding-top: 1.1rem; border-top: 1px solid #f0f2f6; }
 .brew-detail__section h2 { margin: 0 0 0.7rem; color: var(--audentra-navy); font-size: 0.8rem; font-weight: 800; letter-spacing: -0.015em; }
 .brew-detail__section--quiet { padding: 0.9rem 1rem; border-radius: 0.7rem; background: #f6f8fc; }
 .brew-detail__section--accent { padding: 0.95rem 1.05rem; border-left: 3px solid var(--audentra-purple); border-radius: 0 0.7rem 0.7rem 0; background: #f9f8ff; }
 .brew-detail__section--accent p { margin: 0; color: #46506a; font-size: 0.68rem; line-height: 1.65; }
 .brew-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.6rem; }
-.brew-stat { display: grid; align-content: start; padding: 0.75rem 0.8rem; border: 1px solid var(--audentra-line); border-radius: 0.65rem; background: #fff; }
+.brew-stat { display: grid; align-content: start; padding: 0.75rem 0.8rem; border: 1px solid var(--audentra-line); border-radius: 0.65rem; background: linear-gradient(170deg, #fbfcfe, #fff); }
 .brew-stat small { color: #8b94a6; font-size: 0.53rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
 .brew-stat strong { margin-top: 0.25rem; color: var(--audentra-navy); font-size: 1.1rem; font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: -0.035em; }
 .brew-stat p { margin: 0.2rem 0 0; color: #78829a; font-size: 0.55rem; line-height: 1.45; }

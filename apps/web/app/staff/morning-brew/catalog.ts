@@ -4,7 +4,6 @@ import type {
   BrewSourceDefinition,
   BrewSourceId,
   BrewSourcePreference,
-  BrewTimeframeId,
   BrewTopic,
   BrewTopicId,
 } from "./types";
@@ -289,16 +288,6 @@ export const BREW_DELIVERY_TIMES: { id: BrewDeliveryTime; label: string; caption
   { id: "06:30", label: "6:30 AM", caption: "Early desk time" },
   { id: "07:00", label: "7:00 AM", caption: "Most people pick this" },
   { id: "07:30", label: "7:30 AM", caption: "Just before stand-up" },
-];
-
-/**
- * Fallback comparison windows. The live list comes from the API, which only
- * declares windows it can actually reconstruct \u2014 there is no week, month, or
- * year here because the platform keeps no end-of-period snapshot.
- */
-export const BREW_TIMEFRAMES: { id: BrewTimeframeId; label: string; short: string }[] = [
-  { id: "now", label: "Now", short: "NOW" },
-  { id: "day", label: "Last 24 hours", short: "24H" },
 ];
 
 /* ----------------------------------------------------------------- defaults */

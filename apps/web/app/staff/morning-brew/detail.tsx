@@ -1,6 +1,7 @@
 "use client";
 
 import type { StaffActionCenterQuery } from "@vv/contracts";
+import { useEffect, useRef } from "react";
 
 import { topicById } from "./catalog";
 import { formatBrewNumber } from "./data";
@@ -103,9 +104,19 @@ function BrewChart({ series, unit }: { series: { label: string; value: number }[
   );
 }
 
+/**
+ * The drill-down, as a dialog over the brief rather than a page in place of it.
+ *
+ * A card and its detail are the same thought at two depths, so the brief stays
+ * on screen behind the panel — blurred, inert, and still there when the reader
+ * dismisses it. Escape closes, the backdrop closes, focus moves into the panel
+ * on open and the page underneath cannot be scrolled while it is up.
+ */
 function DetailShell({
   eyebrow,
   title,
+  mark,
+  accent = "purple",
   meta,
   actions,
   children,
@@ -113,24 +124,65 @@ function DetailShell({
 }: {
   eyebrow: string;
   title: string;
+  /** The glyph the card carried, so the panel opens as the same object. */
+  mark?: string;
+  accent?: "purple" | "blue" | "teal" | "navy" | "amber";
   meta?: React.ReactNode;
   actions?: React.ReactNode;
   children: React.ReactNode;
   onBack: () => void;
 }) {
+  const panel = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onBack();
+    };
+    const { overflow } = document.body.style;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    panel.current?.focus();
+    return () => {
+      document.body.style.overflow = overflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onBack]);
+
   return (
-    <article className="brew-detail">
-      <button className="brew-detail__back" type="button" onClick={onBack}>
-        <span aria-hidden="true">←</span> Back to Morning Brew
-      </button>
-      <header className="brew-detail__head">
-        <p className="brew-eyebrow">{eyebrow}</p>
-        <h1>{title}</h1>
+    <div
+      className="brew-detail-layer"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onBack();
+      }}
+    >
+      <div
+        className="brew-detail"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        tabIndex={-1}
+        ref={panel}
+      >
+        <header className="brew-detail__head">
+          {mark ? (
+            <span className={`brew-detail__mark brew-detail__mark--${accent}`} aria-hidden="true">
+              {mark}
+            </span>
+          ) : null}
+          <div>
+            <p className="brew-eyebrow">{eyebrow}</p>
+            <h1>{title}</h1>
+          </div>
+          <button className="brew-detail__close" type="button" onClick={onBack} aria-label="Close">
+            <span aria-hidden="true">✕</span>
+          </button>
+        </header>
         {meta ? <div className="brew-detail__meta">{meta}</div> : null}
         {actions ? <div className="brew-detail__actions">{actions}</div> : null}
-      </header>
-      <div className="brew-detail__body">{children}</div>
-    </article>
+        <div className="brew-detail__body">{children}</div>
+      </div>
+    </div>
   );
 }
 
@@ -166,7 +218,7 @@ function CohortEvidence({
     <section className="brew-detail__section brew-detail__section--evidence">
       <h2>How this was counted</h2>
       <p className="brew-detail__lede">
-        Students matching <strong>{cohort.label}</strong>, counted from canonical records.
+        Students matching <strong>{cohort.label}</strong>, counted from the demo corpus.
       </p>
       {cohort.clauses.length ? (
         <ul className="brew-note-list">
@@ -224,7 +276,15 @@ export function MorningBrewDetail({
 
     return (
       <DetailShell
-        eyebrow={`${topic?.title ?? "Enrollment"} · ${insight.label}`}
+        // The topic and the insight's own label are often the same word; saying
+        // it twice reads as a bug rather than a hierarchy.
+        eyebrow={
+          insight.label && insight.label !== topic?.title
+            ? `${topic?.title ?? "Enrollment"} · ${insight.label}`
+            : `${topic?.title ?? "Enrollment"} · Institutional Intelligence`
+        }
+        mark="✦"
+        accent="amber"
         title={insight.title}
         onBack={onBack}
         meta={
@@ -357,20 +417,20 @@ export function MorningBrewDetail({
   if (detail.kind === "kpi") {
     const kpi = briefing.kpis.find((item) => item.id === detail.id);
     if (!kpi) return <NotFound onBack={onBack} />;
-    const frame = kpi.frames[detail.timeframe] ?? kpi.frames.now;
-    const timeframe = briefing.timeframes.find((entry) => entry.id === detail.timeframe);
     const topic = topicById(kpi.topic);
+    const value = `${formatBrewNumber(kpi.value)}${kpi.format === "percent" ? "%" : ""}`;
 
     return (
       <DetailShell
-        eyebrow={`${topic?.title ?? "Enrollment"} · Enrollment Pulse`}
+        eyebrow={`${topic?.title ?? "Enrollment"} · Institutional Pulse`}
+        mark={kpi.icon}
+        accent="teal"
         title={kpi.label}
         onBack={onBack}
         meta={
           <>
-            <b>{formatBrewNumber(frame.numeric)}</b>
-            <span>{frame.window}</span>
-            {timeframe ? <span>{timeframe.label}</span> : null}
+            <b>{value}</b>
+            <span>{kpi.window}</span>
           </>
         }
         actions={
@@ -389,28 +449,44 @@ export function MorningBrewDetail({
         <p className="brew-detail__lede">{kpi.detail.definition}</p>
 
         <section className="brew-detail__section">
-          <h2>This window</h2>
+          <h2>Where it stands</h2>
           <div className="brew-stat-grid">
             <div className="brew-stat">
               <small>Value</small>
-              <strong>{formatBrewNumber(frame.numeric)}</strong>
-              <p>{frame.window}</p>
+              <strong>{value}</strong>
+              <p>{kpi.window}</p>
             </div>
-            {frame.basisLabel && frame.basisPercent !== null ? (
+            {kpi.basisLabel && kpi.basisPercent !== null ? (
               <div className="brew-stat">
                 <small>Share</small>
-                <strong>{frame.basisPercent}%</strong>
-                <p>{frame.basisLabel}</p>
+                <strong>{kpi.basisPercent}%</strong>
+                <p>{kpi.basisLabel}</p>
               </div>
             ) : null}
-            <div className="brew-stat">
-              <small>Change</small>
-              <strong>{frame.delta ?? "Not tracked"}</strong>
-              <p>{frame.comparison ?? "No timestamp proves a change for this metric"}</p>
-            </div>
           </div>
-          <p className="brew-detail__note">{frame.note}</p>
         </section>
+
+        {kpi.comparisons.length ? (
+          <section className="brew-detail__section">
+            <h2>How it moved</h2>
+            {/* The card cycles these one at a time; here they sit still, all
+                at once, which is the whole reason to open the card. */}
+            <ul className="brew-move-list">
+              {kpi.comparisons.map((comparison) => (
+                <li key={comparison.id}>
+                  <span>{comparison.label}</span>
+                  <b className={comparison.favorable ? "is-good" : "is-watch"}>
+                    <i aria-hidden="true">
+                      {comparison.direction === "up" ? "▲" : comparison.direction === "down" ? "▼" : "■"}
+                    </i>{" "}
+                    {comparison.delta}
+                  </b>
+                  <em>{comparison.percent ?? "—"}</em>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
         {kpi.detail.segments.length ? (
           <section className="brew-detail__section">
@@ -427,7 +503,7 @@ export function MorningBrewDetail({
                 <tr>
                   <th scope="col">Group</th>
                   <th scope="col">Students</th>
-                  <th scope="col">Share of roster</th>
+                  <th scope="col">Share</th>
                 </tr>
               </thead>
               <tbody>
@@ -464,7 +540,9 @@ export function MorningBrewDetail({
 
     return (
       <DetailShell
-        eyebrow={`${topic?.title ?? "Enrollment"} · Deadline`}
+        eyebrow={`${topic?.title ?? "Enrollment"} · Calendar`}
+        mark="▦"
+        accent="purple"
         title={deadline.title}
         onBack={onBack}
         meta={
@@ -506,8 +584,10 @@ export function MorningBrewDetail({
 
     return (
       <DetailShell
-        eyebrow="Student request"
+        eyebrow="Email · Student request"
         title={request.subject}
+        mark="✉"
+        accent="purple"
         onBack={onBack}
         meta={
           <>
@@ -545,7 +625,9 @@ export function MorningBrewDetail({
 
     return (
       <DetailShell
-        eyebrow={`${topic?.title ?? "Enrollment"} · Queue`}
+        eyebrow={`${topic?.title ?? "Enrollment"} · Action Center`}
+        mark={priority.icon}
+        accent="blue"
         title={priority.title}
         onBack={onBack}
         meta={
