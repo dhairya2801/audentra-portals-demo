@@ -1686,12 +1686,15 @@ function StudentsView({
   workspace,
   refresh,
   openTaskBoard,
+  initialQuery = "",
 }: {
   workspace: StaffOperationsWorkspace;
   refresh: () => void;
   openTaskBoard: (query: StaffActionCenterQuery) => void;
+  /** Seeded by the topbar search; the view is keyed on it so it applies once. */
+  initialQuery?: string;
 }) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [selectedId, setSelectedId] = useState(
     workspace.cohort[0]?.id ?? workspace.student.student.id,
   );
@@ -1754,7 +1757,7 @@ function StudentsView({
           <header className="staff-panel__heading">
             <div>
               <p className="eyebrow">Active cohort</p>
-              <h2>Fall 2027 students</h2>
+              <h2>Incoming students</h2>
             </div>
             <span>{filteredStudents.length} students</span>
           </header>
@@ -4129,7 +4132,7 @@ function OutreachView({
               Audience definition
               <textarea
                 name="audience"
-                defaultValue="Admitted Fall 2027 students with a deposit due within 72 hours"
+                defaultValue="Admitted Fall 2026 students with a deposit due within 72 hours"
                 required
               />
             </label>
@@ -4308,6 +4311,21 @@ function StaffWorkspaceShell({
   refresh: () => void;
 }) {
   const [view, setView] = useState<StaffView>("overview");
+  // The topbar search: what is typed there opens the Students view filtered
+  // to it (Enter), and ⌘K / Ctrl+K focuses the box from anywhere.
+  const [globalSearch, setGlobalSearch] = useState("");
+  const globalSearchInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        globalSearchInput.current?.focus();
+        globalSearchInput.current?.select();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [requestedWorkItemId, setRequestedWorkItemId] = useState<string | null>(null);
   const [taskBoardRequest, setTaskBoardRequest] = useState<{
@@ -4415,7 +4433,21 @@ function StaffWorkspaceShell({
         <label className="staff-global-search">
           <span aria-hidden="true">⌕</span>
           <span className="sr-only">Search staff workspace</span>
-          <input placeholder="Search students, tasks, and content" />
+          <input
+            ref={globalSearchInput}
+            placeholder="Search students, tasks, and content"
+            value={globalSearch}
+            onChange={(event) => setGlobalSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                setView("students");
+              } else if (event.key === "Escape") {
+                setGlobalSearch("");
+                event.currentTarget.blur();
+              }
+            }}
+          />
           <kbd>⌘ K</kbd>
         </label>
         <div className="staff-topbar__actions">
@@ -4514,7 +4546,13 @@ function StaffWorkspaceShell({
             onDetailClosed={() => setRequestedWorkItemId(null)}
           />
         ) : view === "students" ? (
-          <StudentsView workspace={workspace} refresh={refresh} openTaskBoard={openTaskBoard} />
+          <StudentsView
+            key={`students:${globalSearch}`}
+            workspace={workspace}
+            refresh={refresh}
+            openTaskBoard={openTaskBoard}
+            initialQuery={globalSearch}
+          />
         ) : view === "journeys" ? (
           <JourneysView workspace={workspace} refresh={refresh} />
         ) : view === "knowledge" ? (

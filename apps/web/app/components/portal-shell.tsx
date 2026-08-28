@@ -823,20 +823,27 @@ export function PortalShell({
         aria-label="Primary navigation"
       >
         <div className="brand-row">
-          <span className="brand-mark" aria-hidden="true">
-            {/* eslint-disable-next-line @next/next/no-img-element -- the tenant's mark is a plain asset URL */}
-            <img
-              className="brand-mark-image"
-              src={tenant.branding.logoUrl}
-              width="40"
-              height="40"
-              alt=""
-            />
-          </span>
-          <div className="brand-name">
-            <strong>{tenant.name}</strong>
-            <span>New Student Portal</span>
-          </div>
+          <Link
+            className="brand-home"
+            href="/dashboard"
+            aria-label={`${tenant.name} — student home`}
+            onClick={() => setMenuOpen(false)}
+          >
+            <span className="brand-mark" aria-hidden="true">
+              {/* eslint-disable-next-line @next/next/no-img-element -- the tenant's mark is a plain asset URL */}
+              <img
+                className="brand-mark-image"
+                src={tenant.branding.logoUrl}
+                width="40"
+                height="40"
+                alt=""
+              />
+            </span>
+            <span className="brand-name">
+              <strong>{tenant.name}</strong>
+              <span>New Student Portal</span>
+            </span>
+          </Link>
           <IconButton
             className="nav-close"
             name="close"
