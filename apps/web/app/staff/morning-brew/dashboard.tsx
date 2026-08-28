@@ -1,16 +1,14 @@
 "use client";
 
 import { useTenant } from "../../components/tenant-provider";
-import { BREW_INCLUDES } from "./catalog";
-import { EnrollmentPulse } from "./pulse";
+import { BREW_SOURCES } from "./catalog";
+import { InstitutionalPulse } from "./pulse";
 import type {
   BrewBriefing,
-  BrewCapacity,
   BrewDetailRef,
+  BrewNewsItem,
   BrewPreferences,
-  BrewTimeframeId,
   EdwardRequest,
-  MorningBrewDestination,
   MorningBrewNavigate,
 } from "./types";
 
@@ -37,118 +35,69 @@ const initialsOf = (name: string) =>
     .slice(0, 2)
     .toUpperCase();
 
-const CAPACITY_SEVERITY_LABEL: Record<BrewCapacity["signals"][number]["severity"], string> = {
-  critical: "Critical",
-  high: "High",
-  medium: "Medium",
-  positive: "Capacity",
-};
-
 /**
- * People & capacity. A summary line, a short ranked list of signals, and a
- * compact office table — the payload is already bounded, so nothing is
- * derived here beyond formatting.
+ * Higher education news — the one band that is not a count of this tenant's
+ * records, and the only one that links off the platform. Every card carries its
+ * publisher and its date for exactly that reason: the reader can go and check
+ * it, which is not something a KPI ever asks of them.
  */
-function CapacitySection({
-  capacity,
-  navigate,
+function NewsSection({
+  news,
+  level,
+  institution,
 }: {
-  capacity: BrewCapacity;
-  navigate: MorningBrewNavigate;
+  news: BrewNewsItem[];
+  /** From "With Context" up, each story says what it bears on. */
+  level: "glance" | "context" | "deep";
+  institution: string;
 }) {
   return (
-    <section className="brew-capacity" aria-labelledby="brew-capacity-title">
+    <section className="brew-news" aria-labelledby="brew-news-title">
       <header className="brew-panel-head">
         <div>
-          <p className="brew-eyebrow" id="brew-capacity-title">
-            <span aria-hidden="true">⚇</span> People &amp; capacity
+          <p className="brew-eyebrow" id="brew-news-title">
+            <span aria-hidden="true">▤</span> Higher Education News
           </p>
-          {capacity.summaryLine ? (
-            <p className="brew-capacity__summary">{capacity.summaryLine}</p>
-          ) : null}
+          <p>What is moving outside {institution} that would change how the figures above read.</p>
         </div>
       </header>
-      {!capacity.available ? (
-        <p className="brew-capacity__basis">{capacity.basis}</p>
-      ) : (
-        <>
-          {capacity.signals.length ? (
-            <ol className="brew-capacity__signals">
-              {capacity.signals.map((signal) => (
-                <li key={signal.id} className={`brew-capacity__signal is-${signal.severity}`}>
-                  <i className={`brew-chip brew-chip--${signal.severity}`}>
-                    {CAPACITY_SEVERITY_LABEL[signal.severity]}
-                  </i>
-                  <div>
-                    <strong>{signal.title}</strong>
-                    <p>{signal.detail}</p>
-                    <small>{signal.action}</small>
-                  </div>
-                  <button
-                    className="brew-link"
-                    type="button"
-                    onClick={() => navigate(signal.destination, signal.boardQuery)}
-                  >
-                    {signal.boardQuery ? "Open on the board" : "Open"}{" "}
-                    <span aria-hidden="true">→</span>
-                  </button>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <p className="brew-capacity__basis">No capacity signals fired today.</p>
-          )}
-          {capacity.signalsOmitted > 0 ? (
-            <p className="brew-capacity__omitted">
-              {capacity.signalsOmitted} further signal{capacity.signalsOmitted === 1 ? "" : "s"} not
-              shown.
-            </p>
-          ) : null}
-          {capacity.offices.length ? (
-            <div className="brew-capacity__offices">
-              <table>
-                <caption className="sr-only">Open work per office</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Office</th>
-                    <th scope="col">Open</th>
-                    <th scope="col">Overdue</th>
-                    <th scope="col">Unassigned</th>
-                    <th scope="col">Stale</th>
-                    <th scope="col">Oldest overdue</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {capacity.offices.map((office) => (
-                    <tr key={office.component}>
-                      <th scope="row">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            navigate("tasks", { component: office.component, status: "open" })
-                          }
-                        >
-                          {office.component}
-                        </button>
-                      </th>
-                      <td>{office.open}</td>
-                      <td className={office.overdue > 0 ? "is-negative" : undefined}>
-                        {office.overdue}
-                      </td>
-                      <td>{office.unassigned}</td>
-                      <td>{office.stale}</td>
-                      <td>
-                        {office.oldestOverdueDays !== null ? `${office.oldestOverdueDays}d` : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
-          <p className="brew-capacity__basis">{capacity.basis}</p>
-        </>
-      )}
+
+      <ol className="brew-news__rail">
+        {news.map((item) => (
+          <li className="brew-news-card" key={item.id}>
+            <img
+              className="brew-news-card__cover"
+              src={item.image}
+              alt={item.imageAlt}
+              loading="lazy"
+              width={400}
+              height={260}
+            />
+            <h3>
+              <a href={item.url} target="_blank" rel="noreferrer noopener">
+                {item.title}
+              </a>
+            </h3>
+            <p>{item.summary}</p>
+            {level !== "glance" ? <p className="brew-news-card__bearing">{item.bearing}</p> : null}
+            {level === "deep" ? (
+              <p className="brew-news-card__implication">{item.implication}</p>
+            ) : null}
+            <footer>
+              <span className="brew-news-card__publisher">
+                <i aria-hidden="true">{item.publisherMark}</i> {item.publisher}
+              </span>
+              <span className="brew-news-card__date">
+                {item.publishedLabel} <i aria-hidden="true">↗</i>
+              </span>
+            </footer>
+          </li>
+        ))}
+      </ol>
+
+      <p className="brew-news__basis">
+        An outside editorial feed, not your records. Nothing here is counted into a figure above.
+      </p>
     </section>
   );
 }
@@ -187,18 +136,26 @@ export function MorningBrewDashboard({
   const alerts =
     briefing.glance.requestsAwaitingReply +
     briefing.priorities.filter((priority) => priority.level === "High").length;
-  const includedCount = BREW_INCLUDES.filter((include) => preferences.include[include.id]).length;
+  const includedCount = BREW_SOURCES.filter(
+    (source) => preferences.sources[source.id].enabled,
+  ).length;
 
-  const showDeadlines = preferences.include.deadlines;
-  const showRequests = preferences.include.requests;
-  const showImpact = preferences.insightDetail !== "headline";
-  const showRecommendation = preferences.insightDetail === "full";
+  const showDeadlines = preferences.sources.calendar.enabled;
+  // "With Context" is where a Calendar row starts carrying its prep line.
+  const showNextStep = preferences.sources.calendar.detail !== "glance";
+  const showRequests = preferences.sources.email.enabled;
+  const newsLevel = preferences.sources.news.detail;
+  // How much of a finding is printed is the reader's own answer for
+  // Institutional Intelligence, not a separate setting they had to find.
+  const intelligenceLevel = preferences.sources.intelligence.detail;
+  const showImpact = intelligenceLevel !== "glance";
+  const showRecommendation = intelligenceLevel === "deep";
   const showPriorities = briefing.priorities.length > 0;
   const showDayGrid = showDeadlines || showRequests || showPriorities;
   const emptyBriefing =
     !briefing.insights.length &&
     !briefing.kpis.length &&
-    !briefing.changes.length &&
+    !briefing.news.length &&
     !showDayGrid;
 
   return (
@@ -256,7 +213,7 @@ export function MorningBrewDashboard({
             <span aria-hidden="true">◷</span> Read time: ~{briefing.readTimeMinutes} min
           </p>
           <small>
-            {briefing.students} students on the roster · changes cover {briefing.windowLabel}
+            {briefing.students} students on the roster · read over {briefing.windowLabel}
           </small>
         </div>
 
@@ -274,7 +231,7 @@ export function MorningBrewDashboard({
               <i className="brew-glance__icon brew-glance__icon--mail" aria-hidden="true">
                 ✉
               </i>
-              Student requests
+              Email
             </span>
             <strong>{showRequests ? briefing.glance.requests : "—"}</strong>
             <small>{showRequests ? "Active conversations" : "Turned off"}</small>
@@ -301,7 +258,7 @@ export function MorningBrewDashboard({
               <i className="brew-glance__icon brew-glance__icon--calendar" aria-hidden="true">
                 ▦
               </i>
-              Deadlines
+              Calendar
             </span>
             <strong>{showDeadlines ? briefing.glance.deadlinesOverdue : "—"}</strong>
             <small>{showDeadlines ? "Students past a due date" : "Turned off"}</small>
@@ -358,7 +315,7 @@ export function MorningBrewDashboard({
           <header className="brew-panel-head">
             <div>
               <p className="brew-eyebrow" id="brew-insights-title">
-                <span aria-hidden="true">✦</span> What needs attention
+                <span aria-hidden="true">✦</span> Institutional Intelligence
               </p>
               <p>Cohorts that are stuck today, ranked by how much they hold up.</p>
             </div>
@@ -423,7 +380,7 @@ export function MorningBrewDashboard({
 
                 <footer className="brew-insight__foot">
                   <span>
-                    Priority: <b>{insight.impactLevel}</b> &nbsp;·&nbsp; <b>Canonical records</b>
+                    Priority: <b>{insight.impactLevel}</b> &nbsp;·&nbsp; <b>Demo data</b>
                   </span>
                   <button
                     className="brew-link"
@@ -439,66 +396,14 @@ export function MorningBrewDashboard({
         </section>
       ) : null}
 
-      {briefing.capacity ? (
-        <CapacitySection capacity={briefing.capacity} navigate={navigate} />
-      ) : null}
-
-      <EnrollmentPulse
+      <InstitutionalPulse
         kpis={briefing.kpis}
-        timeframes={briefing.timeframes}
         refreshedAt={`${updatedClock} ET`}
         students={briefing.students}
-        onOpenKpi={(id: string, timeframe: BrewTimeframeId) =>
-          onOpenDetail({ kind: "kpi", id, timeframe })
-        }
+        onOpenKpi={(id: string) => onOpenDetail({ kind: "kpi", id })}
         onAskEdward={() => onAskEdward({ mode: "insights", context: "the enrollment funnel" })}
         onOpenDashboard={() => navigate("overview")}
       />
-
-      {briefing.changes.length ? (
-        <section className="brew-changes" aria-labelledby="brew-changes-title">
-          <header className="brew-panel-head">
-            <div>
-              <p className="brew-eyebrow" id="brew-changes-title">
-                <span aria-hidden="true">↻</span> Since yesterday
-              </p>
-              <p>Canonical records written in {briefing.windowLabel}.</p>
-            </div>
-            <div className="brew-panel-head__actions">
-              <EdwardChip
-                label="Summarize"
-                onClick={() =>
-                  onAskEdward({ mode: "summarize", context: "what changed since yesterday" })
-                }
-              />
-            </div>
-          </header>
-
-          <ol className="brew-change-rail">
-            {briefing.changes.map((change) => (
-              <li className={`brew-change brew-change--${change.tone}`} key={change.id}>
-                <time>{change.time}</time>
-                <h3>
-                  <button
-                    className="brew-stretch"
-                    type="button"
-                    onClick={() => onOpenDetail({ kind: "change", id: change.id })}
-                  >
-                    {change.title}
-                  </button>
-                </h3>
-                <p>{change.detail}</p>
-                <span className="brew-change__foot">
-                  <b>{change.metric}</b>
-                  <i className="brew-source brew-source--workspace">
-                    {change.exact ? "Canonical" : "Last write"}
-                  </i>
-                </span>
-              </li>
-            ))}
-          </ol>
-        </section>
-      ) : null}
 
       {showDayGrid ? (
         <div className="brew-day-grid">
@@ -506,7 +411,7 @@ export function MorningBrewDashboard({
             <section className="brew-panel" aria-labelledby="brew-deadlines-title">
               <header className="brew-panel__head">
                 <p className="brew-eyebrow" id="brew-deadlines-title">
-                  <span aria-hidden="true">▦</span> Deadlines ahead
+                  <span aria-hidden="true">▦</span> Calendar
                 </p>
                 <EdwardChip
                   label="Who is affected?"
@@ -541,7 +446,7 @@ export function MorningBrewDashboard({
                           </button>
                         </h3>
                         <p>{deadline.detail}</p>
-                        {preferences.deadlineNextStep && deadline.priority === "high" ? (
+                        {showNextStep && deadline.priority === "high" ? (
                           <p className="brew-prep-line">
                             <span aria-hidden="true">✎</span> {deadline.nextStep}
                           </p>
@@ -580,7 +485,7 @@ export function MorningBrewDashboard({
             <section className="brew-panel" aria-labelledby="brew-requests-title">
               <header className="brew-panel__head">
                 <p className="brew-eyebrow" id="brew-requests-title">
-                  <span aria-hidden="true">✉</span> Student requests
+                  <span aria-hidden="true">✉</span> Email
                 </p>
                 <EdwardChip
                   label="Summarize"
@@ -660,7 +565,7 @@ export function MorningBrewDashboard({
             <section className="brew-panel" aria-labelledby="brew-priorities-title">
               <header className="brew-panel__head">
                 <p className="brew-eyebrow" id="brew-priorities-title">
-                  <span aria-hidden="true">⚑</span> Today&rsquo;s queues
+                  <span aria-hidden="true">⚑</span> Action Center
                 </p>
                 <EdwardChip
                   label="Summarize"
@@ -725,7 +630,7 @@ export function MorningBrewDashboard({
                       : "Switch on student requests and we'll pull out the support conversations waiting on your team."}
                 </p>
                 <small>
-                  {includedCount} of {BREW_INCLUDES.length} switched on
+                  {includedCount} of {BREW_SOURCES.length} sources switched on
                 </small>
               </div>
               <button className="button button--primary" type="button" onClick={onManageConnections}>
@@ -736,6 +641,14 @@ export function MorningBrewDashboard({
         </div>
       ) : null}
 
+      {briefing.news.length ? (
+        <NewsSection
+          news={briefing.news}
+          level={newsLevel}
+          institution={tenantRuntime.tenant.shortName}
+        />
+      ) : null}
+
       <section className="brew-coverage" aria-labelledby="brew-coverage-title">
         <p className="brew-eyebrow" id="brew-coverage-title">
           <span aria-hidden="true">◎</span> What this briefing does and does not cover
@@ -744,13 +657,6 @@ export function MorningBrewDashboard({
           {briefing.coverage.notes.map((note) => (
             <li key={note}>{note}</li>
           ))}
-          {!briefing.engagementActivitySignal ? (
-            <li className="brew-coverage__note--muted">
-              Portal inactivity is unknown for this institution: no portal activity has been
-              recorded in the last 30 days, so a quiet student cannot be told apart from an
-              unconnected one.
-            </li>
-          ) : null}
         </ul>
         <details className="brew-coverage__details">
           <summary>Metrics this briefing will not show ({briefing.coverage.unsupported.length})</summary>
@@ -788,9 +694,8 @@ export function MorningBrewDashboard({
       </footer>
 
       <p className="brew-disclaimer">
-        Every figure above is a count of canonical records in your Audentra database, read at{" "}
-        {updatedClock} ET. Nothing on this page is modelled, projected, or generated by a language
-        model.
+        <b>Demo data.</b> Every figure above is illustrative and no student record was read to
+        produce it. Nothing on this page is modelled, projected, or generated by a language model.
       </p>
     </div>
   );

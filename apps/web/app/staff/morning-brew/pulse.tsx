@@ -1,115 +1,133 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { formatBrewNumber } from "./data";
-import type { BrewKpi, BrewTimeframeId } from "./types";
+import type { BrewKpi, BrewKpiComparison } from "./types";
 
-/** How long each timeframe holds the board before the carousel advances. */
-const ROTATE_MS = 5200;
-const TICKER_MS = 760;
-
-export type PulseMode = "auto" | BrewTimeframeId;
+/** How long one comparison holds the card before the cluster advances. */
+const ROTATE_MS = 3400;
 
 function prefersReducedMotion() {
-  return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return (
+    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
+const arrowFor = (direction: BrewKpiComparison["direction"]) =>
+  direction === "up" ? "▲" : direction === "down" ? "▼" : "■";
+
+/**
+ * One comparison, in the two sizes the card uses.
+ *
+ * The tone follows `favorable`, not `direction`: a falling verification queue
+ * is good news and a rising one is not, and a card that painted every downward
+ * arrow red would tell the reader the opposite of what happened.
+ */
+function Movement({
+  comparison,
+  primary,
+}: {
+  comparison: BrewKpiComparison;
+  primary?: boolean;
+}) {
+  return (
+    <span className={primary ? "brew-move brew-move--primary" : "brew-move"}>
+      <b className={comparison.favorable ? "is-good" : "is-watch"}>
+        <i aria-hidden="true">{arrowFor(comparison.direction)}</i>{" "}
+        {primary ? comparison.delta : (comparison.percent ?? comparison.delta)}
+      </b>
+      <small>{comparison.label}</small>
+    </span>
+  );
 }
 
 /**
- * Counts the displayed value toward its new target so a timeframe change reads
- * like a ticker rather than a hard swap. Interrupting mid-flight resumes from
- * wherever the number currently sits.
+ * A KPI card: one figure, and the distances it can be read from.
+ *
+ * The headline number never moves. What rotates is the comparison cluster
+ * beneath it — each window takes a turn as the large reading beside the figure
+ * while the next two sit below it, so the card always shows three distinct
+ * distances and never the same one twice. Pointing at the card stops the
+ * rotation, because a number that changes while you are reading it is a number
+ * you cannot read.
  */
-function useTicker(target: number) {
-  const [display, setDisplay] = useState(target);
-  const currentRef = useRef(target);
-  const frameRef = useRef(0);
+function PulseCard({ kpi, onOpen }: { kpi: BrewKpi; onOpen: () => void }) {
+  const [offset, setOffset] = useState(0);
+  const [held, setHeld] = useState(false);
+  const rotates = kpi.comparisons.length > 1;
 
   useEffect(() => {
-    const from = currentRef.current;
-    if (from === target || prefersReducedMotion()) {
-      currentRef.current = target;
-      setDisplay(target);
-      return;
-    }
-    const started = performance.now();
-    const step = (now: number) => {
-      const progress = Math.min(1, (now - started) / TICKER_MS);
-      const eased = 1 - (1 - progress) ** 3;
-      const value = from + (target - from) * eased;
-      currentRef.current = value;
-      setDisplay(value);
-      if (progress < 1) frameRef.current = requestAnimationFrame(step);
-    };
-    frameRef.current = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(frameRef.current);
-  }, [target]);
+    if (!rotates || held || prefersReducedMotion()) return;
+    const timer = window.setInterval(
+      () => setOffset((current) => (current + 1) % kpi.comparisons.length),
+      ROTATE_MS,
+    );
+    return () => window.clearInterval(timer);
+  }, [rotates, held, kpi.comparisons.length]);
 
-  return formatBrewNumber(display);
-}
-
-function PulseCard({
-  kpi,
-  timeframe,
-  onOpen,
-}: {
-  kpi: BrewKpi;
-  timeframe: BrewTimeframeId;
-  onOpen: () => void;
-}) {
-  const frame = kpi.frames[timeframe] ?? kpi.frames.now;
-  const value = useTicker(frame.numeric);
+  const at = (index: number) => kpi.comparisons[(offset + index) % kpi.comparisons.length];
+  const primary = kpi.comparisons.length ? at(0) : null;
+  const secondary = kpi.comparisons.length > 2 ? [at(1), at(2)] : [];
 
   return (
     <button
-      className={frame.unavailable ? "brew-kpi brew-kpi--muted" : "brew-kpi"}
+      className={kpi.unavailable ? "brew-kpi brew-kpi--muted" : "brew-kpi"}
       type="button"
       onClick={onOpen}
+      onMouseEnter={() => setHeld(true)}
+      onMouseLeave={() => setHeld(false)}
+      onFocus={() => setHeld(true)}
+      onBlur={() => setHeld(false)}
     >
       <span className="brew-kpi__head">
         <i aria-hidden="true">{kpi.icon}</i>
         {kpi.label}
       </span>
-      <strong className="brew-kpi__value">{value}</strong>
-      <span className="brew-kpi__movement">
-        {frame.delta ? (
-          <>
-            <i
-              className={frame.favorable ? "brew-kpi__delta" : "brew-kpi__delta brew-kpi__delta--watch"}
-              key={`${kpi.id}-${timeframe}`}
-            >
-              {frame.direction === "up" ? "▲" : frame.direction === "down" ? "▼" : "■"} {frame.delta}
-            </i>
-            <small>{frame.comparison}</small>
-          </>
+
+      <span className="brew-kpi__figure">
+        <strong className="brew-kpi__value">
+          {formatBrewNumber(kpi.value)}
+          {kpi.format === "percent" ? <em>%</em> : null}
+        </strong>
+        {primary ? (
+          // Keyed on the window so each turn of the cluster re-runs the fade.
+          <span className="brew-kpi__primary" key={primary.id}>
+            <Movement comparison={primary} primary />
+          </span>
         ) : (
-          // No timestamp proves a change for this metric, so the slot says so
-          // rather than borrowing a number from somewhere else.
           <small className="brew-kpi__nodelta">No change tracked</small>
         )}
       </span>
-      <span className="brew-kpi__window">{frame.window}</span>
-      {frame.basisPercent !== null && frame.basisLabel ? (
+
+      {secondary.length ? (
+        <span className="brew-kpi__movements">
+          {secondary.map((comparison) => (
+            <Movement comparison={comparison} key={`${comparison.id}-${offset}`} />
+          ))}
+        </span>
+      ) : null}
+
+      {kpi.basisPercent !== null && kpi.basisLabel ? (
         <>
           <span className="brew-kpi__target">
-            <small>{frame.basisLabel}</small>
-            <b>{frame.basisPercent}%</b>
+            <small>{kpi.basisLabel}</small>
+            <b>{kpi.basisPercent}%</b>
           </span>
           <span className="brew-kpi__bar" aria-hidden="true">
-            <i style={{ width: `${Math.min(100, frame.basisPercent)}%` }} />
+            <i style={{ width: `${Math.min(100, kpi.basisPercent)}%` }} />
           </span>
         </>
       ) : (
         <span className="brew-kpi__target brew-kpi__target--plain">
-          <small>{kpi.cohort.clauses.join(" · ") || "Whole roster"}</small>
+          <small>{kpi.window}</small>
         </span>
       )}
     </button>
   );
 }
 
-export function EnrollmentPulse({
+export function InstitutionalPulse({
   kpis,
-  timeframes,
   onOpenKpi,
   onAskEdward,
   onOpenDashboard,
@@ -117,43 +135,22 @@ export function EnrollmentPulse({
   students,
 }: {
   kpis: BrewKpi[];
-  /** Windows the API declared it can reconstruct. Never a fixed list. */
-  timeframes: { id: BrewTimeframeId; label: string; short: string }[];
-  onOpenKpi: (id: string, timeframe: BrewTimeframeId) => void;
+  onOpenKpi: (id: string) => void;
   onAskEdward: () => void;
   onOpenDashboard: () => void;
   refreshedAt: string;
   students: number;
 }) {
-  const [mode, setMode] = useState<PulseMode>("auto");
-  const [rotation, setRotation] = useState(0);
-
-  useEffect(() => {
-    if (mode !== "auto" || prefersReducedMotion() || timeframes.length < 2) return;
-    const timer = window.setInterval(() => {
-      setRotation((current) => (current + 1) % timeframes.length);
-    }, ROTATE_MS);
-    return () => window.clearInterval(timer);
-  }, [mode, timeframes.length]);
-
-  if (!kpis.length || !timeframes.length) return null;
-
-  const fallback = timeframes[0];
-  const timeframe: BrewTimeframeId =
-    mode === "auto" ? (timeframes[rotation] ?? fallback).id : mode;
-  const active = timeframes.find((entry) => entry.id === timeframe) ?? fallback;
+  if (!kpis.length) return null;
 
   return (
     <section className="brew-pulse" aria-labelledby="brew-pulse-title">
       <header className="brew-panel-head">
         <div>
-          <h2 id="brew-pulse-title">
-            <span className="brew-panel-head__glyph" aria-hidden="true">
-              ⌁
-            </span>
-            Enrollment Pulse
-          </h2>
-          <p>Where the {students}-student funnel stands, and what share of each stage converts</p>
+          <p className="brew-eyebrow" id="brew-pulse-title">
+            <span aria-hidden="true">⌁</span> Institutional Pulse
+          </p>
+          <p>Where the {formatBrewNumber(students)}-student institution stands this morning.</p>
         </div>
         <div className="brew-panel-head__actions">
           <button className="brew-edward-chip" type="button" onClick={onAskEdward}>
@@ -165,70 +162,14 @@ export function EnrollmentPulse({
         </div>
       </header>
 
-      <div className="brew-pulse__controls">
-        <div className="brew-timeframes" role="group" aria-label="Comparison period">
-          {timeframes.length > 1 ? (
-            <button
-              className={
-                mode === "auto"
-                  ? "brew-timeframe brew-timeframe--auto is-active"
-                  : "brew-timeframe brew-timeframe--auto"
-              }
-              type="button"
-              aria-pressed={mode === "auto"}
-              onClick={() => setMode("auto")}
-            >
-              <i className="brew-live-dot" aria-hidden="true" />
-              Live
-            </button>
-          ) : null}
-          {timeframes.map((entry) => (
-            <button
-              className={mode === entry.id ? "brew-timeframe is-active" : "brew-timeframe"}
-              type="button"
-              aria-pressed={mode === entry.id}
-              onClick={() => setMode(entry.id)}
-              key={entry.id}
-            >
-              <b>{entry.short}</b>
-              {entry.label}
-            </button>
-          ))}
-        </div>
-        <p className="brew-pulse__status" aria-live="polite">
-          {mode === "auto" ? (
-            <>
-              Cycling periods · now showing <strong>{active.label.toLowerCase()}</strong>
-            </>
-          ) : (
-            <>
-              Filtered to <strong>{active.label.toLowerCase()}</strong>
-            </>
-          )}
-        </p>
-      </div>
-
-      {mode === "auto" && timeframes.length > 1 ? (
-        <div className="brew-pulse__progress" aria-hidden="true">
-          <i key={rotation} style={{ animationDuration: `${ROTATE_MS}ms` }} />
-        </div>
-      ) : null}
-
       <div className="brew-kpi-grid">
         {kpis.map((kpi) => (
-          <PulseCard
-            kpi={kpi}
-            timeframe={timeframe}
-            onOpen={() => onOpenKpi(kpi.id, timeframe)}
-            key={kpi.id}
-          />
+          <PulseCard kpi={kpi} onOpen={() => onOpenKpi(kpi.id)} key={kpi.id} />
         ))}
       </div>
 
       <footer className="brew-pulse__foot">
-        <span>
-          Counts, not targets — the platform holds no enrollment plan figures to compare against
-        </span>
+        <span>Comparisons cycle every few seconds — point at a card to hold it still.</span>
         <span>
           Read at {refreshedAt} <i aria-hidden="true">↻</i>
         </span>

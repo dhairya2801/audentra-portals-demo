@@ -14,14 +14,9 @@
 
 import type {
   StaffActionCenterQuery,
-  StaffBrewCapacitySeverity,
-  StaffBrewCapacitySignalKind,
   StaffBrewCohortRef,
   StaffBrewDestination,
   StaffBrewSeverity,
-  StaffBrewTone,
-  StaffBrewWindowId,
-  StaffMorningBrew,
 } from "@vv/contracts";
 
 /** Subjects a leader can follow each morning; each maps to canonical state. */
@@ -33,30 +28,27 @@ export type BrewTopicId =
   | "student_success";
 
 /**
- * Sections the reader can switch on. The identifiers are stable across
- * versions so a saved preference survives; the labels in `catalog.ts` describe
- * what each one actually shows today.
+ * The six sources a reader can switch on. Each one owns exactly one band of
+ * the briefing, and the section heading in the brief is the source's own title
+ * — so a reader who switched on "Calendar" finds a section called Calendar,
+ * not "Deadlines ahead".
  */
-export type BrewIncludeId =
-  | "requests"
-  | "deadlines"
-  | "numbers"
-  | "signals"
-  | "movements";
+export type BrewSourceId =
+  | "pulse"
+  | "news"
+  | "calendar"
+  | "email"
+  | "actions"
+  | "intelligence";
 
-/** How much the reader wants in front of them each morning. */
-export type BrewDepthId = "headlines" | "balanced" | "deep";
-
-/** Voice of the generated summary. */
-export type BrewToneId = "executive" | "narrative";
+/**
+ * How much context a source brings. Chosen per source rather than once for the
+ * whole read: a leader can want the funnel at a glance and the action center in
+ * full, and a single global "depth" could never say that.
+ */
+export type BrewDetailLevelId = "glance" | "context" | "deep";
 
 export type BrewDeliveryTime = "06:00" | "06:30" | "07:00" | "07:30";
-
-/** Comparison windows the API declares it can actually support. */
-export type BrewTimeframeId = StaffBrewWindowId;
-
-export type BrewRequestDepthId = "urgent" | "handful" | "everything";
-export type BrewInsightDetailId = "headline" | "impact" | "full";
 
 /** Staff workspace views the briefing can hand the reader off to. */
 export type MorningBrewDestination = StaffBrewDestination;
@@ -84,41 +76,43 @@ export interface BrewTopic {
   recommendation: string;
 }
 
-export interface BrewInclude {
-  id: BrewIncludeId;
+/** One of the three answers to "how much context would you like?". */
+export interface BrewDetailOption {
   title: string;
-  blurb: string;
+  /** The four-word promise beside the title: "The essentials", "Goals & progress". */
+  kicker: string;
+  description: string;
+  /** The badge across the foot of the option card: "FAST SCAN", "DEEPER INSIGHT". */
+  tag: string;
+}
+
+export interface BrewSourceDefinition {
+  id: BrewSourceId;
+  title: string;
+  /** The single line under the title in the collapsed row. */
+  kicker: string;
+  /** The paragraph in the opened card, describing what the source brings. */
+  description: string;
   /** The canonical records behind it, named plainly. */
   source: string;
+  /** A glyph name from the vendored icon set. */
   icon: string;
   accent: BrewAccent;
+  recommended: boolean;
+  details: Record<BrewDetailLevelId, BrewDetailOption>;
 }
 
-export interface BrewDepthOption {
-  id: BrewDepthId;
-  title: string;
-  description: string;
-  readTime: string;
-  storyCount: number;
-}
-
-export interface BrewToneOption {
-  id: BrewToneId;
-  title: string;
-  description: string;
-  sample: string;
+/** What the reader chose for one source: in or out, and at what depth. */
+export interface BrewSourcePreference {
+  enabled: boolean;
+  detail: BrewDetailLevelId;
 }
 
 export interface BrewPreferences {
-  version: 5;
+  version: 6;
   topics: BrewTopicId[];
-  include: Record<BrewIncludeId, boolean>;
-  depth: BrewDepthId;
-  tone: BrewToneId;
+  sources: Record<BrewSourceId, BrewSourcePreference>;
   deliveryTime: BrewDeliveryTime;
-  requestDepth: BrewRequestDepthId;
-  deadlineNextStep: boolean;
-  insightDetail: BrewInsightDetailId;
   onboardingComplete: boolean;
   updatedAt: string;
 }
@@ -178,21 +172,25 @@ export interface BrewInsight {
   };
 }
 
-export interface BrewKpiFrame {
-  /** Raw number the ticker animates toward. */
-  numeric: number;
-  /** What the value describes in this window. */
-  window: string;
-  /** Share of a denominator, replacing the notion of "progress to target". */
-  basisLabel: string | null;
-  basisPercent: number | null;
-  /** Only present where the change is reconstructable from a timestamp. */
-  delta: string | null;
+/**
+ * One comparison behind a KPI: how the figure moved against an earlier point.
+ *
+ * A KPI carries a list of these and the card cycles through them. The headline
+ * number never changes as it cycles — only the comparison beside it does, which
+ * is the honest reading: there is one current value, seen from several
+ * distances.
+ */
+export interface BrewKpiComparison {
+  id: string;
+  /** "vs yesterday", "vs last 7 days" — names the distance, not the value. */
+  label: string;
+  /** Absolute movement, already signed: "+47". */
+  delta: string;
+  /** Relative movement, or null where a percentage would mislead. */
+  percent: string | null;
   direction: "up" | "down" | "flat";
+  /** Whether up is good here; a rising withdrawal count is not. */
   favorable: boolean;
-  comparison: string | null;
-  note: string;
-  unavailable: boolean;
 }
 
 export interface BrewKpi {
@@ -200,9 +198,19 @@ export interface BrewKpi {
   topic: BrewTopicId;
   label: string;
   icon: string;
-  source: "canonical_postgres";
+  /** The current figure. One number, not one per window. */
+  value: number;
+  /** Whether the figure is a count or a rate; decides the "%" and the rounding. */
+  format: "int" | "percent";
+  /** What the figure counts, in a few words. */
+  window: string;
+  /** Share of a denominator, replacing the notion of "progress to target". */
+  basisLabel: string | null;
+  basisPercent: number | null;
   cohort: StaffBrewCohortRef;
-  frames: Record<BrewTimeframeId, BrewKpiFrame>;
+  /** Empty where nothing can be compared against; the card then says so. */
+  comparisons: BrewKpiComparison[];
+  unavailable: boolean;
   detail: {
     definition: string;
     segments: { label: string; value: number; percent: number | null }[];
@@ -210,20 +218,29 @@ export interface BrewKpi {
   };
 }
 
-export interface BrewChange {
+/**
+ * One higher-education story. The only content on this surface that is not a
+ * count of the tenant's own records, which is why it carries a publisher and a
+ * link out: the reader can always go and check it.
+ */
+export interface BrewNewsItem {
   id: string;
-  topic: BrewTopicId;
-  /** Clock time of the latest such event, or the window when none occurred. */
-  time: string;
   title: string;
-  detail: string;
-  tone: StaffBrewTone;
-  count: number;
-  metric: string;
-  destination: MorningBrewDestination;
-  basis: string;
-  basisNote: string;
-  exact: boolean;
+  summary: string;
+  publisher: string;
+  /** Publisher wordmark, shown as initials beside the byline. */
+  publisherMark: string;
+  /** Cover artwork, served from `public/media/news`. */
+  image: string;
+  /** What the artwork shows, for anyone who cannot see it. */
+  imageAlt: string;
+  publishedLabel: string;
+  url: string;
+  topic: BrewTopicId;
+  /** Shown from "With Context" up: the figure in this brief the story would move. */
+  bearing: string;
+  /** Shown at "Deep Dive": what the story implies for the reader's own cohorts. */
+  implication: string;
 }
 
 export interface BrewDeadline {
@@ -275,43 +292,6 @@ export interface BrewPriority {
   boardQuery: StaffActionCenterQuery | null;
 }
 
-/** One rule-based people signal: who is absent, over cap, or has room. */
-export interface BrewCapacitySignal {
-  id: string;
-  kind: StaffBrewCapacitySignalKind;
-  severity: StaffBrewCapacitySeverity;
-  title: string;
-  detail: string;
-  action: string;
-  count: number;
-  destination: MorningBrewDestination;
-  boardQuery: StaffActionCenterQuery | null;
-}
-
-export interface BrewCapacityOffice {
-  component: string;
-  open: number;
-  overdue: number;
-  unassigned: number;
-  stale: number;
-  oldestOverdueDays: number | null;
-}
-
-/**
- * People & capacity — a short ranked read, not a per-person dashboard. When
- * `available` is false only `basis` is shown.
- */
-export interface BrewCapacity {
-  topic: BrewTopicId;
-  available: boolean;
-  /** "88 staff · 1 on leave · …" composed only from the counts the API sent. */
-  summaryLine: string | null;
-  signals: BrewCapacitySignal[];
-  signalsOmitted: number;
-  offices: BrewCapacityOffice[];
-  basis: string;
-}
-
 export interface BrewQuickLink {
   id: string;
   label: string;
@@ -334,10 +314,9 @@ export interface BrewBriefing {
   windowLabel: string;
   deliveryLabel: string;
   students: number;
-  timeframes: { id: BrewTimeframeId; label: string; short: string }[];
   insights: BrewInsight[];
   kpis: BrewKpi[];
-  changes: BrewChange[];
+  news: BrewNewsItem[];
   deadlines: BrewDeadline[];
   requests: BrewRequest[];
   priorities: BrewPriority[];
@@ -347,25 +326,16 @@ export interface BrewBriefing {
     notes: string[];
     unsupported: { metric: string; reason: string }[];
   };
-  engagementScanAvailable: boolean;
-  /** False when the tenant records no portal activity, so inactivity cannot be read. */
-  engagementActivitySignal: boolean;
-  /** Null when the reader switched signals off or does not follow the topic. */
-  capacity: BrewCapacity | null;
 }
-
-/** The raw payload, re-exported so components can name the source shape. */
-export type BrewSource = StaffMorningBrew;
 
 /* ------------------------------------------------------------------- detail */
 
 export type BrewDetailRef =
   | { kind: "insight"; id: string }
-  | { kind: "kpi"; id: string; timeframe: BrewTimeframeId }
+  | { kind: "kpi"; id: string }
   | { kind: "deadline"; id: string }
   | { kind: "request"; id: string }
-  | { kind: "priority"; id: string }
-  | { kind: "change"; id: string };
+  | { kind: "priority"; id: string };
 
 /* ------------------------------------------------------------------- edward */
 

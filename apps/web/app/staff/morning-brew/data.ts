@@ -1,38 +1,26 @@
-import type {
-  StaffBrewAttentionItem,
-  StaffBrewCapacity,
-  StaffBrewChange,
-  StaffBrewDeadline,
-  StaffBrewMetric,
-  StaffBrewPriority,
-  StaffBrewRequest,
-  StaffMorningBrew,
-} from "@vv/contracts";
-import { BREW_DEPTH_OPTIONS, BREW_TIMEFRAMES } from "./catalog";
+import { HIGHER_ED_NEWS } from "./news";
+import type { BrewDemoSource } from "./demo-brew";
 import type {
   BrewBriefing,
-  BrewCapacity,
-  BrewCapacitySignal,
-  BrewChange,
-  BrewDeadline,
-  BrewInsight,
-  BrewKpi,
-  BrewKpiFrame,
+  BrewDetailLevelId,
+  BrewNewsItem,
   BrewPreferences,
-  BrewPriority,
   BrewQuickLink,
-  BrewRequest,
-  BrewTimeframeId,
+  BrewSourceId,
   BrewTopicId,
 } from "./types";
 
 /**
- * Turn the canonical briefing payload into the shape the page renders.
+ * Turn the briefing corpus into the shape the page renders.
  *
- * This module does exactly two things: rename fields, and apply the reader's
- * own filters and limits. It computes no metric, derives no severity, and
- * writes no prose about the institution. That rule is why the frontend cannot
- * quietly disagree with the API — there is nothing here to disagree with.
+ * This module does exactly one thing: apply the reader's own filters and
+ * limits. It computes no metric, derives no severity, and writes no prose about
+ * the institution — everything it returns was already written in
+ * `demo-brew.ts`. Preferences may only ever subtract.
+ *
+ * Until this commit the corpus arrived from `GET /v1/staff/morning-brew` and
+ * this module also renamed the contract's fields. The live read is off for the
+ * demo; the mappers are recoverable from git history.
  */
 
 const INT = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
@@ -41,284 +29,57 @@ const ONE_DECIMAL = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 1,
 });
 
-/** Formats a KPI value. Shared by the static card and the animated ticker. */
+/** Formats a KPI value. Shared by the card and the drill-down. */
 export function formatBrewNumber(value: number): string {
-  return INT.format(value);
+  return Number.isInteger(value) ? INT.format(value) : ONE_DECIMAL.format(value);
 }
 
 export function formatBrewPercent(value: number): string {
   return `${ONE_DECIMAL.format(value)}%`;
 }
 
-const CLOCK = new Intl.DateTimeFormat("en-US", {
-  hour: "numeric",
-  minute: "2-digit",
-  timeZone: "America/New_York",
-});
-
-const DAY = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  timeZone: "America/New_York",
-});
-
 /* ---------------------------------------------------------------- filtering */
 
-const depthOption = (preferences: BrewPreferences) =>
-  BREW_DEPTH_OPTIONS.find((option) => option.id === preferences.depth) ?? BREW_DEPTH_OPTIONS[1];
+/**
+ * How long a section runs is now the source's own answer, not one global
+ * setting: a reader who asked for the funnel at a glance and the action center
+ * in full gets a short KPI band and a long queue, which is what they said.
+ */
+const levelOf = (preferences: BrewPreferences, id: BrewSourceId): BrewDetailLevelId =>
+  preferences.sources[id].detail;
 
-const readTimeFor = (preferences: BrewPreferences) =>
-  preferences.depth === "headlines" ? 2 : preferences.depth === "deep" ? 6 : 4;
+const enabled = (preferences: BrewPreferences, id: BrewSourceId): boolean =>
+  preferences.sources[id].enabled;
 
-const kpiLimit = (preferences: BrewPreferences) => (preferences.depth === "deep" ? 12 : 6);
-const changeLimit = (preferences: BrewPreferences) =>
-  preferences.depth === "headlines" ? 4 : preferences.depth === "deep" ? 12 : 6;
-const priorityLimit = (preferences: BrewPreferences) => (preferences.depth === "deep" ? 5 : 3);
+/** Picks the count for a level, in `[glance, context, deep]` order. */
+const byLevel = (level: BrewDetailLevelId, counts: [number, number, number]): number =>
+  level === "glance" ? counts[0] : level === "context" ? counts[1] : counts[2];
+
+const kpiLimit = (preferences: BrewPreferences) =>
+  byLevel(levelOf(preferences, "pulse"), [4, 6, 12]);
+const insightLimit = (preferences: BrewPreferences) =>
+  byLevel(levelOf(preferences, "intelligence"), [2, 3, 4]);
+const priorityLimit = (preferences: BrewPreferences) =>
+  byLevel(levelOf(preferences, "actions"), [3, 4, 6]);
 const deadlineLimit = (preferences: BrewPreferences) =>
-  preferences.depth === "headlines" ? 3 : 6;
-
-/** The reader's own answer about their request list wins over the general length. */
+  byLevel(levelOf(preferences, "calendar"), [3, 6, 12]);
 const requestLimit = (preferences: BrewPreferences) =>
-  preferences.requestDepth === "urgent" ? 2 : preferences.requestDepth === "everything" ? 12 : 4;
-
-/* ------------------------------------------------------------------ mapping */
-
-function frameFor(frame: StaffBrewMetric["frames"][number]): BrewKpiFrame {
-  return {
-    numeric: frame.value,
-    window: frame.window,
-    basisLabel: frame.basisLabel,
-    basisPercent: frame.basisPercent,
-    delta: frame.change ? frame.change.label : null,
-    direction: frame.change ? frame.change.direction : "flat",
-    favorable: frame.change ? frame.change.favorable : true,
-    comparison: frame.change ? frame.change.comparison : null,
-    note: frame.note,
-    unavailable: frame.unavailable,
-  };
-}
-
-function toKpi(metric: StaffBrewMetric): BrewKpi {
-  const frames = {} as Record<BrewTimeframeId, BrewKpiFrame>;
-  for (const frame of metric.frames) frames[frame.windowId] = frameFor(frame);
-  return {
-    id: metric.id,
-    topic: metric.topic,
-    label: metric.label,
-    icon: metric.icon,
-    source: metric.source,
-    cohort: metric.cohort,
-    frames,
-    detail: {
-      definition: metric.definition,
-      segments: metric.segments.map((segment) => ({
-        label: segment.label,
-        value: segment.value,
-        percent: segment.percent,
-      })),
-      notes: [
-        `Cohort: ${metric.cohort.clauses.join("; ") || "every student in this tenant"}.`,
-        "Counted from canonical PostgreSQL records at the time shown in the masthead.",
-      ],
-    },
-  };
-}
-
-function toInsight(item: StaffBrewAttentionItem): BrewInsight {
-  return {
-    id: item.id,
-    topic: item.topic,
-    label: item.label,
-    title: item.title,
-    severity: item.severity,
-    summary: item.summary,
-    scope: item.scope,
-    impactLabel: item.impactLabel,
-    impact: item.impact,
-    recommendedAction: item.recommendedAction,
-    impactLevel: item.priorityLevel,
-    destination: item.destination,
-    cohort: item.cohort,
-    detail: item.detail,
-  };
-}
-
-function toChange(change: StaffBrewChange): BrewChange {
-  return {
-    id: change.id,
-    topic: change.topic,
-    time: change.occurredAt ? CLOCK.format(new Date(change.occurredAt)) : "No activity",
-    title: change.title,
-    detail: change.detail,
-    tone: change.tone,
-    count: change.count,
-    metric: change.metric,
-    destination: change.destination,
-    basis: change.basis,
-    basisNote: change.basisNote,
-    exact: change.exact,
-  };
-}
+  byLevel(levelOf(preferences, "email"), [3, 5, 12]);
+const newsLimit = (preferences: BrewPreferences) =>
+  byLevel(levelOf(preferences, "news"), [4, 6, 8]);
 
 /**
- * Deadlines carry no topic of their own on the wire, so route them to the
- * topic that owns the underlying requirement. An unknown code stays under
- * student progress rather than being dropped — a deadline nobody claims is
- * still a deadline.
+ * A minute per switched-on source, and a second minute for one asked for in
+ * full. It is a reading estimate over what is actually on the page, not a
+ * setting the reader chose and we then honour.
  */
-const DEADLINE_TOPICS: Record<string, BrewTopicId> = {
-  offer_response: "admissions",
-  enrollment_deposit: "admissions",
-  financial_aid_verification: "financial_aid",
-  fafsa_submission: "financial_aid",
-  official_transcript: "registrar",
-  identity_document: "registrar",
-  transcript_upload: "registrar",
-  housing_preference: "housing",
-  housing_contract: "housing",
-};
-
-const NEXT_STEP: Record<BrewDeadline["bucket"], string> = {
-  overdue: "Confirm whether the student or the university is holding this.",
-  today: "Clear it today or move the date deliberately.",
-  this_week: "Remind the affected students before the date passes.",
-  this_month: "Schedule the reminder so it does not arrive late.",
-};
-
-function toDeadline(deadline: StaffBrewDeadline): BrewDeadline {
-  const bucket = deadline.bucket;
-  return {
-    id: deadline.id,
-    topic: DEADLINE_TOPICS[deadline.code] ?? "student_success",
-    kind: deadline.kind,
-    kindLabel:
-      deadline.kind === "offer_response" ? "Admission offer response" : "Enrollment requirement",
-    code: deadline.code,
-    title: deadline.title,
-    detail: deadline.detail,
-    bucket,
-    dueLabel: DAY.format(new Date(deadline.dueAt)),
-    relativeLabel: deadline.relativeLabel,
-    students: deadline.students,
-    priority: deadline.priority,
-    nextStep: NEXT_STEP[bucket],
-    destination: deadline.destination,
-  };
+function readTimeFor(preferences: BrewPreferences): number {
+  const on = Object.values(preferences.sources).filter((source) => source.enabled);
+  const deep = on.filter((source) => source.detail === "deep").length;
+  return Math.max(1, Math.round(on.length * 0.7 + deep * 0.8));
 }
 
-const REQUEST_TOPICS: Record<string, BrewTopicId> = {
-  payments: "admissions",
-  documents: "registrar",
-  getting_started: "student_success",
-  support: "student_success",
-};
-
-function toRequest(request: StaffBrewRequest): BrewRequest {
-  return {
-    id: request.id,
-    topic: REQUEST_TOPICS[request.topicCode] ?? "student_success",
-    subject: request.subject,
-    summary: request.summary,
-    studentName: request.studentName,
-    programName: request.programName,
-    status: request.status,
-    priority: request.priority,
-    waitingLabel: request.waitingLabel,
-    assigneeName: request.assigneeName,
-    destination: request.destination,
-  };
-}
-
-function toPriority(priority: StaffBrewPriority): BrewPriority {
-  return {
-    id: priority.id,
-    topic: priority.topic,
-    title: priority.title,
-    level: priority.level,
-    detail: priority.detail,
-    icon: priority.icon,
-    linkLabel: priority.linkLabel,
-    destination: priority.destination,
-    breakdown: priority.breakdown,
-    steps: priority.steps,
-    window: priority.window,
-    count: priority.count,
-    boardQuery: priority.boardQuery ?? null,
-  };
-}
-
-/* ----------------------------------------------------------------- capacity */
-
-const CAPACITY_TOPIC: BrewTopicId = "student_success";
-const CAPACITY_SIGNAL_LIMIT = 10;
-
-const plural = (count: number, noun: string, pluralNoun = `${noun}s`) =>
-  `${INT.format(count)} ${count === 1 ? noun : pluralNoun}`;
-
-/**
- * One line a reader can say out loud: staff headcount, who is unavailable,
- * and who is over or under capacity. Zero-valued parts are left out so the
- * line names only what is true today; the headcount is always first.
- */
-export function capacitySummaryLine(summary: StaffBrewCapacity["summary"]): string | null {
-  if (!summary) return null;
-  const parts = [plural(summary.staff, "staff", "staff")];
-  if (summary.onLeave > 0) parts.push(`${INT.format(summary.onLeave)} on leave`);
-  if (summary.departed > 0) parts.push(`${INT.format(summary.departed)} departed`);
-  if (summary.awayNow > 0) parts.push(`${INT.format(summary.awayNow)} away today`);
-  if (summary.overCap > 0) parts.push(`${INT.format(summary.overCap)} over cap`);
-  if (summary.fallingBehind > 0) parts.push(`${INT.format(summary.fallingBehind)} falling behind`);
-  if (summary.spareCapacity > 0) {
-    parts.push(`${INT.format(summary.spareCapacity)} with spare capacity`);
-  }
-  if (summary.itemsOwnedByUnavailable > 0) {
-    parts.push(
-      `${plural(summary.itemsOwnedByUnavailable, "open item")} owned by someone unavailable`,
-    );
-  }
-  if (summary.unassignedItems > 0) parts.push(`${plural(summary.unassignedItems, "item")} unassigned`);
-  if (summary.staleItems > 0) parts.push(`${plural(summary.staleItems, "stale item")}`);
-  return parts.join(" · ");
-}
-
-function toCapacitySignal(signal: StaffBrewCapacity["signals"][number]): BrewCapacitySignal {
-  return {
-    id: signal.id,
-    kind: signal.kind,
-    severity: signal.severity,
-    title: signal.title,
-    detail: signal.detail,
-    action: signal.action,
-    count: signal.count,
-    destination: signal.destination,
-    boardQuery: signal.boardQuery ?? null,
-  };
-}
-
-export function toCapacity(capacity: StaffBrewCapacity | null | undefined): BrewCapacity | null {
-  if (!capacity) return null;
-  const signals = (capacity.signals ?? []).slice(0, CAPACITY_SIGNAL_LIMIT).map(toCapacitySignal);
-  return {
-    topic: CAPACITY_TOPIC,
-    available: capacity.available,
-    summaryLine: capacity.available ? capacitySummaryLine(capacity.summary) : null,
-    signals: capacity.available ? signals : [],
-    signalsOmitted:
-      (capacity.signalsOmitted ?? 0) +
-      Math.max(0, (capacity.signals ?? []).length - signals.length),
-    offices: capacity.available
-      ? (capacity.components ?? []).map((office) => ({
-          component: office.component,
-          open: office.open,
-          overdue: office.overdue,
-          unassigned: office.unassigned,
-          stale: office.stale,
-          oldestOverdueDays: office.oldestOverdueDays,
-        }))
-      : [],
-    basis: capacity.basis,
-  };
-}
+/* ------------------------------------------------------------------- builder */
 
 export const BREW_QUICK_LINKS: BrewQuickLink[] = [
   { id: "students", label: "Student roster", destination: "students" },
@@ -327,106 +88,93 @@ export const BREW_QUICK_LINKS: BrewQuickLink[] = [
   { id: "edward", label: "Ask Edward", destination: "edward" },
 ];
 
-/* ------------------------------------------------------------------- builder */
-
-function deckFor(preferences: BrewPreferences, brew: StaffMorningBrew): string {
-  if (preferences.tone === "narrative" && brew.synthesis.bullets.length) {
-    return `${brew.synthesis.headline} ${brew.synthesis.bullets[0]}`;
-  }
-  return brew.synthesis.headline;
+/**
+ * The news list is a constant, so "building" it is only ever filtering: the
+ * topics the reader follows, bounded by the depth they asked for. No story is
+ * scored, reordered by relevance, or joined to a student.
+ */
+function newsFor(preferences: BrewPreferences, topics: Set<BrewTopicId>): BrewNewsItem[] {
+  return HIGHER_ED_NEWS.filter((item) => topics.has(item.topic)).slice(0, newsLimit(preferences));
 }
 
 /**
- * Assemble today's briefing from the canonical payload and the reader's
- * choices.
+ * The deck the corpus wrote, lengthened by its own first bullet when the reader
+ * asked for the read-across in full. Nothing here composes a sentence.
+ */
+function deckFor(preferences: BrewPreferences, source: BrewDemoSource): string {
+  const full =
+    enabled(preferences, "intelligence") && levelOf(preferences, "intelligence") === "deep";
+  if (full && source.synthesis.bullets.length) {
+    return `${source.synthesis.headline} ${source.synthesis.bullets[0]}`;
+  }
+  return source.synthesis.headline;
+}
+
+/**
+ * Assemble today's briefing from the corpus and the reader's choices.
  *
- * Preferences only ever subtract. A section the reader switched off is empty;
- * a topic they do not follow is filtered out; a shorter read is a shorter
- * slice. Nothing here can add a value the API did not send.
+ * Preferences only ever subtract. A section the reader switched off is empty; a
+ * topic they do not follow is filtered out; a shallower level is a shorter
+ * slice. Nothing here can add a value the corpus did not hold.
  */
 export function buildBrewBriefing(
-  brew: StaffMorningBrew,
+  source: BrewDemoSource,
   preferences: BrewPreferences,
   staffName: string,
 ): BrewBriefing {
   const topics = new Set<BrewTopicId>(preferences.topics);
-  const { requests, deadlines, numbers, signals, movements } = preferences.include;
+  const pulse = enabled(preferences, "pulse");
+  const news = enabled(preferences, "news");
+  const calendar = enabled(preferences, "calendar");
+  const email = enabled(preferences, "email");
+  const actions = enabled(preferences, "actions");
+  const intelligence = enabled(preferences, "intelligence");
 
-  const kpis = brew.metrics
-    .filter((metric) => topics.has(metric.topic))
-    .slice(0, kpiLimit(preferences))
-    .map(toKpi);
+  const kpis = source.kpis
+    .filter((kpi) => topics.has(kpi.topic))
+    .slice(0, kpiLimit(preferences));
 
-  const insights = brew.attention
+  const insights = source.insights
     .filter((item) => topics.has(item.topic))
-    .slice(0, depthOption(preferences).storyCount)
-    .map(toInsight);
+    .slice(0, insightLimit(preferences));
 
-  // Quiet classes stay in the payload but only surface at the deepest read;
-  // a rail of zeroes buries the one line that moved.
-  const changeItems = brew.changes.filter(
-    (change) => topics.has(change.topic) && (change.count > 0 || preferences.depth === "deep"),
-  );
-
-  const deadlineItems = brew.deadlines
-    .map(toDeadline)
+  const deadlineItems = source.deadlines
     .filter((deadline) => topics.has(deadline.topic))
     .slice(0, deadlineLimit(preferences));
 
-  const requestItems = brew.requests.items
-    .map(toRequest)
+  // An urgent request reaches the reader even from a topic they do not follow:
+  // a student waiting on money is not a subject preference.
+  const requestItems = source.requests
     .filter((request) => topics.has(request.topic) || request.priority === "urgent")
     .slice(0, requestLimit(preferences));
 
-  const priorities = brew.priorities
+  const priorities = source.priorities
     .filter((priority) => topics.has(priority.topic))
-    .slice(0, priorityLimit(preferences))
-    .map(toPriority);
-
-  const capacity = topics.has(CAPACITY_TOPIC) ? toCapacity(brew.staffCapacity) : null;
-
-  const timeframes = (brew.windows.length ? brew.windows : BREW_TIMEFRAMES).map((window) => ({
-    id: window.id as BrewTimeframeId,
-    label: window.label,
-    short: window.short,
-  }));
-
-  // Headcounts, not a sum over deadline rows: a student with four overdue
-  // requirements is one person to chase, and summing the rows would print a
-  // number larger than the roster.
-  const overdue = brew.population.cohorts.overdue ?? 0;
-  const thisWeek = brew.population.cohorts.due_soon ?? 0;
+    .slice(0, priorityLimit(preferences));
 
   return {
     greetingName: staffName.split(" ")[0] || "there",
-    deck: deckFor(preferences, brew),
-    bullets: signals ? brew.synthesis.bullets : [],
+    deck: deckFor(preferences, source),
+    bullets: intelligence ? source.synthesis.bullets : [],
     readTimeMinutes: readTimeFor(preferences),
-    updatedAt: brew.generatedAt,
-    windowLabel: brew.window.label,
+    updatedAt: source.generatedAt,
+    windowLabel: source.windowLabel,
     deliveryLabel: preferences.deliveryTime.replace(/^0/, ""),
-    students: brew.population.students,
-    timeframes,
-    insights: signals ? insights : [],
-    kpis: numbers ? kpis : [],
-    changes: movements ? changeItems.slice(0, changeLimit(preferences)).map(toChange) : [],
-    deadlines: deadlines ? deadlineItems : [],
-    requests: requests ? requestItems : [],
-    priorities: signals ? priorities : [],
+    students: source.students,
+    insights: intelligence ? insights : [],
+    kpis: pulse ? kpis : [],
+    news: news ? newsFor(preferences, topics) : [],
+    deadlines: calendar ? deadlineItems : [],
+    requests: email ? requestItems : [],
+    priorities: actions ? priorities : [],
     quickLinks: BREW_QUICK_LINKS,
     glance: {
-      requests: requests ? brew.requests.total : 0,
-      requestsAwaitingReply: requests ? brew.requests.awaitingFirstReply : 0,
-      deadlinesOverdue: deadlines ? overdue : 0,
-      deadlinesThisWeek: deadlines ? thisWeek : 0,
+      requests: email ? source.glance.requests : 0,
+      requestsAwaitingReply: email ? source.glance.requestsAwaitingReply : 0,
+      deadlinesOverdue: calendar ? source.glance.deadlinesOverdue : 0,
+      deadlinesThisWeek: calendar ? source.glance.deadlinesThisWeek : 0,
     },
-    coverage: {
-      notes: brew.coverage.notes,
-      unsupported: brew.coverage.unsupported,
-    },
-    engagementScanAvailable: brew.engagementScan.available,
-    engagementActivitySignal: brew.engagementScan.activitySignal !== false,
-    capacity: signals ? capacity : null,
+    coverage: source.coverage,
   };
 }
 

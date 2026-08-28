@@ -2,76 +2,38 @@
 
 import type { StaffOperationsWorkspace } from "@vv/contracts";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useApiResource } from "../../hooks/use-api-resource";
-import { getStaffMorningBrew } from "../../lib/api-client";
-import { useTenant } from "../../components/tenant-provider";
 import { buildBrewBriefing } from "./data";
+import { demoBrewSource } from "./demo-brew";
 import { MorningBrewDashboard } from "./dashboard";
 import { MorningBrewDetail } from "./detail";
 import { EdwardPanel } from "./edward-panel";
+import { BrewLoading } from "./loading";
 import { MorningBrewOnboarding, type OnboardingDraft, type OnboardingStep } from "./onboarding";
 import { browserBrewPreferenceStore, DEFAULT_BREW_PREFERENCES } from "./preferences";
 import type {
   BrewDetailRef,
-  BrewIncludeId,
   BrewPreferences,
+  BrewSourceId,
+  BrewSourcePreference,
   BrewTopicId,
   EdwardRequest,
-  MorningBrewDestination,
   MorningBrewNavigate,
 } from "./types";
 
-type Mode = "loading" | "onboarding" | "briefing";
+/**
+ * `building` is the beat after setup: the reader has just answered, and the
+ * screen reads their answers back while the aggregate read finishes. It is a
+ * separate mode from `loading` because only one of the two knows what was
+ * chosen.
+ */
+type Mode = "loading" | "onboarding" | "building" | "briefing";
 
 const draftFrom = (preferences: Omit<BrewPreferences, "version" | "updatedAt">): OnboardingDraft => ({
   topics: [...preferences.topics],
-  include: { ...preferences.include },
-  depth: preferences.depth,
-  tone: preferences.tone,
-  deliveryTime: preferences.deliveryTime,
-  requestDepth: preferences.requestDepth,
-  deadlineNextStep: preferences.deadlineNextStep,
-  insightDetail: preferences.insightDetail,
+  sources: Object.fromEntries(
+    Object.entries(preferences.sources).map(([id, source]) => [id, { ...source }]),
+  ) as Record<BrewSourceId, BrewSourcePreference>,
 });
-
-function LoadingBrew() {
-  return (
-    <section className="brew-loading" aria-label="Preparing Morning Brew" aria-live="polite">
-      <div className="brew-loading__masthead" />
-      <div className="brew-loading__headline" />
-      <div className="brew-loading__deck" />
-      <div className="brew-loading__cards">
-        <span />
-        <span />
-        <span />
-      </div>
-    </section>
-  );
-}
-
-/**
- * The briefing is an aggregate read over the whole tenant, so it fails on its
- * own terms. Showing the last stale edition with a fabricated freshness stamp
- * would be worse than saying the read did not complete.
- */
-function BrewUnavailable({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <section className="brew-unavailable" role="alert">
-      <span className="brew-cup" aria-hidden="true" />
-      <div>
-        <h1>Today&rsquo;s briefing could not be assembled</h1>
-        <p>{message}</p>
-        <p className="brew-unavailable__note">
-          Morning Brew reads live enrollment records. Rather than show yesterday&rsquo;s numbers
-          under today&rsquo;s date, it waits for a successful read.
-        </p>
-      </div>
-      <button className="button button--primary" type="button" onClick={onRetry}>
-        Try again
-      </button>
-    </section>
-  );
-}
 
 export function MorningBrewView({
   workspace,
@@ -80,11 +42,11 @@ export function MorningBrewView({
   workspace: StaffOperationsWorkspace;
   navigate: MorningBrewNavigate;
 }) {
-  const tenantRuntime = useTenant();
-  const scope = `${tenantRuntime.tenant.slug}:${workspace.currentStaff.id}`;
+  const scope = `demo:${workspace.currentStaff.id}`;
 
-  const loadBrew = useCallback((signal: AbortSignal) => getStaffMorningBrew(signal), []);
-  const brew = useApiResource(loadBrew, { refreshOnAmbient: false });
+  // Resolved once per mount so the masthead clock reads as this morning every
+  // time the demo is opened, rather than as the day the corpus was written.
+  const source = useMemo(() => demoBrewSource(), []);
 
   const [mode, setMode] = useState<Mode>("loading");
   const [step, setStep] = useState<OnboardingStep>(1);
@@ -114,7 +76,7 @@ export function MorningBrewView({
       saved ?? {
         ...DEFAULT_BREW_PREFERENCES,
         ...draft,
-        version: 5,
+        version: 6,
         updatedAt: "",
         onboardingComplete: false,
       },
@@ -122,10 +84,9 @@ export function MorningBrewView({
   );
 
   const staffName = workspace.currentStaff.name;
-  const source = brew.data;
 
   const briefing = useMemo(
-    () => (source ? buildBrewBriefing(source, preferences, staffName) : null),
+    () => buildBrewBriefing(source, preferences, staffName),
     [source, preferences, staffName],
   );
 
@@ -133,19 +94,17 @@ export function MorningBrewView({
      reacts to a choice before it has been committed. */
   const draftBriefing = useMemo(
     () =>
-      source
-        ? buildBrewBriefing(
-            source,
-            {
-              ...DEFAULT_BREW_PREFERENCES,
-              ...draft,
-              version: 5,
-              updatedAt: "",
-              onboardingComplete: false,
-            },
-            staffName,
-          )
-        : null,
+      buildBrewBriefing(
+        source,
+        {
+          ...DEFAULT_BREW_PREFERENCES,
+          ...draft,
+          version: 6,
+          updatedAt: "",
+          onboardingComplete: false,
+        },
+        staffName,
+      ),
     [source, draft, staffName],
   );
 
@@ -159,9 +118,15 @@ export function MorningBrewView({
 
   const complete = () => {
     if (!draft.topics.length) return;
-    setSaved(browserBrewPreferenceStore.save(scope, { ...draft, onboardingComplete: true }));
+    setSaved(
+      browserBrewPreferenceStore.save(scope, {
+        ...draft,
+        deliveryTime: saved?.deliveryTime ?? DEFAULT_BREW_PREFERENCES.deliveryTime,
+        onboardingComplete: true,
+      }),
+    );
     setDetail(null);
-    setMode("briefing");
+    setMode("building");
     setStep(1);
     setDirection(1);
     scrollToTop();
@@ -195,13 +160,23 @@ export function MorningBrewView({
     scrollToTop();
   }, []);
 
-  if (mode === "loading" || brew.status === "loading") return <LoadingBrew />;
-
-  if (brew.status === "error" || !briefing || !draftBriefing) {
+  if (mode === "loading") {
     return (
-      <BrewUnavailable
-        message={brew.error ?? "The briefing read returned no data."}
-        onRetry={brew.reload}
+      <BrewLoading
+        firstName={saved ? staffName.split(" ")[0] || null : null}
+        draft={saved ? draft : null}
+        students={source.students}
+      />
+    );
+  }
+
+  if (mode === "building") {
+    return (
+      <BrewLoading
+        firstName={briefing.greetingName}
+        draft={draft}
+        students={briefing.students}
+        onDone={() => setMode("briefing")}
       />
     );
   }
@@ -212,6 +187,7 @@ export function MorningBrewView({
         step={step}
         direction={direction}
         firstName={briefing.greetingName}
+        staffName={staffName}
         draft={draft}
         preview={draftBriefing}
         customizing={Boolean(saved?.onboardingComplete)}
@@ -223,13 +199,12 @@ export function MorningBrewView({
               : [...current.topics, topic],
           }))
         }
-        onToggleInclude={(include: BrewIncludeId) =>
+        onChangeSource={(id: BrewSourceId, patch: Partial<BrewSourcePreference>) =>
           setDraft((current) => ({
             ...current,
-            include: { ...current.include, [include]: !current.include[include] },
+            sources: { ...current.sources, [id]: { ...current.sources[id], ...patch } },
           }))
         }
-        onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
         onStep={goToStep}
         onComplete={complete}
         onCancel={saved ? cancel : undefined}
