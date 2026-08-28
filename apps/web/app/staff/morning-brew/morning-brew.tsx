@@ -11,6 +11,7 @@ import { MorningBrewDetail } from "./detail";
 import { EdwardPanel } from "./edward-panel";
 import { MorningBrewOnboarding, type OnboardingDraft, type OnboardingStep } from "./onboarding";
 import { browserBrewPreferenceStore, DEFAULT_BREW_PREFERENCES } from "./preferences";
+import { MorningBrewExternalContext } from "./web-search";
 import type {
   BrewDetailRef,
   BrewIncludeId,
@@ -205,40 +206,48 @@ export function MorningBrewView({
     );
   }
 
-  if (mode === "onboarding") {
-    return (
-      <MorningBrewOnboarding
-        step={step}
-        direction={direction}
-        firstName={briefing.greetingName}
-        draft={draft}
-        preview={draftBriefing}
-        customizing={Boolean(saved?.onboardingComplete)}
-        onToggleTopic={(topic: BrewTopicId) =>
-          setDraft((current) => ({
-            ...current,
-            topics: current.topics.includes(topic)
-              ? current.topics.filter((item) => item !== topic)
-              : [...current.topics, topic],
-          }))
-        }
-        onToggleInclude={(include: BrewIncludeId) =>
-          setDraft((current) => ({
-            ...current,
-            include: { ...current.include, [include]: !current.include[include] },
-          }))
-        }
-        onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
-        onStep={goToStep}
-        onComplete={complete}
-        onCancel={saved ? cancel : undefined}
-      />
-    );
-  }
-
   return (
     <>
-      {detail ? (
+      <MorningBrewDashboard
+        briefing={briefing}
+        preferences={preferences}
+        staffName={staffName}
+        navigate={navigate}
+        onOpenDetail={openDetail}
+        onAskEdward={setEdward}
+        onCustomize={() => openOnboarding(1)}
+        onManageConnections={() => openOnboarding(2)}
+        externalContext={<MorningBrewExternalContext />}
+        hidden={mode !== "briefing" || detail !== null}
+      />
+      {mode === "onboarding" ? (
+        <MorningBrewOnboarding
+          step={step}
+          direction={direction}
+          firstName={briefing.greetingName}
+          draft={draft}
+          preview={draftBriefing}
+          customizing={Boolean(saved?.onboardingComplete)}
+          onToggleTopic={(topic: BrewTopicId) =>
+            setDraft((current) => ({
+              ...current,
+              topics: current.topics.includes(topic)
+                ? current.topics.filter((item) => item !== topic)
+                : [...current.topics, topic],
+            }))
+          }
+          onToggleInclude={(include: BrewIncludeId) =>
+            setDraft((current) => ({
+              ...current,
+              include: { ...current.include, [include]: !current.include[include] },
+            }))
+          }
+          onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
+          onStep={goToStep}
+          onComplete={complete}
+          onCancel={saved ? cancel : undefined}
+        />
+      ) : detail ? (
         <MorningBrewDetail
           detail={detail}
           briefing={briefing}
@@ -246,19 +255,10 @@ export function MorningBrewView({
           navigate={navigate}
           onAskEdward={setEdward}
         />
-      ) : (
-        <MorningBrewDashboard
-          briefing={briefing}
-          preferences={preferences}
-          staffName={staffName}
-          navigate={navigate}
-          onOpenDetail={openDetail}
-          onAskEdward={setEdward}
-          onCustomize={() => openOnboarding(1)}
-          onManageConnections={() => openOnboarding(2)}
-        />
-      )}
-      <EdwardPanel request={edward} briefing={briefing} onClose={() => setEdward(null)} />
+      ) : null}
+      {mode === "briefing" ? (
+        <EdwardPanel request={edward} briefing={briefing} onClose={() => setEdward(null)} />
+      ) : null}
     </>
   );
 }

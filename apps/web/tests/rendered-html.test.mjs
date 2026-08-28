@@ -743,6 +743,8 @@ test("typed client wires every resource route and mutation contract", async () =
     });
     await client.getStaffActionCenter();
     await client.getStaffOperationsWorkspace();
+    await client.triggerStaffMorningBrewExternalContext();
+    await client.getStaffMorningBrewExternalContext();
     await client.createStaffKnowledgeCard({
       title: "Orientation guide",
       summary: "Arrival guidance.",
@@ -932,6 +934,7 @@ test("typed client wires every resource route and mutation contract", async () =
     "/v1/auth/staff/sign-up",
     "/v1/staff/action-center",
     "/v1/staff/workspace",
+    "/v1/staff/morning-brew/external-context",
     "/v1/staff/knowledge-base",
     "/v1/staff/knowledge-base/00000000-0000-7000-8000-000000000931",
     "/v1/staff/core-plays",
@@ -1101,6 +1104,21 @@ test("typed client wires every resource route and mutation contract", async () =
     ],
     },
   );
+  const externalContextRequests = requests.filter(
+    (entry) =>
+      new URL(entry.url).pathname === "/v1/staff/morning-brew/external-context",
+  );
+  const triggerExternalContext = externalContextRequests.find(
+    (entry) => entry.init.method === "POST",
+  );
+  const readExternalContext = externalContextRequests.find(
+    (entry) => entry.init.method === "GET",
+  );
+  assert.ok(triggerExternalContext, "missing external-context trigger request");
+  assert.ok(readExternalContext, "missing external-context canonical read request");
+  assert.equal(triggerExternalContext.init.credentials, "include");
+  assert.equal(readExternalContext.init.credentials, "include");
+  assert.equal(triggerExternalContext.init.body, undefined);
 });
 
 test("onboarding preserves the eight-step order and authoritative boundary actions", async () => {
@@ -1286,8 +1304,8 @@ test("Morning Brew renders a canonical briefing, not a synthetic one", async () 
   assert.match(styles, /@media \(max-width: 520px\)/);
 
   // Guard the whole surface against the synthetic corpus coming back: no
-  // fabricated dollar impact, no confidence score, no external news, and no
-  // preview-workspace risk band.
+  // fabricated dollar impact, no confidence score, no synthetic news cards,
+  // and no preview-workspace risk band.
   const surface = [container, onboarding, dashboard, edward, data].join("\n");
   for (const forbidden of [
     /Confidence: /,

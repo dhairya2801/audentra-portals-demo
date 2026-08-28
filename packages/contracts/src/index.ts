@@ -2662,6 +2662,91 @@ export interface EdwardFeedbackListResponse {
  * authenticated session and resolves student referents server-side.
  * ------------------------------------------------------------------------- */
 
+export type StaffWebSearchSafeSearch = "moderate";
+export type StaffWebSearchSourceType = "web" | "news";
+export type StaffWebSearchPurpose = "edward" | "morning_brew";
+export type StaffWebSearchQueryLengthBucket =
+  | "2-25"
+  | "26-50"
+  | "51-100"
+  | "101-200"
+  | "201-300";
+
+/**
+ * Purpose is assigned by the server from the trusted call path. Clients must
+ * not send purpose, freshness, or domain filters in this initial contract.
+ */
+export interface StaffWebSearchInput {
+  /** Public-information query only; student identifiers and record referents are rejected. */
+  query: string;
+  /** Defaults to 5; the platform enforces a range of 1-10. */
+  limit?: number;
+}
+
+export interface StaffWebSearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+  kind: StaffWebSearchSourceType;
+  publishedAt: string | null;
+  source: string | null;
+  /** Provider-supplied, safe HTTPS preview image for visual result rails. */
+  thumbnailUrl: string | null;
+}
+
+/**
+ * Canonical asynchronous external-news state for the staff Morning Brew.
+ * The platform owns the query, provider scheduling, and stale-result policy;
+ * the portal only renders this tenant-scoped read model.
+ */
+export type StaffMorningBrewExternalContextStatus =
+  | "idle"
+  | "pending"
+  | "running"
+  | "ready"
+  | "failed"
+  | "unavailable";
+
+export interface StaffMorningBrewExternalContext {
+  status: StaffMorningBrewExternalContextStatus;
+  query: string;
+  provider: "you.com" | null;
+  results: StaffWebSearchResult[];
+  requestedAt: string | null;
+  searchedAt: string | null;
+  retryAfter: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  stale: boolean;
+}
+
+export interface StaffWebSearchResponse {
+  provider: "you.com";
+  query: string;
+  searchedAt: string;
+  safeSearch: StaffWebSearchSafeSearch;
+  results: StaffWebSearchResult[];
+  total: number;
+  requestId: string;
+  metadata: {
+    queryLength: number;
+    queryLengthBucket: StaffWebSearchQueryLengthBucket;
+    requestedLimit: number;
+    returned: number;
+    purpose: StaffWebSearchPurpose;
+    latencyMs: number;
+  };
+}
+
+export interface StaffAssistantWebSourcesBlock {
+  type: "web_sources";
+  fallbackText: string;
+  query: string;
+  searchedAt: string;
+  /** External, read-only source links returned by the server-side provider. */
+  results: StaffWebSearchResult[];
+}
+
 export interface StaffAssistantDraftBlock {
   type: "draft";
   fallbackText: string;
@@ -2671,7 +2756,10 @@ export interface StaffAssistantDraftBlock {
   disclaimer: string;
 }
 
-export type StaffAssistantResponseBlock = AssistantResponseBlock | StaffAssistantDraftBlock;
+export type StaffAssistantResponseBlock =
+  | AssistantResponseBlock
+  | StaffAssistantDraftBlock
+  | StaffAssistantWebSourcesBlock;
 
 export interface AskStaffEdwardInput {
   message: string;

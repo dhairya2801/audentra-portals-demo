@@ -23,10 +23,10 @@ export interface BrewPreferenceStore {
 
 const STORAGE_PREFIX = "audentra:morning-brew:v5";
 /**
- * Earlier shapes. v4 offered inbox/calendar/news sections that were backed by
- * synthetic content; those slots now carry canonical student requests and
- * deadlines, so a returning reader is walked back through setup rather than
- * silently re-subscribed to something different.
+ * Earlier shapes. v4 offered inbox/calendar/news sections backed by synthetic
+ * content; those slots now carry canonical student requests and deadlines.
+ * Optional public-source search is an explicit action outside preferences, so
+ * a returning reader is never silently subscribed to provider requests.
  */
 const LEGACY_PREFIXES = [
   "audentra:morning-brew:v4",
