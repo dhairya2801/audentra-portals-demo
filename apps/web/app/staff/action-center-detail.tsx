@@ -7,6 +7,8 @@ import type {
   StaffCallRecording,
   StaffCommunicationChannel,
   StaffInteraction,
+  StaffEmailSendIntent,
+  StaffMailbox,
   StaffWorkItemDetail,
   StaffWorkItemStatus,
 } from "@vv/contracts";
@@ -21,10 +23,13 @@ import {
 import {
   ApiClientError,
   completeStaffInteraction,
+  confirmStaffEmailSendIntent,
+  createStaffEmailSendIntent,
   createStaffWorkComment,
   getStaffCallRecordingContent,
   getStaffDocumentContentUrl,
   getStaffDocumentReviewOptions,
+  getStaffMailboxes,
   getStaffWorkItemDetail,
   recordStaffCommunication,
   requestStaffAiRefresh,
@@ -546,6 +551,7 @@ export function ActionCenterDetail({
               detail={detail}
               channel={channel}
               busy={busy}
+              interactionId={activeInteraction?.id ?? null}
               onChannel={setChannel}
               onStart={() => void start()}
               onReviewDocument={(documentId, input, idempotencyKey) =>
@@ -1129,6 +1135,7 @@ function NextStepTab({
   detail,
   channel,
   busy,
+  interactionId,
   onChannel,
   onStart,
   onReviewDocument,
@@ -1138,6 +1145,7 @@ function NextStepTab({
   detail: StaffWorkItemDetail;
   channel: StaffCommunicationChannel;
   busy: string | null;
+  interactionId: string | null;
   onChannel: (channel: StaffCommunicationChannel) => void;
   onStart: () => void;
   onReviewDocument: (
@@ -1148,6 +1156,65 @@ function NextStepTab({
   onRecord: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
   const studentName = detail.workItem.student.preferredName;
+  const [mailboxes, setMailboxes] = useState<StaffMailbox[]>([]);
+  const [emailIntent, setEmailIntent] = useState<StaffEmailSendIntent | null>(null);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailMessage, setEmailMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (channel !== "email") return;
+    const controller = new AbortController();
+    void getStaffMailboxes(controller.signal)
+      .then((result) => setMailboxes(result.items.filter((mailbox) => mailbox.canSend)))
+      .catch((error: unknown) => setEmailMessage(errorMessage(error)));
+    return () => controller.abort();
+  }, [channel]);
+
+  const prepareEmail = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!interactionId) {
+      setEmailMessage("Start a new email interaction before preparing the delivery.");
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    setEmailBusy(true);
+    try {
+      const intent = await createStaffEmailSendIntent({
+        mailboxId: String(form.get("mailboxId")),
+        studentId: detail.workItem.student.id,
+        interactionId,
+        subject: String(form.get("subject") ?? "").trim(),
+        body: String(form.get("body") ?? "").trim(),
+      });
+      setEmailIntent(intent);
+      setEmailMessage("Review the exact sender, recipient, subject, and body before confirming.");
+    } catch (error) {
+      setEmailMessage(errorMessage(error));
+    } finally {
+      setEmailBusy(false);
+    }
+  };
+
+  const confirmEmail = async () => {
+    if (!emailIntent) return;
+    setEmailBusy(true);
+    try {
+      const queued = await confirmStaffEmailSendIntent(
+        emailIntent.id,
+        {
+          expectedVersion: emailIntent.version,
+          contentSha256: emailIntent.contentSha256,
+        },
+        crypto.randomUUID(),
+      );
+      setEmailIntent(queued);
+      setEmailMessage("Email queued. Delivery status will appear in the interaction timeline.");
+    } catch (error) {
+      setEmailMessage(errorMessage(error));
+    } finally {
+      setEmailBusy(false);
+    }
+  };
   return (
     <div className="action-panel-stack">
       <DocumentReviewPanel
@@ -1234,6 +1301,76 @@ function NextStepTab({
             Send portal message
           </button>
         </form>
+      ) : channel === "email" ? (
+        <section className="action-card action-email-composer">
+          <div className="action-card-heading">
+            <div>
+              <p className="eyebrow">University email</p>
+              <h2>Email {studentName}</h2>
+            </div>
+            <span>Confirmation required</span>
+          </div>
+          {!emailIntent ? (
+            <form onSubmit={prepareEmail}>
+              <label>
+                From mailbox
+                <select name="mailboxId" required defaultValue="">
+                  <option value="" disabled>Select an authorized mailbox</option>
+                  {mailboxes.map((mailbox) => (
+                    <option value={mailbox.id} key={mailbox.id}>{mailbox.address}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Subject
+                <input
+                  name="subject"
+                  required
+                  maxLength={998}
+                  defaultValue={detail.workItem.title}
+                />
+              </label>
+              <label>
+                Message
+                <textarea
+                  name="body"
+                  required
+                  maxLength={100_000}
+                  rows={7}
+                  defaultValue={`Hi ${studentName},\n\n${detail.taskInsight.suggestedApproach ?? "I am reaching out about your enrollment next step."}\n\nBest,\nYour enrollment team`}
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={itemTerminal || Boolean(busy) || emailBusy || !interactionId || mailboxes.length === 0}
+              >
+                Prepare email for review
+              </button>
+              {!interactionId ? <small>Use “Start a new email” above to open an auditable interaction first.</small> : null}
+              {mailboxes.length === 0 ? <small>Connect a send-enabled mailbox from the Mailboxes workspace.</small> : null}
+            </form>
+          ) : (
+            <div className="action-email-review">
+              <dl>
+                <div><dt>From</dt><dd>{emailIntent.sender}</dd></div>
+                <div><dt>To</dt><dd>{emailIntent.recipients.join(", ")}</dd></div>
+                <div><dt>Subject</dt><dd>{emailIntent.subject}</dd></div>
+              </dl>
+              <pre>{emailIntent.body}</pre>
+              {emailIntent.status === "pending_confirmation" ? (
+                <div className="action-email-review__actions">
+                  <button type="button" onClick={() => setEmailIntent(null)} disabled={emailBusy}>Edit</button>
+                  <button type="button" onClick={() => void confirmEmail()} disabled={emailBusy}>
+                    Confirm and send
+                  </button>
+                </div>
+              ) : (
+                <strong>Status: {readable(emailIntent.status)}</strong>
+              )}
+            </div>
+          )}
+          {emailMessage ? <p role="status">{emailMessage}</p> : null}
+        </section>
       ) : (
         <p className="action-channel-handoff">
           Continue in the approved {readable(channel)} channel, then record the confirmed result

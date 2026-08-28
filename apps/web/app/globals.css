@@ -15538,6 +15538,178 @@ a {
   width: 100%;
 }
 
+.staff-sso-options {
+  display: grid;
+  width: 100%;
+  gap: 0.9rem;
+  margin: 1.15rem 0 1.25rem;
+}
+
+.staff-sso-button {
+  display: grid;
+  width: 100%;
+  min-height: 3.25rem;
+  grid-template-columns: 2.65rem minmax(0, 1fr) 2.65rem;
+  align-items: center;
+  padding: 0.38rem;
+  border-color: #cdd5df;
+  border-radius: 0.52rem;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(9 30 66 / 12%);
+  color: #172b4d;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-decoration: none;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.staff-sso-button.button:not(:disabled):hover {
+  transform: none;
+  border-color: #9fadbf;
+  background: #f7f8fa;
+  box-shadow: 0 2px 5px rgb(9 30 66 / 17%);
+}
+
+.staff-sso-button:focus-visible {
+  outline: 3px solid rgb(12 102 228 / 38%);
+  outline-offset: 2px;
+}
+
+.staff-sso-button__icon,
+.staff-sso-button__endcap {
+  display: grid;
+  width: 2.3rem;
+  height: 2.3rem;
+  place-items: center;
+}
+
+.staff-sso-button__icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.staff-sso-button__label {
+  text-align: center;
+}
+
+.staff-sso-divider {
+  color: #6b778c;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.staff-sso-divider::before,
+.staff-sso-divider::after {
+  background: #dfe1e6;
+  content: "";
+  flex: 1;
+  height: 1px;
+}
+
+.staff-mail-connect {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
+}
+
+.staff-mail-connect label,
+.staff-mail-search {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.staff-mailbox-list,
+.staff-mail-message-list {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 1rem;
+}
+
+.staff-mailbox-list article,
+.staff-mail-message-list article {
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  padding: 0.85rem;
+}
+
+.staff-mailbox-list article {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.staff-mailbox-list article.is-selected {
+  border-color: var(--tenant-primary);
+}
+
+.staff-mailbox-list article > button:first-child {
+  display: grid;
+  flex: 1;
+  gap: 0.25rem;
+  text-align: left;
+}
+
+.staff-mail-message-list article > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.staff-mail-message-list article p {
+  margin-bottom: 0;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 900px) {
+  .staff-mail-connect {
+    grid-template-columns: 1fr;
+  }
+}
+
+.action-email-composer form,
+.action-email-review {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.action-email-composer label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.action-email-review dl,
+.action-email-review pre {
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  margin: 0;
+  padding: 0.9rem;
+}
+
+.action-email-review dl > div {
+  display: grid;
+  grid-template-columns: 5rem 1fr;
+  gap: 0.7rem;
+}
+
+.action-email-review pre {
+  font: inherit;
+  white-space: pre-wrap;
+}
+
+.action-email-review__actions {
+  display: flex;
+  gap: 0.7rem;
+  justify-content: flex-end;
+}
+
 .staff-auth-form label,
 .staff-yaml-field,
 .staff-edward-config label {
