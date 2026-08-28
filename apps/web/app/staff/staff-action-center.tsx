@@ -12,12 +12,14 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
 import {
   ApiClientError,
   getStaffActionCenter,
+  getStaffDocumentReviewOptions,
   getStaffStudentRecord,
   reviewStaffDocument,
   signInStaff,
@@ -458,12 +460,19 @@ export function StudentInspector({
     [item.student.id],
   );
   const student = useApiResource(loadStudent);
+  const loadReviewOptions = useCallback(
+    (signal: AbortSignal) => getStaffDocumentReviewOptions(signal),
+    [],
+  );
+  const reviewOptions = useApiResource(loadReviewOptions, { refreshOnAmbient: false });
   const updateItem = useApiAction(updateStaffWorkItem);
   const updatePreferences = useApiAction(updateStaffStudentPreferences);
   const decideDocument = useApiAction(reviewStaffDocument);
   const [note, setNote] = useState("");
   const [reviewNote, setReviewNote] = useState("");
+  const [reviewReasonCode, setReviewReasonCode] = useState("");
   const [notifyStudent, setNotifyStudent] = useState(true);
+  const reviewIntentRef = useRef<{ signature: string; key: string } | null>(null);
 
   const mutateWorkItem = async (input: {
     status?: StaffWorkItemStatus;
@@ -521,16 +530,24 @@ export function StudentInspector({
     documentWorkItem: StaffWorkItem,
     decision: "accepted" | "rejected",
   ) => {
-    if (!reviewNote.trim()) return;
+    if (!reviewNote.trim() || (decision === "rejected" && !reviewReasonCode)) return;
+    const input = {
+      workItemId: documentWorkItem.id,
+      expectedWorkItemVersion: documentWorkItem.version,
+      decision,
+      note: reviewNote.trim(),
+      notifyStudent,
+      ...(decision === "rejected" ? { reasonCode: reviewReasonCode } : {}),
+    };
+    const signature = JSON.stringify({ documentId, input });
+    if (reviewIntentRef.current?.signature !== signature) {
+      reviewIntentRef.current = { signature, key: crypto.randomUUID() };
+    }
     try {
-      await decideDocument.run(documentId, {
-        workItemId: documentWorkItem.id,
-        expectedWorkItemVersion: documentWorkItem.version,
-        decision,
-        note: reviewNote.trim(),
-        notifyStudent,
-      });
+      await decideDocument.run(documentId, input, reviewIntentRef.current.key);
+      reviewIntentRef.current = null;
       setReviewNote("");
+      setReviewReasonCode("");
       student.refresh();
       onBoardChanged();
     } catch {
@@ -785,6 +802,29 @@ export function StudentInspector({
                     onChange={(event) => setReviewNote(event.target.value)}
                   />
                 </label>
+                <label>
+                  Requested-change reason
+                  <select
+                    value={reviewReasonCode}
+                    disabled={reviewOptions.status !== "ready"}
+                    onChange={(event) => setReviewReasonCode(event.target.value)}
+                  >
+                    <option value="">
+                      {reviewOptions.status === "loading" ? "Loading reasons..." : "Choose when requesting changes"}
+                    </option>
+                    {reviewOptions.status === "ready"
+                      ? reviewOptions.data.rejectionReasons.map((reason) => (
+                          <option key={reason.code} value={reason.code}>{reason.label}</option>
+                        ))
+                      : null}
+                  </select>
+                </label>
+                {reviewOptions.status === "error" ? (
+                  <p className="field-error" role="alert">
+                    {reviewOptions.error}{" "}
+                    <button type="button" onClick={reviewOptions.reload}>Try again</button>
+                  </p>
+                ) : null}
                 <div className="staff-document-list">
                   {student.data.documents.items.map((document) => {
                     const documentWorkItem = center.items.find(
@@ -826,6 +866,7 @@ export function StudentInspector({
                               type="button"
                               disabled={
                                 !reviewNote.trim() ||
+                                !reviewReasonCode ||
                                 decideDocument.status === "loading"
                               }
                               onClick={() =>

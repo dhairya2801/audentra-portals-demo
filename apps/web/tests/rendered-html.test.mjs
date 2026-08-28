@@ -855,6 +855,7 @@ test("typed client wires every resource route and mutation contract", async () =
         notifyStudent: false,
       },
     );
+    await client.getStaffDocumentReviewOptions();
     await client.reviewStaffDocument(
       "00000000-0000-7000-8000-000000000601",
       {
@@ -864,6 +865,7 @@ test("typed client wires every resource route and mutation contract", async () =
         note: "Reviewed.",
         notifyStudent: true,
       },
+      "staff-document-decision-12345678",
     );
     await client.signOutStaff();
     testWindow.location.pathname = "/parent/documents";
@@ -947,6 +949,7 @@ test("typed client wires every resource route and mutation contract", async () =
     "/v1/staff/work-items/00000000-0000-7000-8000-000000000911",
     "/v1/staff/students/00000000-0000-7000-8000-000000000101",
     "/v1/staff/students/00000000-0000-7000-8000-000000000101/preferences",
+    "/v1/staff/documents/review-options",
     "/v1/staff/documents/00000000-0000-7000-8000-000000000601/decision",
     "/v1/auth/staff/sign-out",
   ];
@@ -1079,6 +1082,12 @@ test("typed client wires every resource route and mutation contract", async () =
       "Idempotency-Key"
     ],
     "intent-12345678",
+  );
+  assert.equal(
+    requestByPath.get(
+      "/v1/staff/documents/00000000-0000-7000-8000-000000000601/decision",
+    ).init.headers["Idempotency-Key"],
+    "staff-document-decision-12345678",
   );
   assert.deepEqual(
     JSON.parse(requestByPath.get("/v1/activity-events/batch").init.body),
@@ -2782,6 +2791,40 @@ test("the Action Center keeps evidence durable while AI and scheduled rules run 
   ]) {
     assert.match(api, new RegExp(route.replaceAll("/", "\\/")));
   }
+});
+
+test("enrollment document decisions stay atomic, explainable, and visible to the student", async () => {
+  const [detail, legacyInspector, documents, requirement, api, contracts] = await Promise.all([
+    readFile(new URL("../app/staff/action-center-detail.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/staff/staff-action-center.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/documents-panel.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/enrollment/requirements/[slug]/page.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
+    readFile(new URL("../../../packages/contracts/src/index.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(detail, /Enrollment document decision/);
+  assert.match(detail, /Reason for requested changes/);
+  assert.match(detail, /Student-facing decision note/);
+  assert.doesNotMatch(detail, /Internal staff note/);
+  assert.match(detail, /crypto\.randomUUID\(\)/);
+  assert.match(legacyInspector, /reviewIntentRef = useRef/);
+  assert.match(legacyInspector, /signature: JSON\.stringify|const signature = JSON\.stringify/);
+  assert.match(legacyInspector, /reviewIntentRef\.current\.key/);
+  assert.match(api, /\/v1\/staff\/documents\/review-options/);
+  assert.match(api, /"Idempotency-Key": idempotencyKey/);
+  assert.match(contracts, /reasonCode\?: string/);
+  assert.match(contracts, /reviewHistory\?: StudentDocumentReviewDecision\[\]/);
+  assert.match(contracts, /history\?: StudentRequirementHistoryEvent\[\]/);
+  assert.match(documents, /Why it came back/);
+  assert.match(documents, /document-decision-history/);
+  assert.match(documents, /review\.reviewerName/);
+  assert.match(requirement, /This step&apos;s history/);
+  assert.match(requirement, /Private staff notes are never included/);
+  assert.match(requirement, /Open document record/);
 });
 
 test("student requirement pages create durable, requirement-linked help requests", async () => {

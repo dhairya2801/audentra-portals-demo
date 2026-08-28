@@ -22068,3 +22068,216 @@ h1, h2, h3, h4,
   .delegate-session-banner button { grid-column: 2; justify-self: start; }
   .aster-shell:has(.delegate-session-banner) .aster-main { padding-top: 11rem; }
 }
+
+/* Enrollment document decisions: one visible staff action and one student-safe trail. */
+.action-document-review {
+  border-left: 4px solid var(--tenant-accent, #ffc329);
+}
+
+.action-document-review .action-card-heading > span {
+  padding: .3rem .5rem;
+  border-radius: 999px;
+  color: #314d68;
+  background: #edf3f8;
+  font-size: .66rem;
+  font-weight: 800;
+}
+
+.action-document-review__lede {
+  max-width: 56rem;
+  margin-bottom: .85rem;
+}
+
+.action-document-review__file,
+.action-document-review__latest,
+.action-document-review__settled {
+  padding: .75rem .85rem;
+  border: 1px solid #dce4eb;
+  border-radius: .65rem;
+  background: #f7f9fb;
+}
+
+.action-document-review__file {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.action-document-review__file > div {
+  display: grid;
+  gap: .2rem;
+}
+
+.action-document-review__file span,
+.action-document-review__latest,
+.action-document-review__settled {
+  color: #617086;
+  font-size: .72rem;
+}
+
+.action-document-review__file a,
+.requirement-history-list a {
+  color: #244f90;
+  font-size: .72rem;
+  font-weight: 800;
+}
+
+.action-document-review__decision {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .55rem 1.25rem;
+  padding: .75rem .85rem;
+  border: 1px solid #dce4eb;
+  border-radius: .65rem;
+}
+
+.action-document-review__decision legend {
+  padding: 0 .3rem;
+  color: #344159;
+  font-size: .7rem;
+  font-weight: 800;
+}
+
+.action-document-review__decision label,
+.action-document-review__notify {
+  display: flex;
+  align-items: center;
+  grid-template-columns: none;
+  gap: .45rem;
+}
+
+.action-document-review__decision input,
+.action-document-review__notify input {
+  width: auto;
+}
+
+.action-document-review label small {
+  color: #6d798b;
+  font-size: .65rem;
+  font-weight: 500;
+}
+
+.reject-reason-label {
+  display: block;
+  margin: .5rem 0 .2rem;
+  color: #6f2930;
+  font-size: .78rem;
+}
+
+.document-decision-history {
+  display: grid;
+  gap: .45rem;
+  margin: .55rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.document-decision-history > li {
+  display: grid;
+  gap: .15rem;
+  padding: .55rem .65rem;
+  border-left: 3px solid #c8d5e2;
+  border-radius: .2rem .5rem .5rem .2rem;
+  background: #f7f9fb;
+}
+
+.document-decision-history strong {
+  color: #2d4055;
+  font-size: .72rem;
+}
+
+.document-decision-history span,
+.document-decision-history p {
+  margin: 0;
+  color: #617086;
+  font-size: .68rem;
+  line-height: 1.45;
+}
+
+.requirement-history-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.requirement-history-panel__heading h3,
+.requirement-history-panel__heading p {
+  margin: 0;
+}
+
+.requirement-history-panel__heading p {
+  margin-top: .35rem;
+  color: #5e6c80;
+  font-size: .78rem;
+  line-height: 1.55;
+}
+
+.requirement-history-list {
+  display: grid;
+  gap: .75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.requirement-history-list > li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: .75rem;
+  padding: .8rem;
+  border: 1px solid #dfe5eb;
+  border-radius: .7rem;
+  background: #fff;
+}
+
+.requirement-history-list__mark {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 50%;
+  color: #244f90;
+  background: #edf3fb;
+}
+
+.requirement-history-list > li > div {
+  display: grid;
+  gap: .25rem;
+}
+
+.requirement-history-list__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+}
+
+.requirement-history-list__title strong {
+  color: #1f3046;
+  font-size: .78rem;
+}
+
+.requirement-history-list__title span {
+  padding: .2rem .4rem;
+  border-radius: 999px;
+  color: #4b6075;
+  background: #eef2f5;
+  font-size: .6rem;
+  font-weight: 800;
+}
+
+.requirement-history-list p,
+.requirement-history-list time {
+  margin: 0;
+  color: #617086;
+  font-size: .69rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .action-document-review__file,
+  .requirement-history-list__title {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
