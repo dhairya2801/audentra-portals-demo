@@ -589,45 +589,5 @@ export function MorningBrewDetail({
     );
   }
 
-  if (detail.kind === "change") {
-    const change = briefing.changes.find((item) => item.id === detail.id);
-    if (!change) return <NotFound onBack={onBack} />;
-    const topic = topicById(change.topic);
-
-    return (
-      <DetailShell
-        eyebrow={`${topic?.title ?? "Enrollment"} · Since yesterday`}
-        title={change.title}
-        onBack={onBack}
-        meta={
-          <>
-            <span className={`brew-chip brew-chip--${change.tone === "watch" ? "medium" : "low"}`}>
-              {change.metric}
-            </span>
-            <span>{change.time}</span>
-            <span>{briefing.windowLabel}</span>
-          </>
-        }
-        actions={openWorkspace(change.destination)}
-      >
-        <p className="brew-detail__lede">{change.detail}</p>
-        <section className="brew-detail__section brew-detail__section--evidence">
-          <h2>How this was counted</h2>
-          <ul className="brew-note-list">
-            <li>
-              Source column: <code>{change.basis}</code>
-            </li>
-            <li>{change.basisNote}</li>
-            <li>
-              {change.exact
-                ? "This timestamp records the event itself."
-                : "This timestamp records the last write to the record, not the transition, so treat the count as an upper bound."}
-            </li>
-          </ul>
-        </section>
-      </DetailShell>
-    );
-  }
-
   return <NotFound onBack={onBack} />;
 }

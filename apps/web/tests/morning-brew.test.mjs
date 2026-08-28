@@ -21,7 +21,7 @@ import ts from "typescript";
  * a data: URL cannot resolve a relative specifier.
  */
 const SOURCE_DIR = new URL("../app/staff/morning-brew/", import.meta.url);
-const MODULES = ["data", "catalog", "preferences", "types"];
+const MODULES = ["data", "catalog", "news", "preferences", "types"];
 
 let compiledDir = null;
 
@@ -373,11 +373,22 @@ async function preferences(overrides = {}) {
   const { DEFAULT_BREW_PREFERENCES } = await loadPreferences();
   return {
     ...DEFAULT_BREW_PREFERENCES,
-    version: 5,
+    version: 6,
     updatedAt: "",
     onboardingComplete: true,
     ...overrides,
   };
+}
+
+/** Per-source overrides, merged over the defaults: `{ news: { enabled: false } }`. */
+async function sources(overrides = {}) {
+  const { DEFAULT_BREW_PREFERENCES } = await loadPreferences();
+  return Object.fromEntries(
+    Object.entries(DEFAULT_BREW_PREFERENCES.sources).map(([id, source]) => [
+      id,
+      { ...source, ...(overrides[id] ?? {}) },
+    ]),
+  );
 }
 
 test("the briefing renders only values the API sent", async () => {
@@ -470,20 +481,21 @@ test("switched-off sections render empty rather than filled with something else"
   const briefing = buildBrewBriefing(
     brew(),
     await preferences({
-      include: {
-        requests: false,
-        deadlines: false,
-        numbers: false,
-        signals: false,
-        movements: false,
-      },
+      sources: await sources({
+        pulse: { enabled: false },
+        news: { enabled: false },
+        calendar: { enabled: false },
+        email: { enabled: false },
+        actions: { enabled: false },
+        intelligence: { enabled: false },
+      }),
     }),
     "Priya Shah",
   );
 
   assert.deepEqual(briefing.kpis, []);
   assert.deepEqual(briefing.insights, []);
-  assert.deepEqual(briefing.changes, []);
+  assert.deepEqual(briefing.news, []);
   assert.deepEqual(briefing.deadlines, []);
   assert.deepEqual(briefing.requests, []);
   assert.deepEqual(briefing.priorities, []);
@@ -519,23 +531,56 @@ test("an empty tenant produces an empty briefing, not a placeholder one", async 
   assert.equal(briefing.deck, "No students are on the roster for this tenant yet.");
 });
 
-test("quiet change classes are hidden at normal depth and kept at the deepest read", async () => {
+test("each source's own detail level bounds only its own section", async () => {
   const { buildBrewBriefing } = await load();
-  const normal = buildBrewBriefing(brew(), await preferences({ depth: "balanced" }), "P S");
-  const deep = buildBrewBriefing(brew(), await preferences({ depth: "deep" }), "P S");
+  const glance = buildBrewBriefing(
+    brew(),
+    await preferences({ sources: await sources({ calendar: { detail: "glance" } }) }),
+    "P S",
+  );
+  const deep = buildBrewBriefing(
+    brew(),
+    await preferences({ sources: await sources({ calendar: { detail: "deep" } }) }),
+    "P S",
+  );
 
-  assert.deepEqual(
-    normal.changes.map((change) => change.id),
-    ["deposits_posted"],
+  // Asking for more Calendar lengthens the Calendar section and nothing else.
+  assert.ok(deep.deadlines.length >= glance.deadlines.length);
+  assert.equal(glance.deadlines.length, Math.min(3, deep.deadlines.length));
+  assert.equal(glance.requests.length, deep.requests.length);
+  assert.equal(glance.kpis.length, deep.kpis.length);
+
+  // Nothing appears at depth that was absent at a glance.
+  const deepIds = new Set(deep.deadlines.map((item) => item.id));
+  for (const item of glance.deadlines) assert.ok(deepIds.has(item.id));
+
+  // The read-time estimate describes what is on the page, not a setting.
+  assert.ok(deep.readTimeMinutes >= glance.readTimeMinutes);
+});
+
+test("higher-ed news is a curated feed, filtered by topic and never counted", async () => {
+  const { buildBrewBriefing } = await load();
+  const briefing = buildBrewBriefing(brew(), await preferences(), "Priya Shah");
+
+  assert.ok(briefing.news.length);
+  for (const item of briefing.news) {
+    assert.ok(item.publisher, "every story is credited");
+    assert.match(item.url, /^https:\/\//, "every story links out");
+    assert.ok(item.publishedLabel, "every story is dated");
+  }
+
+  // It answers to the topic filter like every other section.
+  const narrow = buildBrewBriefing(brew(), await preferences({ topics: ["housing"] }), "P S");
+  assert.ok(narrow.news.every((item) => item.topic === "housing"));
+  assert.ok(narrow.news.length < briefing.news.length);
+
+  // Switched off, it is empty rather than replaced by something else.
+  const off = buildBrewBriefing(
+    brew(),
+    await preferences({ sources: await sources({ news: { enabled: false } }) }),
+    "P S",
   );
-  assert.deepEqual(
-    deep.changes.map((change) => change.id),
-    ["deposits_posted", "offers_accepted"],
-  );
-  // A class with no events still says so rather than being silently dropped.
-  const quiet = deep.changes.find((change) => change.id === "offers_accepted");
-  assert.equal(quiet.count, 0);
-  assert.equal(quiet.time, "No activity");
+  assert.deepEqual(off.news, []);
 });
 
 test("deadlines and requests are routed to the topic that owns them", async () => {
@@ -574,80 +619,6 @@ test("coverage travels with the briefing so the page can state its limits", asyn
     { metric: "Yield forecasts", reason: "No validated model exists." },
   ]);
   assert.equal(briefing.engagementScanAvailable, false);
-});
-
-test("people & capacity is mapped, summarised, and bounded from the payload", async () => {
-  const { buildBrewBriefing, capacitySummaryLine } = await load();
-  const briefing = buildBrewBriefing(brew(), await preferences(), "Priya Shah");
-  const capacity = briefing.capacity;
-  assert.ok(capacity);
-  assert.equal(capacity.available, true);
-  assert.equal(
-    capacity.summaryLine,
-    "88 staff · 1 on leave · 1 departed · 6 away today · 1 over cap · 1 with spare capacity · 110 open items owned by someone unavailable",
-  );
-  assert.equal(capacity.signals.length, 2);
-  assert.equal(capacity.signals[0].severity, "critical");
-  assert.deepEqual(capacity.signals[0].boardQuery, { assignee: "staff-7", status: "open" });
-  assert.equal(capacity.signals[1].boardQuery, null);
-  assert.deepEqual(capacity.offices, [
-    { component: "Registrar", open: 140, overdue: 30, unassigned: 4, stale: 9, oldestOverdueDays: 41 },
-  ]);
-  assert.equal(capacity.basis, staffCapacity().basis);
-  // Zero-valued parts stay out of the line; the headcount always leads.
-  assert.equal(
-    capacitySummaryLine({ ...staffCapacity().summary, onLeave: 0, departed: 0, awayNow: 0, overCap: 0, spareCapacity: 0, itemsOwnedByUnavailable: 0 }),
-    "88 staff",
-  );
-  assert.equal(capacitySummaryLine(null), null);
-
-  // More than ten signals are cut, and the cut is reported rather than hidden.
-  const many = buildBrewBriefing(
-    brew({
-      staffCapacity: staffCapacity({
-        signals: Array.from({ length: 12 }, (_, index) => ({
-          ...staffCapacity().signals[1],
-          id: `spare:${index}`,
-        })),
-        signalsOmitted: 2,
-      }),
-    }),
-    await preferences(),
-    "Priya Shah",
-  );
-  assert.equal(many.capacity.signals.length, 10);
-  assert.equal(many.capacity.signalsOmitted, 4);
-});
-
-test("people & capacity is subtract-only and honest when unavailable", async () => {
-  const { buildBrewBriefing } = await load();
-  const off = buildBrewBriefing(
-    brew(),
-    await preferences({ include: { requests: true, deadlines: true, numbers: true, signals: false, movements: true } }),
-    "Priya Shah",
-  );
-  assert.equal(off.capacity, null);
-  const otherTopic = buildBrewBriefing(brew(), await preferences({ topics: ["housing"] }), "Priya Shah");
-  assert.equal(otherTopic.capacity, null);
-
-  const unavailable = buildBrewBriefing(
-    brew({
-      staffCapacity: staffCapacity({
-        available: false,
-        summary: null,
-        signals: [],
-        components: [],
-        basis: "No staff directory is loaded for this tenant.",
-      }),
-    }),
-    await preferences(),
-    "Priya Shah",
-  );
-  assert.equal(unavailable.capacity.available, false);
-  assert.equal(unavailable.capacity.summaryLine, null);
-  assert.deepEqual(unavailable.capacity.signals, []);
-  assert.deepEqual(unavailable.capacity.offices, []);
-  assert.equal(unavailable.capacity.basis, "No staff directory is loaded for this tenant.");
 });
 
 test("priorities carry the board query and an absent activity signal is surfaced", async () => {
@@ -700,12 +671,19 @@ test("legacy preferences carry topics forward and re-run setup", async () => {
     );
     const loaded = browserBrewPreferenceStore.load("aster:staff-1");
     assert.deepEqual(loaded.topics, ["financial_aid", "admissions"]);
-    // The old inbox switch mapped onto the canonical successor section.
-    assert.equal(loaded.include.requests, false);
-    assert.equal(loaded.include.deadlines, true);
+    // The old inbox and calendar switches map onto the sources that replaced
+    // them, and the reader's "off" is carried forward as an "off".
+    assert.equal(loaded.sources.email.enabled, false);
+    assert.equal(loaded.sources.calendar.enabled, true);
+    // Higher-ed news has no predecessor, so it starts on and is met in setup.
+    assert.equal(loaded.sources.news.enabled, true);
+    // Every source arrives with a detail level, which is the question v6 adds.
+    for (const source of Object.values(loaded.sources)) {
+      assert.ok(["glance", "context", "deep"].includes(source.detail));
+    }
     // A changed vocabulary means the reader answers the new questions again.
     assert.equal(loaded.onboardingComplete, false);
-    assert.equal(loaded.version, 5);
+    assert.equal(loaded.version, 6);
   } finally {
     delete globalThis.window;
   }

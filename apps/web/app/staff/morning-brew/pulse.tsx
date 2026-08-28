@@ -107,7 +107,7 @@ function PulseCard({
   );
 }
 
-export function EnrollmentPulse({
+export function InstitutionalPulse({
   kpis,
   timeframes,
   onOpenKpi,
@@ -151,7 +151,7 @@ export function EnrollmentPulse({
             <span className="brew-panel-head__glyph" aria-hidden="true">
               ⌁
             </span>
-            Enrollment Pulse
+            Institutional Pulse
           </h2>
           <p>Where the {students}-student funnel stands, and what share of each stage converts</p>
         </div>

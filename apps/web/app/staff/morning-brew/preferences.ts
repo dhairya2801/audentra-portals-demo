@@ -1,17 +1,15 @@
 import {
-  BREW_INCLUDE_IDS,
+  BREW_SOURCE_IDS,
   BREW_TOPIC_IDS,
-  DEFAULT_BREW_INCLUDES,
+  DEFAULT_BREW_SOURCES,
   DEFAULT_BREW_TOPICS,
 } from "./catalog";
 import type {
   BrewDeliveryTime,
-  BrewDepthId,
-  BrewIncludeId,
-  BrewInsightDetailId,
+  BrewDetailLevelId,
   BrewPreferences,
-  BrewRequestDepthId,
-  BrewToneId,
+  BrewSourceId,
+  BrewSourcePreference,
   BrewTopicId,
 } from "./types";
 
@@ -21,14 +19,17 @@ export interface BrewPreferenceStore {
   clear(scope: string): void;
 }
 
-const STORAGE_PREFIX = "audentra:morning-brew:v5";
+const STORAGE_PREFIX = "audentra:morning-brew:v6";
 /**
- * Earlier shapes. v4 offered inbox/calendar/news sections that were backed by
- * synthetic content; those slots now carry canonical student requests and
- * deadlines, so a returning reader is walked back through setup rather than
- * silently re-subscribed to something different.
+ * Earlier shapes. v5 asked a single question per section — in or out — and then
+ * asked for a reading length, a tone, and a delivery time on a third screen.
+ * v6 replaces all of that with one question per source: is it in, and how much
+ * context does it bring. There is no honest way to infer the second answer from
+ * the first, so a returning reader is walked back through setup rather than
+ * silently assigned a depth they never chose.
  */
 const LEGACY_PREFIXES = [
+  "audentra:morning-brew:v5",
   "audentra:morning-brew:v4",
   "audentra:morning-brew:v3",
   "audentra:morning-brew:v2",
@@ -36,21 +37,13 @@ const LEGACY_PREFIXES = [
 ];
 
 const TOPIC_IDS = new Set<string>(BREW_TOPIC_IDS);
-const DEPTHS = new Set<string>(["headlines", "balanced", "deep"]);
-const TONES = new Set<string>(["executive", "narrative"]);
+const DETAIL_LEVELS = new Set<string>(["glance", "context", "deep"]);
 const TIMES = new Set<string>(["06:00", "06:30", "07:00", "07:30"]);
-const REQUEST_DEPTHS = new Set<string>(["urgent", "handful", "everything"]);
-const INSIGHT_DETAILS = new Set<string>(["headline", "impact", "full"]);
 
 export const DEFAULT_BREW_PREFERENCES: Omit<BrewPreferences, "version" | "updatedAt"> = {
   topics: DEFAULT_BREW_TOPICS,
-  include: DEFAULT_BREW_INCLUDES,
-  depth: "balanced",
-  tone: "executive",
+  sources: DEFAULT_BREW_SOURCES,
   deliveryTime: "07:00",
-  requestDepth: "handful",
-  deadlineNextStep: true,
-  insightDetail: "full",
   onboardingComplete: false,
 };
 
@@ -62,41 +55,71 @@ function normalizeTopics(value: unknown): BrewTopicId[] {
   return topics.length ? [...new Set(topics)] : [...DEFAULT_BREW_TOPICS];
 }
 
-function normalizeInclude(value: unknown): Record<BrewIncludeId, boolean> {
+function normalizeSources(value: unknown): Record<BrewSourceId, BrewSourcePreference> {
   const record = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
   return Object.fromEntries(
-    BREW_INCLUDE_IDS.map((id) => [
-      id,
-      typeof record[id] === "boolean" ? record[id] : DEFAULT_BREW_INCLUDES[id],
-    ]),
-  ) as Record<BrewIncludeId, boolean>;
+    BREW_SOURCE_IDS.map((id) => {
+      const fallback = DEFAULT_BREW_SOURCES[id];
+      const stored = record[id];
+      if (!stored || typeof stored !== "object") return [id, { ...fallback }];
+      const { enabled, detail } = stored as Partial<BrewSourcePreference>;
+      return [
+        id,
+        {
+          enabled: typeof enabled === "boolean" ? enabled : fallback.enabled,
+          detail: DETAIL_LEVELS.has(String(detail))
+            ? (detail as BrewDetailLevelId)
+            : fallback.detail,
+        },
+      ];
+    }),
+  ) as Record<BrewSourceId, BrewSourcePreference>;
 }
 
 function normalize(value: Partial<BrewPreferences>): BrewPreferences {
   return {
-    version: 5,
+    version: 6,
     topics: normalizeTopics(value.topics),
-    include: normalizeInclude(value.include),
-    depth: DEPTHS.has(String(value.depth)) ? (value.depth as BrewDepthId) : "balanced",
-    tone: TONES.has(String(value.tone)) ? (value.tone as BrewToneId) : "executive",
+    sources: normalizeSources(value.sources),
     deliveryTime: TIMES.has(String(value.deliveryTime))
       ? (value.deliveryTime as BrewDeliveryTime)
       : "07:00",
-    requestDepth: REQUEST_DEPTHS.has(String(value.requestDepth))
-      ? (value.requestDepth as BrewRequestDepthId)
-      : "handful",
-    deadlineNextStep: value.deadlineNextStep !== false,
-    insightDetail: INSIGHT_DETAILS.has(String(value.insightDetail))
-      ? (value.insightDetail as BrewInsightDetailId)
-      : "full",
     onboardingComplete: value.onboardingComplete === true,
     updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : new Date().toISOString(),
   };
 }
 
+/** Every source a legacy switch can be read as, with the level it starts at. */
+function sourcesFromLegacy(
+  include: Record<string, boolean | undefined>,
+): Record<BrewSourceId, BrewSourcePreference> {
+  // An explicit "on" anywhere wins, then an explicit "off"; a switch the reader
+  // never saw falls back to the default rather than being read as a decision.
+  const carry = (id: BrewSourceId, ...keys: string[]): BrewSourcePreference => {
+    const answers = keys.map((key) => include[key]).filter((value) => typeof value === "boolean");
+    return {
+      enabled: answers.length ? answers.some(Boolean) : DEFAULT_BREW_SOURCES[id].enabled,
+      detail: DEFAULT_BREW_SOURCES[id].detail,
+    };
+  };
+  return {
+    pulse: carry("pulse", "numbers", "pulse"),
+    // New in v6 and backed by an outside feed, so nothing earlier can speak for
+    // it. It starts on and the reader meets it in setup before it ever renders.
+    news: { ...DEFAULT_BREW_SOURCES.news },
+    calendar: carry("calendar", "deadlines", "calendar"),
+    email: carry("email", "requests", "inbox"),
+    // v5 gated the queues and the read-across on one "signals" switch. Both
+    // carry forward from it, and the reader re-answers them separately.
+    actions: carry("actions", "signals"),
+    intelligence: carry("intelligence", "signals", "insights"),
+  };
+}
+
 /**
- * Carry a returning reader's topics forward where we can, then send them back
- * through setup so they can answer the questions this version adds.
+ * Carry a returning reader's topics and section choices forward where we can,
+ * then send them back through setup so they can answer the detail-level
+ * question this version adds.
  */
 function migrateLegacy(scope: string): BrewPreferences | null {
   for (const prefix of LEGACY_PREFIXES) {
@@ -110,8 +133,6 @@ function migrateLegacy(scope: string): BrewPreferences | null {
         include?: Record<string, boolean>;
         connectors?: Record<string, boolean>;
         sections?: Record<string, boolean>;
-        depth?: string;
-        tone?: string;
         deliveryTime?: string;
       };
       const previous = new Set([
@@ -142,18 +163,11 @@ function migrateLegacy(scope: string): BrewPreferences | null {
       return normalize({
         ...DEFAULT_BREW_PREFERENCES,
         topics,
-        include: {
-          // The old inbox and calendar switches described connectors that never
-          // existed. Their nearest honest successors are the canonical student
-          // request and deadline sections, so the intent carries over.
-          requests: legacy.include?.inbox ?? legacy.connectors?.outlook ?? true,
-          deadlines: legacy.include?.calendar ?? legacy.connectors?.calendar ?? true,
-          numbers: legacy.include?.numbers ?? legacy.sections?.pulse ?? true,
-          signals: legacy.include?.signals ?? legacy.sections?.insights ?? true,
-          movements: legacy.include?.movements ?? legacy.sections?.changes ?? true,
-        },
-        depth: legacy.depth as BrewDepthId | undefined,
-        tone: legacy.tone as BrewToneId | undefined,
+        sources: sourcesFromLegacy({
+          ...(legacy.sections ?? {}),
+          ...(legacy.connectors ?? {}),
+          ...(legacy.include ?? {}),
+        }),
         deliveryTime: legacy.deliveryTime as BrewDeliveryTime | undefined,
         onboardingComplete: false,
       });
@@ -170,7 +184,7 @@ export const browserBrewPreferenceStore: BrewPreferenceStore = {
       const raw = window.localStorage.getItem(`${STORAGE_PREFIX}:${scope}`);
       if (!raw) return migrateLegacy(scope);
       const value = JSON.parse(raw) as Partial<BrewPreferences>;
-      if (value.version !== 5) return migrateLegacy(scope);
+      if (value.version !== 6) return migrateLegacy(scope);
       return normalize(value);
     } catch {
       return null;

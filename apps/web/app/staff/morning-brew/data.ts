@@ -1,27 +1,26 @@
 import type {
   StaffBrewAttentionItem,
-  StaffBrewCapacity,
-  StaffBrewChange,
   StaffBrewDeadline,
   StaffBrewMetric,
   StaffBrewPriority,
   StaffBrewRequest,
   StaffMorningBrew,
 } from "@vv/contracts";
-import { BREW_DEPTH_OPTIONS, BREW_TIMEFRAMES } from "./catalog";
+import { BREW_TIMEFRAMES } from "./catalog";
+import { HIGHER_ED_NEWS } from "./news";
 import type {
   BrewBriefing,
-  BrewCapacity,
-  BrewCapacitySignal,
-  BrewChange,
   BrewDeadline,
+  BrewDetailLevelId,
   BrewInsight,
   BrewKpi,
   BrewKpiFrame,
+  BrewNewsItem,
   BrewPreferences,
   BrewPriority,
   BrewQuickLink,
   BrewRequest,
+  BrewSourceId,
   BrewTimeframeId,
   BrewTopicId,
 } from "./types";
@@ -50,12 +49,6 @@ export function formatBrewPercent(value: number): string {
   return `${ONE_DECIMAL.format(value)}%`;
 }
 
-const CLOCK = new Intl.DateTimeFormat("en-US", {
-  hour: "numeric",
-  minute: "2-digit",
-  timeZone: "America/New_York",
-});
-
 const DAY = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
@@ -64,22 +57,44 @@ const DAY = new Intl.DateTimeFormat("en-US", {
 
 /* ---------------------------------------------------------------- filtering */
 
-const depthOption = (preferences: BrewPreferences) =>
-  BREW_DEPTH_OPTIONS.find((option) => option.id === preferences.depth) ?? BREW_DEPTH_OPTIONS[1];
+/**
+ * How long a section runs is now the source's own answer, not one global
+ * setting: a reader who asked for the funnel at a glance and the action center
+ * in full gets a short KPI band and a long queue, which is what they said.
+ */
+const levelOf = (preferences: BrewPreferences, id: BrewSourceId): BrewDetailLevelId =>
+  preferences.sources[id].detail;
 
-const readTimeFor = (preferences: BrewPreferences) =>
-  preferences.depth === "headlines" ? 2 : preferences.depth === "deep" ? 6 : 4;
+const enabled = (preferences: BrewPreferences, id: BrewSourceId): boolean =>
+  preferences.sources[id].enabled;
 
-const kpiLimit = (preferences: BrewPreferences) => (preferences.depth === "deep" ? 12 : 6);
-const changeLimit = (preferences: BrewPreferences) =>
-  preferences.depth === "headlines" ? 4 : preferences.depth === "deep" ? 12 : 6;
-const priorityLimit = (preferences: BrewPreferences) => (preferences.depth === "deep" ? 5 : 3);
+/** Picks the count for a level, in `[glance, context, deep]` order. */
+const byLevel = (level: BrewDetailLevelId, counts: [number, number, number]): number =>
+  level === "glance" ? counts[0] : level === "context" ? counts[1] : counts[2];
+
+const kpiLimit = (preferences: BrewPreferences) =>
+  byLevel(levelOf(preferences, "pulse"), [4, 6, 12]);
+const insightLimit = (preferences: BrewPreferences) =>
+  byLevel(levelOf(preferences, "intelligence"), [2, 3, 4]);
+const priorityLimit = (preferences: BrewPreferences) =>
+  byLevel(levelOf(preferences, "actions"), [3, 4, 6]);
 const deadlineLimit = (preferences: BrewPreferences) =>
-  preferences.depth === "headlines" ? 3 : 6;
-
-/** The reader's own answer about their request list wins over the general length. */
+  byLevel(levelOf(preferences, "calendar"), [3, 6, 12]);
 const requestLimit = (preferences: BrewPreferences) =>
-  preferences.requestDepth === "urgent" ? 2 : preferences.requestDepth === "everything" ? 12 : 4;
+  byLevel(levelOf(preferences, "email"), [3, 5, 12]);
+const newsLimit = (preferences: BrewPreferences) =>
+  byLevel(levelOf(preferences, "news"), [4, 6, 8]);
+
+/**
+ * A minute per switched-on source, and a second minute for one asked for in
+ * full. It is a reading estimate over what is actually on the page, not a
+ * setting the reader chose and we then honour.
+ */
+function readTimeFor(preferences: BrewPreferences): number {
+  const on = Object.values(preferences.sources).filter((source) => source.enabled);
+  const deep = on.filter((source) => source.detail === "deep").length;
+  return Math.max(1, Math.round(on.length * 0.7 + deep * 0.8));
+}
 
 /* ------------------------------------------------------------------ mapping */
 
@@ -140,23 +155,6 @@ function toInsight(item: StaffBrewAttentionItem): BrewInsight {
     destination: item.destination,
     cohort: item.cohort,
     detail: item.detail,
-  };
-}
-
-function toChange(change: StaffBrewChange): BrewChange {
-  return {
-    id: change.id,
-    topic: change.topic,
-    time: change.occurredAt ? CLOCK.format(new Date(change.occurredAt)) : "No activity",
-    title: change.title,
-    detail: change.detail,
-    tone: change.tone,
-    count: change.count,
-    metric: change.metric,
-    destination: change.destination,
-    basis: change.basis,
-    basisNote: change.basisNote,
-    exact: change.exact,
   };
 }
 
@@ -247,77 +245,13 @@ function toPriority(priority: StaffBrewPriority): BrewPriority {
   };
 }
 
-/* ----------------------------------------------------------------- capacity */
-
-const CAPACITY_TOPIC: BrewTopicId = "student_success";
-const CAPACITY_SIGNAL_LIMIT = 10;
-
-const plural = (count: number, noun: string, pluralNoun = `${noun}s`) =>
-  `${INT.format(count)} ${count === 1 ? noun : pluralNoun}`;
-
 /**
- * One line a reader can say out loud: staff headcount, who is unavailable,
- * and who is over or under capacity. Zero-valued parts are left out so the
- * line names only what is true today; the headcount is always first.
+ * The news list is a constant, so "building" it is only ever filtering: the
+ * topics the reader follows, bounded by the depth they asked for. No story is
+ * scored, reordered by relevance, or joined to a student.
  */
-export function capacitySummaryLine(summary: StaffBrewCapacity["summary"]): string | null {
-  if (!summary) return null;
-  const parts = [plural(summary.staff, "staff", "staff")];
-  if (summary.onLeave > 0) parts.push(`${INT.format(summary.onLeave)} on leave`);
-  if (summary.departed > 0) parts.push(`${INT.format(summary.departed)} departed`);
-  if (summary.awayNow > 0) parts.push(`${INT.format(summary.awayNow)} away today`);
-  if (summary.overCap > 0) parts.push(`${INT.format(summary.overCap)} over cap`);
-  if (summary.fallingBehind > 0) parts.push(`${INT.format(summary.fallingBehind)} falling behind`);
-  if (summary.spareCapacity > 0) {
-    parts.push(`${INT.format(summary.spareCapacity)} with spare capacity`);
-  }
-  if (summary.itemsOwnedByUnavailable > 0) {
-    parts.push(
-      `${plural(summary.itemsOwnedByUnavailable, "open item")} owned by someone unavailable`,
-    );
-  }
-  if (summary.unassignedItems > 0) parts.push(`${plural(summary.unassignedItems, "item")} unassigned`);
-  if (summary.staleItems > 0) parts.push(`${plural(summary.staleItems, "stale item")}`);
-  return parts.join(" · ");
-}
-
-function toCapacitySignal(signal: StaffBrewCapacity["signals"][number]): BrewCapacitySignal {
-  return {
-    id: signal.id,
-    kind: signal.kind,
-    severity: signal.severity,
-    title: signal.title,
-    detail: signal.detail,
-    action: signal.action,
-    count: signal.count,
-    destination: signal.destination,
-    boardQuery: signal.boardQuery ?? null,
-  };
-}
-
-export function toCapacity(capacity: StaffBrewCapacity | null | undefined): BrewCapacity | null {
-  if (!capacity) return null;
-  const signals = (capacity.signals ?? []).slice(0, CAPACITY_SIGNAL_LIMIT).map(toCapacitySignal);
-  return {
-    topic: CAPACITY_TOPIC,
-    available: capacity.available,
-    summaryLine: capacity.available ? capacitySummaryLine(capacity.summary) : null,
-    signals: capacity.available ? signals : [],
-    signalsOmitted:
-      (capacity.signalsOmitted ?? 0) +
-      Math.max(0, (capacity.signals ?? []).length - signals.length),
-    offices: capacity.available
-      ? (capacity.components ?? []).map((office) => ({
-          component: office.component,
-          open: office.open,
-          overdue: office.overdue,
-          unassigned: office.unassigned,
-          stale: office.stale,
-          oldestOverdueDays: office.oldestOverdueDays,
-        }))
-      : [],
-    basis: capacity.basis,
-  };
+function newsFor(preferences: BrewPreferences, topics: Set<BrewTopicId>): BrewNewsItem[] {
+  return HIGHER_ED_NEWS.filter((item) => topics.has(item.topic)).slice(0, newsLimit(preferences));
 }
 
 export const BREW_QUICK_LINKS: BrewQuickLink[] = [
@@ -329,8 +263,14 @@ export const BREW_QUICK_LINKS: BrewQuickLink[] = [
 
 /* ------------------------------------------------------------------- builder */
 
+/**
+ * The deck the API wrote, lengthened by its own first bullet when the reader
+ * asked for the read-across in full. Nothing here composes a sentence.
+ */
 function deckFor(preferences: BrewPreferences, brew: StaffMorningBrew): string {
-  if (preferences.tone === "narrative" && brew.synthesis.bullets.length) {
+  const full =
+    enabled(preferences, "intelligence") && levelOf(preferences, "intelligence") === "deep";
+  if (full && brew.synthesis.bullets.length) {
     return `${brew.synthesis.headline} ${brew.synthesis.bullets[0]}`;
   }
   return brew.synthesis.headline;
@@ -350,7 +290,12 @@ export function buildBrewBriefing(
   staffName: string,
 ): BrewBriefing {
   const topics = new Set<BrewTopicId>(preferences.topics);
-  const { requests, deadlines, numbers, signals, movements } = preferences.include;
+  const pulse = enabled(preferences, "pulse");
+  const news = enabled(preferences, "news");
+  const calendar = enabled(preferences, "calendar");
+  const email = enabled(preferences, "email");
+  const actions = enabled(preferences, "actions");
+  const intelligence = enabled(preferences, "intelligence");
 
   const kpis = brew.metrics
     .filter((metric) => topics.has(metric.topic))
@@ -359,14 +304,8 @@ export function buildBrewBriefing(
 
   const insights = brew.attention
     .filter((item) => topics.has(item.topic))
-    .slice(0, depthOption(preferences).storyCount)
+    .slice(0, insightLimit(preferences))
     .map(toInsight);
-
-  // Quiet classes stay in the payload but only surface at the deepest read;
-  // a rail of zeroes buries the one line that moved.
-  const changeItems = brew.changes.filter(
-    (change) => topics.has(change.topic) && (change.count > 0 || preferences.depth === "deep"),
-  );
 
   const deadlineItems = brew.deadlines
     .map(toDeadline)
@@ -383,8 +322,6 @@ export function buildBrewBriefing(
     .slice(0, priorityLimit(preferences))
     .map(toPriority);
 
-  const capacity = topics.has(CAPACITY_TOPIC) ? toCapacity(brew.staffCapacity) : null;
-
   const timeframes = (brew.windows.length ? brew.windows : BREW_TIMEFRAMES).map((window) => ({
     id: window.id as BrewTimeframeId,
     label: window.label,
@@ -400,25 +337,25 @@ export function buildBrewBriefing(
   return {
     greetingName: staffName.split(" ")[0] || "there",
     deck: deckFor(preferences, brew),
-    bullets: signals ? brew.synthesis.bullets : [],
+    bullets: intelligence ? brew.synthesis.bullets : [],
     readTimeMinutes: readTimeFor(preferences),
     updatedAt: brew.generatedAt,
     windowLabel: brew.window.label,
     deliveryLabel: preferences.deliveryTime.replace(/^0/, ""),
     students: brew.population.students,
     timeframes,
-    insights: signals ? insights : [],
-    kpis: numbers ? kpis : [],
-    changes: movements ? changeItems.slice(0, changeLimit(preferences)).map(toChange) : [],
-    deadlines: deadlines ? deadlineItems : [],
-    requests: requests ? requestItems : [],
-    priorities: signals ? priorities : [],
+    insights: intelligence ? insights : [],
+    kpis: pulse ? kpis : [],
+    news: news ? newsFor(preferences, topics) : [],
+    deadlines: calendar ? deadlineItems : [],
+    requests: email ? requestItems : [],
+    priorities: actions ? priorities : [],
     quickLinks: BREW_QUICK_LINKS,
     glance: {
-      requests: requests ? brew.requests.total : 0,
-      requestsAwaitingReply: requests ? brew.requests.awaitingFirstReply : 0,
-      deadlinesOverdue: deadlines ? overdue : 0,
-      deadlinesThisWeek: deadlines ? thisWeek : 0,
+      requests: email ? brew.requests.total : 0,
+      requestsAwaitingReply: email ? brew.requests.awaitingFirstReply : 0,
+      deadlinesOverdue: calendar ? overdue : 0,
+      deadlinesThisWeek: calendar ? thisWeek : 0,
     },
     coverage: {
       notes: brew.coverage.notes,
@@ -426,7 +363,6 @@ export function buildBrewBriefing(
     },
     engagementScanAvailable: brew.engagementScan.available,
     engagementActivitySignal: brew.engagementScan.activitySignal !== false,
-    capacity: signals ? capacity : null,
   };
 }
 

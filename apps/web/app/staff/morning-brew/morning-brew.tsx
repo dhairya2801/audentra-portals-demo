@@ -9,45 +9,33 @@ import { buildBrewBriefing } from "./data";
 import { MorningBrewDashboard } from "./dashboard";
 import { MorningBrewDetail } from "./detail";
 import { EdwardPanel } from "./edward-panel";
+import { BrewLoading } from "./loading";
 import { MorningBrewOnboarding, type OnboardingDraft, type OnboardingStep } from "./onboarding";
 import { browserBrewPreferenceStore, DEFAULT_BREW_PREFERENCES } from "./preferences";
 import type {
   BrewDetailRef,
-  BrewIncludeId,
   BrewPreferences,
+  BrewSourceId,
+  BrewSourcePreference,
   BrewTopicId,
   EdwardRequest,
-  MorningBrewDestination,
   MorningBrewNavigate,
 } from "./types";
 
-type Mode = "loading" | "onboarding" | "briefing";
+/**
+ * `building` is the beat after setup: the reader has just answered, and the
+ * screen reads their answers back while the aggregate read finishes. It is a
+ * separate mode from `loading` because only one of the two knows what was
+ * chosen.
+ */
+type Mode = "loading" | "onboarding" | "building" | "briefing";
 
 const draftFrom = (preferences: Omit<BrewPreferences, "version" | "updatedAt">): OnboardingDraft => ({
   topics: [...preferences.topics],
-  include: { ...preferences.include },
-  depth: preferences.depth,
-  tone: preferences.tone,
-  deliveryTime: preferences.deliveryTime,
-  requestDepth: preferences.requestDepth,
-  deadlineNextStep: preferences.deadlineNextStep,
-  insightDetail: preferences.insightDetail,
+  sources: Object.fromEntries(
+    Object.entries(preferences.sources).map(([id, source]) => [id, { ...source }]),
+  ) as Record<BrewSourceId, BrewSourcePreference>,
 });
-
-function LoadingBrew() {
-  return (
-    <section className="brew-loading" aria-label="Preparing Morning Brew" aria-live="polite">
-      <div className="brew-loading__masthead" />
-      <div className="brew-loading__headline" />
-      <div className="brew-loading__deck" />
-      <div className="brew-loading__cards">
-        <span />
-        <span />
-        <span />
-      </div>
-    </section>
-  );
-}
 
 /**
  * The briefing is an aggregate read over the whole tenant, so it fails on its
@@ -114,7 +102,7 @@ export function MorningBrewView({
       saved ?? {
         ...DEFAULT_BREW_PREFERENCES,
         ...draft,
-        version: 5,
+        version: 6,
         updatedAt: "",
         onboardingComplete: false,
       },
@@ -139,7 +127,7 @@ export function MorningBrewView({
             {
               ...DEFAULT_BREW_PREFERENCES,
               ...draft,
-              version: 5,
+              version: 6,
               updatedAt: "",
               onboardingComplete: false,
             },
@@ -159,9 +147,15 @@ export function MorningBrewView({
 
   const complete = () => {
     if (!draft.topics.length) return;
-    setSaved(browserBrewPreferenceStore.save(scope, { ...draft, onboardingComplete: true }));
+    setSaved(
+      browserBrewPreferenceStore.save(scope, {
+        ...draft,
+        deliveryTime: saved?.deliveryTime ?? DEFAULT_BREW_PREFERENCES.deliveryTime,
+        onboardingComplete: true,
+      }),
+    );
     setDetail(null);
-    setMode("briefing");
+    setMode("building");
     setStep(1);
     setDirection(1);
     scrollToTop();
@@ -195,13 +189,32 @@ export function MorningBrewView({
     scrollToTop();
   }, []);
 
-  if (mode === "loading" || brew.status === "loading") return <LoadingBrew />;
+  if (mode === "loading" || brew.status === "loading") {
+    return (
+      <BrewLoading
+        firstName={saved ? staffName.split(" ")[0] || null : null}
+        draft={saved ? draft : null}
+        students={source?.population.students ?? null}
+      />
+    );
+  }
 
   if (brew.status === "error" || !briefing || !draftBriefing) {
     return (
       <BrewUnavailable
         message={brew.error ?? "The briefing read returned no data."}
         onRetry={brew.reload}
+      />
+    );
+  }
+
+  if (mode === "building") {
+    return (
+      <BrewLoading
+        firstName={briefing.greetingName}
+        draft={draft}
+        students={briefing.students}
+        onDone={() => setMode("briefing")}
       />
     );
   }
@@ -223,13 +236,12 @@ export function MorningBrewView({
               : [...current.topics, topic],
           }))
         }
-        onToggleInclude={(include: BrewIncludeId) =>
+        onChangeSource={(id: BrewSourceId, patch: Partial<BrewSourcePreference>) =>
           setDraft((current) => ({
             ...current,
-            include: { ...current.include, [include]: !current.include[include] },
+            sources: { ...current.sources, [id]: { ...current.sources[id], ...patch } },
           }))
         }
-        onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
         onStep={goToStep}
         onComplete={complete}
         onCancel={saved ? cancel : undefined}
