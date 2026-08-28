@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+  ReviewStaffDocumentInput,
   StaffActionCenter,
   StaffAiProcessingState,
   StaffCallRecording,
@@ -23,14 +24,17 @@ import {
   createStaffWorkComment,
   getStaffCallRecordingContent,
   getStaffDocumentContentUrl,
+  getStaffDocumentReviewOptions,
   getStaffWorkItemDetail,
   recordStaffCommunication,
   requestStaffAiRefresh,
+  reviewStaffDocument,
   retryStaffCallTranscription,
   startStaffInteraction,
   updateStaffWorkItem,
   uploadStaffCallRecording,
 } from "../lib/api-client";
+import { useApiResource } from "../hooks/use-api-resource";
 
 type DetailTab = "overview" | "next_step" | "outcomes" | "comments" | "history";
 
@@ -544,6 +548,17 @@ export function ActionCenterDetail({
               busy={busy}
               onChannel={setChannel}
               onStart={() => void start()}
+              onReviewDocument={(documentId, input, idempotencyKey) =>
+                runMutation(
+                  "document-review",
+                  async () => {
+                    await reviewStaffDocument(documentId, input, idempotencyKey);
+                  },
+                  input.decision === "accepted"
+                    ? "Document accepted. The enrollment step and student record were updated."
+                    : "Changes requested. The reason and enrollment history are now visible to the student.",
+                )
+              }
               onRecord={async (event) => {
                 event.preventDefault();
                 const formElement = event.currentTarget;
@@ -861,6 +876,254 @@ function OverviewTab({
   );
 }
 
+const reviewableDocumentStatuses = new Set(["needs_review", "under_review"]);
+
+function DocumentReviewPanel({
+  detail,
+  busy,
+  onReviewDocument,
+}: {
+  detail: StaffWorkItemDetail;
+  busy: string | null;
+  onReviewDocument: (
+    documentId: string,
+    input: ReviewStaffDocumentInput,
+    idempotencyKey: string,
+  ) => Promise<boolean>;
+}) {
+  const documents = detail.relatedDocuments;
+  const reviewableDocuments = useMemo(
+    () => documents.filter((document) => reviewableDocumentStatuses.has(document.status)),
+    [documents],
+  );
+  const loadOptions = useCallback(
+    (signal: AbortSignal) => getStaffDocumentReviewOptions(signal),
+    [],
+  );
+  const options = useApiResource(loadOptions, { refreshOnAmbient: false });
+  const [selectedDocumentId, setSelectedDocumentId] = useState(
+    () => reviewableDocuments[0]?.id ?? documents[0]?.id ?? "",
+  );
+  const [decision, setDecision] = useState<"accepted" | "rejected">("accepted");
+  const [reasonCode, setReasonCode] = useState("");
+  const [note, setNote] = useState("");
+  const [notifyStudent, setNotifyStudent] = useState(true);
+  const intentRef = useRef<{ signature: string; key: string } | null>(null);
+
+  if (documents.length === 0) return null;
+
+  const selectedDocument =
+    documents.find((document) => document.id === selectedDocumentId) ??
+    reviewableDocuments[0] ??
+    documents[0];
+  const selectedIsReviewable = reviewableDocumentStatuses.has(selectedDocument.status);
+  const rejectionReasons = options.status === "ready" ? options.data.rejectionReasons : [];
+  const selectedReason = rejectionReasons.find((reason) => reason.code === reasonCode) ?? null;
+  const canSubmit =
+    selectedIsReviewable &&
+    note.trim().length >= 3 &&
+    (decision === "accepted" || (options.status === "ready" && Boolean(reasonCode))) &&
+    !busy;
+
+  const submitDecision = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!canSubmit) return;
+    const input: ReviewStaffDocumentInput = {
+      workItemId: detail.workItem.id,
+      expectedWorkItemVersion: detail.workItem.version,
+      decision,
+      note: note.trim(),
+      notifyStudent,
+      ...(decision === "rejected" ? { reasonCode } : {}),
+    };
+    const signature = JSON.stringify({ documentId: selectedDocument.id, input });
+    if (intentRef.current?.signature !== signature) {
+      intentRef.current = { signature, key: crypto.randomUUID() };
+    }
+    const succeeded = await onReviewDocument(
+      selectedDocument.id,
+      input,
+      intentRef.current.key,
+    );
+    if (!succeeded) return;
+    intentRef.current = null;
+    setDecision("accepted");
+    setReasonCode("");
+    setNote("");
+  };
+
+  return (
+    <section className="action-card action-document-review" aria-labelledby="document-review-title">
+      <div className="action-card-heading">
+        <div>
+          <p className="eyebrow">Enrollment document decision</p>
+          <h2 id="document-review-title">Approve or request a replacement</h2>
+        </div>
+        <span>{reviewableDocuments.length} awaiting decision</span>
+      </div>
+      <p className="action-document-review__lede">
+        The decision updates this enrollment step, its audit trail, and the student&apos;s
+        document history together. Private staff context is never shown to the student.
+      </p>
+
+      <form onSubmit={submitDecision}>
+        <div className="action-form-grid">
+          <label className="action-form-span">
+            Uploaded file
+            <select
+              value={selectedDocument.id}
+              onChange={(event) => {
+                setSelectedDocumentId(event.target.value);
+                intentRef.current = null;
+              }}
+            >
+              {documents.map((document) => (
+                <option key={document.id} value={document.id}>
+                  {document.fileName} - {readable(document.status)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="action-form-span action-document-review__file">
+            <div>
+              <strong>{selectedDocument.fileName}</strong>
+              <span>
+                {readable(selectedDocument.category)} · {readable(selectedDocument.status)}
+              </span>
+            </div>
+            {selectedDocument.contentUrl ? (
+              <a
+                href={getStaffDocumentContentUrl(selectedDocument.contentUrl)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open original
+              </a>
+            ) : null}
+          </div>
+
+          {selectedDocument.review ? (
+            <p className="action-form-span action-document-review__latest">
+              Latest decision: <strong>{readable(selectedDocument.review.decision)}</strong> by{" "}
+              {selectedDocument.review.reviewerName} on {dateTime(selectedDocument.review.decidedAt)}
+              {selectedDocument.review.note ? ` - ${selectedDocument.review.note}` : ""}
+            </p>
+          ) : null}
+
+          {selectedIsReviewable ? (
+            <>
+              <fieldset className="action-form-span action-document-review__decision">
+                <legend>Decision</legend>
+                <label>
+                  <input
+                    type="radio"
+                    name="documentDecision"
+                    value="accepted"
+                    checked={decision === "accepted"}
+                    onChange={() => {
+                      setDecision("accepted");
+                      setReasonCode("");
+                      intentRef.current = null;
+                    }}
+                  />
+                  Approve document
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="documentDecision"
+                    value="rejected"
+                    checked={decision === "rejected"}
+                    onChange={() => {
+                      setDecision("rejected");
+                      intentRef.current = null;
+                    }}
+                  />
+                  Request changes
+                </label>
+              </fieldset>
+
+              {decision === "rejected" ? (
+                <label className="action-form-span">
+                  Reason for requested changes
+                  <select
+                    required
+                    value={reasonCode}
+                    disabled={options.status !== "ready"}
+                    onChange={(event) => {
+                      setReasonCode(event.target.value);
+                      intentRef.current = null;
+                    }}
+                  >
+                    <option value="">
+                      {options.status === "loading" ? "Loading reasons..." : "Choose a reason"}
+                    </option>
+                    {rejectionReasons.map((reason) => (
+                      <option key={reason.code} value={reason.code}>{reason.label}</option>
+                    ))}
+                  </select>
+                  {selectedReason ? <small>{selectedReason.description}</small> : null}
+                  {options.status === "error" ? (
+                    <span className="field-error" role="alert">
+                      {options.error}{" "}
+                      <button type="button" onClick={options.reload}>Try again</button>
+                    </span>
+                  ) : null}
+                </label>
+              ) : null}
+
+              <label className="action-form-span">
+                Student-facing decision note
+                <textarea
+                  required
+                  minLength={3}
+                  maxLength={500}
+                  rows={3}
+                  value={note}
+                  placeholder={
+                    decision === "accepted"
+                      ? "Confirm what was accepted."
+                      : "Explain exactly what the student should replace or correct."
+                  }
+                  onChange={(event) => {
+                    setNote(event.target.value);
+                    intentRef.current = null;
+                  }}
+                />
+                <small>This appears in the student&apos;s document and enrollment history.</small>
+              </label>
+
+              <label className="action-form-span action-document-review__notify">
+                <input
+                  type="checkbox"
+                  checked={notifyStudent}
+                  onChange={(event) => {
+                    setNotifyStudent(event.target.checked);
+                    intentRef.current = null;
+                  }}
+                />
+                Send the student an inbox notification
+              </label>
+              <button type="submit" disabled={!canSubmit}>
+                {busy === "document-review"
+                  ? "Saving decision..."
+                  : decision === "accepted"
+                    ? "Approve document"
+                    : "Request changes"}
+              </button>
+            </>
+          ) : (
+            <p className="action-form-span action-document-review__settled" role="status">
+              This file is {readable(selectedDocument.status)} and has no pending decision.
+            </p>
+          )}
+        </div>
+      </form>
+    </section>
+  );
+}
+
 function NextStepTab({
   itemTerminal,
   detail,
@@ -868,6 +1131,7 @@ function NextStepTab({
   busy,
   onChannel,
   onStart,
+  onReviewDocument,
   onRecord,
 }: {
   itemTerminal: boolean;
@@ -876,11 +1140,21 @@ function NextStepTab({
   busy: string | null;
   onChannel: (channel: StaffCommunicationChannel) => void;
   onStart: () => void;
+  onReviewDocument: (
+    documentId: string,
+    input: ReviewStaffDocumentInput,
+    idempotencyKey: string,
+  ) => Promise<boolean>;
   onRecord: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
   const studentName = detail.workItem.student.preferredName;
   return (
     <div className="action-panel-stack">
+      <DocumentReviewPanel
+        detail={detail}
+        busy={busy}
+        onReviewDocument={onReviewDocument}
+      />
       <section className="action-card">
         <p className="eyebrow">1. Choose how you want to reach out</p>
         <h2>Pick the channel that fits the next action</h2>

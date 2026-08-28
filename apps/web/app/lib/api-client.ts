@@ -69,6 +69,7 @@ import type {
   StaffActionRuleList,
   StaffCorePlay,
   StaffDocumentDecisionResult,
+  StaffDocumentReviewOptions,
   StaffEdwardPreview,
   StaffEdwardPreviewInput,
   StaffEdwardConfigurationDraft,
@@ -1532,6 +1533,7 @@ export function updateStaffStudentPreferences(
 export function reviewStaffDocument(
   documentId: string,
   input: ReviewStaffDocumentInput,
+  idempotencyKey: string,
 ) {
   return request<StaffDocumentDecisionResult>(
     `/v1/staff/documents/${encodeURIComponent(documentId)}/decision`,
@@ -1540,8 +1542,21 @@ export function reviewStaffDocument(
       headers: {
         ...staffHeaders,
         "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
       },
       body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function getStaffDocumentReviewOptions(signal?: AbortSignal) {
+  return request<StaffDocumentReviewOptions>(
+    "/v1/staff/documents/review-options",
+    {
+      method: "GET",
+      headers: staffHeaders,
+      signal,
     },
     { notifyStudentRecordChanged: false },
   );
