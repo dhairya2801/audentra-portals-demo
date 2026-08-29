@@ -62,6 +62,7 @@ import {
 import { ActionCenterDetail } from "./action-center-detail";
 import { ActionRulesEditor } from "./action-rules-editor";
 import { JourneyFlowBuilder } from "./journey-flow-builder";
+import { InstitutionProfileView } from "./institution-profile/institution-profile";
 import { MorningBrewView } from "./morning-brew/morning-brew";
 import { NotificationCenter } from "./notification-center";
 import { connectStaffRealtime, type StaffRealtimeEvent } from "./staff-realtime";
@@ -92,6 +93,7 @@ type StaffView =
   | "messages"
   | "campus_life"
   | "academics"
+  | "institution_profile"
   | "edward";
 
 interface StaffRealtimeNotice {
@@ -198,6 +200,7 @@ const viewOrder: StaffView[] = [
   "messages",
   "campus_life",
   "academics",
+  "institution_profile",
   "edward",
 ];
 
@@ -232,6 +235,7 @@ const navigation: Array<{
   {
     label: "Enablement",
     items: [
+      { id: "institution_profile", label: "Institution profile", icon: "I" },
       { id: "knowledge", label: "Knowledge base", icon: "K" },
       { id: "core_plays", label: "Core plays", icon: "P" },
       { id: "edward", label: "Edward", icon: "E" },
@@ -344,6 +348,12 @@ const viewCopy: Record<
     title: "Courses and catalog",
     description:
       "Manage the student classroom catalog and Edward-assisted academic planning content.",
+  },
+  institution_profile: {
+    eyebrow: "Institutional reference",
+    title: "Institution profile",
+    description:
+      "Who the institution is, before any of its work: size, schools, offices, price, and where the incoming class stands.",
   },
   edward: {
     eyebrow: "Staff copilot",
@@ -4571,6 +4581,8 @@ function StaffWorkspaceShell({
           <AcademicsView workspace={workspace} refresh={refresh} />
         ) : view === "outreach" ? (
           <OutreachView workspace={workspace} refresh={refresh} />
+        ) : view === "institution_profile" ? (
+          <InstitutionProfileView navigate={navigate} />
         ) : (
           <EdwardView staffName={workspace.currentStaff.name} />
         )}

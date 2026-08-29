@@ -15,6 +15,7 @@ import SummaryFigure from "../design-system/patterns/SummaryFigure.jsx";
 import ToastStack from "../design-system/patterns/Toast.jsx";
 import { useToasts } from "../design-lib/toast.js";
 import { HealthAccessibilityPanel } from "../components/health-accessibility-panel";
+import { officeAdvisor } from "../components/office-contact";
 import {
   accommodationAnswer,
   bandFor,
@@ -45,11 +46,14 @@ const ADVISOR_SCOPE =
 export default function HealthPage() {
   const router = useRouter();
   const { tenant, href } = useTenant();
-  // The institution's real admissions contact — no named advisor exists in the platform.
-  const advisorContact = tenant.contacts.admissions ?? tenant.contacts.support ?? null;
-  const ADVISOR = advisorContact
-    ? { name: advisorContact.label, label: "Your admissions contact", office: null as string | null }
-    : null;
+  // The person who covers enrollment for this student, on the office contact the
+  // institution published — see `components/office-contact.ts` for why the bar
+  // seats a person here rather than repeating the office's own label as a name.
+  const ADVISOR = officeAdvisor(
+    "admissions",
+    tenant.contacts.admissions ?? tenant.contacts.support ?? null,
+    "Your admissions contact",
+  );
   const { toasts, push, dismiss } = useToasts();
 
   const loadRequirements = useCallback((signal: AbortSignal) => getStudentRequirements(signal), []);

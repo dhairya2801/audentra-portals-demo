@@ -1,0 +1,579 @@
+/* ==========================================================================
+ * Institution profile — the portal's page vocabulary, inside the workspace.
+ *
+ * Two things live here and nothing else:
+ *
+ *   1. The frame. `.staff-main--workspace` is a fluid column with the shell's
+ *      own type and ink on it; a student section is a 1220px column centred in
+ *      the window with the design's type and ink. So this file restates the
+ *      three inherited properties (family, colour, measure) and centres the
+ *      column, which is all it takes for `page-hero`, `page-summary`,
+ *      `page-body`, `section-card`, `advisor-bar`, `anchor-card` and
+ *      `provenance-card` to draw here exactly as they draw on My Enrollment.
+ *
+ *   2. The shapes this page adds, because no section had them: an attribute
+ *      grid, a school with a share bar, a price ladder that sums, a funnel, a
+ *      dated timeline, an office roster, and a percentage list for the rail.
+ *      Every one is built from `tokens.css` — no hex, no raw pixel outside the
+ *      two places a bar's geometry needs one.
+ *
+ * It is a file of its own rather than a block in `globals.css` on purpose:
+ * `globals.css` is 22,000 lines shared with the sign-in, onboarding and staff
+ * screens, and a page that is only ever mounted by one component has no reason
+ * to add to what every route parses.
+ *
+ * Specificity: the shell reaches headings by name
+ * (`.staff-shell--workspace :is(h1, h2, h3, …)`, one class and one element), so
+ * the rules that have to beat it double this page's class rather than relying on
+ * which stylesheet the bundler happened to emit second.
+ * ==========================================================================*/
+
+/* ── The frame ──────────────────────────────────────────────────────────── */
+
+.institution-profile {
+  color: var(--ink);
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+/* The student column, centred. `.staff-main--workspace` already pays the gutter
+   to the sidebar and the topbar, so this adds only the page's own padding — and
+   it has to be at least `--band-outdent`, because the hero reaches that far past
+   the column on each side and would otherwise touch the shell's edge. */
+.institution-profile__page {
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: 0 var(--space-12) var(--space-12);
+}
+
+.institution-profile.institution-profile :is(h1, h2, h3, h4) {
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+}
+
+.institution-profile.institution-profile :is(button, input, select, textarea) {
+  font-family: inherit;
+}
+
+/* The shell paints the workspace's focus ring; inside the page it is the
+   design's, the same restatement `student.css` makes for `.app-shell`. */
+.institution-profile
+  :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 2px;
+}
+
+/* ── Prose ──────────────────────────────────────────────────────────────── */
+
+.institution-profile .profile-prose {
+  max-width: 68ch;
+  margin: 0 0 var(--space-8);
+  color: var(--ink-2);
+  font-size: var(--fs-h4);
+  line-height: var(--lh-body);
+  text-wrap: pretty;
+}
+
+.institution-profile .profile-prose--muted {
+  color: var(--muted);
+  font-size: var(--fs-copy);
+}
+
+.institution-profile .profile-prose--tight {
+  margin-top: var(--space-8);
+  margin-bottom: 0;
+}
+
+/* The line a card has to say about its own figures. It is a `Notice` in every
+   respect but one — it belongs to the card rather than to the section — so it
+   takes the same ink budget and none of the section-wide slots. */
+.institution-profile .profile-callout {
+  display: flex;
+  gap: var(--space-5);
+  align-items: flex-start;
+  margin-top: var(--space-8);
+  padding: var(--space-6) var(--space-7);
+  border: 1px solid var(--purple-line);
+  border-radius: var(--radius-row);
+  background: var(--purple-wash);
+}
+
+.institution-profile .profile-callout--amber {
+  border-color: var(--amber-line);
+  background: var(--amber-wash);
+}
+
+.institution-profile .profile-callout__mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  margin-top: 1px;
+  color: var(--purple);
+}
+
+.institution-profile .profile-callout--amber .profile-callout__mark {
+  color: var(--amber);
+}
+
+.institution-profile .profile-callout p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  text-wrap: pretty;
+}
+
+/* ── The attribute grid: a fact is a label, a value, and sometimes a caveat ── */
+
+.institution-profile .fact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-row);
+  background: var(--surface);
+}
+
+.institution-profile .fact-grid--wide {
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  margin-top: var(--space-8);
+}
+
+/* Each cell draws its own top and left hairline and pulls back over the one
+   before it, so the rules land between cells wherever `auto-fit` puts the
+   column break. The alternative — a 1px grid gap over a coloured container —
+   ruled the *tracks*, so a row that did not fill (four facts in a grid three
+   wide) painted the remainder grey and left the card with a hole in it. */
+.institution-profile .fact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: -1px 0 0 -1px;
+  padding: var(--space-7) var(--space-7) var(--space-8);
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.institution-profile .fact dt {
+  color: var(--muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-heavy);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+}
+
+.institution-profile .fact dd {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-snug);
+  font-variant-numeric: tabular-nums;
+}
+
+.institution-profile .fact dd small {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-regular);
+  letter-spacing: 0;
+  line-height: var(--lh-body);
+  text-wrap: pretty;
+}
+
+/* ── Schools: a name, a headcount, and the share it is of the whole ──────── */
+
+.institution-profile .school-list,
+.institution-profile .office-list,
+.institution-profile .funnel,
+.institution-profile .timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.institution-profile .school + .school {
+  margin-top: var(--space-8);
+  padding-top: var(--space-8);
+  border-top: 1px solid var(--line-soft);
+}
+
+.institution-profile .school__head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-6);
+  align-items: baseline;
+}
+
+.institution-profile .school__head strong {
+  font-size: var(--fs-h3);
+  font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-snug);
+}
+
+.institution-profile .school__count {
+  flex: none;
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+  color: var(--ink);
+  font-size: var(--fs-display);
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--ls-tight);
+}
+
+.institution-profile .school__count small {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0;
+}
+
+/* One bar, three users: a school's share of undergraduates, a funnel stage's
+   share of the widest stage, and a composition percentage in the rail. The
+   width is always `--share` so the three cannot drift apart. */
+.institution-profile .school__bar,
+.institution-profile .funnel__bar,
+.institution-profile .share-list__bar {
+  display: block;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--line-soft);
+}
+
+.institution-profile .school__bar,
+.institution-profile .funnel__bar {
+  height: 6px;
+  margin: var(--space-5) 0 var(--space-4);
+}
+
+.institution-profile .school__bar i,
+.institution-profile .funnel__bar i,
+.institution-profile .share-list__bar i {
+  display: block;
+  width: var(--share, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--grad-purple);
+}
+
+.institution-profile .school__meta,
+.institution-profile .funnel__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-7);
+  align-items: baseline;
+  color: var(--muted);
+  font-size: var(--fs-meta);
+}
+
+.institution-profile .school__meta b {
+  color: var(--ink-2);
+  font-weight: var(--fw-semi);
+}
+
+/* ── The price ladder: three components, and what they come to ───────────── */
+
+.institution-profile .ladder {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-row);
+}
+
+.institution-profile .ladder__line {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-6);
+  align-items: baseline;
+  padding: var(--space-6) var(--space-7);
+  color: var(--ink-2);
+  font-size: var(--fs-h4);
+}
+
+.institution-profile .ladder__line + .ladder__line {
+  border-top: 1px solid var(--line-soft);
+}
+
+.institution-profile .ladder__line b {
+  color: var(--ink);
+  font-size: var(--fs-h3);
+  font-weight: var(--fw-semi);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--ls-snug);
+}
+
+/* The sum is not another row of the same weight — it is what the rows are for,
+   so it takes the sunk plane and the figure size. */
+.institution-profile .ladder__line--total {
+  border-top: 1px solid var(--line);
+  background: var(--card-zone);
+  color: var(--ink);
+  font-weight: var(--fw-semi);
+}
+
+.institution-profile .ladder__line--total b {
+  font-size: var(--fs-display);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-tight);
+}
+
+/* ── The funnel ─────────────────────────────────────────────────────────── */
+
+.institution-profile .funnel__stage + .funnel__stage {
+  margin-top: var(--space-8);
+  padding-top: var(--space-8);
+  border-top: 1px solid var(--line-soft);
+}
+
+.institution-profile .funnel__head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-6);
+  align-items: baseline;
+}
+
+.institution-profile .funnel__head strong {
+  font-size: var(--fs-h3);
+  font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-snug);
+}
+
+.institution-profile .funnel__value {
+  flex: none;
+  color: var(--ink);
+  font-size: var(--fs-display);
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--ls-tight);
+}
+
+.institution-profile .funnel__rate b {
+  color: var(--ink-2);
+  font-size: var(--fs-copy);
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.institution-profile .funnel__rate--base {
+  font-style: italic;
+}
+
+.institution-profile .funnel__note {
+  color: var(--faint);
+  text-wrap: pretty;
+}
+
+/* Amber is what somebody has to act on — the three stages that are a gap rather
+   than a result. The colour budget is the portal's and means the same thing
+   here (`tokens.css`, semantic roles). */
+.institution-profile .funnel__stage--watch .funnel__bar i {
+  background: var(--amber);
+}
+
+.institution-profile .funnel__stage--watch .funnel__rate b {
+  color: var(--amber-ink);
+}
+
+.institution-profile .funnel__stage--good .funnel__bar i {
+  background: var(--green);
+}
+
+.institution-profile .funnel__stage--good .funnel__rate b {
+  color: var(--green-ink);
+}
+
+/* ── The dated timeline ─────────────────────────────────────────────────── */
+
+.institution-profile .timeline {
+  position: relative;
+}
+
+.institution-profile .timeline__row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto auto;
+  gap: var(--space-6);
+  align-items: center;
+  padding: var(--space-6) 0;
+}
+
+.institution-profile .timeline__row + .timeline__row {
+  border-top: 1px solid var(--line-soft);
+}
+
+/* The thread behind the marks, drawn from the mark's own geometry so the two
+   cannot drift apart by a pixel. */
+.institution-profile .timeline__row:not(:last-child)::before {
+  position: absolute;
+  top: 50%;
+  bottom: -50%;
+  left: 8px;
+  width: 1px;
+  background: var(--line);
+  content: "";
+}
+
+.institution-profile .timeline__mark {
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-round);
+  background: var(--surface);
+  color: var(--on-ink);
+}
+
+.institution-profile .timeline__row.is-past .timeline__mark {
+  border-color: transparent;
+  background: var(--purple);
+}
+
+.institution-profile .timeline__label {
+  font-size: var(--fs-h4);
+  font-weight: var(--fw-medium);
+}
+
+.institution-profile .timeline__row.is-past .timeline__label {
+  color: var(--muted);
+  font-weight: var(--fw-regular);
+}
+
+.institution-profile .timeline__date {
+  color: var(--ink-2);
+  font-size: var(--fs-copy);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.institution-profile .timeline__state {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 4.6rem;
+}
+
+/* ── The office roster ──────────────────────────────────────────────────── */
+
+.institution-profile .office {
+  display: flex;
+  gap: var(--space-7);
+  align-items: center;
+  padding: var(--space-6) 0;
+}
+
+.institution-profile .office + .office {
+  border-top: 1px solid var(--line-soft);
+}
+
+.institution-profile .office__staff {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--purple-line);
+  border-radius: var(--radius-tile);
+  background: var(--purple-wash);
+  color: var(--purple-ink);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.institution-profile .office__staff small {
+  color: var(--purple);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-heavy);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+}
+
+.institution-profile .office__copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.institution-profile .office__copy strong {
+  font-size: var(--fs-h4);
+  font-weight: var(--fw-semi);
+}
+
+.institution-profile .office__copy small {
+  color: var(--muted);
+  font-size: var(--fs-copy);
+  line-height: var(--lh-body);
+  text-wrap: pretty;
+}
+
+/* ── The rail's percentage list ─────────────────────────────────────────── */
+
+.institution-profile .share-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin: var(--space-6) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.institution-profile .share-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2) var(--space-5);
+  align-items: center;
+}
+
+.institution-profile .share-list__label {
+  color: var(--ink-2);
+  font-size: var(--fs-copy);
+}
+
+.institution-profile .share-list li b {
+  color: var(--ink);
+  font-size: var(--fs-copy);
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.institution-profile .share-list__bar {
+  grid-column: 1 / -1;
+  order: 3;
+  height: 4px;
+}
+
+/* ── Below the rail breakpoint the page is one column, as every section is ── */
+
+@media (width <= 1060px) {
+  .institution-profile .page-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .institution-profile .page-rail {
+    position: static;
+  }
+}
+
+@media (width <= 820px) {
+  .institution-profile__page {
+    padding: 0 var(--space-9) var(--space-10);
+  }
+
+  .institution-profile .timeline__row {
+    grid-template-columns: 18px minmax(0, 1fr) auto;
+  }
+
+  .institution-profile .timeline__state {
+    display: none;
+  }
+}

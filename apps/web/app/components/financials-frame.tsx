@@ -14,6 +14,7 @@ import SummaryFigure from "../design-system/patterns/SummaryFigure.jsx";
 import { GROUPS, groupLeaves } from "../design-lib/navigation.js";
 import { useApiResource } from "../hooks/use-api-resource";
 import { getStudentFinancials } from "../lib/api-client";
+import { officeAdvisor } from "./office-contact";
 import { PortalShell, type PortalSection } from "./portal-shell";
 import { TenantLink as Link } from "./tenant-link";
 import { useTenant } from "./tenant-provider";
@@ -92,12 +93,9 @@ function BalanceStrip({ data, ledger }: { data: StudentFinancials; ledger: Ledge
   const router = useRouter();
   const money = moneyFor(tenant);
   const contact = tenant.contacts.financialAid ?? tenant.contacts.support;
-  const advisor = {
-    name: contact.label,
-    label: "Your financial aid contact",
-    office: null,
-    photo: null,
-  };
+  // The counselor who packages this student's aid, on the office contact the
+  // institution published — `components/office-contact.ts`.
+  const advisor = officeAdvisor("financialAid", contact, "Your financial aid contact");
 
   const onContact = (channel: "email" | "message") => {
     if (channel === "email" && contact.email) {
@@ -125,7 +123,7 @@ function BalanceStrip({ data, ledger }: { data: StudentFinancials; ledger: Ledge
           : copy(`Your package is final. This can still change if your housing or meal plan does. ${data.academicYear} academic year.`)}
       </SummaryFigure>
 
-      <AdvisorBar advisor={advisor} onContact={onContact} />
+      {advisor ? <AdvisorBar advisor={advisor} onContact={onContact} /> : null}
     </>
   );
 }
