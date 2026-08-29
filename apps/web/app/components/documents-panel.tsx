@@ -776,8 +776,15 @@ function ExtractionReview({
     () => new Set(defaultAcceptedDocumentExtractionFieldKeys(extraction)),
   );
   const confirmAction = useCallback(
-    (fieldKeys: string[], key: string) =>
-      confirmStudentDocumentExtraction(document.id, { acceptedFieldKeys: fieldKeys }, key),
+    (fieldKeys: string[], key: string, applyRequirementId?: string) =>
+      confirmStudentDocumentExtraction(
+        document.id,
+        {
+          acceptedFieldKeys: fieldKeys,
+          ...(applyRequirementId ? { applyRequirementId } : {}),
+        },
+        key,
+      ),
     [document.id],
   );
   const confirm = useApiAction(confirmAction);
@@ -836,6 +843,17 @@ function ExtractionReview({
     }
   };
 
+  const applyRequirement = async (requirementId: string) => {
+    const key = intentKey.current ?? (intentKey.current = crypto.randomUUID());
+    try {
+      const changed = await confirm.run([...acceptedKeys], key, requirementId);
+      intentKey.current = null;
+      onDocumentChanged(changed);
+    } catch {
+      // Keep the idempotency key for a safe retry of the same confirmation.
+    }
+  };
+
   return (
     <section className="extract-review" aria-labelledby="extract-title">
       <div className="extract-head">
@@ -843,7 +861,13 @@ function ExtractionReview({
         <p className="extract-note">{extraction.summary}</p>
       </div>
 
-      <DocumentContextMatches matches={extraction.contextMatches} />
+      <DocumentContextMatches
+        matches={extraction.contextMatches}
+        pending={confirm.status === "loading"}
+        onApplyRequirement={
+          reviewable ? (requirementId) => void applyRequirement(requirementId) : undefined
+        }
+      />
 
       {extraction.fields.length > 0 ? (
         <ul className="extract-fields">
@@ -926,9 +950,11 @@ function ExtractionReview({
         </>
       ) : (
         <p className="extract-left" role="status">
-          Reviewed{" "}
-          {extraction.verifiedAt ? formatDate(extraction.verifiedAt) : "by you"}. Nothing was
-          assumed.
+          {extraction.autoResolution?.status === "accepted"
+            ? "Audentra AI accepted this document and notified staff."
+            : extraction.autoResolution?.status === "rejected"
+              ? "Audentra AI requested a replacement document and notified staff."
+              : `Reviewed ${extraction.verifiedAt ? formatDate(extraction.verifiedAt) : "by you"}. Nothing was assumed.`}
         </p>
       )}
     </section>

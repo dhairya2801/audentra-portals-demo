@@ -1702,6 +1702,71 @@ function ConversationSignalsCard({ interaction }: { interaction: StaffInteractio
   );
 }
 
+function documentsForTaskOutcome(detail: StaffWorkItemDetail) {
+  const { source } = detail.workItem;
+  if (source?.type === "document") {
+    const sourceDocument = detail.relatedDocuments.find((document) => document.id === source.id);
+    return sourceDocument ? [sourceDocument] : detail.relatedDocuments;
+  }
+
+  const taskCreatedAt = Date.parse(detail.workItem.createdAt);
+  if (Number.isNaN(taskCreatedAt)) return [];
+  return detail.relatedDocuments.filter((document) => {
+    const documentCreatedAt = Date.parse(document.createdAt);
+    return !Number.isNaN(documentCreatedAt) && documentCreatedAt >= taskCreatedAt;
+  });
+}
+
+function DocumentOutcomeCard({
+  documents,
+}: {
+  documents: ReturnType<typeof documentsForTaskOutcome>;
+}) {
+  const latestDecision = documents.find((document) => document.review)?.review ?? null;
+  const title =
+    latestDecision?.decision === "accepted"
+      ? "Document accepted"
+      : latestDecision?.decision === "rejected"
+        ? "Changes requested"
+        : "Student document activity";
+
+  return (
+    <section className="action-card action-transcript-card">
+      <div className="action-card-heading">
+        <div>
+          <p className="eyebrow">2. Student document outcome</p>
+          <h2>{title}</h2>
+        </div>
+        <span>{documents.length} {documents.length === 1 ? "file" : "files"}</span>
+      </div>
+      <ol className="action-transcript">
+        {documents.map((document) => (
+          <li key={document.id}>
+            <div>
+              <strong>{document.fileName}</strong>
+              <span>Submitted {dateTime(document.createdAt)}</span>
+            </div>
+            <p>{readable(document.category)} - {readable(document.status)}</p>
+            {document.review ? (
+              <small>
+                {readable(document.review.decision)} by {document.review.reviewerName} on {dateTime(document.review.decidedAt)}
+                {document.review.note ? ` - ${document.review.note}` : ""}
+              </small>
+            ) : (
+              <small>Student submission recorded; review is still in progress.</small>
+            )}
+            {document.contentUrl ? (
+              <a href={getStaffDocumentContentUrl(document.contentUrl)} target="_blank" rel="noreferrer">
+                Open original
+              </a>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 function OutcomesTab({
   detail,
   interaction,
@@ -1725,6 +1790,19 @@ function OutcomesTab({
   onRetryTranscription: (recording: StaffCallRecording) => Promise<boolean>;
   onComplete: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
+  const documents = documentsForTaskOutcome(detail);
+  const isDocumentTask = detail.workItem.source?.type === "document";
+  const communicationCount = detail.interactions.reduce(
+    (count, candidate) => count + candidate.communications.length,
+    0,
+  );
+  const latestDocumentDecision = documents.find((document) => document.review)?.review ?? null;
+  const taskOutcome =
+    latestDocumentDecision?.decision ??
+    interaction?.outcome?.outcomeCode ??
+    (terminalStatuses.has(detail.workItem.status) ? detail.workItem.status : "awaiting_student_action");
+  const canRecordContactOutcome = Boolean(interaction) || !isDocumentTask;
+
   return (
     <div className="action-panel-stack">
       {detail.interactions.length > 1 ? (
@@ -1741,69 +1819,88 @@ function OutcomesTab({
 
       <div className="action-outcome-grid">
         <section className="action-card">
-          <p className="eyebrow">1. Interaction outcome</p>
-          <h2>{interaction?.outcome?.outcomeCode ? readable(interaction.outcome.outcomeCode) : "Awaiting outcome"}</h2>
+          <p className="eyebrow">1. Task outcome</p>
+          <h2>{readable(taskOutcome)}</h2>
           <dl className="action-fact-list">
-            <div><dt>Resolution</dt><dd>{interaction?.outcome?.resolutionCode ? readable(interaction.outcome.resolutionCode) : "Not generated"}</dd></div>
+            <div><dt>Current state</dt><dd>{readable(detail.workItem.status)}</dd></div>
+            <div><dt>Student action</dt><dd>{documents.length ? `${documents.length} document ${documents.length === 1 ? "submitted" : "submissions"}` : "No document activity for this task"}</dd></div>
+            <div><dt>Contact activity</dt><dd>{communicationCount ? `${communicationCount} ${communicationCount === 1 ? "event" : "events"}` : "Not started"}</dd></div>
             <div><dt>Next step</dt><dd>{interaction?.outcome?.nextStep ?? detail.workItem.nextStep ?? "Not set"}</dd></div>
-            <div><dt>Follow-up</dt><dd>{interaction?.outcome?.followUpRequired ? "Required" : "Not indicated"}</dd></div>
-            <div><dt>Coverage</dt><dd>{interaction ? `${interaction.coveredSourceVersion} of ${interaction.sourceVersion}` : "No sources"}</dd></div>
           </dl>
         </section>
-        {interaction &&
-        (interaction.selectedChannel === "voice" || interaction.recordings.length > 0) ? (
-          <CallRecordingPanel
-            interaction={interaction}
-            busy={busy}
-            onUpload={onUploadRecording}
-            onRetry={onRetryTranscription}
-          />
+
+        {documents.length ? <DocumentOutcomeCard documents={documents} /> : null}
+
+        {interaction ? (
+          <>
+            <section className="action-card">
+              <p className="eyebrow">3. Reach-out outcome</p>
+              <h2>{interaction.outcome?.outcomeCode ? readable(interaction.outcome.outcomeCode) : "Awaiting contact outcome"}</h2>
+              <dl className="action-fact-list">
+                <div><dt>Resolution</dt><dd>{interaction.outcome?.resolutionCode ? readable(interaction.outcome.resolutionCode) : "Not recorded"}</dd></div>
+                <div><dt>Channel</dt><dd>{interaction.selectedChannel ? readable(interaction.selectedChannel) : "Not selected"}</dd></div>
+                <div><dt>Follow-up</dt><dd>{interaction.outcome?.followUpRequired ? "Required" : "Not indicated"}</dd></div>
+                <div><dt>Coverage</dt><dd>{interaction.coveredSourceVersion} of {interaction.sourceVersion}</dd></div>
+              </dl>
+            </section>
+
+            {interaction.selectedChannel === "voice" || interaction.recordings.length > 0 ? (
+              <CallRecordingPanel
+                interaction={interaction}
+                busy={busy}
+                onUpload={onUploadRecording}
+                onRetry={onRetryTranscription}
+              />
+            ) : null}
+
+            <section className="action-card action-transcript-card">
+              <div className="action-card-heading">
+                <div><p className="eyebrow">Reach-out evidence</p><h2>{interaction.communications.length ? "Communication timeline" : "Outreach started"}</h2></div>
+                <span>{interaction.communications.length} events</span>
+              </div>
+              {interaction.communications.length ? (
+                <ol className="action-transcript">
+                  {interaction.communications.map((communication) => (
+                    <li key={communication.id}>
+                      <div>
+                        <strong>{communication.direction === "inbound" ? detail.workItem.student.preferredName : "Staff"}</strong>
+                        <span>{communication.channel} - {dateTime(communication.occurredAt)}</span>
+                      </div>
+                      <p>{communication.body ?? "No text was captured for this event."}</p>
+                      <small>{readable(communication.deliveryStatus)}</small>
+                    </li>
+                  ))}
+                </ol>
+              ) : <p>No staff or student contact has been recorded yet.</p>}
+            </section>
+
+            <section className="action-card action-ai-card">
+              <div className="action-card-heading">
+                <div><p className="eyebrow">AI reach-out summary</p><h2>{aiLabel(interaction.aiState)}</h2></div>
+                <span className={`action-ai-state action-ai-state--${interaction.aiState}`}>
+                  {aiLabel(interaction.aiState)}
+                </span>
+              </div>
+              <p>{interaction.outcome?.summary ?? (interaction.communications.length ? "The source communication is visible while the summary is generated." : "AI outcome analysis begins after staff or the student records a communication.")}</p>
+              {interaction.outcome?.channelResults.length ? (
+                <ul>{interaction.outcome.channelResults.map((result) => <li key={`${result.channel}:${result.result}`}>{result.channel}: {result.result}</li>)}</ul>
+              ) : null}
+              {enrichmentTiming(interaction) ? (
+                <small className="action-enrichment-timing">
+                  {enrichmentTiming(interaction)}
+                </small>
+              ) : null}
+            </section>
+            {interaction.communications.length || interaction.outcome ? <ConversationSignalsCard interaction={interaction} /> : null}
+          </>
         ) : null}
-        <section className="action-card action-transcript-card">
-          <div className="action-card-heading">
-            <div><p className="eyebrow">Source evidence</p><h2>Communication timeline</h2></div>
-            <span>{interaction?.communications.length ?? 0} events</span>
-          </div>
-          {interaction?.communications.length ? (
-            <ol className="action-transcript">
-              {interaction.communications.map((communication) => (
-                <li key={communication.id}>
-                  <div>
-                    <strong>{communication.direction === "inbound" ? detail.workItem.student.preferredName : "Staff"}</strong>
-                    <span>{communication.channel} - {dateTime(communication.occurredAt)}</span>
-                  </div>
-                  <p>{communication.body ?? "No text was captured for this event."}</p>
-                  <small>{readable(communication.deliveryStatus)}</small>
-                </li>
-              ))}
-            </ol>
-          ) : <p>No communication has been recorded.</p>}
-        </section>
-        <section className="action-card action-ai-card">
-          <div className="action-card-heading">
-            <div><p className="eyebrow">3. AI outcome summary</p><h2>{interaction ? aiLabel(interaction.aiState) : "Not requested"}</h2></div>
-            <span className={`action-ai-state action-ai-state--${interaction?.aiState ?? "not_requested"}`}>
-              {aiLabel(interaction?.aiState ?? "not_requested")}
-            </span>
-          </div>
-          <p>{interaction?.outcome?.summary ?? "The source communication is visible while the summary is generated."}</p>
-          {interaction?.outcome?.channelResults.length ? (
-            <ul>{interaction.outcome.channelResults.map((result) => <li key={`${result.channel}:${result.result}`}>{result.channel}: {result.result}</li>)}</ul>
-          ) : null}
-          {interaction && enrichmentTiming(interaction) ? (
-            <small className="action-enrichment-timing">
-              {enrichmentTiming(interaction)}
-            </small>
-          ) : null}
-        </section>
-        <ConversationSignalsCard interaction={interaction} />
       </div>
 
-      {!terminalStatuses.has(detail.workItem.status) ? (
+      {!terminalStatuses.has(detail.workItem.status) && canRecordContactOutcome ? (
         <form className="action-card action-completion-form" onSubmit={onComplete}>
-          <p className="eyebrow">Record the official outcome</p>
+          <p className="eyebrow">Record the official contact outcome</p>
           <h2>Complete or schedule follow-up</h2>
-          <p>AI text is advisory. These fields are the staff-confirmed CRM outcome.</p>
+          <p>These fields describe staff and student contact. Document decisions remain in the document outcome above.</p>
           <div className="action-form-grid">
             <label>Outcome
               <select name="outcomeCode" required defaultValue={interaction?.outcome?.outcomeCode ?? "student_reached"}>
@@ -1826,7 +1923,7 @@ function OutcomesTab({
             <label className="action-form-span">Next step<textarea name="nextStep" defaultValue={interaction?.outcome?.nextStep ?? detail.workItem.nextStep ?? ""} /></label>
             <label>Follow up at<DateTimePicker name="followUpAt" /></label>
           </div>
-          <button type="submit" disabled={Boolean(busy)}>Save official outcome</button>
+          <button type="submit" disabled={Boolean(busy)}>Save contact outcome</button>
         </form>
       ) : null}
 
@@ -1834,7 +1931,7 @@ function OutcomesTab({
         <p className="action-processing-note">AI enrichment is running in the background. You can leave this page safely.</p>
       ) : null}
       {detail.aiState === "dead_letter" ? (
-        <button type="button" onClick={() => onRetry("both")} disabled={Boolean(busy)}>Retry all AI projections</button>
+        <button type="button" onClick={() => onRetry(interaction ? "both" : "student_summary")} disabled={Boolean(busy)}>Retry available AI projections</button>
       ) : null}
     </div>
   );

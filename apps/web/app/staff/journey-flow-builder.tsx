@@ -63,6 +63,7 @@ interface JourneyBuilderTask extends StaffJourneyBlueprintItem {
   signatureTemplateId: string | null;
   acceptedFileTypes: string[];
   documentCategories: string[];
+  autoResolveDocuments: boolean;
   aboutYouRequiredFields: AboutYouConfigurableField[];
   identityQuickUpload: boolean;
   formDefinition: FormBuilderDefinition;
@@ -651,6 +652,8 @@ function parsedTasks(
             input.document_categories ??
             task.document_categories,
         ),
+        autoResolveDocuments:
+          input.autoResolveDocuments ?? input.auto_resolve_documents ?? false,
         aboutYouRequiredFields: (() => {
           const configured = stringList(
             input.required_fields ?? input.requiredFields,
@@ -1668,11 +1671,13 @@ function JourneyTaskEditor({
         }
         task.accepted_mime_types = acceptedMimeTypes;
         task.document_categories = formList(form.get("documentCategories"));
+        task.auto_resolve_documents = form.get("autoResolveDocuments") === "on";
         delete task.accepted_file_types;
       } else {
         delete task.accepted_mime_types;
         delete task.accepted_file_types;
         delete task.document_categories;
+        delete task.auto_resolve_documents;
       }
 
       if (selectedType === "selection_flow") {
@@ -1716,6 +1721,8 @@ function JourneyTaskEditor({
         "acceptedFileTypes",
         "document_categories",
         "documentCategories",
+        "auto_resolve_documents",
+        "autoResolveDocuments",
       ]) {
         delete existingInput[key];
       }
@@ -1738,6 +1745,10 @@ function JourneyTaskEditor({
         delete existingInput.docusignTemplateId;
       } else {
         delete existingInput.portalScopes;
+      }
+      if (selectedType === "upload_file") {
+        existingInput.autoResolveDocuments =
+          form.get("autoResolveDocuments") === "on";
       }
       if (Object.keys(existingInput).length === 0) {
         delete task.input;
@@ -2283,6 +2294,19 @@ function JourneyTaskEditor({
                 defaultValue={item.acceptedFileTypes.join(", ")}
                 placeholder="application/pdf, image/jpeg, image/png"
               />
+            </label>
+            <label className="staff-checkbox">
+              <input
+                name="autoResolveDocuments"
+                type="checkbox"
+                defaultChecked={item.autoResolveDocuments}
+              />
+              Auto-resolve matching documents with AI
+              <small>
+                A confident valid or invalid image parse completes or returns the
+                requirement automatically. Staff are notified either way; unclear
+                or mismatched files stay in review.
+              </small>
             </label>
           </div>
         ) : null}
@@ -3125,6 +3149,7 @@ export function JourneyFlowBuilder({
           signatureTemplateId: null,
           acceptedFileTypes: [],
           documentCategories: [],
+          autoResolveDocuments: false,
           aboutYouRequiredFields: defaultAboutYouRequiredFields,
           identityQuickUpload: true,
           formDefinition: onePageForm([
