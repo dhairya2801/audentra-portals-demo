@@ -19,16 +19,21 @@ export interface BrewPreferenceStore {
   clear(scope: string): void;
 }
 
-const STORAGE_PREFIX = "audentra:morning-brew:v6";
+const STORAGE_PREFIX = "audentra:morning-brew:v7";
 /**
- * Earlier shapes. v5 asked a single question per section — in or out — and then
- * asked for a reading length, a tone, and a delivery time on a third screen.
- * v6 replaces all of that with one question per source: is it in, and how much
- * context does it bring. There is no honest way to infer the second answer from
- * the first, so a returning reader is walked back through setup rather than
- * silently assigned a depth they never chose.
+ * Earlier shapes. v6 asked one question per source — is it in, and how much
+ * context does it bring — against five topics named after internal offices
+ * (registrar, student success). v7 keeps the source question unchanged and
+ * renames the topics to the five a leader actually thinks in: Financial Aid,
+ * Admissions, Enrollment, Housing, Campus Life.
+ *
+ * The topic rename is not a pure relabelling — "student success" split across
+ * Enrollment and Campus Life, and "registrar" has no successor at all — so a
+ * returning reader is walked back through setup with their nearest topics
+ * pre-selected rather than silently assigned a set they never chose.
  */
 const LEGACY_PREFIXES = [
+  "audentra:morning-brew:v6",
   "audentra:morning-brew:v5",
   "audentra:morning-brew:v4",
   "audentra:morning-brew:v3",
@@ -78,7 +83,7 @@ function normalizeSources(value: unknown): Record<BrewSourceId, BrewSourcePrefer
 
 function normalize(value: Partial<BrewPreferences>): BrewPreferences {
   return {
-    version: 6,
+    version: 7,
     topics: normalizeTopics(value.topics),
     sources: normalizeSources(value.sources),
     deliveryTime: TIMES.has(String(value.deliveryTime))
@@ -143,21 +148,30 @@ function migrateLegacy(scope: string): BrewPreferences | null {
       const topics: BrewTopicId[] = [];
       if (previous.has("financial_aid") || previous.has("financial_health"))
         topics.push("financial_aid");
-      if (
-        previous.has("admissions") ||
-        previous.has("enrollment_admissions") ||
-        previous.has("enrollment")
-      )
+      if (previous.has("admissions") || previous.has("enrollment_admissions"))
         topics.push("admissions");
-      if (previous.has("student_success") || previous.has("student_operations"))
-        topics.push("student_success");
-      if (previous.has("housing")) topics.push("housing");
+      // v6's "admissions" covered offers *and* deposits, and its
+      // "student_success" covered the blocked-after-deposit cohort. Both of
+      // those are Enrollment now.
       if (
+        previous.has("enrollment") ||
+        previous.has("admissions") ||
+        previous.has("student_success") ||
+        previous.has("student_operations")
+      )
+        topics.push("enrollment");
+      if (previous.has("housing")) topics.push("housing");
+      // "registrar" has no successor: records work reaches the reader through
+      // the Action Center now rather than as a subject of its own. A reader who
+      // followed it is offered Campus Life, which is the nearest thing to the
+      // student-facing half of what they were watching.
+      if (
+        previous.has("campus_life") ||
         previous.has("registrar") ||
         previous.has("academics") ||
         previous.has("executive_performance")
       )
-        topics.push("registrar");
+        topics.push("campus_life");
       if (!topics.length) continue;
 
       return normalize({
@@ -184,7 +198,7 @@ export const browserBrewPreferenceStore: BrewPreferenceStore = {
       const raw = window.localStorage.getItem(`${STORAGE_PREFIX}:${scope}`);
       if (!raw) return migrateLegacy(scope);
       const value = JSON.parse(raw) as Partial<BrewPreferences>;
-      if (value.version !== 6) return migrateLegacy(scope);
+      if (value.version !== 7) return migrateLegacy(scope);
       return normalize(value);
     } catch {
       return null;

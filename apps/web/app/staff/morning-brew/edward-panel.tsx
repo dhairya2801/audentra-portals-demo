@@ -15,7 +15,8 @@ const MODE_LABELS: Record<EdwardRequest["mode"], string> = {
 
 interface Turn {
   id: string;
-  question: string;
+  /** Null on the opening turn, where Edward speaks first and nobody asked. */
+  question: string | null;
   answer: string | null;
   receipts: string[];
   error: string | null;
@@ -101,7 +102,23 @@ export function EdwardPanel({
     setThread([]);
     setQuestion("");
     conversationIdRef.current = null;
-    if (request) {
+    if (request?.greeting) {
+      /*
+       * A card that already names its subject opens with Edward asking rather
+       * than answering. Guessing a question on the reader's behalf here would
+       * spend a canonical read on something they did not ask for, and would
+       * then have to be scrolled past.
+       */
+      setThread([
+        {
+          id: "greeting",
+          question: null,
+          answer: request.greeting,
+          receipts: [],
+          error: null,
+        },
+      ]);
+    } else if (request) {
       const opening = edwardOpeningQuestion(
         request.mode,
         request.context,
@@ -173,7 +190,9 @@ export function EdwardPanel({
         <div className="brew-edward__conversation" aria-live="polite" ref={conversationRef}>
           {thread.map((turn) => (
             <div key={turn.id}>
-              <div className="brew-edward__question">{turn.question}</div>
+              {turn.question ? (
+                <div className="brew-edward__question">{turn.question}</div>
+              ) : null}
               <article className="brew-edward__answer">
                 <span className="brew-edward__mini-mark" aria-hidden="true">
                   E

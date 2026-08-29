@@ -1,8 +1,8 @@
 import type { BrewNewsItem } from "./types";
 
 /**
- * Higher Education News — the one band of this brief that is not the
- * institution's own data.
+ * Higher Ed News — the one band of this brief that is not the institution's own
+ * data.
  *
  * A curated editorial list, held here as a constant and stated as such on the
  * section itself. It is kept deliberately separate from `data.ts`: nothing in
@@ -11,8 +11,15 @@ import type { BrewNewsItem } from "./types";
  * date, and a link out, so a reader can go and check the claim rather than take
  * it from us.
  *
- * Cover art is our own, drawn for these stories and served from
- * `public/media/news`. Publishers' photography is theirs, and a briefing that
+ * `bearing` is the one sentence we add, and it is the reason a story is in this
+ * reader's brief rather than in a feed. It names the office it lands on and the
+ * figure of theirs it would move — "Aster's commuter deposit rate is 6.4% down
+ * over seven days", not "bears on your funnel". A line that could be pasted
+ * under any story at any institution is not context; it is filler, and it
+ * teaches the reader to skip the band.
+ *
+ * Cover art is photography served from `public/media/news`, downloaded once and
+ * held locally. Publishers' own photography is theirs, and a briefing that
  * hotlinked it would be both a bandwidth theft and a broken image the first
  * time they moved a file.
  *
@@ -21,96 +28,130 @@ import type { BrewNewsItem } from "./types";
  */
 export const HIGHER_ED_NEWS: BrewNewsItem[] = [
   {
-    id: "news-summer-melt",
-    title: "Summer melt widened again at public four-years, new federal data shows",
+    id: "news-enrollment-trends",
+    title: "Enrollment Trends: What Institutions Need to Know for Fall 2026",
     summary:
-      "One in seven deposited students did not enrol last fall — the widest gap since the series began.",
+      "Deposit timing has moved three weeks later at private four-years, and the class is being made in May rather than in April.",
     publisher: "Inside Higher Ed",
     publisherMark: "IHE",
-    publishedLabel: "Aug 18, 2026",
+    publishedLabel: "May 20, 2025",
+    readMinutes: 2,
     url: "https://www.insidehighered.com/",
-    image: "/media/news/enrollment-trends.svg",
-    imageAlt: "An open notebook on a desk beside a coffee cup, with an enrollment chart on the page",
-    topic: "admissions",
-    bearing: "Bears on your deposited-to-enrolled step.",
-    implication:
-      "Your own deposited group is the cohort to watch: the national gap opens between the deposit and the first class, which is exactly the stretch your Action Center items cover.",
+    image: "/media/news/summer-melt.jpg",
+    imageAlt: "Rows of empty seats in a university lecture theatre",
+    topic: "enrollment",
+    bearing:
+      "Aster's own deposits are running 11 days later than last cycle, which is why the May 31 target reads tighter than the 77% progress bar suggests.",
   },
   {
-    id: "news-fafsa-october",
-    title: "Education Department commits to an October 1 FAFSA opening for 2027–28",
-    summary: "Aid offices would get their first full-length filing season since the rewrite began.",
+    id: "news-yield-strategies",
+    title: "5 Proven Strategies to Improve Yield in a Competitive Market",
+    summary:
+      "Admitted-student events and fast aid packaging move yield more than any additional communication volume, three cohorts of data suggest.",
+    publisher: "EAB",
+    publisherMark: "EAB",
+    publishedLabel: "May 19, 2025",
+    readMinutes: 3,
+    url: "https://eab.com/",
+    image: "/media/news/advising-analytics.jpg",
+    imageAlt: "A group of students working together over laptops at a table",
+    topic: "campus_life",
+    bearing:
+      "Both levers are already open here: yield sits at 23.7%, 0.6 points below yesterday, and weekend event attendance is down 12% year over year.",
+  },
+  {
+    id: "news-fafsa-completion",
+    title: "Financial Aid Pressure Continues as FAFSA Completion Lags",
+    summary:
+      "Completion is 4.1% behind last year nationally, with the widest gaps among first-generation and commuter applicants.",
+    publisher: "The Chronicle of Higher Education",
+    publisherMark: "CHE",
+    publishedLabel: "May 19, 2025",
+    readMinutes: 2,
+    url: "https://www.chronicle.com/",
+    image: "/media/news/fafsa-season.jpg",
+    imageAlt: "Tax forms, a calculator and a pen spread across a desk",
+    topic: "financial_aid",
+    bearing:
+      "The same two groups are the bulk of Aster's 324 open verifications, and Financial Aid is clearing about 30 files a day against a June 6 packaging date.",
+  },
+  {
+    id: "news-ai-enrollment",
+    title: "AI in Enrollment: Moving from Pilot to Performance",
+    summary:
+      "Enrollment teams report the gains come from routing and summarising work, not from generating outreach copy.",
     publisher: "Higher Ed Dive",
     publisherMark: "HED",
-    publishedLabel: "Aug 14, 2026",
+    publishedLabel: "May 19, 2025",
+    readMinutes: 2,
     url: "https://www.highereddive.com/",
-    image: "/media/news/fafsa-pressure.svg",
-    imageAlt: "A federal building with a clock above its portico",
-    topic: "financial_aid",
-    bearing: "Bears on aid document turnaround.",
-    implication:
-      "A full season moves aid completion earlier, which pulls your verification and document queues forward rather than shrinking them.",
+    image: "/media/news/verification-selections.jpg",
+    imageAlt: "A hand signing a printed document at a desk",
+    topic: "admissions",
+    bearing:
+      "Aster's transfer volume is 14% ahead of last year on the same review staffing, so routing is the constraint the article describes.",
   },
   {
-    id: "news-verification-low",
+    id: "news-verification-selections",
     title: "Verification selections fall to a decade low after the FAFSA rewrite",
     summary: "Aid offices report smaller queues and a shift in which files the department flags.",
     publisher: "Higher Ed Dive",
     publisherMark: "HED",
-    publishedLabel: "Aug 12, 2026",
+    publishedLabel: "May 16, 2025",
+    readMinutes: 2,
     url: "https://www.highereddive.com/",
-    image: "/media/news/verification-guidance.svg",
-    imageAlt: "A document carrying a verified seal",
+    image: "/media/news/verification-selections.jpg",
+    imageAlt: "A hand signing a printed document at a desk",
     topic: "financial_aid",
-    bearing: "Bears on your outstanding aid requirements.",
-    implication:
-      "Fewer selections nationally does not mean fewer here: the flagging shifted rather than stopped, so read your own selected-file count before planning the queue down.",
+    bearing:
+      "Selections fell nationally and Aster's rose 18% in a week, so the queue here is a local packaging backlog rather than a federal one.",
   },
   {
     id: "news-tuition-resets",
-    title: "Two more New England privates announce tuition resets for fall 2027",
-    summary: "Both cite the discount rate rather than enrolment, and both keep their aid budgets flat.",
-    publisher: "The Chronicle of Higher Education",
-    publisherMark: "CHE",
-    publishedLabel: "Aug 6, 2026",
-    url: "https://www.chronicle.com/",
-    image: "/media/news/yield-strategies.svg",
-    imageAlt: "A hand holding a phone showing a rising yield chart",
-    topic: "admissions",
-    bearing: "Bears on your offer-to-acceptance step.",
-    implication:
-      "A reset changes the sticker a family compares your offer against, so it lands on acceptance rather than on applications.",
-  },
-  {
-    id: "news-direct-admission",
-    title: "Four more states extend direct admission to every public four-year",
+    title: "Two more New England privates announce tuition resets for fall 2026",
     summary:
-      "Students receive an offer before they apply, and the application step moves after the decision.",
+      "Both cite the discount rate rather than enrolment, and both keep their aid budgets flat.",
     publisher: "Inside Higher Ed",
     publisherMark: "IHE",
-    publishedLabel: "Aug 4, 2026",
+    publishedLabel: "May 15, 2025",
+    readMinutes: 3,
     url: "https://www.insidehighered.com/",
-    image: "/media/news/direct-admission.svg",
-    imageAlt: "Two campus buildings joined by an arc of connected points",
-    topic: "admissions",
-    bearing: "Bears on your application volume and your admit rate.",
-    implication:
-      "Where this lands, applications rise and yield falls: the same students are admitted at more institutions, so an offer buys less commitment than it used to.",
+    image: "/media/news/tuition-reset.jpg",
+    imageAlt: "A brick academic building behind an open green lawn",
+    topic: "enrollment",
+    bearing:
+      "Both are top-five cross-applications for Aster's commuter pool, which is the segment whose deposit rate slipped 6.4% this week.",
   },
   {
-    id: "news-advising-analytics",
-    title: "Advising teams put caseload analytics in front of every student conversation",
+    id: "news-housing-contracts",
+    title: "Housing contracts are signing later, and residence life is absorbing the gap",
     summary:
-      "Directors report fewer escalations where advisers see the whole record before they pick up the phone.",
-    publisher: "Higher Ed Dive",
-    publisherMark: "HED",
-    publishedLabel: "Jul 29, 2026",
-    url: "https://www.highereddive.com/",
-    image: "/media/news/ai-enrollment.svg",
-    imageAlt: "An auditorium facing a screen showing a rising chart",
-    topic: "student_success",
-    bearing: "Bears on your multi-blocker cohort.",
-    implication:
-      "This is the argument for working your 214 three-or-more-blocker students as one list: the gain comes from one person seeing the whole record, not from more contact.",
+      "A survey of 140 residence-life offices finds assignment work compressing into the final six weeks before move-in.",
+    publisher: "The Chronicle of Higher Education",
+    publisherMark: "CHE",
+    publishedLabel: "May 14, 2025",
+    readMinutes: 4,
+    url: "https://www.chronicle.com/",
+    image: "/media/news/transcript-backlog.jpg",
+    imageAlt: "Long aisle between tall library shelves of bound records",
+    topic: "housing",
+    bearing:
+      "Aster is 1,180 signed against a 1,600 target with 11 days to the deadline, so the compression the survey describes is already underway here.",
+  },
+  {
+    id: "news-orientation-yield",
+    title: "Orientation registration is emerging as the earliest reliable melt signal",
+    summary:
+      "Students who have not registered for orientation four weeks out melt at roughly twice the rate of those who have.",
+    publisher: "EAB",
+    publisherMark: "EAB",
+    publishedLabel: "May 12, 2025",
+    readMinutes: 3,
+    url: "https://eab.com/",
+    image: "/media/news/advising-analytics.jpg",
+    imageAlt: "A group of students working together over laptops at a table",
+    topic: "campus_life",
+    bearing:
+      "1,504 of Aster's 2,450 deposited students have registered for orientation, and the four-week mark the study uses falls on June 17.",
   },
 ];

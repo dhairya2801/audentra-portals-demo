@@ -1,15 +1,19 @@
 /**
  * Morning Brew — the enrollment leader's first read of the day.
  *
- * Every value rendered on this surface arrives from `GET /v1/staff/morning-brew`
- * as a count of canonical records. The types below are a *presentation* shape:
- * they rename and trim the API payload for the components, and they add nothing
- * to it. There is deliberately no field for a target, a forecast, or a
- * confidence score — the platform holds none of those, and a slot for one is
- * how invented numbers get in.
+ * The types below are a *presentation* shape: they name what a card renders,
+ * and nothing more. The reader still chooses what lands in their morning; those
+ * choices only ever filter and bound what the corpus already holds.
  *
- * The reader still chooses what lands in their morning; those choices only ever
- * filter and bound what the API already sent.
+ * Two things this file states that the older shape did not, both because the
+ * daily-briefing design asks for them:
+ *
+ *  - a KPI carries a **target** and the progress against it, so a card can say
+ *    "650 / 900 · 72% · due by May 31" rather than only a share of the step
+ *    before it;
+ *  - a KPI carries **three lines** — last year, this year's actuals, and a
+ *    forecast — because the deep read is a chart of where the figure has been
+ *    and where the pace it is running at would put it.
  */
 
 import type {
@@ -19,13 +23,20 @@ import type {
   StaffBrewSeverity,
 } from "@vv/contracts";
 
-/** Subjects a leader can follow each morning; each maps to canonical state. */
+/**
+ * Subjects a leader can follow each morning.
+ *
+ * These are the five the setup screen offers, in its order. `enrollment` and
+ * `admissions` are deliberately separate: an admissions figure is about who was
+ * offered and who said yes, and an enrollment figure is about who paid, cleared
+ * and will actually be in a seat — different offices, different weeks.
+ */
 export type BrewTopicId =
   | "financial_aid"
   | "admissions"
+  | "enrollment"
   | "housing"
-  | "registrar"
-  | "student_success";
+  | "campus_life";
 
 /**
  * The six sources a reader can switch on. Each one owns exactly one band of
@@ -45,6 +56,12 @@ export type BrewSourceId =
  * How much context a source brings. Chosen per source rather than once for the
  * whole read: a leader can want the funnel at a glance and the action center in
  * full, and a single global "depth" could never say that.
+ *
+ * Not every source offers all three. Higher Ed News offers the first two only —
+ * a curated outside feed has a headline and a reason it reached your desk, and
+ * a third, longer reading of someone else's article was depth we could not
+ * honestly supply. `BrewSourceDefinition.levels` is the list a source actually
+ * answers for.
  */
 export type BrewDetailLevelId = "glance" | "context" | "deep";
 
@@ -70,13 +87,14 @@ export interface BrewTopic {
   blurb: string;
   /** A concrete taste of what lands in the brief when this is on. */
   preview: string;
+  /** A glyph name from `glyphs.tsx`. */
   icon: string;
   accent: BrewAccent;
   recommended: boolean;
   recommendation: string;
 }
 
-/** One of the three answers to "how much context would you like?". */
+/** One of the answers to "how much context would you like?". */
 export interface BrewDetailOption {
   title: string;
   /** The four-word promise beside the title: "The essentials", "Goals & progress". */
@@ -99,6 +117,8 @@ export interface BrewSourceDefinition {
   icon: string;
   accent: BrewAccent;
   recommended: boolean;
+  /** The depths this source answers for, in the order setup offers them. */
+  levels: BrewDetailLevelId[];
   details: Record<BrewDetailLevelId, BrewDetailOption>;
 }
 
@@ -109,7 +129,7 @@ export interface BrewSourcePreference {
 }
 
 export interface BrewPreferences {
-  version: 6;
+  version: 7;
   topics: BrewTopicId[];
   sources: Record<BrewSourceId, BrewSourcePreference>;
   deliveryTime: BrewDeliveryTime;
@@ -145,13 +165,32 @@ export interface BrewInsight {
   label: string;
   title: string;
   severity: StaffBrewSeverity;
+  /**
+   * The finding in one sentence. Deliberately identical at every depth: a
+   * reader who asked for the short brief and one who asked for the long one
+   * should walk away having read the same claim, not two different ones.
+   */
   summary: string;
-  /** The cohort stated against the roster, e.g. "3 of 14 students". */
-  scope: string;
+  /**
+   * The consequence of the finding if nothing changes — the second paragraph
+   * on the card, under the summary.
+   */
+  projection: string;
+  /** The figures under the headline. Each depth names a different set. */
+  stats: Record<BrewDetailLevelId, string>;
+  /** The paragraph that arrives at "With Context". */
+  context: string;
+  /** The longer reading that replaces it at "Deep Dive". */
+  deepDive: string;
   impactLabel: string;
   impact: BrewImpactChip[];
-  recommendedAction: string;
+  /** What to do about it, stated at the depth the reader asked for. */
+  recommendations: Record<BrewDetailLevelId, string>;
+  /** The office the recommendation is addressed to. */
+  owner: string;
   impactLevel: "High" | "Medium" | "Low";
+  /** How firm the reading is, as a whole percent. Printed in the card's foot. */
+  confidence: number;
   destination: MorningBrewDestination;
   cohort: StaffBrewCohortRef;
   detail: {
@@ -184,9 +223,9 @@ export interface BrewKpiComparison {
   id: string;
   /** "vs yesterday", "vs last 7 days" — names the distance, not the value. */
   label: string;
-  /** Absolute movement, already signed: "+47". */
+  /** Movement, already signed and already formatted: "+3.2%", "−1.7pp". */
   delta: string;
-  /** Relative movement, or null where a percentage would mislead. */
+  /** A second reading of the same move, where one adds something. */
   percent: string | null;
   direction: "up" | "down" | "flat";
   /** Whether up is good here; a rising withdrawal count is not. */
@@ -197,16 +236,41 @@ export interface BrewKpi {
   id: string;
   topic: BrewTopicId;
   label: string;
+  /** A glyph name from `glyphs.tsx`. */
   icon: string;
-  /** The current figure. One number, not one per window. */
+  /** The current figure, as a number, for the chart and the progress bar. */
   value: number;
-  /** Whether the figure is a count or a rate; decides the "%" and the rounding. */
-  format: "int" | "percent";
+  /** The same figure as the card prints it: "14,782", "40.1%", "$98.4M". */
+  display: string;
   /** What the figure counts, in a few words. */
   window: string;
-  /** Share of a denominator, replacing the notion of "progress to target". */
-  basisLabel: string | null;
-  basisPercent: number | null;
+  /**
+   * This cycle's actuals, oldest first, one per day, ending on today. The last
+   * entry is always `value`: the line and the number above it are the same
+   * measurement, so they cannot be allowed to disagree.
+   */
+  series: number[];
+  /**
+   * The same measurement over the equivalent window a year ago, drawn behind
+   * the actuals. Spans the whole 30-day axis, forecast days included — last
+   * year is history, and history is known all the way across.
+   */
+  previousYear: number[];
+  /**
+   * Where the current pace lands, starting from today. The first entry is
+   * `value`, so the dotted run-out leaves the solid line rather than floating
+   * beside it.
+   */
+  forecast: number[];
+  /** The goal for the cycle, and the same figure as the card prints it. */
+  target: number | null;
+  targetDisplay: string | null;
+  /** Progress to target as a whole percent. Null where there is no target. */
+  progressPercent: number | null;
+  /** When the target has to be met: "Due by May 31". */
+  dueLabel: string | null;
+  /** One line under the progress bar, at Deep Dive, reading the trend. */
+  trendNote: string;
   cohort: StaffBrewCohortRef;
   /** Empty where nothing can be compared against; the card then says so. */
   comparisons: BrewKpiComparison[];
@@ -235,29 +299,45 @@ export interface BrewNewsItem {
   /** What the artwork shows, for anyone who cannot see it. */
   imageAlt: string;
   publishedLabel: string;
+  /** How long the story itself takes to read, as the publisher states it. */
+  readMinutes: number;
   url: string;
   topic: BrewTopicId;
-  /** Shown from "With Context" up: the figure in this brief the story would move. */
+  /**
+   * Shown from "With Context": the specific thing at this institution the
+   * story lands on, named with the figure it would move. Not "bears on your
+   * funnel" — the office, the cohort, and the number.
+   */
   bearing: string;
-  /** Shown at "Deep Dive": what the story implies for the reader's own cohorts. */
-  implication: string;
 }
 
-export interface BrewDeadline {
+/**
+ * One entry on the day's calendar.
+ *
+ * A meeting, not a due date: the daily briefing's Calendar band answers "what
+ * am I in today", which is the question a leader opens their morning with.
+ * Requirement deadlines still exist in the corpus, but they reach the reader
+ * through the Action Center, where something can actually be done about them.
+ */
+export interface BrewMeeting {
   id: string;
   topic: BrewTopicId;
-  kind: "requirement" | "offer_response";
-  kindLabel: string;
-  /** The canonical requirement code, so a deadline can be traced back. */
-  code: string;
   title: string;
+  /** The one line under the title: what it is for, or who is in it. */
   detail: string;
-  bucket: "overdue" | "today" | "this_week" | "this_month";
-  dueLabel: string;
-  relativeLabel: string;
-  students: number;
+  /** Clock time in the reader's timezone, as printed: "8:30 AM". */
+  timeLabel: string;
+  /** Minutes in the slot, for the line under the time. */
+  durationMinutes: number;
+  /** Sortable minute-of-day, so a filter can cut the list without reparsing. */
+  startsAtMinutes: number;
   priority: "high" | "medium" | "low";
-  nextStep: string;
+  /** Everyone in the invitation, named. The row draws the first three. */
+  attendees: string[];
+  /** Whether the reader is the organizer; the "Mine" filter reads this. */
+  organizer: boolean;
+  /** What the reader should have done before walking in. */
+  prep: string;
   destination: MorningBrewDestination;
 }
 
@@ -266,10 +346,17 @@ export interface BrewRequest {
   topic: BrewTopicId;
   subject: string;
   summary: string;
-  studentName: string;
-  programName: string;
+  /** Who sent it, and the seat they sent it from. */
+  fromName: string;
+  fromRole: string;
   status: "new" | "open" | "waiting_on_student" | "resolved";
   priority: "urgent" | "high" | "medium" | "low";
+  /** Unopened in the reader's own mailbox; what the "Unread" view filters on. */
+  unread: boolean;
+  /** Flagged by the reader or by a rule; what the "Important" view filters on. */
+  important: boolean;
+  /** When it landed: a clock time this morning, or a day name before that. */
+  receivedLabel: string;
   waitingLabel: string;
   assigneeName: string | null;
   destination: MorningBrewDestination;
@@ -281,6 +368,7 @@ export interface BrewPriority {
   title: string;
   level: "High" | "Medium" | "Low";
   detail: string;
+  /** A glyph name from `glyphs.tsx`. */
   icon: string;
   linkLabel: string;
   destination: MorningBrewDestination;
@@ -288,6 +376,8 @@ export interface BrewPriority {
   steps: string[];
   window: string;
   count: number;
+  /** Whether the next move is the reader's own, or someone else's to report. */
+  ownedByReader: boolean;
   /** Opens the task board pre-filtered on the items behind this queue. */
   boardQuery: StaffActionCenterQuery | null;
 }
@@ -301,12 +391,23 @@ export interface BrewQuickLink {
 export interface BrewGlance {
   requests: number;
   requestsAwaitingReply: number;
-  deadlinesOverdue: number;
-  deadlinesThisWeek: number;
+  meetings: number;
+  meetingsHighPriority: number;
+}
+
+/** Who the brief is written for. The demo corpus names its own reader. */
+export interface BrewReader {
+  name: string;
+  firstName: string;
+  role: string;
+  email: string;
 }
 
 export interface BrewBriefing {
   greetingName: string;
+  reader: BrewReader;
+  /** The admissions cycle every figure in the brief is counted against. */
+  cycleLabel: string;
   deck: string;
   bullets: string[];
   readTimeMinutes: number;
@@ -317,7 +418,7 @@ export interface BrewBriefing {
   insights: BrewInsight[];
   kpis: BrewKpi[];
   news: BrewNewsItem[];
-  deadlines: BrewDeadline[];
+  meetings: BrewMeeting[];
   requests: BrewRequest[];
   priorities: BrewPriority[];
   quickLinks: BrewQuickLink[];
@@ -333,7 +434,7 @@ export interface BrewBriefing {
 export type BrewDetailRef =
   | { kind: "insight"; id: string }
   | { kind: "kpi"; id: string }
-  | { kind: "deadline"; id: string }
+  | { kind: "meeting"; id: string }
   | { kind: "request"; id: string }
   | { kind: "priority"; id: string };
 
@@ -346,4 +447,14 @@ export interface EdwardRequest {
   /** Human label for the surface Edward was launched from. */
   context: string;
   question?: string;
+  /**
+   * An opening line from Edward rather than a question sent on the reader's
+   * behalf.
+   *
+   * A card that already names its subject — a KPI, say — should not guess what
+   * the reader wants to know about it. When this is set the panel opens with
+   * Edward's greeting on screen and the cursor in the box, and asks the API
+   * nothing until the reader has typed.
+   */
+  greeting?: string;
 }

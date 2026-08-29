@@ -1297,7 +1297,7 @@ test("Morning Brew renders the demo corpus, and says that it is one", async () =
   assert.match(onboarding, /What should we bring you\?/);
   assert.doesNotMatch(onboarding, /how do you like it\?/);
   assert.match(onboarding, /Step \{step\} of 2/);
-  assert.match(dashboard, /Customize your Morning Brew/);
+  assert.match(dashboard, /Customize \$\{briefing\.reader\.name\}'s Morning Brew/);
 
   // Each section carries the name of the source the reader switched on, so the
   // question they answered and the band they meet share a title.
@@ -1306,7 +1306,7 @@ test("Morning Brew renders the demo corpus, and says that it is one", async () =
     "Calendar",
     "Email",
     "Action Center",
-    "Higher Education News",
+    "Higher Ed News",
   ]) {
     assert.ok(dashboard.includes(heading), `Morning Brew must carry the ${heading} section`);
   }
@@ -1330,6 +1330,7 @@ test("Morning Brew renders the demo corpus, and says that it is one", async () =
   // implementation of it, so the two can never drift apart.
   assert.match(onboarding, /<MorningBrewDashboard/);
   assert.match(onboarding, /inert/);
+  assert.match(preferences, /audentra:morning-brew:v7/);
   assert.match(preferences, /audentra:morning-brew:v6/);
   assert.match(preferences, /audentra:morning-brew:v5/);
   assert.match(preferences, /audentra:morning-brew:v2/);
@@ -1338,20 +1339,43 @@ test("Morning Brew renders the demo corpus, and says that it is one", async () =
   assert.match(styles, /\.brew-setup/);
   assert.match(styles, /@media \(max-width: 520px\)/);
 
-  // Guard the whole surface against the synthetic corpus coming back: no
-  // fabricated dollar impact, no confidence score, no preview-workspace risk
-  // band, and no vendor inbox.
+  /*
+   * The daily-briefing design brought back three things an earlier version of
+   * this surface refused outright: a dollar impact, a confidence figure, and a
+   * forecast line. They are allowed now, and each one is allowed on a stated
+   * condition, which is what these assertions check.
+   *
+   *  - a dollar impact is arithmetic on one published conversion, not a model
+   *    output, and the corpus says so;
+   *  - a confidence is the analyst's own firmness and is documented as not a
+   *    calibrated probability;
+   *  - a forecast is the current pace continued, drawn as a different kind of
+   *    line and named as such in the colophon.
+   *
+   * What stays forbidden is the thing none of those are: a score attached to an
+   * individual student.
+   */
   const surface = [container, onboarding, dashboard, edward, data, corpus].join("\n");
   for (const forbidden of [
-    /Confidence: /,
     /meltLikelihoodPercent/,
     /recoveryLikelihoodPercent/,
     /risk\.band/,
-    /Outlook/,
-    /\$\d+(\.\d+)?M/,
+    /riskScore/,
   ]) {
     assert.doesNotMatch(surface, forbidden, `Morning Brew must not contain ${forbidden}`);
   }
+  assert.match(corpus, /No model scores individual students, by design/);
+  assert.match(corpus, /not a calibrated probability/);
+  assert.match(
+    corpus,
+    /\$19,500 of net tuition per enrolled student|net tuition per enrolled student/,
+    "a dollar impact has to name the conversion it rests on",
+  );
+  assert.match(
+    dashboard,
+    /except the dotted forecast line/,
+    "the one drawn value nobody counted has to be named in the colophon",
+  );
 
   // Higher Education News is the one band that is not this tenant's records,
   // and it is only allowed on those terms: an outside feed, credited, linked,

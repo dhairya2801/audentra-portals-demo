@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 
 import { topicById } from "./catalog";
 import { formatBrewNumber } from "./data";
+import { Glyph } from "./glyphs";
 import type {
   BrewBriefing,
   BrewDetailRef,
@@ -125,7 +126,7 @@ function DetailShell({
   eyebrow: string;
   title: string;
   /** The glyph the card carried, so the panel opens as the same object. */
-  mark?: string;
+  mark?: React.ReactNode;
   accent?: "purple" | "blue" | "teal" | "navy" | "amber";
   meta?: React.ReactNode;
   actions?: React.ReactNode;
@@ -283,7 +284,7 @@ export function MorningBrewDetail({
             ? `${topic?.title ?? "Enrollment"} · ${insight.label}`
             : `${topic?.title ?? "Enrollment"} · Institutional Intelligence`
         }
-        mark="✦"
+        mark={<Glyph name="sparkle" size={20} />}
         accent="amber"
         title={insight.title}
         onBack={onBack}
@@ -297,7 +298,7 @@ export function MorningBrewDetail({
                   : "Medium"}
             </span>
             <span>Priority: {insight.impactLevel}</span>
-            <span>{insight.scope}</span>
+            <span>{insight.stats.deep}</span>
           </>
         }
         actions={
@@ -418,12 +419,12 @@ export function MorningBrewDetail({
     const kpi = briefing.kpis.find((item) => item.id === detail.id);
     if (!kpi) return <NotFound onBack={onBack} />;
     const topic = topicById(kpi.topic);
-    const value = `${formatBrewNumber(kpi.value)}${kpi.format === "percent" ? "%" : ""}`;
+    const value = kpi.display;
 
     return (
       <DetailShell
         eyebrow={`${topic?.title ?? "Enrollment"} · Institutional Pulse`}
-        mark={kpi.icon}
+        mark={<Glyph name={kpi.icon} size={20} />}
         accent="teal"
         title={kpi.label}
         onBack={onBack}
@@ -456,11 +457,14 @@ export function MorningBrewDetail({
               <strong>{value}</strong>
               <p>{kpi.window}</p>
             </div>
-            {kpi.basisLabel && kpi.basisPercent !== null ? (
+            {kpi.targetDisplay && kpi.progressPercent !== null ? (
               <div className="brew-stat">
-                <small>Share</small>
-                <strong>{kpi.basisPercent}%</strong>
-                <p>{kpi.basisLabel}</p>
+                <small>Progress to target</small>
+                <strong>{kpi.progressPercent}%</strong>
+                <p>
+                  Target {kpi.targetDisplay}
+                  {kpi.dueLabel ? ` · ${kpi.dueLabel}` : ""}
+                </p>
               </div>
             ) : null}
           </div>
@@ -533,45 +537,60 @@ export function MorningBrewDetail({
     );
   }
 
-  if (detail.kind === "deadline") {
-    const deadline = briefing.deadlines.find((item) => item.id === detail.id);
-    if (!deadline) return <NotFound onBack={onBack} />;
-    const topic = topicById(deadline.topic);
+  if (detail.kind === "meeting") {
+    const meeting = briefing.meetings.find((item) => item.id === detail.id);
+    if (!meeting) return <NotFound onBack={onBack} />;
+    const topic = topicById(meeting.topic);
 
     return (
       <DetailShell
         eyebrow={`${topic?.title ?? "Enrollment"} · Calendar`}
-        mark="▦"
+        mark={<Glyph name="calendar" size={20} />}
         accent="purple"
-        title={deadline.title}
+        title={meeting.title}
         onBack={onBack}
         meta={
           <>
-            <span className={`brew-chip brew-chip--${deadline.priority}`}>
-              {deadline.relativeLabel}
+            <span className={`brew-chip brew-chip--${meeting.priority}`}>
+              {meeting.priority === "high"
+                ? "High"
+                : meeting.priority === "medium"
+                  ? "Medium"
+                  : "Low"}
             </span>
-            <span>{deadline.dueLabel}</span>
+            <span>{meeting.timeLabel}</span>
+            <span>{meeting.durationMinutes} min</span>
             <span>
-              {deadline.students} {deadline.students === 1 ? "student" : "students"}
+              {meeting.attendees.length}{" "}
+              {meeting.attendees.length === 1 ? "guest" : "guests"}
             </span>
           </>
         }
-        actions={openWorkspace(deadline.destination)}
+        actions={openWorkspace(meeting.destination)}
       >
-        <p className="brew-detail__lede">{deadline.detail}</p>
+        <p className="brew-detail__lede">{meeting.detail}</p>
         <section className="brew-detail__section">
-          <h2>What to do next</h2>
-          <p className="brew-detail__paragraph">{deadline.nextStep}</p>
+          <h2>Before you walk in</h2>
+          <p className="brew-detail__paragraph">{meeting.prep}</p>
+        </section>
+        <section className="brew-detail__section">
+          <h2>Who is in it</h2>
+          <ul className="brew-note-list">
+            {meeting.attendees.map((name) => (
+              <li key={name}>{name}</li>
+            ))}
+          </ul>
         </section>
         <section className="brew-detail__section brew-detail__section--evidence">
-          <h2>How this was counted</h2>
+          <h2>How this reached the brief</h2>
           <ul className="brew-note-list">
+            <li>An accepted invitation on your calendar for today</li>
             <li>
-              {deadline.kindLabel} due{" "}
-              {deadline.bucket === "overdue" ? "before today" : "inside the next 30 days"}
+              {meeting.organizer
+                ? "You are the organizer, so it appears under Mine"
+                : "Organized by somebody else and accepted by you"}
             </li>
-            <li>Requirements that are still incomplete on a student&rsquo;s journey</li>
-            <li>Students counted once per requirement, not once per due date</li>
+            <li>Priority is the invitation&rsquo;s own, not a score we computed</li>
           </ul>
         </section>
       </DetailShell>
@@ -584,19 +603,19 @@ export function MorningBrewDetail({
 
     return (
       <DetailShell
-        eyebrow="Email · Student request"
+        eyebrow="Email"
         title={request.subject}
-        mark="✉"
+        mark={<Glyph name="mail" size={20} />}
         accent="purple"
         onBack={onBack}
         meta={
           <>
             <span className={`brew-chip brew-chip--${request.status === "new" ? "high" : "medium"}`}>
-              {request.status === "new" ? "No reply yet" : "Open"}
+              {request.unread ? "Unread" : request.status === "new" ? "No reply yet" : "Open"}
             </span>
-            <span>{request.studentName}</span>
-            <span>{request.programName}</span>
-            <span>Last message {request.waitingLabel}</span>
+            <span>{request.fromName}</span>
+            <span>{request.fromRole}</span>
+            <span>Received {request.receivedLabel}</span>
           </>
         }
         actions={openWorkspace("messages")}
@@ -626,7 +645,7 @@ export function MorningBrewDetail({
     return (
       <DetailShell
         eyebrow={`${topic?.title ?? "Enrollment"} · Action Center`}
-        mark={priority.icon}
+        mark={<Glyph name={priority.icon} size={20} />}
         accent="blue"
         title={priority.title}
         onBack={onBack}

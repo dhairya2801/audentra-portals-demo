@@ -44,8 +44,8 @@ export function MorningBrewView({
 }) {
   const scope = `demo:${workspace.currentStaff.id}`;
 
-  // Resolved once per mount so the masthead clock reads as this morning every
-  // time the demo is opened, rather than as the day the corpus was written.
+  // The corpus is one pinned morning — June 24, 2027, 7:02 AM ET — because
+  // every relative label in it is counted from that date.
   const source = useMemo(() => demoBrewSource(), []);
 
   const [mode, setMode] = useState<Mode>("loading");
@@ -76,36 +76,30 @@ export function MorningBrewView({
       saved ?? {
         ...DEFAULT_BREW_PREFERENCES,
         ...draft,
-        version: 6,
+        version: 7,
         updatedAt: "",
         onboardingComplete: false,
       },
     [saved, draft],
   );
 
-  const staffName = workspace.currentStaff.name;
-
   const briefing = useMemo(
-    () => buildBrewBriefing(source, preferences, staffName),
-    [source, preferences, staffName],
+    () => buildBrewBriefing(source, preferences),
+    [source, preferences],
   );
 
   /* Setup previews the draft, not the saved copy, so the miniature on screen
      reacts to a choice before it has been committed. */
   const draftBriefing = useMemo(
     () =>
-      buildBrewBriefing(
-        source,
-        {
-          ...DEFAULT_BREW_PREFERENCES,
-          ...draft,
-          version: 6,
-          updatedAt: "",
-          onboardingComplete: false,
-        },
-        staffName,
-      ),
-    [source, draft, staffName],
+      buildBrewBriefing(source, {
+        ...DEFAULT_BREW_PREFERENCES,
+        ...draft,
+        version: 7,
+        updatedAt: "",
+        onboardingComplete: false,
+      }),
+    [source, draft],
   );
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
@@ -163,7 +157,7 @@ export function MorningBrewView({
   if (mode === "loading") {
     return (
       <BrewLoading
-        firstName={saved ? staffName.split(" ")[0] || null : null}
+        firstName={saved ? briefing.greetingName : null}
         draft={saved ? draft : null}
         students={source.students}
       />
@@ -186,8 +180,7 @@ export function MorningBrewView({
       <MorningBrewOnboarding
         step={step}
         direction={direction}
-        firstName={briefing.greetingName}
-        staffName={staffName}
+        staffName={briefing.reader.name}
         draft={draft}
         preview={draftBriefing}
         customizing={Boolean(saved?.onboardingComplete)}
@@ -226,7 +219,6 @@ export function MorningBrewView({
         <MorningBrewDashboard
           briefing={briefing}
           preferences={preferences}
-          staffName={staffName}
           navigate={navigate}
           onOpenDetail={openDetail}
           onAskEdward={setEdward}

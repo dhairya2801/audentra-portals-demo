@@ -20889,10 +20889,10 @@ a {
 .brew { display: grid; gap: 0.85rem; }
 .brew-eyebrow { display: flex; gap: 0.4rem; align-items: center; margin: 0; color: var(--audentra-purple); font-size: 0.58rem; font-weight: 900; letter-spacing: 0.11em; text-transform: uppercase; }
 .brew-eyebrow > span { font-size: 0.68rem; }
-.brew-link { display: inline-flex; gap: 0.28rem; align-items: center; padding: 0; border: 0; background: transparent; color: var(--audentra-blue); font-size: 0.6rem; font-weight: 800; white-space: nowrap; cursor: pointer; }
+.brew-link { display: inline-flex; gap: 0.3rem; align-items: center; padding: 0; border: 0; background: transparent; color: var(--audentra-blue); font-size: 0.68rem; font-weight: 600; white-space: nowrap; cursor: pointer; }
 .brew-link:hover { color: #123fc4; }
-.brew-link span { transition: transform 150ms ease; }
-.brew-link:hover span { transform: translateX(2px); }
+.brew-link span, .brew-link svg { transition: transform 150ms ease; }
+.brew-link:hover span, .brew-link:hover svg { transform: translateX(2px); }
 .brew-stretch { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .brew-stretch::after { position: absolute; z-index: 1; border-radius: inherit; content: ""; inset: 0; }
 .brew-stretch:hover { color: var(--audentra-purple); }
@@ -20901,19 +20901,22 @@ a {
 .brew-edward-chip > span { display: grid; width: 0.92rem; height: 0.92rem; place-items: center; border-radius: 0.28rem; background: linear-gradient(145deg, var(--audentra-purple), var(--audentra-blue)); color: #fff; font-size: 0.48rem; font-weight: 900; }
 
 /* chips, deltas, and source tags ------------------------------------------- */
-.brew-chip { display: inline-flex; align-items: center; padding: 0.18rem 0.42rem; border-radius: 0.35rem; background: #eef1f6; color: #5c6675; font-size: 0.5rem; font-weight: 800; white-space: nowrap; }
-.brew-chip--high { background: #fdeceb; color: #b3372a; }
-.brew-chip--medium { background: #fef4e4; color: #97650a; }
-.brew-chip--low { background: #eaf6f1; color: #1c7a5e; }
-.brew-chip--positive { background: var(--audentra-soft-teal); color: #0a7d64; }
+.brew-chip { display: inline-flex; align-items: center; padding: 0.22rem 0.5rem; border-radius: 0.35rem; background: #eef1f6; color: #5c6675; font-size: 0.62rem; font-style: normal; font-weight: 700; white-space: nowrap; }
+.brew-chip--urgent, .brew-chip--high { background: #fdeaec; color: #cc1c31; }
+.brew-chip--medium { background: #fdf3d8; color: #9a6a08; }
+.brew-chip--low { background: #e7f7ef; color: #0f7a54; }
+.brew-chip--positive { background: #e7f7ef; color: #0f7a54; }
 .brew-delta { color: #0f9174; font-weight: 800; }
 .brew-delta--watch { color: #d0453a; }
 .brew-source { display: inline-flex; align-items: center; padding: 0.16rem 0.36rem; border-radius: 999px; background: #f0f2f6; color: #697386; font-size: 0.46rem; font-weight: 800; font-style: normal; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
 .brew-source--workspace { background: var(--audentra-soft-teal); color: #087d68; }
-.brew-impact { display: inline-flex; align-items: center; padding: 0.24rem 0.46rem; border-radius: 0.38rem; font-size: 0.6rem; font-weight: 800; white-space: nowrap; }
-.brew-impact--negative { background: #fdeceb; color: #b3372a; }
-.brew-impact--positive { background: var(--audentra-soft-teal); color: #0a7d64; }
-.brew-impact--neutral { background: #eef1f6; color: #4c5768; }
+/* The impact figures are the loudest thing on a finding, and they are printed
+   rather than boxed: a chip around a number reads as a label, and these are the
+   consequence itself. */
+.brew-impact { display: inline-flex; align-items: center; font-size: 0.76rem; font-weight: 800; letter-spacing: -0.01em; white-space: nowrap; }
+.brew-impact--negative { color: #d0193a; }
+.brew-impact--positive { color: #0f7a54; }
+.brew-impact--neutral { color: #4c5768; }
 
 /* masthead ------------------------------------------------------------------ */
 .brew-masthead { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: 0.7rem 1.1rem; border: 1px solid var(--audentra-line); border-radius: 0.9rem; background: #fff; box-shadow: 0 6px 20px rgb(10 31 68 / 4%); }
@@ -20936,136 +20939,264 @@ a {
 
 /* hero ---------------------------------------------------------------------- */
 .brew-hero { display: grid; grid-template-columns: minmax(16rem, 1fr) minmax(0, 1.3fr); gap: clamp(1.2rem, 4vw, 3rem); align-items: start; padding: 1.5rem 1.4rem; border: 1px solid var(--audentra-line); border-radius: 0.9rem; background: radial-gradient(circle at 96% -20%, rgb(106 56 255 / 7%), transparent 22rem), #fff; box-shadow: 0 6px 20px rgb(10 31 68 / 4%); }
-.brew-hero__greeting h1 { max-width: 22rem; margin: 0 0 0.55rem; color: #101a2e; font-family: "Source Serif 4", Georgia, serif; font-size: clamp(1.65rem, 3vw, 2.35rem); font-style: italic; font-weight: 700; letter-spacing: -0.02em; line-height: 1.08; }
-.brew-hero__greeting > p { max-width: 24rem; margin: 0; color: #5f6a7e; font-size: 0.68rem; line-height: 1.55; }
-.brew-hero__read { display: flex; gap: 0.35rem; align-items: center; margin-top: 0.75rem !important; color: var(--audentra-navy) !important; font-size: 0.63rem !important; font-weight: 700; }
-.brew-hero__read span { color: var(--audentra-purple); }
-.brew-hero__greeting small { display: block; margin-top: 0.55rem; color: #97a0b2; font-size: 0.55rem; }
+.brew-hero__greeting { max-width: 30rem; }
+.brew-hero__greeting h1 { max-width: none; margin: 0 0 0.6rem; color: #101a2e; font-family: "Source Serif 4", Georgia, serif; font-size: clamp(1.65rem, 3vw, 2.35rem); font-style: italic; font-weight: 700; letter-spacing: -0.02em; line-height: 1.08; }
+.brew-hero__deck { margin: 0; max-width: 24rem; color: #46506a; font-size: 0.8rem; font-weight: 500; line-height: 1.55; }
+/* Read time on its own line under the deck, the way the briefing masthead
+   reads it: one fact, not a rule-separated band of four. */
+.brew-hero__meta { display: inline-flex; gap: 0.4rem; align-items: center; margin: 1rem 0 0; color: #5f6a7e; font-size: 0.72rem; }
+.brew-hero__meta svg { color: #8b94a6; }
 .brew-hero__cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.7rem; }
 .brew-glance { display: grid; align-content: start; gap: 0.1rem; min-height: 8.6rem; padding: 0.8rem 0.85rem; border: 1px solid var(--audentra-line); border-radius: 0.75rem; background: #fff; text-align: left; box-shadow: 0 5px 16px rgb(10 31 68 / 3%); cursor: pointer; transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease; }
 .brew-glance:hover { transform: translateY(-2px); border-color: #cbc4f5; box-shadow: 0 12px 26px rgb(10 31 68 / 8%); }
 .brew-glance__head { display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.45rem; color: var(--audentra-navy); font-size: 0.6rem; font-weight: 800; }
-.brew-glance__icon { display: grid; width: 1.25rem; height: 1.25rem; place-items: center; border-radius: 0.35rem; background: var(--audentra-soft-purple); color: var(--audentra-purple); font-size: 0.62rem; font-style: normal; }
-.brew-glance__icon--mail { background: var(--audentra-soft-blue); color: var(--audentra-blue); }
-.brew-glance__icon--calendar { background: var(--audentra-soft-teal); color: #068c71; }
-.brew-glance > strong { color: var(--audentra-navy); font-size: 1.55rem; font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; }
-.brew-glance > small { color: #78829a; font-size: 0.57rem; }
-.brew-glance > em { margin-top: 0.3rem; color: #c0483c; font-size: 0.55rem; font-style: normal; font-weight: 700; }
-.brew-glance__link { margin-top: auto; padding-top: 0.5rem; color: var(--audentra-blue); font-size: 0.55rem; font-weight: 800; }
+.brew-glance__icon { display: grid; width: 1.35rem; height: 1.35rem; place-items: center; border-radius: 0.35rem; background: var(--audentra-soft-purple); color: var(--audentra-purple); font-size: 0.62rem; font-style: normal; }
+.brew-glance__icon--calendar { background: var(--audentra-soft-blue); color: var(--audentra-blue); }
+.brew-glance__icon--link { background: transparent; color: var(--audentra-blue); }
+/* Outlook's own square, unpadded and untinted: the card is naming somebody
+   else's mailbox, so its mark is not wrapped in one of our tiles. */
+.brew-glance__icon--plain { background: transparent; }
+.brew-glance > strong { margin-top: 0.15rem; color: var(--audentra-navy); font-size: 1.7rem; font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: -0.045em; line-height: 1.1; }
+.brew-glance > small { margin-top: 0.1rem; color: #78829a; font-size: 0.66rem; }
+.brew-glance > em { margin-top: 0.42rem; color: #d0453a; font-size: 0.66rem; font-style: normal; font-weight: 600; }
+.brew-glance__link { display: inline-flex; gap: 0.3rem; align-items: center; margin-top: auto; padding-top: 0.65rem; color: var(--audentra-blue); font-size: 0.66rem; font-weight: 600; }
 .brew-glance__link i { font-style: normal; }
 .brew-glance--links { cursor: default; }
 .brew-glance--links:hover { transform: none; border-color: var(--audentra-line); box-shadow: 0 5px 16px rgb(10 31 68 / 3%); }
 .brew-glance--links ul { display: grid; margin: 0; padding: 0; list-style: none; }
 .brew-glance--links li + li { border-top: 1px solid #f0f2f7; }
-.brew-glance--links button { display: flex; justify-content: space-between; gap: 0.5rem; align-items: center; width: 100%; padding: 0.35rem 0; border: 0; background: transparent; color: #37445c; font-size: 0.58rem; font-weight: 600; text-align: left; cursor: pointer; }
+.brew-glance--links button { display: flex; justify-content: space-between; gap: 0.5rem; align-items: center; width: 100%; padding: 0.42rem 0; border: 0; background: transparent; color: #37445c; font-size: 0.68rem; font-weight: 500; text-align: left; cursor: pointer; }
 .brew-glance--links button:hover { color: var(--audentra-purple); }
-.brew-glance--links button i { color: #b3bccc; font-style: normal; }
+.brew-glance--links button svg { flex: none; color: #b3bccc; }
 
-/* shared panel heads --------------------------------------------------------- */
-.brew-panel-head { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; margin-bottom: 0.85rem; }
-.brew-panel-head h2 { display: flex; gap: 0.42rem; align-items: center; margin: 0; color: var(--audentra-navy); font-size: 0.92rem; font-weight: 800; letter-spacing: -0.02em; }
-.brew-panel-head__glyph { color: var(--audentra-purple); font-size: 0.85rem; }
-.brew-panel-head > div > p { margin: 0.22rem 0 0; color: #78829a; font-size: 0.6rem; }
-.brew-panel-head__actions { display: flex; gap: 0.5rem; align-items: center; }
+/* shared section heads ------------------------------------------------------- */
+/* A band's head is a title, not an eyebrow: a marked glyph, the section's name
+   at reading size, and the one line saying what the band is for — set inline
+   after the name where it fits and wrapping underneath where it does not. */
+.brew-section-head { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; margin-bottom: 0.95rem; }
+.brew-section-head h2 { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0; color: var(--audentra-navy); font-size: 1.02rem; font-weight: 800; letter-spacing: -0.025em; line-height: 1.25; }
+.brew-section-head h2 small { flex-basis: 100%; color: #78829a; font-size: 0.68rem; font-weight: 500; letter-spacing: 0; }
+.brew-section-head__mark { display: grid; flex: none; place-items: center; color: var(--audentra-purple); }
+.brew-section-head__mark--blue { color: var(--audentra-blue); }
+.brew-section-head__mark--navy { color: var(--audentra-navy); }
+.brew-section-head__actions { display: flex; flex: none; gap: 0.5rem; align-items: center; }
+/* Where the head's line is short enough to sit beside the name, it does. */
+@media (min-width: 60rem) {
+  .brew-pulse .brew-section-head h2 small,
+  .brew-news .brew-section-head h2 small { flex-basis: auto; }
+}
 
 /* emerging insights ---------------------------------------------------------- */
 .brew-insights, .brew-pulse, .brew-changes, .brew-coverage { padding: 1.05rem 1.1rem; border: 1px solid var(--audentra-line); border-radius: 0.9rem; background: #fff; box-shadow: 0 6px 20px rgb(10 31 68 / 4%); }
-.brew-insight-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.7rem; }
-.brew-insight { position: relative; display: flex; flex-direction: column; padding: 0.9rem; border: 1px solid var(--audentra-line); border-top: 3px solid #98a3b6; border-radius: 0.75rem; background: #fff; transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease; }
-.brew-insight:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgb(10 31 68 / 8%); }
-.brew-insight--high { border-top-color: #e0483c; }
-.brew-insight--medium { border-top-color: #e3a11c; }
-.brew-insight--positive { border-top-color: var(--audentra-teal); }
-.brew-insight__top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.5rem; align-items: start; }
-.brew-insight__rank { display: grid; width: 1.25rem; height: 1.25rem; place-items: center; border-radius: 50%; background: var(--audentra-navy); color: #fff; font-size: 0.58rem; font-weight: 900; }
-.brew-insight__top h3 { margin: 0; color: var(--audentra-navy); font-size: 0.76rem; font-weight: 800; letter-spacing: -0.01em; line-height: 1.35; }
-.brew-insight__summary { margin: 0.7rem 0 0; color: #58637a; font-size: 0.63rem; line-height: 1.55; }
-.brew-insight__projection { margin: 0.45rem 0 0.8rem; color: #58637a; font-size: 0.63rem; line-height: 1.55; }
-.brew-insight__impact { margin-top: auto; padding-top: 0.65rem; border-top: 1px solid #eef0f5; }
-.brew-insight__impact small, .brew-insight__action small { display: block; margin-bottom: 0.35rem; color: #8b94a6; font-size: 0.5rem; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; }
-.brew-insight__impact > div { display: flex; flex-wrap: wrap; gap: 0.35rem; }
-.brew-insight__action { margin-top: 0.7rem; padding: 0.6rem 0.65rem; border-left: 2px solid var(--audentra-purple); border-radius: 0 0.4rem 0.4rem 0; background: #f9f8ff; }
-.brew-insight__action small { color: var(--audentra-purple); }
-.brew-insight__action p { margin: 0; color: #46506a; font-size: 0.6rem; line-height: 1.5; }
-.brew-insight__foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.4rem; align-items: center; margin-top: 0.85rem; padding-top: 0.6rem; border-top: 1px solid #eef0f5; color: #8b94a6; font-size: 0.53rem; }
+.brew-insight-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.85rem; }
+/* A plain card. The finding's severity is carried by its chip and by the colour
+   of its impact figures, which is where a reader looks anyway; a coloured rule
+   across the top of all three said the same thing a second time and turned the
+   row into a traffic light. */
+.brew-insight { position: relative; display: flex; flex-direction: column; padding: 1.05rem 1.05rem 0.9rem; border: 1px solid var(--audentra-line); border-radius: 0.8rem; background: #fff; transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease; }
+.brew-insight:hover { transform: translateY(-2px); border-color: #cbc4f5; box-shadow: 0 12px 28px rgb(10 31 68 / 8%); }
+.brew-insight__top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.6rem; align-items: start; }
+.brew-insight__rank { display: grid; width: 1.5rem; height: 1.5rem; place-items: center; border-radius: 50%; background: var(--audentra-soft-blue); color: var(--audentra-blue); font-size: 0.68rem; font-weight: 700; }
+.brew-insight__top h3 { margin: 0; padding-top: 0.12rem; color: var(--audentra-navy); font-size: 0.82rem; font-weight: 800; letter-spacing: -0.015em; line-height: 1.35; }
+/* The finding, in the one sentence it reads the same at every depth, and the
+   consequence under it if nothing changes. Same size, same colour: they are one
+   claim in two sentences, not a headline and a footnote. */
+.brew-insight__summary { margin: 0.95rem 0 0; color: #46506a; font-size: 0.7rem; font-weight: 500; line-height: 1.6; }
+.brew-insight__projection { margin: 0.75rem 0 0; color: #46506a; font-size: 0.7rem; font-weight: 500; line-height: 1.6; }
+/* The figures under it. Which figures depends on the depth asked for. */
+.brew-insight__stats { margin: 0.75rem 0 0; padding: 0.45rem 0.55rem; border-left: 2px solid #d8dde7; border-radius: 0 0.35rem 0.35rem 0; background: #f7f9fc; color: #46506a; font-size: 0.6rem; font-variant-numeric: tabular-nums; font-weight: 600; line-height: 1.5; }
+.brew-insight--high .brew-insight__stats { border-left-color: #e0483c; }
+.brew-insight--medium .brew-insight__stats { border-left-color: #e3a11c; }
+.brew-insight--positive .brew-insight__stats { border-left-color: var(--audentra-teal); }
+.brew-insight__reading { margin: 0.6rem 0 0; color: #67718a; font-size: 0.64rem; line-height: 1.6; }
+.brew-insight__impact { margin-top: auto; padding-top: 1.1rem; }
+.brew-insight__impact small, .brew-insight__action small { display: block; margin-bottom: 0.4rem; color: #98a1b3; font-size: 0.64rem; font-weight: 500; letter-spacing: 0; text-transform: none; }
+.brew-insight__impact > div { display: flex; flex-wrap: wrap; gap: 0.9rem; padding: 0.55rem 0.7rem; border-radius: 0.4rem; background: #f7f9fc; }
+.brew-insight__action { margin-top: 0.9rem; padding: 0.6rem 0.7rem; border-left: 2px solid var(--audentra-purple); border-radius: 0 0.4rem 0.4rem 0; background: #f9f8ff; }
+.brew-insight__action small { margin-bottom: 0.25rem; color: var(--audentra-purple); font-weight: 700; }
+.brew-insight__action p { margin: 0; color: #46506a; font-size: 0.66rem; line-height: 1.55; }
+/* The vendored design system reserves the foot of every `footer` element for
+   the Edward corner (`padding-bottom: var(--safe-bottom)`, 76px). Inside a card
+   that is not a reserved corner, it is a hole — so every footer in this brief
+   states its own padding on all four sides rather than only the top. */
+.brew-insight__foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; align-items: center; margin-top: 1rem; padding: 0.75rem 0 0; border-top: 1px solid #eef0f5; color: #78829a; font-size: 0.64rem; }
 .brew-insight__foot b { color: #46506a; }
-.brew-insight__foot .brew-link { position: relative; z-index: 2; }
+.brew-insight__foot .brew-link { position: relative; z-index: 2; margin-left: auto; font-size: 0.64rem; font-weight: 600; }
 
-/* enrollment pulse ----------------------------------------------------------- */
-.brew-pulse__controls { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.6rem; align-items: center; margin-bottom: 0.5rem; }
-.brew-timeframes { display: inline-flex; gap: 0.2rem; padding: 0.2rem; border-radius: 999px; background: #f2f4f9; }
-.brew-timeframe { display: inline-flex; gap: 0.3rem; align-items: center; padding: 0.32rem 0.62rem; border: 0; border-radius: 999px; background: transparent; color: #67718a; font-size: 0.56rem; font-weight: 700; white-space: nowrap; cursor: pointer; transition: background 150ms ease, color 150ms ease; }
-.brew-timeframe b { color: #9aa4b8; font-size: 0.5rem; font-weight: 900; letter-spacing: 0.04em; }
-.brew-timeframe:hover { color: var(--audentra-navy); }
-.brew-timeframe.is-active { background: #fff; color: var(--audentra-navy); font-weight: 800; box-shadow: 0 2px 8px rgb(10 31 68 / 10%); }
-.brew-timeframe.is-active b { color: var(--audentra-purple); }
-.brew-live-dot { width: 0.42rem; height: 0.42rem; border-radius: 50%; background: #b6bdcb; }
-.brew-timeframe--auto.is-active .brew-live-dot { background: var(--audentra-teal); animation: brew-pulse-dot 1.6s ease-in-out infinite; }
-.brew-pulse__status { margin: 0; color: #8b94a6; font-size: 0.56rem; }
-.brew-pulse__status strong { color: var(--audentra-navy); }
-.brew-pulse__progress { overflow: hidden; height: 2px; margin-bottom: 0.75rem; border-radius: 999px; background: #eef1f6; }
-.brew-pulse__progress i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--audentra-purple), var(--audentra-blue)); animation: brew-rotate-progress linear forwards; }
-.brew-kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.55rem; }
-.brew-kpi { display: grid; align-content: start; gap: 0.05rem; padding: 0.7rem 0.65rem 0.6rem; border: 1px solid var(--audentra-line); border-radius: 0.7rem; background: #fff; text-align: left; cursor: pointer; transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease; }
-.brew-kpi:hover { transform: translateY(-2px); border-color: #cbc4f5; box-shadow: 0 10px 22px rgb(10 31 68 / 8%); }
-.brew-kpi__head { display: flex; gap: 0.34rem; align-items: center; color: #6b7488; font-size: 0.54rem; font-weight: 800; }
-.brew-kpi__head i { display: grid; width: 1.05rem; height: 1.05rem; place-items: center; border-radius: 0.3rem; background: var(--audentra-soft-purple); color: var(--audentra-purple); font-size: 0.55rem; font-style: normal; }
+/* institutional pulse -------------------------------------------------------- */
+/* One row, always. The funnel is a sequence, so a card that wrapped onto a
+   second line would put yield underneath applications as though it came first.
+   As many whole cards as fit are shown and the rest arrive through the next
+   control; the columns are exact fractions of the viewport so a page scroll
+   always lands on a card edge. */
+.brew-kpi-reel { --brew-kpi-per-view: 6; display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - (var(--brew-kpi-per-view) - 1) * 1px) / var(--brew-kpi-per-view)); overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.brew-kpi-reel::-webkit-scrollbar { display: none; }
+.brew-kpi-reel:focus-visible { border-radius: 0.5rem; outline: 2px solid var(--audentra-blue); outline-offset: 3px; }
+@media (max-width: 1180px) { .brew-kpi-reel { --brew-kpi-per-view: 4; } }
+@media (max-width: 820px) { .brew-kpi-reel { --brew-kpi-per-view: 3; } }
+@media (max-width: 560px) { .brew-kpi-reel { --brew-kpi-per-view: 2; } }
+.brew-reel__controls { display: inline-flex; gap: 0.3rem; }
+.brew-reel__controls button { display: grid; width: 1.6rem; height: 1.6rem; place-items: center; padding: 0; border: 1px solid var(--audentra-line); border-radius: 50%; background: #fff; color: #46506a; cursor: pointer; transition: border-color 150ms ease, color 150ms ease; }
+.brew-reel__controls button:hover:not(:disabled) { border-color: #b9a5ff; color: var(--audentra-purple); }
+.brew-reel__controls button:disabled { color: #cbd2df; cursor: default; }
+/* Cards divided by a hairline rather than boxed. Six boxes in a row read as six
+   separate things; the funnel is one thing measured six times. */
+/* `min-width: 0` is load-bearing: a grid item sizes to its content by default,
+   and the trend chart's 300-unit viewBox would otherwise set a floor under
+   every card and push the whole page into a horizontal scroll. */
+/* A column rather than a grid, so the goal block can be pushed to the foot with
+   `margin-top: auto`. Not every card's movement carries a second line — a rate
+   states its move in points and nothing else — and without this the bars in a
+   row of six sat at six different heights. */
+.brew-kpi { position: relative; display: flex; flex-direction: column; min-width: 0; padding: 0.15rem 0.9rem 0.35rem; border-right: 1px solid var(--audentra-line); background: #fff; text-align: left; scroll-snap-align: start; cursor: pointer; transition: background 150ms ease; }
+.brew-kpi:last-child { border-right: 0; }
+.brew-kpi:hover { background: #fbfcfe; }
+.brew-kpi__head { display: flex; gap: 0.4rem; align-items: center; min-height: 1.45rem; color: #67718a; font-size: 0.68rem; font-weight: 500; }
+.brew-kpi__head .brew-stretch { flex: 1; min-width: 0; font: inherit; }
+/* Above the stretched label, so the one corner of the card that is not the
+   drill-down goes to Edward instead. */
+.brew-kpi__edward { position: relative; z-index: 2; display: grid; flex: none; width: 1.05rem; height: 1.05rem; place-items: center; padding: 0; border: 1px solid #ded6ff; border-radius: 0.3rem; background: var(--audentra-soft-purple); cursor: pointer; transition: border-color 150ms ease, background 150ms ease; }
+.brew-kpi__edward:hover { border-color: #b9a5ff; background: #ebe5ff; }
+.brew-kpi__edward > span { display: grid; width: 0.72rem; height: 0.72rem; place-items: center; border-radius: 0.2rem; background: linear-gradient(145deg, var(--audentra-purple), var(--audentra-blue)); color: #fff; font-size: 0.44rem; font-weight: 900; }
+.brew-kpi__head i { display: grid; flex: none; place-items: center; color: #78829a; font-style: normal; }
 /* Figure on the left, the comparison currently in the cluster on the right.
    The row is baseline-aligned so the rotating half never nudges the number. */
-.brew-kpi__figure { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.5rem; align-items: baseline; margin-top: 0.3rem; }
-.brew-kpi__value { color: var(--audentra-navy); font-size: 1.32rem; font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: -0.045em; line-height: 1.12; }
+.brew-kpi__figure { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.4rem; align-items: baseline; margin-top: 0.35rem; }
+.brew-kpi__value { color: var(--audentra-navy); font-size: 1.42rem; font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: -0.045em; line-height: 1.12; }
 .brew-kpi__value em { font-size: 0.86rem; font-style: normal; font-weight: 700; }
+/* The target under the figure rather than only under the bar, so a glance
+   answers "how far through" without reading the percentage. It sits on its own
+   line because six of these share a row: "14,782 / 20,000" set across does not
+   fit a sixth of the band at any size worth reading. */
+.brew-kpi__of { display: block; margin-top: 0.05rem; color: #a2abbc; font-size: 0.78rem; font-style: normal; font-weight: 600; letter-spacing: -0.02em; white-space: nowrap; }
 .brew-kpi__primary { display: block; animation: brew-move-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 @keyframes brew-move-in { from { transform: translateY(0.3rem); opacity: 0; } }
-.brew-kpi__movements { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.3rem; margin-top: 0.5rem; padding-top: 0.42rem; border-top: 1px solid #f0f2f6; }
-.brew-kpi__nodelta { color: #a2abbc; font-size: 0.52rem; }
+/* Every comparison window takes its turn in the one slot beside the figure, so
+   the card carries one reading at a time instead of four competing for the
+   same glance. The ticks say how many there are and which one is up. */
+.brew-kpi__ticks { display: flex; gap: 0.2rem; justify-content: flex-end; margin-top: 0.34rem; }
+.brew-kpi__ticks i { width: 0.24rem; height: 0.24rem; border-radius: 50%; background: #d8dde7; transition: background 200ms ease, transform 200ms ease; }
+.brew-kpi__ticks i.is-on { background: var(--audentra-purple); transform: scale(1.35); }
+.brew-kpi__nodelta { color: #a2abbc; font-size: 0.6rem; }
 .brew-move { display: grid; gap: 0.02rem; text-align: right; }
-.brew-kpi__movements .brew-move { text-align: left; }
-.brew-move b { color: #0f9174; font-size: 0.6rem; font-variant-numeric: tabular-nums; font-weight: 800; white-space: nowrap; }
+.brew-move b { display: block; color: #0f9174; font-size: 0.72rem; font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
 .brew-move b.is-watch { color: #d0453a; }
-.brew-move b i { font-size: 0.44rem; font-style: normal; }
-.brew-move small { color: #98a1b3; font-size: 0.48rem; white-space: nowrap; }
-.brew-move--primary b { font-size: 0.76rem; }
-.brew-move--primary small { font-size: 0.5rem; }
-.brew-kpi__target { display: flex; justify-content: space-between; gap: 0.4rem; align-items: baseline; margin-top: 0.5rem; }
-.brew-kpi__target small { color: #8b94a6; font-size: 0.5rem; font-weight: 700; }
-.brew-kpi__target b { color: var(--audentra-navy); font-size: 0.55rem; font-variant-numeric: tabular-nums; }
-.brew-kpi__bar { display: block; overflow: hidden; height: 3px; margin-top: 0.3rem; border-radius: 999px; background: #eef1f6; }
-.brew-kpi__bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--audentra-blue), var(--audentra-purple)); transition: width 620ms cubic-bezier(0.22, 1, 0.36, 1); }
-/* padding-bottom is stated because something upstream leaves ~76px on this
-   footer, which read as a hole between the cards and the read-time line. */
-.brew-pulse__foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; margin-top: 0.75rem; padding-top: 0.6rem; padding-bottom: 0; border-top: 1px solid #eef0f5; color: #8b94a6; font-size: 0.54rem; }
-.brew-pulse__foot i { color: var(--audentra-teal); font-style: normal; }
+.brew-move b i { font-size: 0.52rem; font-style: normal; }
+.brew-move small { color: #98a1b3; font-size: 0.6rem; white-space: nowrap; }
+/* A second reading of the same move where one adds something: the count behind
+   a percentage, and nothing at all behind a movement already stated in points. */
+.brew-move b em { display: block; color: #a2abbc; font-size: 0.58rem; font-style: normal; font-weight: 600; }
+.brew-kpi__target { display: flex; justify-content: space-between; gap: 0.4rem; align-items: baseline; margin-top: auto; padding-top: 0.7rem; }
+.brew-kpi__target small { color: #78829a; font-size: 0.62rem; font-weight: 500; }
+.brew-kpi__target b { color: var(--audentra-navy); font-size: 0.68rem; font-variant-numeric: tabular-nums; font-weight: 700; }
+.brew-kpi__bar { display: block; overflow: hidden; height: 5px; margin-top: 0.34rem; border-radius: 999px; background: #eef1f6; }
+.brew-kpi__bar i { display: block; height: 100%; border-radius: 999px; background: var(--audentra-blue); transition: width 620ms cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* Thirty days of the figure. Three lines, three kinds of claim: last year is
+   history and runs the whole axis in grey, this year is measured and carries
+   the card's colour, and the forecast is arithmetic on the current pace, so it
+   is dotted and starts on today's point rather than beside it. */
+.brew-kpi__chart { margin-top: 0.65rem; margin-bottom: 0.15rem; }
+.brew-kpi__chart svg { display: block; width: 100%; height: 3.6rem; }
+.brew-trend { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.brew-trend--previous { stroke: #c3cad8; stroke-width: 1.4; }
+.brew-trend--actual { stroke-width: 2; }
+.brew-trend--forecast { stroke-width: 1.6; stroke-dasharray: 3 3; opacity: 0.62; }
+.brew-trend__today { stroke: #e4e8f0; stroke-width: 1; stroke-dasharray: 2 3; }
+/* The key belongs to the band, not to each card: the convention is the same on
+   all six, and six copies of it wrapped onto two lines apiece. */
+.brew-trend-key { display: inline-flex; flex-wrap: wrap; gap: 0.75rem; color: #8b94a6; font-size: 0.62rem; font-weight: 500; }
+.brew-trend-key span { display: inline-flex; gap: 0.3rem; align-items: center; white-space: nowrap; }
+.brew-trend-key span::before { width: 0.8rem; height: 0; border-top: 2px solid currentColor; content: ""; }
+.brew-trend-key .is-previous { color: #b3bccc; }
+.brew-trend-key .is-actual { color: #0f9174; }
+.brew-trend-key .is-forecast::before { border-top-style: dotted; }
+/* One sentence reading the line, which is the whole point of drawing it. */
+.brew-kpi__note { margin: 0.5rem 0 0; color: #78829a; font-size: 0.58rem; line-height: 1.5; }
+/* padding-bottom is stated because the vendored `footer` rule reserves 76px of
+   Edward corner at the foot of every footer element, which read as a hole
+   between the cards and the read-time line. */
+.brew-pulse__foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; margin-top: 1.1rem; padding-top: 0.8rem; padding-bottom: 0; border-top: 1px solid #eef0f5; color: #78829a; font-size: 0.66rem; }
+.brew-pulse__foot > span:last-child { display: inline-flex; gap: 0.35rem; align-items: center; }
+.brew-pulse__foot svg { color: #a2abbc; }
+/* At a glance the card is the figure and its movement and nothing else, so the
+   row closes up rather than reserving the space a bar would have taken. */
+.brew-pulse--glance .brew-kpi { padding-bottom: 0.15rem; }
 
 /* since yesterday ------------------------------------------------------------ */
 
 /* today's day panels --------------------------------------------------------- */
-.brew-day-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; align-items: stretch; }
-.brew-panel { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; border: 1px solid var(--audentra-line); border-radius: 0.9rem; background: #fff; box-shadow: 0 6px 20px rgb(10 31 68 / 4%); }
-.brew-panel__head { display: flex; justify-content: space-between; gap: 0.6rem; align-items: center; padding: 0.8rem 0.9rem; border-bottom: 1px solid #eef0f5; }
-.brew-panel__foot { padding: 0.6rem 0.9rem 0.75rem; border-top: 1px solid #eef0f5; text-align: center; }
-.brew-list { display: grid; align-content: start; grid-auto-rows: minmax(8rem, max-content); margin: 0; padding: 0 0.9rem; list-style: none; }
-.brew-list > li { position: relative; display: grid; gap: 0.55rem; align-content: center; align-items: start; padding: 0.75rem 0; }
+/* One body height for all three columns. The panels open on four rows and hold
+   the rest behind "Show all", which scrolls inside that height rather than
+   growing it — so expanding one column never moves the page under the other
+   two, and the row stays level however the reader works it. */
+.brew-day-grid { --brew-panel-body: 27.5rem; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; align-items: stretch; }
+.brew-panel { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; border: 1px solid var(--audentra-line); border-radius: 0.9rem; background: #fff; box-shadow: 0 6px 20px rgb(10 31 68 / 4%); }
+.brew-panel__views { display: flex; flex-wrap: wrap; gap: 0.25rem; padding: 0.55rem 0.9rem; border-bottom: 1px solid #eef0f5; }
+.brew-panel__views button { display: inline-flex; gap: 0.28rem; align-items: center; padding: 0.28rem 0.55rem; border: 1px solid transparent; border-radius: 999px; background: #f3f5f9; color: #67718a; font-size: 0.62rem; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background 150ms ease, color 150ms ease, border-color 150ms ease; }
+.brew-panel__views button:hover { border-color: #cbc4f5; color: var(--audentra-navy); }
+.brew-panel__views button i { color: #9aa4b8; font-size: 0.48rem; font-style: normal; font-weight: 800; }
+.brew-panel__views button.is-active { border-color: #ded6ff; background: var(--audentra-soft-purple); color: #5227d6; }
+.brew-panel__views button.is-active i { color: var(--audentra-purple); }
+.brew-panel__body { height: var(--brew-panel-body); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.brew-panel__body.is-scrolling { scrollbar-width: thin; }
+.brew-panel__body::-webkit-scrollbar { width: 6px; }
+.brew-panel__body::-webkit-scrollbar-thumb { border-radius: 999px; background: #dde2ec; }
+.brew-more { display: inline-flex; gap: 0.3rem; align-items: center; padding: 0.2rem 0.4rem; border: 0; background: transparent; color: var(--audentra-blue); font-size: 0.7rem; font-weight: 500; white-space: nowrap; cursor: pointer; transition: color 150ms ease; }
+.brew-more:hover { color: #123fc4; text-decoration: underline; }
+.brew-more i { font-size: 0.48rem; font-style: normal; }
+.brew-more--rest { color: #a2abbc; cursor: default; }
+.brew-more--rest:hover { color: #a2abbc; text-decoration: none; }
+.brew-panel__head { display: flex; justify-content: space-between; gap: 0.6rem; align-items: center; padding: 0.85rem 0.95rem; border-bottom: 1px solid #eef0f5; }
+.brew-panel__title { display: flex; gap: 0.5rem; align-items: center; margin: 0; color: var(--audentra-navy); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
+.brew-panel__mark { display: grid; flex: none; place-items: center; }
+.brew-panel__mark--rose { color: #e0364b; }
+.brew-panel__mark--blue { color: var(--audentra-blue); }
+/* One centred link, the way the briefing closes each column. */
+.brew-panel__foot { display: flex; justify-content: center; gap: 0.5rem; align-items: center; padding: 0.6rem 0.95rem 0.7rem; border-top: 1px solid #eef0f5; }
+.brew-list { display: grid; align-content: start; grid-auto-rows: max-content; margin: 0; padding: 0 0.95rem; list-style: none; }
+.brew-list > li { position: relative; display: grid; gap: 0.6rem; align-content: center; align-items: start; padding: 0.85rem 0; }
 .brew-list > li + li { border-top: 1px solid #f2f4f8; }
-.brew-list h3 { margin: 0; color: #1d2b45; font-size: 0.66rem; font-weight: 800; line-height: 1.35; }
-.brew-list p { margin: 0.24rem 0 0; color: #78829a; font-size: 0.57rem; line-height: 1.45; }
-.brew-dot { width: 0.45rem; height: 0.45rem; margin-top: 0.34rem; border-radius: 50%; background: #b6bdcb; }
-.brew-dot--high { background: #e0483c; box-shadow: 0 0 0 3px #fdeceb; }
-.brew-dot--medium { background: #e3a11c; box-shadow: 0 0 0 3px #fef4e4; }
-.brew-dot--low { background: var(--audentra-teal); box-shadow: 0 0 0 3px var(--audentra-soft-teal); }
-.brew-list--meetings > li { grid-template-columns: 0.45rem 3.1rem minmax(0, 1fr) auto; }
-.brew-list--meetings time { display: grid; color: var(--audentra-navy); font-size: 0.6rem; font-weight: 800; }
-.brew-list--meetings time small { margin-top: 0.1rem; color: #98a1b3; font-size: 0.5rem; font-weight: 500; }
+.brew-list h3 { margin: 0; color: var(--audentra-navy); font-size: 0.7rem; font-weight: 800; line-height: 1.35; }
+.brew-list p { margin: 0.28rem 0 0; color: #78829a; font-size: 0.66rem; line-height: 1.5; }
+.brew-dot { width: 0.5rem; height: 0.5rem; margin-top: 0.36rem; border-radius: 50%; background: #b6bdcb; }
+.brew-dot--high { background: #e0364b; }
+.brew-dot--medium { background: #f0a300; }
+.brew-dot--low { background: #12a37f; }
+.brew-list--meetings > li { grid-template-columns: 0.5rem 4.1rem minmax(0, 1fr) auto; }
+.brew-list--meetings time { display: grid; color: var(--audentra-navy); font-size: 0.7rem; font-weight: 800; white-space: nowrap; }
+.brew-list--meetings time small { margin-top: 0.14rem; color: #98a1b3; font-size: 0.64rem; font-weight: 500; }
+/* Guests as a stack of three and a count. The row is a pointer to the meeting,
+   not its invitation list. */
+.brew-attendees { display: inline-flex; gap: 0.28rem; align-items: center; margin-top: 0.55rem; }
+.brew-attendees i { display: grid; width: 1.05rem; height: 1.05rem; place-items: center; border-radius: 50%; background: #dfe9fb; color: #7b93bd; }
+.brew-attendees i + i { margin-left: -0.42rem; box-shadow: 0 0 0 1.5px #fff; }
+.brew-attendees b { margin-left: 0.28rem; color: #98a1b3; font-size: 0.62rem; font-weight: 500; }
+.brew-guests { margin-top: 0.4rem !important; color: #a2abbc !important; font-size: 0.6rem !important; }
+/* The small print a row grows at "With Context": what it is waiting on, who
+   owns it, and — at depth — the figures behind it. */
+.brew-row__cue { margin-top: 0.34rem !important; color: #a2abbc !important; font-size: 0.6rem !important; }
+.brew-row__facts { margin-top: 0.3rem !important; padding: 0.32rem 0.42rem; border-radius: 0.3rem; background: #f6f8fc; color: #67718a !important; font-size: 0.58rem !important; font-variant-numeric: tabular-nums; line-height: 1.5 !important; }
 .brew-prep-line { display: flex; gap: 0.35rem; align-items: flex-start; margin-top: 0.4rem !important; padding: 0.35rem 0.45rem; border-left: 2px solid var(--audentra-purple); border-radius: 0 0.35rem 0.35rem 0; background: #f9f8ff; color: #5b6480 !important; font-size: 0.54rem !important; line-height: 1.45 !important; }
 .brew-prep-line span { color: var(--audentra-purple); }
-.brew-list--emails > li, .brew-list--priorities > li { grid-template-columns: auto minmax(0, 1fr); }
-.brew-email__top { display: flex; justify-content: space-between; gap: 0.5rem; align-items: center; margin-bottom: 0.28rem; }
-.brew-email__top time { color: #98a1b3; font-size: 0.5rem; }
-.brew-email__top h3 { flex: 1; }
-.brew-priority-icon { display: grid; width: 1.5rem; height: 1.5rem; place-items: center; border-radius: 0.4rem; background: #eef1f6; color: #5c6675; font-size: 0.7rem; }
-.brew-priority-icon--high { background: #fdeceb; color: #b3372a; }
-.brew-priority-icon--medium { background: #fef4e4; color: #97650a; }
-.brew-priority-icon--low { background: var(--audentra-soft-teal); color: #0a7d64; }
+/* Email carries a time column like the calendar beside it, so a reader
+   scanning the row of panels reads the same shape three times. */
+.brew-list--emails > li { grid-template-columns: 0.5rem 4.1rem minmax(0, 1fr) auto; }
+.brew-list--emails time { color: var(--audentra-navy); font-size: 0.7rem; font-weight: 800; white-space: nowrap; }
+.brew-list--priorities > li { grid-template-columns: auto minmax(0, 1fr); }
+.brew-row__top { display: flex; justify-content: space-between; gap: 0.5rem; align-items: flex-start; }
+.brew-row__top h3 { flex: 1; }
+.brew-email__from { margin: 0.34rem 0 0 !important; color: #98a1b3 !important; font-size: 0.62rem !important; font-weight: 600; }
+.brew-email__from span { color: #b3bccc; font-weight: 500; }
+/* Two lines of the opening message. The row is a pointer to the thread, not
+   the thread, and a fourth line only pushes the next sender off the screen. */
+.brew-email__body { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+/* A solid flag, sized to the title beside it. The colour is the level, so the
+   row says it once in the glyph and once in the chip and nowhere else. */
+.brew-priority-flag { display: grid; place-items: center; padding-top: 0.05rem; color: #98a3b6; }
+.brew-priority-flag--high { color: #e0364b; }
+.brew-priority-flag--medium { color: #f0a300; }
+.brew-priority-flag--low { color: #12a37f; }
 .brew-row-actions { position: relative; z-index: 2; display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.5rem; }
 .brew-row-actions button { display: inline-flex; gap: 0.3rem; align-items: center; padding: 0.3rem 0.55rem; border: 1px solid var(--audentra-line); border-radius: 0.4rem; background: #fff; color: #46506a; font-size: 0.54rem; font-weight: 700; cursor: pointer; transition: border-color 150ms ease, color 150ms ease; }
 .brew-row-actions button:hover { border-color: #b9a5ff; color: var(--audentra-purple); }
@@ -21079,22 +21210,26 @@ a {
 .brew-connect-card small { display: block; margin-top: 0.3rem; color: #a2abbc; font-size: 0.53rem; }
 
 /* higher ed news ------------------------------------------------------------- */
-.brew-news { display: grid; gap: 0.7rem; padding: 0.95rem 1rem 0.85rem; border: 1px solid var(--audentra-line); border-radius: 0.9rem; background: #fff; box-shadow: 0 6px 20px rgb(10 31 68 / 4%); }
-.brew-news__rail { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(13.5rem, 1fr); gap: 0.6rem; overflow-x: auto; margin: 0; padding: 0 0 0.5rem; list-style: none; scroll-snap-type: x proximity; }
-.brew-news-card { display: grid; align-content: start; gap: 0.34rem; padding: 0.55rem 0.6rem 0.6rem; border: 1px solid var(--audentra-line); border-radius: 0.7rem; background: #fff; scroll-snap-align: start; transition: border-color 150ms ease, box-shadow 150ms ease; }
-.brew-news-card:hover { border-color: #cbc4f5; box-shadow: 0 10px 24px rgb(10 31 68 / 7%); }
-.brew-news-card__cover { display: block; width: 100%; height: 6.6rem; border-radius: 0.5rem; background: #f2f4f8; object-fit: cover; }
-.brew-news-card h3 { margin: 0; color: var(--audentra-navy); font-size: 0.7rem; font-weight: 800; letter-spacing: -0.01em; line-height: 1.35; }
+.brew-news { display: grid; gap: 0.9rem; padding: 1.05rem 1.1rem 0.95rem; border: 1px solid var(--audentra-line); border-radius: 0.9rem; background: #fff; box-shadow: 0 6px 20px rgb(10 31 68 / 4%); }
+/* Cover on the left, byline and headline on the right, four across. A story is
+   a line in a feed here, not a magazine spread: the artwork identifies it and
+   the headline is what the reader is actually scanning. */
+.brew-news__rail { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.1rem; margin: 0; padding: 0; list-style: none; }
+.brew-news-card { display: grid; grid-template-columns: 5.2rem minmax(0, 1fr); gap: 0.75rem; align-items: start; background: transparent; }
+.brew-news-card__cover { display: block; width: 5.2rem; height: 5.2rem; border-radius: 0.5rem; background: #eef2fa; object-fit: cover; }
+.brew-news-card__body { display: grid; gap: 0.32rem; min-width: 0; }
+.brew-news-card__byline { display: flex; justify-content: space-between; gap: 0.5rem; align-items: baseline; color: #78829a; font-size: 0.64rem; font-weight: 500; }
+.brew-news-card__byline b { color: #a2abbc; font-weight: 500; white-space: nowrap; }
+.brew-news-card__read { margin: 0; color: #98a1b3; font-size: 0.62rem; font-weight: 500; }
+.brew-news-card h3 { margin: 0; color: var(--audentra-navy); font-size: 0.74rem; font-weight: 800; letter-spacing: -0.012em; line-height: 1.4; }
 .brew-news-card h3 a { color: inherit; text-decoration: none; }
 .brew-news-card h3 a:hover { color: var(--audentra-purple); text-decoration: underline; }
-.brew-news-card > p { margin: 0; color: #78829a; font-size: 0.58rem; line-height: 1.5; }
-.brew-news-card__bearing { color: #7a5a0d !important; font-weight: 700; }
-.brew-news-card__implication { padding: 0.4rem 0.45rem; border-radius: 0.4rem; background: #f6f8fc; color: #67718a !important; font-size: 0.55rem !important; }
-.brew-news-card footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.3rem; align-items: center; padding-top: 0.45rem; border-top: 1px solid #f0f2f6; }
-.brew-news-card__publisher { display: inline-flex; gap: 0.3rem; align-items: center; color: var(--audentra-navy); font-size: 0.53rem; font-weight: 800; }
-.brew-news-card__publisher i { display: grid; width: 0.95rem; height: 0.95rem; place-items: center; border-radius: 0.2rem; background: #e8edf6; font-size: 0.36rem; font-style: normal; font-weight: 900; }
-.brew-news-card__date { display: inline-flex; gap: 0.25rem; align-items: center; color: #a2abbc; font-size: 0.53rem; font-weight: 700; }
-.brew-news__basis { margin: 0; color: #a2abbc; font-size: 0.52rem; line-height: 1.5; }
+/* The one line we add: why this story is in this reader's brief. Styled as the
+   setup preview styles it, so the sample and the real card agree. */
+.brew-news-card__bearing { margin: 0.15rem 0 0; padding: 0.34rem 0.42rem; border-radius: 0.3rem; background: #fdf6e8; color: #7a5a0d; font-size: 0.62rem; line-height: 1.5; }
+.brew-news__basis { margin: 0; padding-top: 0.55rem; border-top: 1px solid #f0f2f6; color: #a2abbc; font-size: 0.6rem; line-height: 1.5; }
+@media (max-width: 1180px) { .brew-news__rail { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .brew-news__rail { grid-template-columns: minmax(0, 1fr); } }
 
 /* the build screen ----------------------------------------------------------- */
 .brew-building { display: grid; place-content: center; justify-items: center; min-height: 72vh; padding: 2.5rem clamp(1.2rem, 6vw, 5rem); text-align: center; }
@@ -21113,12 +21248,12 @@ a {
 
 /* colophon ------------------------------------------------------------------- */
 .brew-colophon { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.7rem; align-items: center; padding: 0.85rem 1.1rem; border: 1px solid var(--audentra-line); border-radius: 0.9rem; background: #fff; }
-.brew-colophon p { margin: 0; color: #8b94a6; font-size: 0.54rem; }
-.brew-colophon > div { display: flex; flex-wrap: wrap; gap: 0.45rem; }
-.brew-colophon button { padding: 0.34rem 0.6rem; border: 1px solid var(--audentra-line); border-radius: 999px; background: #fff; color: #46506a; font-size: 0.54rem; font-weight: 700; cursor: pointer; }
+.brew-colophon p { margin: 0; color: #8b94a6; font-size: 0.66rem; }
+.brew-colophon > div { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; }
+.brew-colophon button { padding: 0.34rem 0.6rem; border: 1px solid var(--audentra-line); border-radius: 999px; background: #fff; color: #46506a; font-size: 0.62rem; font-weight: 600; cursor: pointer; }
 .brew-colophon button:hover { border-color: #b9a5ff; color: var(--audentra-purple); }
-.brew-feedback { display: inline-flex; gap: 0.3rem; align-items: center; }
-.brew-disclaimer { margin: 0 0 0.5rem; color: #a2abbc; font-size: 0.52rem; line-height: 1.5; text-align: center; }
+.brew-feedback { display: inline-flex; gap: 0.35rem; align-items: center; }
+.brew-disclaimer { margin: 0 0 0.5rem; color: #a2abbc; font-size: 0.56rem; line-height: 1.5; text-align: center; }
 
 /* setup ---------------------------------------------------------------------- */
 .brew-setup { display: grid; gap: 1.1rem; overflow-x: clip; padding: 1.6rem clamp(1.1rem, 3vw, 2.4rem) 1.3rem; border: 1px solid var(--audentra-line); border-radius: 1.1rem; background: radial-gradient(circle at 96% -10%, rgb(106 56 255 / 8%), transparent 26rem), #fff; box-shadow: 0 10px 34px rgb(10 31 68 / 6%); }
@@ -21195,7 +21330,10 @@ a {
 .brew-source-mark--blue { background: var(--audentra-blue); }
 .brew-source-mark--teal { background: #0a8c72; }
 .brew-source-mark--amber { background: #9a6a08; }
+/* Outlook's square is its own; it does not sit inside one of our tiles. */
+.brew-source-mark--plain { background: transparent; }
 .brew-source-card:not(.is-on) .brew-source-mark { background: #e4e8f0; color: #a2abbc; }
+.brew-source-card:not(.is-on) .brew-source-mark--plain { background: transparent; opacity: 0.45; }
 
 .brew-toggle { display: grid; place-items: center; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .brew-source-card.is-on .brew-toggle__switch { background: var(--audentra-purple); }
@@ -21256,6 +21394,7 @@ a {
 .mbp-meter i.is-warn { background: #e3a11c; }
 .mbp-meter i.is-bad { background: #e0483c; }
 .mbp-meter i.is-purple { background: var(--audentra-purple); }
+.mbp-meter i.is-blue { background: var(--audentra-blue); }
 .mbp-meter i.is-muted { background: #d7dce6; }
 .mbp-legend { display: flex; flex-wrap: wrap; gap: 0.25rem 0.4rem; }
 .mbp-legend em { display: inline-flex; gap: 0.16rem; align-items: center; color: #78829a; font-size: 0.4rem; font-style: normal; font-weight: 700; }
@@ -21392,7 +21531,11 @@ a {
 .bp-page::-webkit-scrollbar { display: none; }
 /* One third scale, with the wrapper widened to match so the shrunk page still
    fills the frame. `zoom` would be simpler but reflows text at fractional
-   sizes; a transform keeps the real layout and only shrinks the result. */
+   sizes; a transform keeps the real layout and only shrinks the result.
+   A transform paints smaller without laying out smaller, so the clip wrapper
+   is given the painted height by measurement — otherwise the frame would
+   scroll two further pages into nothing after the last band. */
+.bp-scale-clip { position: relative; overflow: hidden; }
 .bp-scale { width: 300%; transform: scale(0.3333); transform-origin: top left; }
 .bp-scale .brew { width: 100%; gap: 0.85rem; }
 .bp-scale .brew-masthead { position: static; }
@@ -21441,7 +21584,7 @@ a {
 .brew-toggle__switch { position: relative; display: block; flex: none; width: 1.85rem; height: 1.05rem; border-radius: 999px; background: #d7dce6; transition: background 160ms ease; }
 .brew-toggle__switch::after { position: absolute; top: 0.13rem; left: 0.14rem; width: 0.78rem; height: 0.78rem; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgb(10 31 68 / 25%); content: ""; transition: transform 160ms ease; }
 
-.brew-setup__footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.8rem; align-items: center; padding-top: 1rem; border-top: 1px solid var(--audentra-line); }
+.brew-setup__footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.8rem; align-items: center; padding: 1rem 0 0; border-top: 1px solid var(--audentra-line); }
 .brew-setup__footer > div:first-child { display: grid; }
 .brew-setup__footer strong { color: var(--audentra-navy); font-size: 0.7rem; }
 .brew-setup__footer span { color: #98a1b3; font-size: 0.58rem; }
@@ -21560,7 +21703,9 @@ a {
 /* The briefing reads live records, so it needs first-class ways to say
    "nothing happened", "we do not measure that", and "the read failed" —
    three different answers the old synthetic content never had to give. */
-.brew-hero__bullets { display: grid; gap: 0.3rem; margin: 0.7rem 0 0; padding-left: 1rem; color: #5f6a7e; font-size: 0.63rem; line-height: 1.55; }
+.brew-hero__bullets { display: grid; gap: 0.42rem; margin: 0.8rem 0 0; padding-left: 0; color: #5f6a7e; font-size: 0.63rem; line-height: 1.55; list-style: none; }
+.brew-hero__bullets li { padding-left: 0.85rem; text-indent: -0.85rem; }
+.brew-hero__bullets li::before { display: inline-block; width: 0.85rem; color: var(--audentra-purple); font-weight: 900; text-indent: 0; content: "\2014"; }
 .brew-hero__bullets li::marker { color: var(--audentra-purple); }
 .brew-unavailable { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; width: min(100%, 52rem); margin: 0 auto; padding: 1.6rem; border: 1px solid var(--audentra-line); border-radius: 1.1rem; background: #fff; box-shadow: 0 10px 34px rgb(10 31 68 / 6%); }
 .brew-unavailable > div { flex: 1; min-width: 18rem; }
@@ -21573,14 +21718,10 @@ a {
 .brew-empty strong { color: var(--audentra-navy); font-size: 0.74rem; }
 .brew-empty p { margin: 0.25rem 0 0; color: #78829a; font-size: 0.6rem; line-height: 1.5; }
 .brew-panel__empty { margin: 0; padding: 1.1rem 0.9rem; color: #98a1b3; font-size: 0.6rem; line-height: 1.55; }
-.brew-count-pill { display: inline-flex; align-items: center; margin-top: 0.45rem; padding: 0.18rem 0.42rem; border-radius: 0.35rem; background: #eef1f6; color: #5c6675; font-size: 0.5rem; font-weight: 800; }
 .brew-kpi--muted { background: #fcfcfe; }
 .brew-kpi--muted .brew-kpi__value { color: #8b94a6; }
 .brew-kpi__nodelta { color: #b3bccc !important; font-size: 0.52rem; }
 .brew-kpi__target--plain { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.brew-list--deadlines > li { grid-template-columns: 0.45rem 3.4rem minmax(0, 1fr) auto; }
-.brew-list--deadlines time { display: grid; color: var(--audentra-navy); font-size: 0.6rem; font-weight: 800; }
-.brew-list--deadlines time small { margin-top: 0.1rem; color: #98a1b3; font-size: 0.5rem; font-weight: 500; }
 
 /* coverage — what the briefing will not claim ------------------------------- */
 .brew-coverage__notes { display: grid; gap: 0.35rem; margin: 0.7rem 0 0; padding-left: 1.05rem; color: #5f6a7e; font-size: 0.6rem; line-height: 1.55; }
@@ -21612,10 +21753,8 @@ a {
 @keyframes brew-tick { from { transform: translateY(-0.25rem); opacity: 0; } }
 @keyframes brew-fade-up { from { transform: translateY(0.2rem); opacity: 0; } }
 @keyframes brew-pulse-dot { 50% { box-shadow: 0 0 0 3px rgb(0 196 154 / 28%); } }
-@keyframes brew-rotate-progress { from { width: 0; } to { width: 100%; } }
 
 @media (width <= 78rem) {
-  .brew-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .brew-insight-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .brew-day-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .brew-hero { grid-template-columns: 1fr; }
@@ -21649,16 +21788,17 @@ a {
   .brew-glance--links { grid-column: 1 / -1; }
 
   .brew-insights, .brew-pulse, .brew-changes, .brew-coverage { padding: 0.9rem 0.8rem; }
-  .brew-panel-head { flex-direction: column; gap: 0.6rem; }
-  .brew-panel-head__actions { flex-wrap: wrap; }
-
-  .brew-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .brew-pulse__controls { flex-direction: column; align-items: flex-start; }
-  .brew-timeframes { flex-wrap: wrap; max-width: 100%; }
+  .brew-section-head { flex-direction: column; gap: 0.6rem; }
+  .brew-section-head__actions { flex-wrap: wrap; }
+  .brew-news__rail { gap: 0.9rem; }
 
   .brew-list { padding-inline: 0.75rem; }
-  .brew-list--meetings > li { grid-template-columns: 0.45rem 2.8rem minmax(0, 1fr); }
-  .brew-list--meetings > li > .brew-chip { grid-column: 2 / -1; justify-self: start; }
+  .brew-list--meetings > li, .brew-list--emails > li { grid-template-columns: 0.45rem 3.6rem minmax(0, 1fr); }
+  .brew-list--meetings > li > .brew-chip, .brew-list--emails > li > .brew-chip { grid-column: 2 / -1; justify-self: start; }
+  /* Stacked, the three panels no longer have to agree on a height, so each one
+     runs as long as it needs and the page scrolls rather than the panel. */
+  .brew-panel__body { height: auto; max-height: none; overflow: visible; }
+  .brew-panel__views { padding-inline: 0.75rem; }
 
   .brew-connect-card { flex-direction: column; align-items: flex-start; }
   .brew-connect-card .button { width: 100%; }
@@ -21687,8 +21827,8 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .brew-edward-layer, .brew-edward, .brew-kpi__delta, .brew-pulse__progress i,
-  .brew-live-dot, .brew-setup__stage, .brew-preview__pulse, .bp-band, .bp-hero,
+  .brew-edward-layer, .brew-edward, .brew-kpi__primary,
+  .brew-setup__stage, .brew-preview__pulse, .bp-band, .bp-hero,
   .brew-building__progress i { animation: none; }
   .brew-glance, .brew-insight, .brew-kpi, .brew-topic-card, .brew-source-card,
   .brew-detail-option { transition: none; }

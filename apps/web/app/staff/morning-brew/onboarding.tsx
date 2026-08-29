@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Icon from "../../design-system/Icon.jsx";
-import { BREW_DETAIL_LEVELS, BREW_SOURCES, BREW_TOPICS } from "./catalog";
+import { BREW_SOURCES, BREW_TOPICS } from "./catalog";
+import { Glyph, OutlookMark } from "./glyphs";
 import { MorningBrewDashboard } from "./dashboard";
 import { DEFAULT_BREW_PREFERENCES } from "./preferences";
 import { SourcePreview } from "./source-previews";
@@ -32,11 +33,25 @@ const LEVEL_ICON: Record<BrewDetailLevelId, string> = {
   deep: "rise",
 };
 
-/** The dark tile that carries a source's glyph, in the list and in the preview. */
+/**
+ * The tile that carries a source's glyph, in the list and in the preview.
+ *
+ * Email is the exception: its mark is Outlook's own square rather than a tinted
+ * tile, because the row names the mailbox provider the reader has connected,
+ * and a house-styled envelope would be us quietly claiming that connection as
+ * ours.
+ */
 function SourceMark({ source, size = 18 }: { source: BrewSourceDefinition; size?: number }) {
+  if (source.icon === "outlook") {
+    return (
+      <span className="brew-source-mark brew-source-mark--plain" aria-hidden="true">
+        <OutlookMark size={size + 6} />
+      </span>
+    );
+  }
   return (
     <span className={`brew-source-mark brew-source-mark--${source.accent}`} aria-hidden="true">
-      <Icon name={source.icon} size={size} />
+      <Glyph name={source.icon} size={size} />
     </span>
   );
 }
@@ -47,11 +62,14 @@ function SourceMark({ source, size = 18 }: { source: BrewSourceDefinition; size?
 const SECTION_OF: Record<BrewSourceId, string> = {
   pulse: "brew-pulse-title",
   news: "brew-news-title",
-  calendar: "brew-deadlines-title",
-  email: "brew-requests-title",
-  actions: "brew-priorities-title",
+  calendar: "meetings-title",
+  email: "emails-title",
+  actions: "priorities-title",
   intelligence: "brew-insights-title",
 };
+
+/** The miniature's scale. Stated once, because two places have to agree on it. */
+const PREVIEW_SCALE = 1 / 3;
 
 /**
  * Tomorrow's edition, at a third of the size.
@@ -70,16 +88,34 @@ const SECTION_OF: Record<BrewSourceId, string> = {
 function BrewLivePreview({
   briefing,
   preferences,
-  staffName,
   focus,
 }: {
   briefing: BrewBriefing;
   preferences: BrewPreferences;
-  staffName: string;
   /** The source whose card is open; the miniature scrolls to its section. */
   focus: BrewSourceId | null;
 }) {
   const page = useRef<HTMLDivElement | null>(null);
+  const scaled = useRef<HTMLDivElement | null>(null);
+  /**
+   * `transform: scale()` paints smaller but still lays out at full size, so the
+   * scroll container used to believe the miniature was three times taller than
+   * it looked — the reader could scroll a page and a half past the end of the
+   * brief into nothing. The wrapper is given the height the page actually
+   * occupies once scaled, measured rather than guessed, so scrolling stops on
+   * the last band.
+   */
+  const [scaledHeight, setScaledHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    const node = scaled.current;
+    if (!node) return;
+    const measure = () => setScaledHeight(node.offsetHeight * PREVIEW_SCALE);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [briefing, preferences]);
 
   useEffect(() => {
     const container = page.current;
@@ -115,20 +151,24 @@ function BrewLivePreview({
           {briefing.kpis.length ||
           briefing.insights.length ||
           briefing.news.length ||
-          briefing.deadlines.length ||
+          briefing.meetings.length ||
           briefing.requests.length ||
           briefing.priorities.length ? (
-            <div className="bp-scale" inert aria-hidden="true">
-              <MorningBrewDashboard
-                briefing={briefing}
-                preferences={preferences}
-                staffName={staffName}
-                navigate={noop}
-                onOpenDetail={noop}
-                onAskEdward={noop}
-                onCustomize={noop}
-                onManageConnections={noop}
-              />
+            <div
+              className="bp-scale-clip"
+              style={scaledHeight ? { height: `${scaledHeight}px` } : undefined}
+            >
+              <div className="bp-scale" ref={scaled} inert aria-hidden="true">
+                <MorningBrewDashboard
+                  briefing={briefing}
+                  preferences={preferences}
+                  navigate={noop}
+                  onOpenDetail={noop}
+                  onAskEdward={noop}
+                  onCustomize={noop}
+                  onManageConnections={noop}
+                />
+              </div>
             </div>
           ) : (
             <p className="bp-empty">
@@ -247,8 +287,9 @@ function SourceCard({
             className="brew-detail-options"
             role="radiogroup"
             aria-label={`${source.title} detail level`}
+            style={{ gridTemplateColumns: `repeat(${source.levels.length}, minmax(0, 1fr))` }}
           >
-            {BREW_DETAIL_LEVELS.map((level) => (
+            {source.levels.map((level) => (
               <DetailOption
                 source={source}
                 level={level}
@@ -273,7 +314,6 @@ function SourceCard({
 export function MorningBrewOnboarding({
   step,
   direction,
-  firstName,
   staffName,
   draft,
   preview,
@@ -287,7 +327,6 @@ export function MorningBrewOnboarding({
   step: OnboardingStep;
   /** 1 when moving forward, -1 when going back; drives the slide direction. */
   direction: 1 | -1;
-  firstName: string;
   /** The reader's full name; the miniature renders the real masthead. */
   staffName: string;
   draft: OnboardingDraft;
@@ -307,7 +346,7 @@ export function MorningBrewOnboarding({
     () => ({
       ...DEFAULT_BREW_PREFERENCES,
       ...draft,
-      version: 6,
+      version: 7,
       updatedAt: "",
       onboardingComplete: false,
     }),
@@ -351,8 +390,8 @@ export function MorningBrewOnboarding({
           {step === 1 ? (
             <>
               <p className="brew-setup__role">
-                Signed in as <strong>{firstName}</strong> · {preview.students} students on your
-                roster
+                Signed in as <strong>{staffName}</strong> · {preview.reader.role} ·{" "}
+                {preview.cycleLabel}
               </p>
               <div className="brew-topic-grid">
                 {BREW_TOPICS.map((topic) => {
@@ -366,7 +405,7 @@ export function MorningBrewOnboarding({
                       key={topic.id}
                     >
                       <span className="brew-topic-card__icon" aria-hidden="true">
-                        {topic.icon}
+                        <Glyph name={topic.icon} size={18} />
                       </span>
                       <span className="brew-topic-card__check" aria-hidden="true">
                         {selected ? "✓" : "+"}
@@ -424,7 +463,6 @@ export function MorningBrewOnboarding({
         <BrewLivePreview
           briefing={preview}
           preferences={previewPreferences}
-          staffName={staffName}
           focus={focus}
         />
       </div>

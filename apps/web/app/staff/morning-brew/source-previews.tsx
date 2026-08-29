@@ -57,92 +57,111 @@ function Meter({ parts }: { parts: { label: string; percent: number; tone: strin
   );
 }
 
-/** A three-point rising sparkline with a dotted run-out to the projection. */
-function Spark() {
+/**
+ * A run that climbs and then flattens, over the window behind it.
+ *
+ * `projected` draws a dotted run-out past today, and is off by default: only
+ * the Deep Dive card continues a line past the last reading, and it draws that
+ * continuation as a different kind of line for exactly this reason.
+ */
+function Spark({ projected = false }: { projected?: boolean }) {
+  const points: [number, number][] = [
+    [4, 32],
+    [20, 28],
+    [36, 27],
+    [52, 20],
+    [68, 16],
+    [84, 15],
+  ];
   return (
     <svg className="mbp-spark" viewBox="0 0 120 40" role="presentation" aria-hidden="true">
       <polyline
-        points="4,32 20,29 36,30 52,24 68,21 84,12"
+        points={points.map(([x, y]) => `${x},${y}`).join(" ")}
         fill="none"
         stroke="currentColor"
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <line x1="84" y1="12" x2="114" y2="7" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3" opacity=".5" />
-      {[
-        [4, 32],
-        [20, 29],
-        [36, 30],
-        [52, 24],
-        [68, 21],
-        [84, 12],
-      ].map(([x, y]) => (
+      {projected ? (
+        <line x1="84" y1="15" x2="114" y2="12" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3" opacity=".5" />
+      ) : null}
+      {points.map(([x, y]) => (
         <circle cx={x} cy={y} r="2.4" fill="#fff" stroke="currentColor" strokeWidth="1.6" key={`${x}`} />
       ))}
-      <circle cx="114" cy="7" r="2.4" fill="#fff" stroke="currentColor" strokeWidth="1.4" opacity=".6" />
+      {projected ? (
+        <circle cx="114" cy="12" r="2.4" fill="#fff" stroke="currentColor" strokeWidth="1.4" opacity=".6" />
+      ) : null}
     </svg>
   );
 }
 
 /* ---------------------------------------------------------- institutional pulse */
 
+/*
+ * The pulse card shows one figure and one comparison at a time — every window
+ * takes its turn in the same slot — so the illustrations show one comparison
+ * too. Three deltas stacked in a drawing would promise a card that does not
+ * exist.
+ *
+ * The three drawings differ in exactly the way the real cards do: nothing under
+ * the figure at a glance, the goal and the progress toward it with context, and
+ * the thirty-day run with a sentence reading it at depth.
+ */
 const PULSE = {
   glance: (
     <div className="mbp-card">
-      <Head label="Net Deposits" />
+      <Head label="Deposit Paid" />
       <div className="mbp-figure">
-        <strong>3,842</strong>
-        <Delta value="47" up note="vs yesterday" />
+        <strong>2,450</strong>
+        <Delta value="1.1%" up={false} note="vs yesterday" />
       </div>
-      <div className="mbp-figure-row">
-        <Delta value="6.2%" up note="vs last 7 days" />
-        <Delta value="8.1%" up note="vs last year" />
-      </div>
+      <p className="mbp-axis">
+        <span>Yesterday</span>
+        <span>7d</span>
+        <span>30d</span>
+        <span>Last year</span>
+      </p>
     </div>
   ),
   context: (
     <div className="mbp-card">
-      <Head label="Net Deposits" />
+      <Head label="Deposit Paid" />
       <div className="mbp-figure">
         <strong>
-          3,842 <small>/ 4,500</small>
+          2,450 <small>/ 3,200</small>
         </strong>
-        <span className="mbp-target">
-          Target
-          <b>May 1</b>
-        </span>
+        <Delta value="1.1%" up={false} note="vs yesterday" />
       </div>
+      <p className="mbp-axis">
+        <span>Due by May 31</span>
+        <span>77%</span>
+      </p>
       <span className="mbp-meter" aria-hidden="true">
-        <i className="is-good" style={{ width: "85%" }} />
+        <i className="is-blue" style={{ width: "77%" }} />
       </span>
-      <p className="mbp-goal">85% to goal</p>
     </div>
   ),
   deep: (
     <div className="mbp-card">
+      <Head label="Deposit Paid" />
       <div className="mbp-figure">
-        <span>
-          <Head label="Net Deposits" />
-          <strong>
-            3,842 <small>/ 4,500</small>
-          </strong>
-        </span>
-        <span className="mbp-goal">85% to goal</span>
+        <strong>
+          2,450 <small>/ 3,200</small>
+        </strong>
+        <Delta value="1.1%" up={false} note="vs yesterday" />
       </div>
       <div className="mbp-trend">
-        <Spark />
-        <span className="mbp-projection">
-          Projected
-          <b>4,470</b>
-          <small>by May 1</small>
-        </span>
+        <Spark projected />
       </div>
       <p className="mbp-axis">
-        <span>30d ago</span>
-        <span>Today</span>
-        <span>May 1</span>
+        <span>Due by May 31</span>
+        <span>77%</span>
       </p>
+      <span className="mbp-meter" aria-hidden="true">
+        <i className="is-blue" style={{ width: "77%" }} />
+      </span>
+      <p className="mbp-fact">Flat for six days; this pace reaches about 2,716 by May 31.</p>
     </div>
   ),
 };

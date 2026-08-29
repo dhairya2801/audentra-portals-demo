@@ -1,8 +1,10 @@
+import { supportedLevel } from "./catalog";
 import { HIGHER_ED_NEWS } from "./news";
 import type { BrewDemoSource } from "./demo-brew";
 import type {
   BrewBriefing,
   BrewDetailLevelId,
+  BrewInsight,
   BrewNewsItem,
   BrewPreferences,
   BrewQuickLink,
@@ -16,7 +18,8 @@ import type {
  * This module does exactly one thing: apply the reader's own filters and
  * limits. It computes no metric, derives no severity, and writes no prose about
  * the institution — everything it returns was already written in
- * `demo-brew.ts`. Preferences may only ever subtract.
+ * `demo-brew.ts`. Preferences may only ever subtract, with one stated exception
+ * described on `insightsFor` below.
  *
  * Until this commit the corpus arrived from `GET /v1/staff/morning-brew` and
  * this module also renamed the contract's fields. The live read is off for the
@@ -41,12 +44,17 @@ export function formatBrewPercent(value: number): string {
 /* ---------------------------------------------------------------- filtering */
 
 /**
- * How long a section runs is now the source's own answer, not one global
- * setting: a reader who asked for the funnel at a glance and the action center
- * in full gets a short KPI band and a long queue, which is what they said.
+ * How long a section runs is the source's own answer, not one global setting: a
+ * reader who asked for the funnel at a glance and the action center in full
+ * gets a short KPI band and a long queue, which is what they said.
+ *
+ * The level is passed through `supportedLevel` so a stored answer for a depth a
+ * source no longer offers reads at the deepest depth it does.
  */
-const levelOf = (preferences: BrewPreferences, id: BrewSourceId): BrewDetailLevelId =>
-  preferences.sources[id].detail;
+export const levelOf = (
+  preferences: BrewPreferences,
+  id: BrewSourceId,
+): BrewDetailLevelId => supportedLevel(id, preferences.sources[id].detail);
 
 const enabled = (preferences: BrewPreferences, id: BrewSourceId): boolean =>
   preferences.sources[id].enabled;
@@ -55,18 +63,32 @@ const enabled = (preferences: BrewPreferences, id: BrewSourceId): boolean =>
 const byLevel = (level: BrewDetailLevelId, counts: [number, number, number]): number =>
   level === "glance" ? counts[0] : level === "context" ? counts[1] : counts[2];
 
+/**
+ * How many KPIs reach the band.
+ *
+ * The Pulse row is one horizontal row with a next control, so this is the size
+ * of the reel rather than the height of the section — a deeper read is worth
+ * more cards to page through, not a taller block.
+ */
 const kpiLimit = (preferences: BrewPreferences) =>
-  byLevel(levelOf(preferences, "pulse"), [4, 6, 12]);
-const insightLimit = (preferences: BrewPreferences) =>
-  byLevel(levelOf(preferences, "intelligence"), [2, 3, 4]);
+  byLevel(levelOf(preferences, "pulse"), [8, 10, 12]);
+
+/**
+ * The three day panels each render four rows and put the rest behind "View
+ * more", so the level no longer decides how tall the column is — the panel
+ * does. These bounds are the reader's appetite for the whole queue.
+ */
 const priorityLimit = (preferences: BrewPreferences) =>
-  byLevel(levelOf(preferences, "actions"), [3, 4, 6]);
-const deadlineLimit = (preferences: BrewPreferences) =>
-  byLevel(levelOf(preferences, "calendar"), [3, 6, 12]);
+  byLevel(levelOf(preferences, "actions"), [9, 10, 14]);
+const meetingLimit = (preferences: BrewPreferences) =>
+  byLevel(levelOf(preferences, "calendar"), [9, 10, 14]);
 const requestLimit = (preferences: BrewPreferences) =>
-  byLevel(levelOf(preferences, "email"), [3, 5, 12]);
+  byLevel(levelOf(preferences, "email"), [9, 10, 14]);
 const newsLimit = (preferences: BrewPreferences) =>
-  byLevel(levelOf(preferences, "news"), [4, 6, 8]);
+  byLevel(levelOf(preferences, "news"), [4, 4, 4]);
+
+/** The brief prints three findings, at every depth. See `insightsFor`. */
+export const BREW_INSIGHT_COUNT = 3;
 
 /**
  * A minute per switched-on source, and a second minute for one asked for in
@@ -76,15 +98,15 @@ const newsLimit = (preferences: BrewPreferences) =>
 function readTimeFor(preferences: BrewPreferences): number {
   const on = Object.values(preferences.sources).filter((source) => source.enabled);
   const deep = on.filter((source) => source.detail === "deep").length;
-  return Math.max(1, Math.round(on.length * 0.7 + deep * 0.8));
+  return Math.max(1, Math.round(on.length * 0.4 + deep * 0.5));
 }
 
 /* ------------------------------------------------------------------- builder */
 
 export const BREW_QUICK_LINKS: BrewQuickLink[] = [
-  { id: "students", label: "Student roster", destination: "students" },
-  { id: "tasks", label: "Action Center", destination: "tasks" },
-  { id: "messages", label: "Messages", destination: "messages" },
+  { id: "overview", label: "Enrollment Dashboard", destination: "overview" },
+  { id: "tasks", label: "Team Updates", destination: "tasks" },
+  { id: "knowledge", label: "Reports Center", destination: "knowledge" },
   { id: "edward", label: "Ask Edward", destination: "edward" },
 ];
 
@@ -92,35 +114,60 @@ export const BREW_QUICK_LINKS: BrewQuickLink[] = [
  * The news list is a constant, so "building" it is only ever filtering: the
  * topics the reader follows, bounded by the depth they asked for. No story is
  * scored, reordered by relevance, or joined to a student.
+ *
+ * Where a reader's topics leave the band short, stories from outside them fill
+ * the row in corpus order. A four-across rail with one card in it looks broken,
+ * and the stories are a curated sector feed rather than a per-topic queue.
  */
 function newsFor(preferences: BrewPreferences, topics: Set<BrewTopicId>): BrewNewsItem[] {
-  return HIGHER_ED_NEWS.filter((item) => topics.has(item.topic)).slice(0, newsLimit(preferences));
+  const limit = newsLimit(preferences);
+  const followed = HIGHER_ED_NEWS.filter((item) => topics.has(item.topic));
+  if (followed.length >= limit) return followed.slice(0, limit);
+  const rest = HIGHER_ED_NEWS.filter((item) => !topics.has(item.topic));
+  return [...followed, ...rest].slice(0, limit);
 }
 
 /**
- * The deck the corpus wrote, lengthened by its own first bullet when the reader
- * asked for the read-across in full. Nothing here composes a sentence.
+ * Three findings, chosen by what the reader follows.
+ *
+ * The count is fixed on purpose. Three is what a leader can act on before
+ * lunch, and a band that grew with the topics followed would turn a briefing
+ * into a backlog. So the reader's topics reorder the pool rather than shorten
+ * it: findings inside their topics come first, in corpus order, and the rest
+ * pad the band when their choices do not fill it.
+ *
+ * This is the one place a preference does not purely subtract, and it is worth
+ * being explicit about why: a two-card row of findings would read as "there are
+ * only two things wrong today", which is a claim about the institution rather
+ * than about the reader's settings.
  */
-function deckFor(preferences: BrewPreferences, source: BrewDemoSource): string {
-  const full =
-    enabled(preferences, "intelligence") && levelOf(preferences, "intelligence") === "deep";
-  if (full && source.synthesis.bullets.length) {
-    return `${source.synthesis.headline} ${source.synthesis.bullets[0]}`;
-  }
+function insightsFor(
+  insights: BrewInsight[],
+  topics: Set<BrewTopicId>,
+): BrewInsight[] {
+  const followed = insights.filter((insight) => topics.has(insight.topic));
+  const rest = insights.filter((insight) => !topics.has(insight.topic));
+  return [...followed, ...rest].slice(0, BREW_INSIGHT_COUNT);
+}
+
+/**
+ * The deck the corpus wrote, and the bullets under it when the read-across is
+ * switched on. Nothing here composes a sentence.
+ */
+function deckFor(source: BrewDemoSource): string {
   return source.synthesis.headline;
 }
 
 /**
  * Assemble today's briefing from the corpus and the reader's choices.
  *
- * Preferences only ever subtract. A section the reader switched off is empty; a
- * topic they do not follow is filtered out; a shallower level is a shorter
- * slice. Nothing here can add a value the corpus did not hold.
+ * A section the reader switched off is empty; a topic they do not follow is
+ * filtered out; a shallower level is a shorter slice. Nothing here can add a
+ * value the corpus did not hold.
  */
 export function buildBrewBriefing(
   source: BrewDemoSource,
   preferences: BrewPreferences,
-  staffName: string,
 ): BrewBriefing {
   const topics = new Set<BrewTopicId>(preferences.topics);
   const pulse = enabled(preferences, "pulse");
@@ -134,17 +181,20 @@ export function buildBrewBriefing(
     .filter((kpi) => topics.has(kpi.topic))
     .slice(0, kpiLimit(preferences));
 
-  const insights = source.insights
-    .filter((item) => topics.has(item.topic))
-    .slice(0, insightLimit(preferences));
+  const insights = insightsFor(source.insights, topics);
 
-  const deadlineItems = source.deadlines
-    .filter((deadline) => topics.has(deadline.topic))
-    .slice(0, deadlineLimit(preferences));
+  // Bound to what actually ships, because the Calendar card at the top counts
+  // the same list the Calendar panel prints — a card reading "9 meetings today"
+  // above a switched-off section would be the page contradicting itself.
+  const meetings = calendar
+    ? source.meetings
+        .filter((meeting) => topics.has(meeting.topic))
+        .slice(0, meetingLimit(preferences))
+    : [];
 
   // An urgent request reaches the reader even from a topic they do not follow:
-  // a student waiting on money is not a subject preference.
-  const requestItems = source.requests
+  // a provost waiting on a number is not a subject preference.
+  const requests = source.requests
     .filter((request) => topics.has(request.topic) || request.priority === "urgent")
     .slice(0, requestLimit(preferences));
 
@@ -153,8 +203,12 @@ export function buildBrewBriefing(
     .slice(0, priorityLimit(preferences));
 
   return {
-    greetingName: staffName.split(" ")[0] || "there",
-    deck: deckFor(preferences, source),
+    // The demo brief is written for one named reader, so the greeting is the
+    // corpus's own rather than whichever persona opened the workspace.
+    greetingName: source.reader.firstName,
+    reader: source.reader,
+    cycleLabel: source.cycleLabel,
+    deck: deckFor(source),
     bullets: intelligence ? source.synthesis.bullets : [],
     readTimeMinutes: readTimeFor(preferences),
     updatedAt: source.generatedAt,
@@ -164,15 +218,18 @@ export function buildBrewBriefing(
     insights: intelligence ? insights : [],
     kpis: pulse ? kpis : [],
     news: news ? newsFor(preferences, topics) : [],
-    deadlines: calendar ? deadlineItems : [],
-    requests: email ? requestItems : [],
+    meetings,
+    requests: email ? requests : [],
     priorities: actions ? priorities : [],
     quickLinks: BREW_QUICK_LINKS,
     glance: {
+      // The mailbox total, which is larger than the curated slice below it.
       requests: email ? source.glance.requests : 0,
       requestsAwaitingReply: email ? source.glance.requestsAwaitingReply : 0,
-      deadlinesOverdue: calendar ? source.glance.deadlinesOverdue : 0,
-      deadlinesThisWeek: calendar ? source.glance.deadlinesThisWeek : 0,
+      // The calendar card counts the same meetings the panel prints, so the two
+      // can never disagree in front of the reader.
+      meetings: meetings.length,
+      meetingsHighPriority: meetings.filter((meeting) => meeting.priority === "high").length,
     },
     coverage: source.coverage,
   };
@@ -182,10 +239,10 @@ export function buildBrewBriefing(
 
 export const EDWARD_SUGGESTIONS = [
   "What should I pay attention to today?",
-  "Which deposited students have an overdue requirement?",
-  "Which accepted students have not paid their enrollment deposit?",
+  "Which commuter admits have not paid a deposit?",
+  "Which students have an open financial aid verification?",
   "What is blocking the most students right now?",
-  "Which students have a requirement due in the next 7 days?",
+  "Which deposited students have not registered for orientation?",
 ] as const;
 
 /**
@@ -215,4 +272,15 @@ export function edwardOpeningQuestion(
     return `Summarise ${context.toLowerCase()} for the incoming class, using canonical records only.`;
   }
   return "What should I pay attention to today?";
+}
+
+/**
+ * The question a KPI's Edward button opens with.
+ *
+ * Addressed to the reader by name and to the figure by its label, because the
+ * button sits on one card and a generic opener would make the reader say which
+ * card they meant after having already pointed at it.
+ */
+export function edwardKpiGreeting(firstName: string, label: string): string {
+  return `Hello ${firstName}, what would you like to know more about ${label}?`;
 }
