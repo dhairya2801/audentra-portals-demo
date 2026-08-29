@@ -39,6 +39,7 @@ import {
   updateStaffWorkItem,
   uploadStaffCallRecording,
 } from "../lib/api-client";
+import { DateTimePicker } from "../components/date-time-picker";
 import { useApiResource } from "../hooks/use-api-resource";
 
 type DetailTab = "overview" | "next_step" | "outcomes" | "comments" | "history";
@@ -94,6 +95,15 @@ function ActionChannelIcon({
     <svg viewBox="0 0 24 24" role="img" aria-label="Enrollment action">
       <rect x="5" y="3.5" width="14" height="17" rx="2" />
       <path d="M9 3.5h6V7H9zM8.5 11h7M8.5 15h5" />
+    </svg>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M20 7v5h-5M4 17v-5h5" />
+      <path d="M18.2 9A7 7 0 0 0 6.1 6.1L4 9M5.8 15A7 7 0 0 0 17.9 17.9L20 15" />
     </svg>
   );
 }
@@ -496,10 +506,7 @@ export function ActionCenterDetail({
               void retryAi(activeInteraction ? "both" : "student_summary")
             }
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M20 7v5h-5M4 17v-5h5" />
-              <path d="M18.2 9A7 7 0 0 0 6.1 6.1L4 9M5.8 15A7 7 0 0 0 17.9 17.9L20 15" />
-            </svg>
+            <RefreshIcon />
           </button>
         </div>
       </header>
@@ -786,23 +793,24 @@ function OverviewTab({
               <p className="eyebrow">Suggested approach (AI)</p>
               <h2>{aiLabel(insight.state)}</h2>
             </div>
-            <span className={`action-ai-state action-ai-state--${insight.state}`}>
-              {aiLabel(insight.state)}
-            </span>
+            <div className="action-card-heading__actions">
+              <span className={`action-ai-state action-ai-state--${insight.state}`}>
+                {aiLabel(insight.state)}
+              </span>
+              <button
+                className="action-icon-button action-ai-refresh"
+                type="button"
+                disabled={Boolean(busy) || isAiBusy(insight.state)}
+                aria-label="Refresh task insight"
+                title="Refresh task insight"
+                onClick={() => onRetry("task_insight")}
+              >
+                <RefreshIcon />
+              </button>
+            </div>
           </div>
           <p>{insight.suggestedApproach ?? "The suggested approach is waiting for the task insight run."}</p>
           {insight.suggestedChannel ? <p><strong>Recommended channel:</strong> {readable(insight.suggestedChannel)}</p> : null}
-          <button
-            type="button"
-            disabled={Boolean(busy) || isAiBusy(insight.state)}
-            onClick={() => onRetry("task_insight")}
-          >
-            {isAiBusy(insight.state)
-              ? "Task insight refresh queued"
-              : insight.state === "failed_retryable" || insight.state === "dead_letter"
-                ? "Retry task insight"
-                : "Refresh task insight"}
-          </button>
         </section>
       </div>
 
@@ -812,9 +820,21 @@ function OverviewTab({
               <p className="eyebrow">Student summary (AI)</p>
               <h2>{aiLabel(summary.state)}</h2>
             </div>
-            <span className={`action-ai-state action-ai-state--${summary.state}`}>
-              {aiLabel(summary.state)}
-            </span>
+            <div className="action-card-heading__actions">
+              <span className={`action-ai-state action-ai-state--${summary.state}`}>
+                {aiLabel(summary.state)}
+              </span>
+              <button
+                className="action-icon-button action-ai-refresh"
+                type="button"
+                disabled={Boolean(busy) || isAiBusy(summary.state)}
+                aria-label="Refresh student summary"
+                title="Refresh student summary"
+                onClick={() => onRetry("student_summary")}
+              >
+                <RefreshIcon />
+              </button>
+            </div>
           </div>
           <p>
             {summary.summary ??
@@ -823,17 +843,6 @@ function OverviewTab({
           {summary.keyFacts.length > 0 ? (
             <ul>{summary.keyFacts.map((fact) => <li key={fact}>{fact}</li>)}</ul>
           ) : null}
-          <button
-            type="button"
-            disabled={Boolean(busy) || isAiBusy(summary.state)}
-            onClick={() => onRetry("student_summary")}
-          >
-            {isAiBusy(summary.state)
-              ? "Student summary refresh queued"
-              : summary.state === "failed_retryable" || summary.state === "dead_letter"
-                ? "Retry student summary"
-                : "Refresh student summary"}
-          </button>
       </section>
 
       {!terminalStatuses.has(item.status) ? (
@@ -871,7 +880,7 @@ function OverviewTab({
             <label className="action-form-span">Blocker or cancellation detail
               <textarea name="blockerDetail" defaultValue={item.blocker?.detail ?? ""} />
             </label>
-            <label>Review blocker at<input name="blockerReviewAt" type="datetime-local" /></label>
+            <label>Review blocker at<DateTimePicker name="blockerReviewAt" /></label>
             <label>Cancellation reason<input name="terminalReason" defaultValue={item.terminalReason ?? ""} /></label>
             <label className="action-form-span">Audit note<textarea name="note" /></label>
           </div>
@@ -962,20 +971,20 @@ function DocumentReviewPanel({
     <section className="action-card action-document-review" aria-labelledby="document-review-title">
       <div className="action-card-heading">
         <div>
-          <p className="eyebrow">Enrollment document decision</p>
-          <h2 id="document-review-title">Approve or request a replacement</h2>
+          <p className="eyebrow">Document check-in</p>
+          <h2 id="document-review-title">Review it and choose the next step</h2>
         </div>
         <span>{reviewableDocuments.length} awaiting decision</span>
       </div>
       <p className="action-document-review__lede">
-        The decision updates this enrollment step, its audit trail, and the student&apos;s
-        document history together. Private staff context is never shown to the student.
+        A thoughtful decision keeps the student&apos;s enrollment moving. They will only see the
+        note you choose to share.
       </p>
 
       <form onSubmit={submitDecision}>
         <div className="action-form-grid">
           <label className="action-form-span">
-            Uploaded file
+            Document ready for review
             <select
               value={selectedDocument.id}
               onChange={(event) => {
@@ -1020,7 +1029,7 @@ function DocumentReviewPanel({
           {selectedIsReviewable ? (
             <>
               <fieldset className="action-form-span action-document-review__decision">
-                <legend>Decision</legend>
+                <legend>What happens next?</legend>
                 <label>
                   <input
                     type="radio"
@@ -1080,7 +1089,7 @@ function DocumentReviewPanel({
               ) : null}
 
               <label className="action-form-span">
-                Student-facing decision note
+                A note for the student
                 <textarea
                   required
                   minLength={3}
@@ -1089,15 +1098,17 @@ function DocumentReviewPanel({
                   value={note}
                   placeholder={
                     decision === "accepted"
-                      ? "Confirm what was accepted."
-                      : "Explain exactly what the student should replace or correct."
+                      ? "Let them know what is all set."
+                      : "Explain what needs updating and how to send it back."
                   }
                   onChange={(event) => {
                     setNote(event.target.value);
                     intentRef.current = null;
                   }}
                 />
-                <small>This appears in the student&apos;s document and enrollment history.</small>
+                <small>
+                  Keep it clear and kind - this note appears in the student&apos;s document history.
+                </small>
               </label>
 
               <label className="action-form-span action-document-review__notify">
@@ -1109,7 +1120,7 @@ function DocumentReviewPanel({
                     intentRef.current = null;
                   }}
                 />
-                Send the student an inbox notification
+                Let the student know in their inbox
               </label>
               <button
                 className={`action-document-review__submit action-document-review__submit--${decision}`}
@@ -1125,7 +1136,7 @@ function DocumentReviewPanel({
             </>
           ) : (
             <p className="action-form-span action-document-review__settled" role="status">
-              This file is {readable(selectedDocument.status)} and has no pending decision.
+              This document is all set and has no decision waiting.
             </p>
           )}
         </div>
@@ -1813,7 +1824,7 @@ function OutcomesTab({
               </select>
             </label>
             <label className="action-form-span">Next step<textarea name="nextStep" defaultValue={interaction?.outcome?.nextStep ?? detail.workItem.nextStep ?? ""} /></label>
-            <label>Follow up at<input name="followUpAt" type="datetime-local" /></label>
+            <label>Follow up at<DateTimePicker name="followUpAt" /></label>
           </div>
           <button type="submit" disabled={Boolean(busy)}>Save official outcome</button>
         </form>

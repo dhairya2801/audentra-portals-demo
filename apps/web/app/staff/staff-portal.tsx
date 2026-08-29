@@ -25,6 +25,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { DateTimePicker } from "../components/date-time-picker";
 import { TenantLink as Link } from "../components/tenant-link";
 import { StaffEdwardAssistant } from "../components/staff-edward-assistant";
 import { PortalMark } from "../components/portal-ui";
@@ -1382,7 +1383,7 @@ function CreateTaskDialog({
         </label>
         <label className="staff-create-task-form__wide">
           <span>Due date and time</span>
-          <input name="dueAt" type="datetime-local" />
+          <DateTimePicker name="dueAt" />
         </label>
         {error ? (
           <p className="field-error staff-create-task-form__wide" role="alert">
@@ -1944,18 +1945,16 @@ function EventEditor({
         <div className="staff-form-grid">
           <label>
             Starts (UTC)
-            <input
+            <DateTimePicker
               name="startsAt"
-              type="datetime-local"
               defaultValue={campusEvent ? utcInputValue(campusEvent.startsAt) : ""}
               required
             />
           </label>
           <label>
             Ends (UTC)
-            <input
+            <DateTimePicker
               name="endsAt"
-              type="datetime-local"
               defaultValue={campusEvent ? utcInputValue(campusEvent.endsAt) : ""}
               required
             />
@@ -2063,9 +2062,8 @@ function EventEditor({
           <div className="staff-form-grid">
             <label>
               Advertise from (UTC)
-              <input
+              <DateTimePicker
                 name="advertisementStartsAt"
-                type="datetime-local"
                 defaultValue={
                   campusEvent?.advertisementStartsAt
                     ? utcInputValue(campusEvent.advertisementStartsAt)
@@ -2075,9 +2073,8 @@ function EventEditor({
             </label>
             <label>
               Advertise until (UTC)
-              <input
+              <DateTimePicker
                 name="advertisementEndsAt"
-                type="datetime-local"
                 defaultValue={
                   campusEvent?.advertisementEndsAt
                     ? utcInputValue(campusEvent.advertisementEndsAt)

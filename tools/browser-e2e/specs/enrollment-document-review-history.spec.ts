@@ -274,7 +274,7 @@ test.describe("UI-only enrollment document decision cycle", () => {
       const reasonLabel = await reasonSelect.locator("option:checked").textContent();
       expect(reasonLabel?.trim()).toBeTruthy();
       await expect(rejectionDialog.getByLabel(/Internal staff note/)).toHaveCount(0);
-      await rejectionDialog.getByLabel("Student-facing decision note").fill(rejectionNote);
+      await rejectionDialog.getByLabel("A note for the student").fill(rejectionNote);
       await rejectionDialog.getByLabel("Send the student an inbox notification").check();
       const rejectResponse = staff.page.waitForResponse(
         (response) =>
@@ -317,7 +317,7 @@ test.describe("UI-only enrollment document decision cycle", () => {
       await selectUploadedFile(approvalDialog, replacementFile);
       await approvalDialog.getByLabel("Approve document", { exact: true }).check();
       await approvalDialog
-        .getByLabel("Student-facing decision note")
+        .getByLabel("A note for the student")
         .fill("Replacement is complete and accepted.");
       const approveResponse = staff.page.waitForResponse(
         (response) =>
