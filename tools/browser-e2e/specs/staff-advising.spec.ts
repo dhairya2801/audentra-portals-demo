@@ -11,6 +11,11 @@ import { demoApiBaseUrl } from "../support/demo-session";
  * i.e. after `npm run audentra:tenant -- demo && npm run audentra:deploy` in
  * Audentra-university-explorer. Otherwise every test skips with a reason.
  *
+ * It drives the *open* demo panels — a search box and a student-ID field — so
+ * the API must run with its persona allowlist empty. The local stack now names
+ * four personas by default, so start it with
+ * `DEMO_STUDENT_ALLOWLIST= DEMO_STAFF_ALLOWLIST= docker compose up`.
+ *
  *   E2E_BASE_URL=http://localhost:3000 E2E_API_BASE_URL=http://localhost:4000 \
  *     npx playwright test tools/browser-e2e/specs/staff-advising.spec.ts
  */
