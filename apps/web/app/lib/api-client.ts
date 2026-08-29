@@ -1742,7 +1742,13 @@ export function getStaffDocumentContentUrl(path: string) {
 }
 
 function tenantAwareDocumentUrl(path: string) {
-  return new URL(path, `${API_BASE_URL}/`).toString();
+  const browserOrigin = typeof window === "undefined" ? "" : window.location.origin;
+  const baseOrigin = API_BASE_URL || browserOrigin;
+  if (!baseOrigin) return path.startsWith("/") ? path : `/${path}`;
+
+  const normalizedBase = new URL(`${baseOrigin}/`);
+  const documentUrl = new URL(path, normalizedBase);
+  return documentUrl.origin === normalizedBase.origin ? documentUrl.toString() : normalizedBase.toString();
 }
 
 export function createAssistantConversation(
