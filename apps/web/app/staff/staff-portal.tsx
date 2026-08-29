@@ -255,15 +255,7 @@ const createTaskActionTypes: Array<{
   value: StaffActionType;
   label: string;
 }> = [
-  { value: "enrollment_follow_up", label: "Enrollment follow-up" },
-  { value: "onboarding_assistance", label: "Onboarding assistance" },
-  { value: "document_review", label: "Document review" },
-  { value: "missing_information", label: "Missing information" },
-  { value: "external_verification", label: "External verification" },
-  { value: "deadline_risk", label: "Deadline risk" },
-  { value: "staff_decision", label: "Staff decision" },
-  { value: "communication_response", label: "Communication response" },
-  { value: "blocked_dependency", label: "Blocked dependency" },
+  { value: "enrollment_follow_up", label: "Reach-out task" },
 ];
 
 const viewCopy: Record<
@@ -1317,15 +1309,17 @@ function CreateTaskDialog({
           </select>
         </label>
         <label>
-          <span>Task category</span>
-          <select name="actionType" defaultValue="">
-            <option value="">Use the flow default</option>
+          <span>Task type</span>
+          <select name="actionType" defaultValue="enrollment_follow_up">
             {createTaskActionTypes.map((option) => (
               <option value={option.value} key={option.value}>
                 {option.label}
               </option>
             ))}
           </select>
+          <small className="staff-create-task-form__hint">
+            Document approval or rejection tasks are created automatically when a student submits a file.
+          </small>
         </label>
         <label>
           <span>Team / component</span>

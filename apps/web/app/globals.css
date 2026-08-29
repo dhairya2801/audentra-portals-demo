@@ -19269,7 +19269,7 @@ a {
 }
 
 .action-channel-grid button {
-  min-height: 7rem;
+  min-height: 4.75rem;
   align-content: start;
   gap: 0.34rem;
   padding: 0.8rem;
@@ -22319,6 +22319,29 @@ h1, h2, h3, h4,
   gap: .45rem;
 }
 
+.action-document-review__decision label {
+  min-height: 2.35rem;
+  padding: .38rem .62rem;
+  border: 1px solid #d9e2eb;
+  border-radius: .55rem;
+  background: #fff;
+  color: #344159;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+.action-document-review__decision label:has(input:checked) {
+  border-color: #2d619d;
+  background: #eef6ff;
+  box-shadow: 0 0 0 2px rgb(45 97 157 / 10%);
+}
+
+.action-document-review__decision label:has(input[value="rejected"]:checked) {
+  border-color: #ad5459;
+  background: #fff4f3;
+  box-shadow: 0 0 0 2px rgb(173 84 89 / 10%);
+}
+
 .action-document-review__decision input,
 .action-document-review__notify input {
   width: auto;
@@ -22328,6 +22351,36 @@ h1, h2, h3, h4,
   color: #6d798b;
   font-size: .65rem;
   font-weight: 500;
+}
+
+.action-document-review__submit {
+  justify-self: start;
+  min-height: 2.25rem !important;
+  padding: .46rem .82rem !important;
+  border-color: #204d80 !important;
+  border-radius: 999px !important;
+  background: linear-gradient(135deg, #173b67, #28639f) !important;
+  box-shadow: 0 5px 12px rgb(23 59 103 / 16%);
+  font-size: .74rem;
+  letter-spacing: .01em;
+}
+
+.action-document-review__submit--rejected {
+  border-color: #98464c !important;
+  background: linear-gradient(135deg, #843d45, #b65a5c) !important;
+  box-shadow: 0 5px 12px rgb(132 61 69 / 16%);
+}
+
+.action-document-review__submit:disabled {
+  box-shadow: none;
+  opacity: .58;
+}
+
+.staff-create-task-form__hint {
+  color: #657187;
+  font-size: .65rem;
+  font-weight: 550;
+  line-height: 1.45;
 }
 
 .reject-reason-label {

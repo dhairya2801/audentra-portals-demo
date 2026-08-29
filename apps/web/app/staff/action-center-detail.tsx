@@ -1111,7 +1111,11 @@ function DocumentReviewPanel({
                 />
                 Send the student an inbox notification
               </label>
-              <button type="submit" disabled={!canSubmit}>
+              <button
+                className={`action-document-review__submit action-document-review__submit--${decision}`}
+                type="submit"
+                disabled={!canSubmit}
+              >
                 {busy === "document-review"
                   ? "Saving decision..."
                   : decision === "accepted"
@@ -1215,13 +1219,20 @@ function NextStepTab({
       setEmailBusy(false);
     }
   };
+  if (detail.workItem.actionType === "document_review") {
+    return (
+      <div className="action-panel-stack">
+        <DocumentReviewPanel
+          detail={detail}
+          busy={busy}
+          onReviewDocument={onReviewDocument}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="action-panel-stack">
-      <DocumentReviewPanel
-        detail={detail}
-        busy={busy}
-        onReviewDocument={onReviewDocument}
-      />
       <section className="action-card">
         <p className="eyebrow">1. Choose how you want to reach out</p>
         <h2>Pick the channel that fits the next action</h2>
