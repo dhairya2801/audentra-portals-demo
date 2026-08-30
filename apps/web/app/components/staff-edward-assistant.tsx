@@ -20,7 +20,6 @@ import type {
   StaffAssistantWebSourcesBlock,
 } from "@vv/contracts";
 import {
-  type FormEvent,
   useCallback,
   useEffect,
   useRef,
@@ -31,7 +30,11 @@ import {
   askStaffEdward,
   createStaffAssistantConversation,
 } from "../lib/api-client";
+import Icon from "../design-system/Icon.jsx";
+import { IconButton } from "../design-system/primitives/Button.jsx";
 import { AssistantBlocks } from "./assistant-blocks";
+import { EdwardComposer } from "./edward-composer";
+import { EDWARD } from "./edward-thread";
 import { EdwardResponseFeedback } from "./edward-response-feedback";
 import { StaffWebSourceList } from "./staff-web-sources";
 import labStyles from "./edward-lab.module.css";
@@ -184,7 +187,7 @@ export function StaffEdwardAssistant({
     welcomeMessage(staffName),
   ]);
   const conversationRef = useRef<string | null>(null);
-  const input = useRef<HTMLInputElement>(null);
+  const input = useRef<HTMLTextAreaElement>(null);
   const transcript = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -300,141 +303,181 @@ export function StaffEdwardAssistant({
     }
   };
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    void send(draft);
-  };
+  const greeting = messages[0];
+  const turns = messages.slice(1);
+  const firstName = staffName.split(" ")[0] || staffName;
 
+  /*
+   * The staff panel is the student panel's twin: the same shell, head, mark,
+   * greeting, turn bubbles, suggestion rows and reference composer, drawn from
+   * the same stylesheet. Only what Edward reads differs — the staff workspace
+   * rather than one student's record — so the two assistants stop looking like
+   * two products.
+   */
   const panel = (
-    <section
+    <aside
       id="staff-edward-panel"
       className={`edward-panel${variant === "embedded" ? " edward-panel--embedded" : ""}`}
       role={variant === "embedded" ? "region" : "dialog"}
-      aria-label="Edward AI staff assistant"
+      aria-label="Edward, your AI staff assistant"
     >
-      <header className="edward-panel__header">
-        <span className="edward-avatar" aria-hidden="true">
-          E
+      <header className="edward-head">
+        <span className="edward-mark small" aria-hidden="true">
+          {EDWARD.mark}
         </span>
-        <div>
-          <strong>Edward</strong>
-          <span>
-            <i aria-hidden="true" /> Connected to the staff workspace ·
-            read-only
-          </span>
+        <div className="edward-title">
+          <strong>{EDWARD.name}</strong>
+          <span>Staff workspace assistant</span>
         </div>
+        <IconButton
+          name="pen"
+          size={18}
+          label="New conversation"
+          disabled={sending}
+          onClick={() => {
+            dropConversation();
+            setMessages([welcomeMessage(staffName)]);
+            setError(null);
+            setDraft("");
+          }}
+        />
         {variant === "floating" ? (
-          <button
-            type="button"
-            aria-label="Close Edward"
+          <IconButton
+            name="close"
+            size={18}
+            label="Close Edward"
+            tip="Close"
             onClick={() => setOpen(false)}
-          >
-            ×
-          </button>
-        ) : (
-          <span className="edward-secure">Private</span>
-        )}
+          />
+        ) : null}
       </header>
 
-      <div ref={transcript} className="edward-transcript" aria-live="polite">
-        {messages.map((message) => (
-          <article
-            className={`edward-message edward-message--${message.role}`}
-            key={message.id}
+      <div className="edward-body">
+        <div className="edward-main">
+          <div
+            ref={transcript}
+            className="edward-thread"
+            role="log"
+            aria-live="polite"
+            aria-label="Conversation with Edward"
           >
-            {message.role === "assistant" && message.blocks?.length ? (
-              <StaffBlocks blocks={message.blocks} idPrefix={message.id} />
-            ) : (
-              <p>{message.content}</p>
-            )}
-            {message.resolvedStudent ? (
-              <div
-                className="edward-context-receipts"
-                aria-label="Student record this response was grounded in"
-              >
-                <span className="edward-context-receipts__label">
-                  Student record
+            {turns.length === 0 ? (
+              <div className="edward-greeting">
+                <span className="edward-mark" aria-hidden="true">
+                  {EDWARD.mark}
                 </span>
-                <span>{message.resolvedStudent.name}</span>
+                <h3>Hi {firstName}. Ask me about your workspace.</h3>
+                {greeting ? <p>{greeting.content}</p> : null}
+                <p className="edward-boundary">
+                  <Icon name="shield" size={13} /> Edward is read-only. It never changes a record.
+                </p>
               </div>
             ) : null}
-            {message.role === "assistant" && message.provider ? (
-              <small>
-                {message.provider === "openrouter" ||
-                message.provider === "openai"
-                  ? "AI-generated — verify before acting on a student record"
-                  : "Built-in workspace guidance"}
-              </small>
+
+            {turns.map((message) =>
+              message.role === "user" ? (
+                <article className="edward-turn student" key={message.id}>
+                  <p className="edward-bubble">{message.content}</p>
+                </article>
+              ) : (
+                <article className="edward-turn edward" key={message.id}>
+                  <div className="edward-answer">
+                    {message.blocks?.length ? (
+                      <StaffBlocks blocks={message.blocks} idPrefix={message.id} />
+                    ) : (
+                      <p>{message.content}</p>
+                    )}
+                    {message.resolvedStudent ? (
+                      <div
+                        className="edward-context-receipts"
+                        aria-label="Student record this response was grounded in"
+                      >
+                        <span className="edward-context-receipts__label">
+                          Student record
+                        </span>
+                        <span>{message.resolvedStudent.name}</span>
+                      </div>
+                    ) : null}
+                    {message.provider ? (
+                      <small>
+                        {message.provider === "openrouter" || message.provider === "openai"
+                          ? "AI-generated — verify before acting on a student record"
+                          : "Built-in workspace guidance"}
+                      </small>
+                    ) : null}
+                  </div>
+                  {message.traceId ? (
+                    <EdwardResponseFeedback
+                      target={{
+                        assistantKind: "staff",
+                        assistantMessageId: message.id,
+                        traceId: message.traceId,
+                      }}
+                    />
+                  ) : null}
+                </article>
+              ),
+            )}
+
+            {sending ? (
+              <article className="edward-turn edward">
+                <p className="edward-thinking" role="status">
+                  <span className="edward-dots" aria-hidden="true">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                  Reading the workspace…
+                </p>
+              </article>
             ) : null}
-            {message.role === "assistant" && message.traceId ? (
-              <EdwardResponseFeedback
-                target={{
-                  assistantKind: "staff",
-                  assistantMessageId: message.id,
-                  traceId: message.traceId,
-                }}
-              />
+
+            {error ? (
+              <article className="edward-turn edward">
+                <div className="edward-answer error" role="alert">
+                  {error}
+                </div>
+              </article>
             ) : null}
-          </article>
-        ))}
-        {sending ? (
-          <div className="edward-typing" role="status">
-            <span />
-            <span />
-            <span />
-            Edward is checking the workspace
+
+            {turns.length === 0 ? (
+              <div className="edward-suggestions">
+                <section>
+                  <p className="panel-label">To get started</p>
+                  {quickPrompts.map((prompt) => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      className="edward-suggestion"
+                      onClick={() => void send(prompt)}
+                    >
+                      <span>{prompt}</span>
+                      <Icon name="arrow" size={15} />
+                    </button>
+                  ))}
+                </section>
+              </div>
+            ) : null}
           </div>
-        ) : null}
-        {error ? (
-          <p className="edward-error" role="alert">
-            {error}
-          </p>
-        ) : null}
-      </div>
 
-      {messages.length === 1 ? (
-        <div className="edward-prompts" aria-label="Suggested questions">
-          {quickPrompts.map((prompt) => (
-            <button
-              type="button"
-              onClick={() => void send(prompt)}
-              key={prompt}
-            >
-              {prompt}
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      <form className="edward-composer" onSubmit={submit}>
-        <label htmlFor="staff-edward-message">
-          Ask about students, tasks, or the workspace
-        </label>
-        <div>
-          <input
-            ref={input}
-            id="staff-edward-message"
-            value={draft}
-            maxLength={2_000}
-            autoComplete="off"
+          <EdwardComposer
+            draft={draft}
+            onDraft={setDraft}
+            onSend={(value) => void send(value)}
+            context="Staff workspace"
+            onDropContext={() => {}}
+            listening={false}
+            micLabel="Dictation is not available for staff Edward"
+            micDisabled
+            onMic={() => {}}
+            disabled={sending}
+            inputRef={input}
             placeholder="Ask about a student, your queue, or a draft…"
-            onChange={(event) => setDraft(event.target.value)}
+            caution="Edward is read-only and can make mistakes. Confirm details in the official record before acting."
           />
-          <button
-            className="edward-send-button"
-            type="submit"
-            disabled={sending || draft.trim().length === 0}
-            aria-label="Send message"
-          >
-            ↑
-          </button>
         </div>
-        <small>
-          Edward is read-only and can make mistakes. Confirm details in the
-          official record before acting.
-        </small>
-      </form>
-    </section>
+      </div>
+    </aside>
   );
 
   if (variant === "embedded") return panel;
@@ -442,19 +485,16 @@ export function StaffEdwardAssistant({
   return (
     <>
       <button
-        className={`edward-launcher${open ? " edward-launcher--open" : ""}`}
+        className="edward-launcher"
         type="button"
         aria-expanded={open}
         aria-controls="staff-edward-panel"
         onClick={() => setOpen((current) => !current)}
       >
-        <span className="edward-avatar" aria-hidden="true">
-          E
+        <span className="edward-mark small" aria-hidden="true">
+          {EDWARD.mark}
         </span>
-        <span>
-          <strong>Ask Edward</strong>
-          <small>AI staff assistant</small>
-        </span>
+        Ask {EDWARD.name}
       </button>
       {open ? panel : null}
     </>

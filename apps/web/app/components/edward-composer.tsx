@@ -24,6 +24,8 @@ export function EdwardComposer({
   disabled,
   note,
   inputRef,
+  placeholder = "Ask about your enrollment",
+  caution = STANDING_CAUTION,
   children,
 }: {
   draft: string;
@@ -39,6 +41,10 @@ export function EdwardComposer({
   /** A status line under the field: listening, voice replies, a mic problem. */
   note?: ReactNode;
   inputRef: RefObject<HTMLTextAreaElement | null>;
+  /** What the empty field invites. Staff Edward asks about the workspace. */
+  placeholder?: string;
+  /** The standing caution pinned under the field, in the reader's own terms. */
+  caution?: ReactNode;
   /** Production-only controls (the live voice session) rendered above the field. */
   children?: ReactNode;
 }) {
@@ -86,7 +92,7 @@ export function EdwardComposer({
           maxLength={2_000}
           autoComplete="off"
           value={draft}
-          placeholder={listening ? "Listening…" : "Ask about your enrollment"}
+          placeholder={listening ? "Listening…" : placeholder}
           disabled={disabled}
           onChange={(event) => onDraft(event.target.value)}
           onKeyDown={onKeyDown}
@@ -131,7 +137,7 @@ export function EdwardComposer({
 
       <p className="edward-caution">
         <Icon name="shield" size={13} />
-        {STANDING_CAUTION}
+        {caution}
       </p>
     </div>
   );
