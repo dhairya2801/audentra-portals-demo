@@ -21,6 +21,7 @@ import {
 import Icon from "../design-system/Icon.jsx";
 import Button from "../design-system/primitives/Button.jsx";
 import Notice from "../design-system/patterns/Notice.jsx";
+import { DateTimePicker } from "./date-time-picker";
 import {
   createStudentRequirementAppointment,
   getStudentRequirementAppointments,
@@ -672,7 +673,7 @@ function SchedulingForm({
             </select>
           </FieldShell>
           <FieldShell label="Date and time">
-            <input name="startsAt" type="datetime-local" required />
+            <DateTimePicker name="startsAt" required />
           </FieldShell>
           <FieldShell label="What you would like to discuss" optional>
             <textarea name="notes" rows={3} maxLength={500} />

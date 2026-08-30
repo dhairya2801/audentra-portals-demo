@@ -41,7 +41,14 @@ test("staff portal serves Morning Brew alongside the workspace", async ({
   await expect(page.locator(".staff-shell--workspace")).toBeVisible();
   await expect(page.locator(".brew-unavailable")).toHaveCount(0);
   await expect(page.getByText(/count of canonical records/)).toBeVisible();
-  await expect(page.getByText(/Higher Ed News/)).toHaveCount(0);
+  const externalNewsRail = page.locator("section.brew-news-rail");
+  await expect(externalNewsRail).toBeVisible();
+  await expect(
+    externalNewsRail.getByText("Higher Ed News", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    externalNewsRail.getByRole("button", { name: "Refresh Higher Ed News" }),
+  ).toBeVisible();
   await expect(page.getByText(/Confidence:/)).toHaveCount(0);
 
   // Other staff views still respond after Morning Brew.

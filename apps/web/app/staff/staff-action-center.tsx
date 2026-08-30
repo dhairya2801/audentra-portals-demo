@@ -3,6 +3,7 @@
 import type {
   HousingPreference,
   StaffActionCenter,
+  StaffIdentityProvider,
   StaffWorkItem,
   StaffWorkItemStatus,
 } from "@vv/contracts";
@@ -12,17 +13,21 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
 import {
   ApiClientError,
+  getStaffAuthOptions,
   getStaffActionCenter,
+  getStaffDocumentReviewOptions,
   getStaffStudentRecord,
   reviewStaffDocument,
   signInStaff,
   signOutStaff,
   signUpStaff,
+  staffSsoStartUrl,
   updateStaffStudentPreferences,
   updateStaffWorkItem,
 } from "../lib/api-client";
@@ -75,6 +80,40 @@ const staffAuthErrorMessage = (error: unknown) =>
   error instanceof ApiClientError
     ? error.message
     : "We couldn't access your staff account. Check your connection and try again.";
+
+function InstitutionalProviderIcon({ provider }: { provider: StaffIdentityProvider }) {
+  if (provider === "google") {
+    return (
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+        <path
+          fill="#4285F4"
+          d="M21.35 12.23c0-.79-.07-1.55-.2-2.28H12v4.31h5.23a4.47 4.47 0 0 1-1.94 2.93v2.79h3.6c2.11-1.94 3.34-4.8 3.34-8.17Z"
+        />
+        <path
+          fill="#34A853"
+          d="M12 21.7c2.7 0 4.96-.9 6.61-2.43l-3.6-2.79c-1 .67-2.28 1.07-3.01 1.07-2.31 0-4.27-1.56-4.97-3.65H3.31v2.88A9.98 9.98 0 0 0 12 21.7Z"
+        />
+        <path
+          fill="#FBBC05"
+          d="M7.03 13.9A6 6 0 0 1 6.75 12c0-.66.11-1.3.28-1.9V7.22H3.31A9.98 9.98 0 0 0 2.3 12c0 1.61.39 3.14 1.01 4.78l3.72-2.88Z"
+        />
+        <path
+          fill="#EA4335"
+          d="M12 6.45c1.47 0 2.79.51 3.83 1.51l2.87-2.87C16.96 3.47 14.7 2.3 12 2.3a9.98 9.98 0 0 0-8.69 4.92l3.72 2.88c.7-2.09 2.66-3.65 4.97-3.65Z"
+        />
+      </svg>
+    );
+  }
+
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+      <path fill="#f35325" d="M2.5 2.5h8.55v8.55H2.5z" />
+      <path fill="#81bc06" d="M12.95 2.5h8.55v8.55h-8.55z" />
+      <path fill="#05a6f0" d="M2.5 12.95h8.55v8.55H2.5z" />
+      <path fill="#ffba08" d="M12.95 12.95h8.55v8.55h-8.55z" />
+    </svg>
+  );
+}
 
 function formatDate(value: string | null) {
   if (!value) return "No due date";
@@ -166,11 +205,20 @@ export function WorkItemSignals({ item }: { item: StaffWorkItem }) {
 export function StaffSignIn({ onSignedIn }: { onSignedIn: () => void }) {
   const tenantRuntime = useTenant();
   const [mode, setMode] = useState<StaffAuthMode>("sign_in");
+  const [ssoProviders, setSsoProviders] = useState<StaffIdentityProvider[]>([]);
   const [fieldErrors, setFieldErrors] = useState<StaffAuthFieldErrors>({});
   const signIn = useApiAction(signInStaff, staffAuthErrorMessage);
   const signUp = useApiAction(signUpStaff, staffAuthErrorMessage);
   const activeAction = mode === "sign_in" ? signIn : signUp;
   const isBusy = signIn.status === "loading" || signUp.status === "loading";
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void getStaffAuthOptions(tenantRuntime.tenant.slug, controller.signal)
+      .then((options) => setSsoProviders(options.providers))
+      .catch(() => setSsoProviders([]));
+    return () => controller.abort();
+  }, [tenantRuntime.tenant.slug]);
 
   const chooseMode = (nextMode: StaffAuthMode) => {
     setMode(nextMode);
@@ -270,6 +318,30 @@ export function StaffSignIn({ onSignedIn }: { onSignedIn: () => void }) {
             Create account
           </button>
         </div>
+        {mode === "sign_in" && ssoProviders.length > 0 ? (
+          <div className="staff-sso-options" role="group" aria-label="Institutional single sign-on">
+            {ssoProviders.map((provider) => (
+              <a
+                className="button staff-sso-button"
+                href={staffSsoStartUrl(
+                  provider,
+                  tenantRuntime.tenant.slug,
+                  "/staff",
+                )}
+                key={provider}
+              >
+                <span className="staff-sso-button__icon">
+                  <InstitutionalProviderIcon provider={provider} />
+                </span>
+                <span className="staff-sso-button__label">
+                  Continue with {provider === "google" ? "Google" : "Microsoft"}
+                </span>
+                <span className="staff-sso-button__endcap" aria-hidden="true" />
+              </a>
+            ))}
+            <span className="staff-sso-divider">or use your staff password</span>
+          </div>
+        ) : null}
         <form key={mode} className="staff-auth-form" noValidate onSubmit={enter}>
           <label>
             Staff email
@@ -490,12 +562,19 @@ export function StudentInspector({
     [item.student.id],
   );
   const student = useApiResource(loadStudent);
+  const loadReviewOptions = useCallback(
+    (signal: AbortSignal) => getStaffDocumentReviewOptions(signal),
+    [],
+  );
+  const reviewOptions = useApiResource(loadReviewOptions, { refreshOnAmbient: false });
   const updateItem = useApiAction(updateStaffWorkItem);
   const updatePreferences = useApiAction(updateStaffStudentPreferences);
   const decideDocument = useApiAction(reviewStaffDocument);
   const [note, setNote] = useState("");
   const [reviewNote, setReviewNote] = useState("");
+  const [reviewReasonCode, setReviewReasonCode] = useState("");
   const [notifyStudent, setNotifyStudent] = useState(true);
+  const reviewIntentRef = useRef<{ signature: string; key: string } | null>(null);
 
   const mutateWorkItem = async (input: {
     status?: StaffWorkItemStatus;
@@ -553,16 +632,24 @@ export function StudentInspector({
     documentWorkItem: StaffWorkItem,
     decision: "accepted" | "rejected",
   ) => {
-    if (!reviewNote.trim()) return;
+    if (!reviewNote.trim() || (decision === "rejected" && !reviewReasonCode)) return;
+    const input = {
+      workItemId: documentWorkItem.id,
+      expectedWorkItemVersion: documentWorkItem.version,
+      decision,
+      note: reviewNote.trim(),
+      notifyStudent,
+      ...(decision === "rejected" ? { reasonCode: reviewReasonCode } : {}),
+    };
+    const signature = JSON.stringify({ documentId, input });
+    if (reviewIntentRef.current?.signature !== signature) {
+      reviewIntentRef.current = { signature, key: crypto.randomUUID() };
+    }
     try {
-      await decideDocument.run(documentId, {
-        workItemId: documentWorkItem.id,
-        expectedWorkItemVersion: documentWorkItem.version,
-        decision,
-        note: reviewNote.trim(),
-        notifyStudent,
-      });
+      await decideDocument.run(documentId, input, reviewIntentRef.current.key);
+      reviewIntentRef.current = null;
       setReviewNote("");
+      setReviewReasonCode("");
       student.refresh();
       onBoardChanged();
     } catch {
@@ -817,6 +904,29 @@ export function StudentInspector({
                     onChange={(event) => setReviewNote(event.target.value)}
                   />
                 </label>
+                <label>
+                  Requested-change reason
+                  <select
+                    value={reviewReasonCode}
+                    disabled={reviewOptions.status !== "ready"}
+                    onChange={(event) => setReviewReasonCode(event.target.value)}
+                  >
+                    <option value="">
+                      {reviewOptions.status === "loading" ? "Loading reasons..." : "Choose when requesting changes"}
+                    </option>
+                    {reviewOptions.status === "ready"
+                      ? reviewOptions.data.rejectionReasons.map((reason) => (
+                          <option key={reason.code} value={reason.code}>{reason.label}</option>
+                        ))
+                      : null}
+                  </select>
+                </label>
+                {reviewOptions.status === "error" ? (
+                  <p className="field-error" role="alert">
+                    {reviewOptions.error}{" "}
+                    <button type="button" onClick={reviewOptions.reload}>Try again</button>
+                  </p>
+                ) : null}
                 <div className="staff-document-list">
                   {student.data.documents.items.map((document) => {
                     const documentWorkItem = center.items.find(
@@ -858,6 +968,7 @@ export function StudentInspector({
                               type="button"
                               disabled={
                                 !reviewNote.trim() ||
+                                !reviewReasonCode ||
                                 decideDocument.status === "loading"
                               }
                               onClick={() =>

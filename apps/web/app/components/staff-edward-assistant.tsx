@@ -17,6 +17,7 @@ import type {
   AssistantResponseBlock,
   StaffAssistantDraftBlock,
   StaffAssistantResponseBlock,
+  StaffAssistantWebSourcesBlock,
 } from "@vv/contracts";
 import {
   type FormEvent,
@@ -32,6 +33,7 @@ import {
 } from "../lib/api-client";
 import { AssistantBlocks } from "./assistant-blocks";
 import { EdwardResponseFeedback } from "./edward-response-feedback";
+import { StaffWebSourceList } from "./staff-web-sources";
 import labStyles from "./edward-lab.module.css";
 
 const quickPrompts = [
@@ -110,7 +112,33 @@ function DraftBlockPanel({ block }: { block: StaffAssistantDraftBlock }) {
   );
 }
 
-/** Staff blocks are the student block family plus `draft`. */
+function WebSourcesBlockPanel({
+  block,
+  idPrefix,
+}: {
+  block: StaffAssistantWebSourcesBlock;
+  idPrefix: string;
+}) {
+  return (
+    <section className="edward-web-sources" aria-label={`Web sources for ${block.query}`}>
+      <header>
+        <span>From the web</span>
+        <strong>{block.query}</strong>
+      </header>
+      {block.fallbackText.trim() ? <p>{block.fallbackText}</p> : null}
+      {block.results.length ? (
+        <StaffWebSourceList results={block.results} idPrefix={idPrefix} />
+      ) : (
+        <p>No public sources matched this search.</p>
+      )}
+      <small>
+        External sources are not student records. Open and verify a source before acting.
+      </small>
+    </section>
+  );
+}
+
+/** Staff blocks are the student block family plus drafts and cited web sources. */
 function StaffBlocks({
   blocks,
   idPrefix,
@@ -121,7 +149,13 @@ function StaffBlocks({
   return (
     <div>
       {blocks.map((block, index) =>
-        block.type === "draft" ? (
+        block.type === "web_sources" ? (
+          <WebSourcesBlockPanel
+            block={block}
+            idPrefix={`${idPrefix}-web-${index}`}
+            key={`${idPrefix}-web-${index}`}
+          />
+        ) : block.type === "draft" ? (
           <DraftBlockPanel block={block} key={`${idPrefix}-draft-${index}`} />
         ) : (
           <AssistantBlocks

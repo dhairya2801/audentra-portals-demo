@@ -596,6 +596,8 @@ export interface StudentRequirementDetail extends StudentRequirementSummary {
   documentCategory: StudentDocumentCategory | null;
   responsibleOffice: string;
   dependencyCodes: string[];
+  /** Oldest-first, student-safe activity for this enrollment task. */
+  history?: StudentRequirementHistoryEvent[];
   immunizationPolicy?: {
     id: string;
     code: string;
@@ -613,6 +615,25 @@ export interface StudentRequirementDetail extends StudentRequirementSummary {
       validityDays: number | null;
     }>;
   };
+}
+
+export type StudentRequirementHistoryEventKind =
+  | "assigned"
+  | "status_changed"
+  | "response_submitted"
+  | "document_uploaded"
+  | "document_reviewed"
+  | "help_requested"
+  | "help_resolved";
+
+export interface StudentRequirementHistoryEvent {
+  id: string;
+  kind: StudentRequirementHistoryEventKind;
+  title: string;
+  detail: string | null;
+  status?: string;
+  documentId?: string;
+  occurredAt: string;
 }
 
 export type StudentRequirementResponseValue =
@@ -889,8 +910,13 @@ export type StudentDocumentProcessingMode =
 export function documentProcessingModeForCategory(
   category: StudentDocumentCategory,
 ): StudentDocumentProcessingMode {
-  if (category === "identity" || category === "transcript") return "agentic";
-  if (category === "financial_aid") return "classification_only";
+  if (
+    category === "identity" ||
+    category === "transcript" ||
+    category === "financial_aid"
+  ) {
+    return "agentic";
+  }
   return "manual_review";
 }
 
@@ -922,6 +948,22 @@ export interface ExtractedDocumentVisualRegion {
   confidence: number;
 }
 
+export interface StudentDocumentValidity {
+  status: "valid" | "invalid" | "uncertain";
+  confidence: number;
+  rationale: string;
+}
+
+export interface StudentDocumentAutoResolution {
+  status:
+    | "accepted"
+    | "rejected"
+    | "needs_student_confirmation"
+    | "needs_review";
+  confidence: number | null;
+  reason: string;
+}
+
 export type StudentDocumentContextTargetType =
   | "profile"
   | "onboarding"
@@ -942,7 +984,8 @@ export interface StudentDocumentContextMatch {
   confidence: number;
   rationale: string;
   applied: boolean;
-  reviewRequired: true;
+  reviewRequired: boolean;
+  studentConfirmationRequired?: boolean;
   href: string | null;
 }
 
@@ -1015,6 +1058,8 @@ export interface StudentDocumentExtraction {
   institutionName: string | null;
   issueDate: string | null;
   academicTerm: string | null;
+  validity?: StudentDocumentValidity;
+  autoResolution?: StudentDocumentAutoResolution;
   fields: ExtractedDocumentField[];
   courses?: ExtractedTranscriptCourse[];
   visualRegions?: ExtractedDocumentVisualRegion[];
@@ -1031,6 +1076,20 @@ export interface StudentDocumentExtraction {
   acceptedFieldKeys?: string[];
   courseExemptionEvaluation?: CourseExemptionEvaluation;
   immunizationCompliance?: ImmunizationComplianceEvaluation;
+}
+
+export interface StudentDocumentReviewDecision {
+  id: string;
+  /** A rejected database state is deliberately phrased as a student action. */
+  decision: "accepted" | "changes_requested";
+  decidedAt: string;
+  reasonCode: string | null;
+  reasonLabel: string | null;
+  /** Explicitly student-visible reviewer guidance; never an internal staff note. */
+  note: string | null;
+  reviewerName: string;
+  synthetic?: boolean;
+  automated?: boolean;
 }
 
 export interface StudentDocument {
@@ -1051,18 +1110,10 @@ export interface StudentDocument {
     | "rejected"
     | "needs_resubmission"
     | "waived";
-  /** Present once a reviewer has ruled on the document. */
-  review?: {
-    decision:
-      | "accepted"
-      | "rejected"
-      | "needs_resubmission"
-      | "waived"
-      | "under_review";
-    decidedAt: string;
-    note: string | null;
-    synthetic?: boolean;
-  };
+  /** Present once a reviewer has ruled on this specific submission. */
+  review?: StudentDocumentReviewDecision;
+  /** Oldest-first immutable decisions for this specific submission. */
+  reviewHistory?: StudentDocumentReviewDecision[];
   sha256?: string;
   contentUrl?: string;
   extraction?: StudentDocumentExtraction;
@@ -1555,6 +1606,8 @@ export type StaffRelatedDocument = Pick<
   | "processingMode"
   | "status"
   | "contentUrl"
+  | "review"
+  | "reviewHistory"
   | "createdAt"
 >;
 
@@ -2104,14 +2157,30 @@ export interface ReviewStaffDocumentInput {
   workItemId: string;
   expectedWorkItemVersion: number;
   decision: "accepted" | "rejected";
+  /** Required for rejection and validated against the tenant's active options. */
+  reasonCode?: string;
+  /** Staff-only context. It is never included in student document/task history. */
+  internalNote?: string;
+  /** This note is student-visible review guidance. */
   note: string;
   notifyStudent: boolean;
+}
+
+export interface StaffDocumentRejectionReason {
+  code: string;
+  label: string;
+  description: string;
+}
+
+export interface StaffDocumentReviewOptions {
+  rejectionReasons: StaffDocumentRejectionReason[];
 }
 
 export interface StaffDocumentDecisionResult {
   document: StudentDocument;
   workItem: StaffWorkItem;
   notification: StudentMessage | null;
+  decision: StudentDocumentReviewDecision;
 }
 
 export type StaffManagedContentStatus = "draft" | "published" | "archived";
@@ -2841,6 +2910,7 @@ export interface CreateStudentDocumentInput {
 
 export interface ConfirmStudentDocumentExtractionInput {
   acceptedFieldKeys: string[];
+  applyRequirementId?: string;
 }
 
 export interface EdwardChatMessage {
@@ -3090,6 +3160,91 @@ export interface EdwardFeedbackListResponse {
  * authenticated session and resolves student referents server-side.
  * ------------------------------------------------------------------------- */
 
+export type StaffWebSearchSafeSearch = "moderate";
+export type StaffWebSearchSourceType = "web" | "news";
+export type StaffWebSearchPurpose = "edward" | "morning_brew";
+export type StaffWebSearchQueryLengthBucket =
+  | "2-25"
+  | "26-50"
+  | "51-100"
+  | "101-200"
+  | "201-300";
+
+/**
+ * Purpose is assigned by the server from the trusted call path. Clients must
+ * not send purpose, freshness, or domain filters in this initial contract.
+ */
+export interface StaffWebSearchInput {
+  /** Public-information query only; student identifiers and record referents are rejected. */
+  query: string;
+  /** Defaults to 5; the platform enforces a range of 1-10. */
+  limit?: number;
+}
+
+export interface StaffWebSearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+  kind: StaffWebSearchSourceType;
+  publishedAt: string | null;
+  source: string | null;
+  /** Provider-supplied, safe HTTPS preview image for visual result rails. */
+  thumbnailUrl: string | null;
+}
+
+/**
+ * Canonical asynchronous external-news state for the staff Morning Brew.
+ * The platform owns the query, provider scheduling, and stale-result policy;
+ * the portal only renders this tenant-scoped read model.
+ */
+export type StaffMorningBrewExternalContextStatus =
+  | "idle"
+  | "pending"
+  | "running"
+  | "ready"
+  | "failed"
+  | "unavailable";
+
+export interface StaffMorningBrewExternalContext {
+  status: StaffMorningBrewExternalContextStatus;
+  query: string;
+  provider: "you.com" | null;
+  results: StaffWebSearchResult[];
+  requestedAt: string | null;
+  searchedAt: string | null;
+  retryAfter: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  stale: boolean;
+}
+
+export interface StaffWebSearchResponse {
+  provider: "you.com";
+  query: string;
+  searchedAt: string;
+  safeSearch: StaffWebSearchSafeSearch;
+  results: StaffWebSearchResult[];
+  total: number;
+  requestId: string;
+  metadata: {
+    queryLength: number;
+    queryLengthBucket: StaffWebSearchQueryLengthBucket;
+    requestedLimit: number;
+    returned: number;
+    purpose: StaffWebSearchPurpose;
+    latencyMs: number;
+  };
+}
+
+export interface StaffAssistantWebSourcesBlock {
+  type: "web_sources";
+  fallbackText: string;
+  query: string;
+  searchedAt: string;
+  /** External, read-only source links returned by the server-side provider. */
+  results: StaffWebSearchResult[];
+}
+
 export interface StaffAssistantDraftBlock {
   type: "draft";
   fallbackText: string;
@@ -3099,7 +3254,10 @@ export interface StaffAssistantDraftBlock {
   disclaimer: string;
 }
 
-export type StaffAssistantResponseBlock = AssistantResponseBlock | StaffAssistantDraftBlock;
+export type StaffAssistantResponseBlock =
+  | AssistantResponseBlock
+  | StaffAssistantDraftBlock
+  | StaffAssistantWebSourcesBlock;
 
 export interface AskStaffEdwardInput {
   message: string;

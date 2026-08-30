@@ -82,6 +82,7 @@ import type {
   StaffActionRuleList,
   StaffCorePlay,
   StaffDocumentDecisionResult,
+  StaffDocumentReviewOptions,
   StaffEdwardPreview,
   StaffEdwardPreviewInput,
   StaffEdwardConfigurationDraft,
@@ -92,11 +93,19 @@ import type {
   StaffManagedConfiguration,
   StaffManagedConfigurationKind,
   StaffMorningBrew,
+  StaffMorningBrewExternalContext,
+  StaffAuthOptions,
+  StaffEmailSendIntent,
+  StaffIdentityProvider,
+  StaffMailboxList,
+  StaffMailMessageList,
   StaffNotificationList,
   StaffNotificationReadResult,
   StaffOperationsWorkspace,
   StaffOutreachRun,
   StaffPortalMediaUpload,
+  StaffWebSearchInput,
+  StaffWebSearchResponse,
   StaffSession,
   StaffSignInInput,
   StaffSignUpInput,
@@ -122,6 +131,9 @@ import type {
   UpdateStudentProfileInput,
   FerpaDelegateLinkIssueResult,
   DelegateSession,
+  ConfirmStaffEmailSendIntentInput,
+  CreateStaffEmailSendIntentInput,
+  SearchStaffMailInput,
 } from "@vv/contracts";
 import { actionCenterQueryToParams } from "../staff/task-board-utils";
 import type { EdwardExecutionMode } from "./edward-lab";
@@ -291,7 +303,8 @@ async function request<T>(
     throw await parseError(response);
   }
 
-  const result = (await response.json()) as T;
+  const result =
+    response.status === 204 ? (undefined as T) : ((await response.json()) as T);
   if (
     typeof window !== "undefined" &&
     (init.method ?? "GET").toUpperCase() !== "GET" &&
@@ -997,6 +1010,109 @@ export function signOutStaff() {
   );
 }
 
+export function getStaffAuthOptions(tenantSlug: string, signal?: AbortSignal) {
+  const query = new URLSearchParams({ tenantSlug });
+  return request<StaffAuthOptions>(`/v1/auth/staff/options?${query}`, { signal });
+}
+
+function absoluteApiUrl(path: string) {
+  if (API_BASE_URL) return `${API_BASE_URL}${path}`;
+  if (typeof window !== "undefined") return new URL(path, window.location.origin).toString();
+  return path;
+}
+
+export function staffSsoStartUrl(
+  provider: StaffIdentityProvider,
+  tenantSlug: string,
+  returnTo: string,
+) {
+  const query = new URLSearchParams({ tenantSlug, returnTo });
+  return absoluteApiUrl(
+    `/v1/auth/staff/sso/${encodeURIComponent(provider)}/start?${query}`,
+  );
+}
+
+export function staffMailboxConnectUrl(input: {
+  provider: StaffIdentityProvider;
+  mailboxKind: "personal" | "shared";
+  address: string;
+  returnTo: string;
+}) {
+  const query = new URLSearchParams({
+    mailboxKind: input.mailboxKind,
+    address: input.address,
+    returnTo: input.returnTo,
+  });
+  return absoluteApiUrl(
+    `/v1/staff/mail/oauth/${encodeURIComponent(input.provider)}/start?${query}`,
+  );
+}
+
+export function getStaffMailboxes(signal?: AbortSignal) {
+  return request<StaffMailboxList>("/v1/staff/mailboxes", {
+    method: "GET",
+    headers: staffHeaders,
+    signal,
+  });
+}
+
+export function disconnectStaffMailbox(mailboxId: string) {
+  return request<void>(
+    `/v1/staff/mailboxes/${encodeURIComponent(mailboxId)}/connection`,
+    { method: "DELETE", headers: staffHeaders },
+  );
+}
+
+export function getRecentStaffMail(
+  mailboxId: string,
+  limit = 25,
+  signal?: AbortSignal,
+) {
+  const query = new URLSearchParams({ mailboxId, limit: String(limit) });
+  return request<StaffMailMessageList>(`/v1/staff/mail/messages?${query}`, {
+    method: "GET",
+    headers: staffHeaders,
+    signal,
+  });
+}
+
+export function searchStaffMail(input: SearchStaffMailInput) {
+  return request<StaffMailMessageList>("/v1/staff/mail/search", {
+    method: "POST",
+    headers: { ...staffHeaders, "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function createStaffEmailSendIntent(
+  input: CreateStaffEmailSendIntentInput,
+) {
+  return request<StaffEmailSendIntent>("/v1/staff/mail/send-intents", {
+    method: "POST",
+    headers: { ...staffHeaders, "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function confirmStaffEmailSendIntent(
+  intentId: string,
+  input: ConfirmStaffEmailSendIntentInput,
+  idempotencyKey: string,
+) {
+  return request<StaffEmailSendIntent>(
+    `/v1/staff/mail/send-intents/${encodeURIComponent(intentId)}/confirm`,
+    {
+      method: "POST",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
 const staffHeaders = {
   "X-Demo-Actor-Type": "staff",
 } as const;
@@ -1123,6 +1239,66 @@ export function getStaffMorningBrew(signal?: AbortSignal) {
     headers: staffHeaders,
     signal,
   });
+}
+
+/**
+ * Read the canonical external-news state prepared for the staff member's
+ * Morning Brew. The platform owns provider credentials, scheduling, and
+ * query construction; this browser request carries no search text.
+ */
+export function getStaffMorningBrewExternalContext(signal?: AbortSignal) {
+  return request<StaffMorningBrewExternalContext>(
+    "/v1/staff/morning-brew/external-context",
+    {
+      method: "GET",
+      headers: staffHeaders,
+      signal,
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+/**
+ * Ask the platform to refresh the asynchronous Morning Brew external-news
+ * context. It is intentionally input-free: no provider query or credential
+ * can originate from the browser.
+ */
+export function triggerStaffMorningBrewExternalContext(signal?: AbortSignal) {
+  return request<StaffMorningBrewExternalContext>(
+    "/v1/staff/morning-brew/external-context",
+    {
+      method: "POST",
+      headers: staffHeaders,
+      signal,
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+/**
+ * Searches public web sources through the authenticated platform boundary.
+ * The browser never talks to the search provider or receives its credential.
+ */
+export function searchStaffWeb(
+  input: StaffWebSearchInput,
+  signal?: AbortSignal,
+) {
+  return request<StaffWebSearchResponse>(
+    "/v1/staff/web-search",
+    {
+      method: "POST",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+      signal,
+    },
+    {
+      // Searching public sources does not mutate a student record.
+      notifyStudentRecordChanged: false,
+    },
+  );
 }
 
 export function getStaffManagedConfiguration(
@@ -1627,6 +1803,7 @@ export function updateStaffStudentPreferences(
 export function reviewStaffDocument(
   documentId: string,
   input: ReviewStaffDocumentInput,
+  idempotencyKey: string,
 ) {
   return request<StaffDocumentDecisionResult>(
     `/v1/staff/documents/${encodeURIComponent(documentId)}/decision`,
@@ -1635,8 +1812,21 @@ export function reviewStaffDocument(
       headers: {
         ...staffHeaders,
         "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
       },
       body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function getStaffDocumentReviewOptions(signal?: AbortSignal) {
+  return request<StaffDocumentReviewOptions>(
+    "/v1/staff/documents/review-options",
+    {
+      method: "GET",
+      headers: staffHeaders,
+      signal,
     },
     { notifyStudentRecordChanged: false },
   );
@@ -1647,7 +1837,13 @@ export function getStaffDocumentContentUrl(path: string) {
 }
 
 function tenantAwareDocumentUrl(path: string) {
-  return new URL(path, `${API_BASE_URL}/`).toString();
+  const browserOrigin = typeof window === "undefined" ? "" : window.location.origin;
+  const baseOrigin = API_BASE_URL || browserOrigin;
+  if (!baseOrigin) return path.startsWith("/") ? path : `/${path}`;
+
+  const normalizedBase = new URL(`${baseOrigin}/`);
+  const documentUrl = new URL(path, normalizedBase);
+  return documentUrl.origin === normalizedBase.origin ? documentUrl.toString() : normalizedBase.toString();
 }
 
 export function createAssistantConversation(

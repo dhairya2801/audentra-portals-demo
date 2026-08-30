@@ -167,15 +167,23 @@ Default URLs:
 
 ## CI/CD behavior
 
-`.github/workflows/ci.yml` has two relevant triggers:
+`.github/workflows/ci.yml` has two relevant triggers and one validation job:
 
 - Pull requests run the complete `validate` job.
-- Pushes to `main` run `validate`, then deploy the hardened VM preview after
-  validation succeeds.
+- Pushes to `main` run the same `validate` job.
 
 A direct push to a feature branch publishes the branch to GitHub but does not
 run this workflow until a pull request is opened or the branch is merged to
 `main`.
+
+Automatic portal delivery is intentionally disabled. The retired
+personal-project VM job has been removed. A manual-only
+`.github/workflows/deploy-ref.yml` validates a selected immutable ref and can
+deploy it to isolated Development or current Cloud Run resources after the
+one-time portal identities, WIF, repository, and resource-scoped IAM bindings
+are provisioned. The authenticated same-origin boundary, operator sequence,
+validation gates, and rollback steps are documented in
+`docs/architecture/cloud-run-portals-cutover.md`.
 
 ## Production work remaining
 
