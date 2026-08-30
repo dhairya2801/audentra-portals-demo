@@ -19,18 +19,92 @@ import {
 } from "react";
 import {
   ApiClientError,
-  completeStaffInteraction,
-  createStaffWorkComment,
+  completeStaffInteraction as platformCompleteInteraction,
+  createStaffWorkComment as platformCreateComment,
   getStaffCallRecordingContent,
   getStaffDocumentContentUrl,
-  getStaffWorkItemDetail,
-  recordStaffCommunication,
-  requestStaffAiRefresh,
+  getStaffWorkItemDetail as platformWorkItemDetail,
+  recordStaffCommunication as platformRecordCommunication,
+  requestStaffAiRefresh as platformAiRefresh,
   retryStaffCallTranscription,
-  startStaffInteraction,
-  updateStaffWorkItem,
+  startStaffInteraction as platformStartInteraction,
+  updateStaffWorkItem as platformUpdateWorkItem,
   uploadStaffCallRecording,
 } from "../lib/api-client";
+import {
+  demoAddComment,
+  demoCompleteInteraction,
+  demoRecordCommunication,
+  demoRefreshedDetail,
+  demoStartInteraction,
+  demoUpdateWorkItem,
+  demoWorkItemDetail,
+  isDemoRecord,
+} from "./demo-workspace";
+
+/**
+ * This panel opens over two boards: the demo task board, whose records live in
+ * `demo-workspace.ts` and never leave the browser, and the Students view, whose
+ * records are the tenant's own. The id says which, so one panel serves both and
+ * a demo card is never sent to the platform to be looked up.
+ */
+const getStaffWorkItemDetail = async (workItemId: string, signal?: AbortSignal) => {
+  if (!isDemoRecord(workItemId)) return platformWorkItemDetail(workItemId, signal);
+  const detail = demoWorkItemDetail(workItemId);
+  if (!detail) throw new Error("That task is not part of the demo board.");
+  return detail;
+};
+
+const updateStaffWorkItem = async (
+  workItemId: string,
+  input: Parameters<typeof platformUpdateWorkItem>[1],
+) =>
+  isDemoRecord(workItemId)
+    ? demoUpdateWorkItem(workItemId, input)
+    : platformUpdateWorkItem(workItemId, input);
+
+const createStaffWorkComment = async (
+  workItemId: string,
+  input: Parameters<typeof platformCreateComment>[1],
+  idempotencyKey: string,
+) =>
+  isDemoRecord(workItemId)
+    ? demoAddComment(workItemId, input)
+    : platformCreateComment(workItemId, input, idempotencyKey);
+
+const startStaffInteraction = async (
+  workItemId: string,
+  input: Parameters<typeof platformStartInteraction>[1],
+  idempotencyKey: string,
+) =>
+  isDemoRecord(workItemId)
+    ? demoStartInteraction(workItemId, input)
+    : platformStartInteraction(workItemId, input, idempotencyKey);
+
+const recordStaffCommunication = async (
+  interactionId: string,
+  input: Parameters<typeof platformRecordCommunication>[1],
+  idempotencyKey: string,
+) =>
+  isDemoRecord(interactionId)
+    ? demoRecordCommunication(interactionId, input)
+    : platformRecordCommunication(interactionId, input, idempotencyKey);
+
+const completeStaffInteraction = async (
+  interactionId: string,
+  input: Parameters<typeof platformCompleteInteraction>[1],
+) =>
+  isDemoRecord(interactionId)
+    ? demoCompleteInteraction(interactionId, input)
+    : platformCompleteInteraction(interactionId, input);
+
+const requestStaffAiRefresh = async (
+  workItemId: string,
+  input: Parameters<typeof platformAiRefresh>[1],
+) =>
+  isDemoRecord(workItemId)
+    ? demoRefreshedDetail(workItemId)
+    : platformAiRefresh(workItemId, input);
 
 type DetailTab = "overview" | "next_step" | "outcomes" | "comments" | "history";
 

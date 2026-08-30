@@ -5,7 +5,15 @@ import Icon from "../../design-system/Icon.jsx";
 import { BREW_SOURCES, topicById } from "./catalog";
 import type { OnboardingDraft } from "./onboarding";
 
-const STEP_MS = 320;
+/**
+ * The whole wait, start to finish. The list of steps is as long as the reader's
+ * answers are — one line per topic and per source — so the beat between lines
+ * is divided out of this rather than fixed per line: a reader who follows
+ * everything and a reader who follows one topic both wait two seconds.
+ */
+const TOTAL_MS = 2000;
+/** The pause after the last line ticks, before `onDone`. Part of the two seconds. */
+const SETTLE_MS = 320;
 
 function prefersReducedMotion() {
   return (
@@ -66,18 +74,19 @@ export function BrewLoading({
 
   useEffect(() => {
     if (reduced) {
-      const settle = window.setTimeout(() => onDone?.(), STEP_MS);
+      const settle = window.setTimeout(() => onDone?.(), TOTAL_MS);
       return () => window.clearTimeout(settle);
     }
+    const beat = Math.max(60, (TOTAL_MS - SETTLE_MS) / Math.max(1, steps.length));
     let index = 0;
     const timer = window.setInterval(() => {
       index += 1;
       setDone(index);
       if (index >= steps.length) {
         window.clearInterval(timer);
-        window.setTimeout(() => onDone?.(), STEP_MS);
+        window.setTimeout(() => onDone?.(), SETTLE_MS);
       }
-    }, STEP_MS);
+    }, beat);
     return () => window.clearInterval(timer);
     // `steps` is derived from the draft, which does not change while this runs.
   }, [steps.length, reduced, onDone]);

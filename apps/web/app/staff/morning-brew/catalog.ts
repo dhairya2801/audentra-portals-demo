@@ -39,7 +39,7 @@ export const BREW_TOPICS: BrewTopic[] = [
     preview: "Applications · admits · transfer volume",
     icon: "applications",
     accent: "blue",
-    recommended: true,
+    recommended: false,
     recommendation: "The top of the funnel your team is measured on",
   },
   {
@@ -59,7 +59,7 @@ export const BREW_TOPICS: BrewTopic[] = [
     preview: "Contracts signed · assignments · waitlist",
     icon: "housing",
     accent: "amber",
-    recommended: true,
+    recommended: false,
     recommendation: "Good for deposit-to-bed visibility",
   },
   {
@@ -69,7 +69,7 @@ export const BREW_TOPICS: BrewTopic[] = [
     preview: "Orientation · yield events · visit volume",
     icon: "events",
     accent: "navy",
-    recommended: true,
+    recommended: false,
     recommendation: "The yield lever that is not a discount",
   },
 ];
@@ -303,9 +303,13 @@ export const BREW_DELIVERY_TIMES: { id: BrewDeliveryTime; label: string; caption
 
 /* ----------------------------------------------------------------- defaults */
 
-export const DEFAULT_BREW_TOPICS: BrewTopicId[] = BREW_TOPICS.filter(
-  (topic) => topic.recommended,
-).map((topic) => topic.id);
+/**
+ * Every topic is on for a first-time reader, and setup is where they drop the
+ * ones they do not want. `recommended` is a separate answer — the two the badge
+ * singles out as picked for this chair — so narrowing the badge does not
+ * quietly narrow the brief that arrives.
+ */
+export const DEFAULT_BREW_TOPICS: BrewTopicId[] = BREW_TOPICS.map((topic) => topic.id);
 
 /**
  * Everything on, at the level the card marks as the essentials. A first-time

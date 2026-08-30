@@ -289,12 +289,13 @@ test("switched-off sections render empty rather than filled with something else"
   assert.deepEqual(briefing.meetings, []);
   assert.deepEqual(briefing.requests, []);
   assert.deepEqual(briefing.priorities, []);
-  assert.deepEqual(briefing.bullets, []);
   assert.deepEqual(briefing.glance, {
     requests: 0,
     requestsAwaitingReply: 0,
     meetings: 0,
     meetingsHighPriority: 0,
+    priorities: 0,
+    prioritiesHighPriority: 0,
   });
 });
 

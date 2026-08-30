@@ -71,7 +71,7 @@ export const DEMO_READER: BrewReader = {
   name: "Vivian Hale",
   firstName: "Vivian",
   role: "Vice President for Enrollment Management",
-  email: "vivian.hale@aster.edu",
+  email: "vivian.hale@aster.example.edu",
 };
 
 /* ------------------------------------------------------------------- lines */
@@ -174,7 +174,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     progressPercent: progress(APPLICATIONS, 20000),
     dueLabel: "Due by Jun 30",
     trendNote:
-      "Twenty-two days of steady filing, and the pace of the last week would reach 16,040 by month end — short of 20,000 without a second transfer push.",
+      "Last week's pace reaches 16,040 by month end — short of 20,000.",
     cohort: cohortOf(
       "applications",
       "Fall 2025 applicants",
@@ -218,7 +218,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     progressPercent: progress(ADMITS, 8500),
     dueLabel: "Due by Jun 15",
     trendNote:
-      "Reading continues at roughly 65 decisions a day; at that rate the round closes near 6,710, and the 8,500 target needs the transfer file released early.",
+      "At roughly 65 decisions a day the round closes near 6,710, short of 8,500.",
     cohort: cohortOf(
       "admits",
       "admitted students",
@@ -261,7 +261,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     progressPercent: progress(DEPOSITS, 3200),
     dueLabel: "Due by May 31",
     trendNote:
-      "The line has flattened for six days and yesterday fell 27 on withdrawals; the current pace reaches about 2,716 by May 31, roughly 480 short of target.",
+      "Flat for six days; the current pace reaches about 2,716 by May 31.",
     cohort: cohortOf(
       "deposit_paid",
       "students with a posted deposit",
@@ -305,7 +305,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     progressPercent: progress(DEPOSIT_RATE, 45),
     dueLabel: "Due by May 31",
     trendNote:
-      "Admits are growing faster than deposits, so the rate is falling even on days the deposit count rises — it is 3.5 points behind the same day last cycle.",
+      "Admits are growing faster than deposits, so the rate falls even on days the count rises.",
     cohort: cohortOf(
       "deposit_rate",
       "admitted students by deposit state",
@@ -348,7 +348,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     progressPercent: progress(98.4, 110),
     dueLabel: "Due by Aug 15",
     trendNote:
-      "The projection tracks deposits with a two-day lag, so the flat week in deposits is about to flatten this line too; the current pace lands near $104.6M.",
+      "This line tracks deposits with a two-day lag; the current pace lands near $104.6M.",
     cohort: cohortOf(
       "net_tuition",
       "enrolled students by aid package",
@@ -392,7 +392,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     progressPercent: progress(YIELD, 26),
     dueLabel: "Due by Aug 15",
     trendNote:
-      "Yield has held within half a point for nine days; the 26.0% target needs either 140 more deposits or a lower melt than last cycle's.",
+      "Held within half a point for nine days; the 26.0% target needs 140 more deposits.",
     cohort: cohortOf(
       "yield",
       "admitted students projected to enrol",
@@ -436,7 +436,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     progressPercent: progress(2604, 2400),
     dueLabel: "Target met May 14",
     trendNote:
-      "Past target six days ago and still climbing, 14% ahead of last year; the constraint now is review capacity rather than volume.",
+      "Past target six days ago and still climbing, 14% ahead of last year.",
     cohort: cohortOf(
       "transfer_applications",
       "transfer applicants",
@@ -481,7 +481,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     progressPercent: null,
     dueLabel: null,
     trendNote:
-      "The queue has grown on eleven of the last fourteen days; at 30 cleared a day against 38 arriving, it reaches roughly 372 by month end.",
+      "At 30 cleared a day against 38 arriving, the queue reaches roughly 372 by month end.",
     cohort: cohortOf(
       "verification_open",
       "students with an open verification file",
@@ -525,7 +525,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     progressPercent: progress(1880, 2600),
     dueLabel: "Due by Jun 6",
     trendNote:
-      "Packaging runs at about 30 a day and the June 6 date needs 43; the gap is the verification queue sitting in front of it.",
+      "Packaging runs at about 30 a day; the June 6 date needs 43.",
     cohort: cohortOf(
       "aid_packaged",
       "students with a released aid package",
@@ -569,7 +569,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     progressPercent: progress(1180, 1600),
     dueLabel: "Due by Jun 1",
     trendNote:
-      "Signing runs at about 25 a day with 11 days left; that reaches 1,402 and leaves roughly 200 beds to assign after the deadline.",
+      "About 25 a day with 11 days left, which reaches 1,402 of the 1,600.",
     cohort: cohortOf(
       "housing_signed",
       "students with a signed housing contract",
@@ -612,7 +612,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     progressPercent: progress(1504, 2450),
     dueLabel: "Due by Jun 17",
     trendNote:
-      "61% of deposited students are registered with four weeks to go; the students who are not are the earliest melt signal the sector has found.",
+      "61% of deposited students are registered with four weeks to go.",
     cohort: cohortOf(
       "orientation_registered",
       "deposited students registered for orientation",
@@ -655,7 +655,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     progressPercent: progress(4120, 5000),
     dueLabel: "Due by Jun 30",
     trendNote:
-      "Weekday visits hold steady while weekend events run 12% behind last year, which is where the whole shortfall sits.",
+      "Weekday visits hold steady; weekend events run 12% behind last year.",
     cohort: cohortOf(
       "campus_visits",
       "students who have visited campus",
@@ -707,12 +707,12 @@ export const DEMO_INSIGHTS: BrewInsight[] = [
       glance: "838 commuter deposits · 6.4% slower over 7 days · 82 deposits at risk by May 31",
       context:
         "838 of 1,807 commuter admits have deposited · 46.4% against 52.8% a week ago · 312 of the slipping group have an open aid file",
-      deep: "838 commuter deposits · rate 46.4%, down 6.4% in 7 days · 82 deposits and $1.6M of net tuition at risk by May 31 · 312 of the 494 undeposited carry an open verification",
+      deep: "838 commuter deposits · rate 46.4%, down 6.4% in 7 days · 312 of the 494 undeposited carry an open verification",
     },
     context:
       "Commuter admits deposit earlier than residential ones in a normal cycle, and this year they have stopped. The slowdown began the day Financial Aid's verification queue crossed 250 files, and 312 of the 494 commuter admits without a deposit are sitting in that queue waiting on a package.",
     deepDive:
-      "The commuter cohort is 29.5% of the admit pool and has historically carried the deposit rate: it ran 6 points above residential at this point last cycle and is now 9 points below its own last-year figure. The break is not in interest — commuter campus-visit attendance is flat — it is in the aid package. 312 of the 494 undeposited commuter admits have an open verification file, and the median file has been open 19 days. At $19.5K of net tuition per enrolled student, the 82 deposits the current pace loses by May 31 is $1.6M against a budget built on 3,200 deposits.",
+      "The commuter cohort ran 6 points above residential at this point last cycle and is now 9 points below its own last-year figure. The break is not in interest — visit attendance is flat — it is in the aid package: 312 of the 494 undeposited commuter admits have an open verification file, open 19 days at the median.",
     impactLabel: "Potential Impact",
     impact: [
       { label: "−$1.6M", tone: "negative" },
@@ -722,7 +722,7 @@ export const DEMO_INSIGHTS: BrewInsight[] = [
       glance: "Launch targeted outreach to 312 high-probability students with incomplete financial aid.",
       context:
         "Launch targeted outreach to the 312 commuter admits with incomplete financial aid, and clear their verification files first.",
-      deep: "Launch targeted outreach to the 312 commuter admits with incomplete financial aid, put the same 312 at the head of the verification queue, and hold the May 31 deadline rather than extending it — the queue is the blocker, not the date.",
+      deep: "Launch targeted outreach to the 312 commuter admits with incomplete financial aid, put the same 312 at the head of the verification queue, and hold the May 31 deadline.",
     },
     owner: "Enrollment Management",
     impactLevel: "High",
@@ -841,19 +841,19 @@ export const DEMO_INSIGHTS: BrewInsight[] = [
       glance: "324 open files · up 18% in 7 days · 312 students without a deposit behind it",
       context:
         "324 open files · 30 cleared a day against 38 arriving · June 6 packaging date needs 43 a day",
-      deep: "324 open files · 197 awaiting documents, 88 awaiting review, 39 in correction · 30 cleared a day against 38 arriving · two reviewers would close the gap by June 4",
+      deep: "324 open files · 197 awaiting documents, 88 awaiting review, 39 in correction · 30 cleared a day against 38 arriving",
     },
     context:
       "The queue is growing because arrivals outrun clearances, not because output fell — Financial Aid cleared 210 files in the last seven days, its best week of the cycle. At 30 a day against 38 arriving, the queue reaches roughly 372 by month end and the June 6 packaging date slips with it.",
     deepDive:
-      "324 files are open: 197 waiting on documents from the family, 88 waiting on review here, and 39 in correction. Only the middle 88 are inside this office's control, which is why more staff moves the number and more email does not. Two temporary reviewers at the observed 15 files a day each would clear the standing queue by June 4 and hold the arrival rate flat thereafter. National verification selections fell this cycle, so this is a local packaging backlog rather than a federal one — a useful thing to be able to say to the provost, because it means it is fixable here.",
+      "324 files are open: 197 waiting on documents from the family, 88 waiting on review here, and 39 in correction. Only the middle 88 are inside this office's control, which is why more staff moves the number and more email does not.",
     impactLabel: "Potential Impact",
     impact: [{ label: "−36 Enrolled Students", tone: "negative" }],
     recommendations: {
       glance: "Add 2 temporary reviewers and prioritize commuter and transfer cases.",
       context:
         "Add 2 temporary reviewers through June 6 and work commuter and transfer files first — both cohorts deposit late and melt early.",
-      deep: "Add 2 temporary reviewers through June 6, work the 312 undeposited files ahead of the rest, and report the queue against arrivals rather than against its own size, so a good week is not read as a bad one.",
+      deep: "Add 2 temporary reviewers through June 6, work the 312 undeposited files ahead of the rest, and report the queue against arrivals rather than against its own size.",
     },
     owner: "Financial Aid",
     impactLevel: "High",
@@ -965,12 +965,12 @@ export const DEMO_INSIGHTS: BrewInsight[] = [
       glance: "2,604 transfer applications · 14% ahead of last year · 9% above target pace",
       context:
         "2,604 applications against a 2,400 target · Business 812 and Health Sciences 705 · credit evaluations 9 days behind",
-      deep: "2,604 applications, target met May 14 · Business 812 (+21%) and Health Sciences 705 (+18%) · 1,108 transfer admits released · credit evaluations 9 days behind the application date",
+      deep: "2,604 applications, target met May 14 · Business 812 (+21%) and Health Sciences 705 (+18%) · credit evaluations 9 days behind",
     },
     context:
       "Transfer is the one part of the funnel running ahead, and it is running ahead in the two programs with room to take students. The constraint has moved from volume to throughput: credit evaluations are nine days behind the application date, and a transfer applicant who waits that long for an evaluation is choosing between offers, not waiting for one.",
     deepDive:
-      "2,604 transfer applications is 320 more than the same day last cycle and 204 above the 2,400 target the round was planned against. Business is up 21% and Health Sciences 18%, and both have capacity. Aster admits 42.6% of the transfer file and yields 33.8% of those, so the extra 320 applications are worth roughly 46 enrolled students and $0.9M of net tuition — but only if the evaluations keep pace. Feeder analysis puts 61% of the growth in five community colleges within 40 miles, which is a short list to build an admitted-student event around.",
+      "2,604 transfer applications is 320 more than the same day last cycle and 204 above the 2,400 target, with Business up 21% and Health Sciences 18%. At Aster's 42.6% admit and 33.8% yield those 320 are worth roughly 46 enrolled students — but only if the evaluations keep pace.",
     impactLabel: "Potential Impact",
     impact: [
       { label: "+$1.2M", tone: "positive" },
@@ -980,7 +980,7 @@ export const DEMO_INSIGHTS: BrewInsight[] = [
       glance: "Increase admitted student events for transfer prospects in top feeder schools.",
       context:
         "Increase admitted-student events at the five feeder colleges carrying the growth, and add evaluation capacity so offers land inside a week.",
-      deep: "Run two admitted-student evenings at the five feeder colleges before June 15, and add one evaluator through the same date — the volume only converts if an offer reaches the student while they are still deciding.",
+      deep: "Run two admitted-student evenings at the five feeder colleges before June 15, and add one evaluator through the same date.",
     },
     owner: "Admissions",
     impactLevel: "Medium",
@@ -1087,12 +1087,12 @@ export const DEMO_INSIGHTS: BrewInsight[] = [
       glance: "1,180 of 1,600 signed · 74% · 11 days to the June 1 deadline",
       context:
         "1,180 signed against a 1,600 target · 25 signing a day · 432 deposited students have not signed",
-      deep: "1,180 signed, 742 assigned · 25 a day against the 38 the deadline needs · 432 deposited students unsigned, 261 of them commuter admits who may not need a bed at all",
+      deep: "1,180 signed, 742 assigned · 25 a day against the 38 the deadline needs · 432 unsigned, 261 of them commuter admits",
     },
     context:
       "Signing is steady but too slow for the date. 432 deposited students have not signed, and 261 of them are commuter admits who may never need a bed — which means the real gap is nearer 171, and Residence Life is planning capacity against a number that includes students who will not use it.",
     deepDive:
-      "1,180 contracts are signed against a 1,600 target, with 742 already assigned to a room. The pace is 25 a day and the deadline needs 38. The useful move is not to chase all 432 unsigned students but to separate them: 261 are commuter admits whose housing intent was never confirmed, and asking them a single yes-or-no question would either release the beds or move them into the real queue. Residence Life is currently holding capacity for all 432.",
+      "1,180 contracts are signed against a 1,600 target, with 742 assigned to a room; the pace is 25 a day and the deadline needs 38. Of the 432 unsigned, 261 are commuter admits whose housing intent was never confirmed, and Residence Life is holding capacity for all 432.",
     impactLabel: "Potential Impact",
     impact: [
       { label: "≈200 late assignments", tone: "negative" },
@@ -1102,7 +1102,7 @@ export const DEMO_INSIGHTS: BrewInsight[] = [
       glance: "Ask the 261 commuter admits to confirm housing intent before holding beds for them.",
       context:
         "Send a one-question housing intent confirmation to the 261 commuter admits, then work the remaining 171 as a named list.",
-      deep: "Send a one-question housing intent confirmation to the 261 commuter admits this week, release the beds that come back negative, and hand Residence Life the remaining 171 as a named list rather than a total — the assignment work is manageable at that size and is not at 432.",
+      deep: "Send a one-question housing intent confirmation to the 261 commuter admits this week, release the beds that come back negative, and hand Residence Life the remaining 171 as a named list.",
     },
     owner: "Residence Life",
     impactLevel: "Medium",
@@ -1202,12 +1202,12 @@ export const DEMO_INSIGHTS: BrewInsight[] = [
       glance: "1,504 of 2,450 registered · 61% · 946 deposited students unregistered",
       context:
         "1,504 registered · Session 3 oversubscribed by 44 · Session 6 a third empty · 946 unregistered",
-      deep: "1,504 registered across six sessions · Session 3 +44 over capacity, Session 6 at 68% · 946 unregistered deposits, historically melting at roughly twice the registered rate",
+      deep: "1,504 registered across six sessions · Session 3 +44 over capacity, Session 6 at 68% · 946 unregistered deposits",
     },
     context:
       "Orientation registration is the earliest reliable melt signal the sector has found, and 946 deposited students have not registered with four weeks to go. The sessions themselves are also badly balanced: Session 3 is oversubscribed by 44 while Session 6 runs a third empty.",
     deepDive:
-      "1,504 of 2,450 deposited students hold an orientation place. The 946 who do not are not evenly distributed — 61% of them are commuter admits, the same cohort whose deposit rate slipped this week, which suggests one group of students is quietly disengaging across three different measures. Rebalancing sessions is the cheap half of the fix: moving 44 students from Session 3 to Session 6 costs nothing and opens the oversubscribed session to the unregistered. The expensive half is contact, and it is worth it — at last cycle's rates the unregistered melt at roughly twice the registered rate.",
+      "1,504 of 2,450 deposited students hold an orientation place. The 946 who do not are 61% commuter admits — the same cohort whose deposit rate slipped this week — and at last cycle's rates the unregistered melt at roughly twice the registered rate.",
     impactLabel: "Potential Impact",
     impact: [
       { label: "−54 Enrolled Students", tone: "negative" },
@@ -1217,7 +1217,7 @@ export const DEMO_INSIGHTS: BrewInsight[] = [
       glance: "Rebalance Session 3 into Session 6 and contact the 946 unregistered deposits.",
       context:
         "Move 44 places from Session 3 to Session 6, then contact the 946 unregistered deposits starting with the 577 commuter admits.",
-      deep: "Move 44 places from Session 3 to Session 6 this week, then work the 946 unregistered deposits as a named list starting with the 577 commuter admits — the same cohort is behind on deposits, orientation and housing, and one conversation can cover all three.",
+      deep: "Move 44 places from Session 3 to Session 6 this week, then work the 946 unregistered deposits as a named list, starting with the 577 commuter admits.",
     },
     owner: "Campus Life",
     impactLevel: "Medium",
@@ -1318,12 +1318,12 @@ export const DEMO_INSIGHTS: BrewInsight[] = [
       glance: "46.4% discount rate · 1.9 points above plan · $2.1M below the net tuition plan",
       context:
         "46.4% against a 44.5% plan · 1,880 of 2,600 packages released · $2.1M at full-class scale",
-      deep: "46.4% discount on 1,880 packages against a 44.5% plan · merit awards up 3.1 points, need-based flat · $2.1M below plan at full-class scale, with 720 packages still to release",
+      deep: "46.4% discount on 1,880 packages against a 44.5% plan · merit awards up 3.1 points, need-based flat · 720 packages still to release",
     },
     context:
       "The rate is running above plan on merit rather than need: need-based awards are flat against last cycle and merit awards are 3.1 points higher, largely from the automatic bands applied at admit. 720 packages are still to release, which is enough room to bring the cycle back to plan if the bands are adjusted now.",
     deepDive:
-      "Institutional aid on the 1,880 packages released averages 46.4% of gross tuition against a 44.5% plan. The gap is entirely in merit: need-based aid is within 0.2 points of last cycle while merit is 3.1 points above it, which follows from the automatic award bands applied at the point of admit rather than from any individual decision. 720 packages remain unreleased. Adjusting the top two bands by one step on those 720 alone recovers roughly $1.4M of the $2.1M, without reopening a single offer already made — reopening an issued package is the one move here that costs more in confidence than it recovers in tuition.",
+      "Institutional aid on the 1,880 packages released averages 46.4% of gross tuition against a 44.5% plan. The gap is entirely in merit — need-based aid is within 0.2 points of last cycle while merit is 3.1 points above it — which follows from the automatic award bands applied at the point of admit.",
     impactLabel: "Potential Impact",
     impact: [
       { label: "−$2.1M", tone: "negative" },
@@ -1333,7 +1333,7 @@ export const DEMO_INSIGHTS: BrewInsight[] = [
       glance: "Adjust the top two merit bands on the 720 packages still to release.",
       context:
         "Adjust the top two merit bands by one step on the 720 unreleased packages, and leave issued offers untouched.",
-      deep: "Adjust the top two merit bands by one step on the 720 unreleased packages — worth about $1.4M — and take the residual $0.7M to the CFO as a plan variance rather than trying to recover it from offers already made.",
+      deep: "Adjust the top two merit bands by one step on the 720 unreleased packages, worth about $1.4M, and take the residual $0.7M to the CFO as a plan variance.",
     },
     owner: "Financial Aid",
     impactLevel: "High",
@@ -1944,7 +1944,7 @@ export interface BrewDemoSource {
   cycleLabel: string;
   students: number;
   reader: BrewReader;
-  synthesis: { headline: string; bullets: string[] };
+  synthesis: { headline: string };
   kpis: BrewKpi[];
   insights: BrewInsight[];
   meetings: BrewMeeting[];
@@ -1976,11 +1976,6 @@ export function demoBrewSource(): BrewDemoSource {
     synthesis: {
       headline:
         "Here is your enrollment executive morning brief as of today 7:30 AM ET",
-      bullets: [
-        "Deposits are 2,450 against a 3,200 target with 11 days left, and the commuter half of that figure slowed 6.4% this week.",
-        "324 aid verifications are open and growing faster than they are cleared, which is what is holding the commuter deposits.",
-        "Transfer applications are 14% ahead of last year — the one part of the funnel running ahead, and it needs evaluation capacity to convert.",
-      ],
     },
     kpis: DEMO_KPIS,
     insights: DEMO_INSIGHTS,

@@ -17,6 +17,8 @@ export interface BrewPreferenceStore {
   load(scope: string): BrewPreferences | null;
   save(scope: string, preferences: Omit<BrewPreferences, "version" | "updatedAt">): BrewPreferences;
   clear(scope: string): void;
+  /** Every scope in this browser, of every shape — what a demo sign-in resets. */
+  clearAll(): void;
 }
 
 const STORAGE_PREFIX = "audentra:morning-brew:v7";
@@ -220,6 +222,23 @@ export const browserBrewPreferenceStore: BrewPreferenceStore = {
       window.localStorage.removeItem(`${STORAGE_PREFIX}:${scope}`);
     } catch {
       // Nothing to do — the reader simply sees setup again next visit.
+    }
+  },
+
+  /**
+   * Signing in as a demo persona starts the demo at the beginning, so whatever
+   * a previous visitor answered on this machine — under any scope, and under
+   * any earlier shape of the preferences — is dropped rather than inherited.
+   */
+  clearAll() {
+    try {
+      const prefixes = [STORAGE_PREFIX, ...LEGACY_PREFIXES];
+      const stale = Object.keys(window.localStorage).filter((key) =>
+        prefixes.some((prefix) => key.startsWith(`${prefix}:`)),
+      );
+      for (const key of stale) window.localStorage.removeItem(key);
+    } catch {
+      // Storage can be unavailable; the reader simply keeps what they had.
     }
   },
 };

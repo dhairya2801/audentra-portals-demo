@@ -20919,10 +20919,7 @@ a {
 .brew-impact--neutral { color: #4c5768; }
 
 /* masthead ------------------------------------------------------------------ */
-.brew-masthead { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: 0.7rem 1.1rem; border: 1px solid var(--audentra-line); border-radius: 0.9rem; background: #fff; box-shadow: 0 6px 20px rgb(10 31 68 / 4%); }
-.brew-masthead__brand { display: flex; gap: 0.5rem; align-items: center; padding-right: 1rem; border-right: 1px solid var(--audentra-line); }
-.brew-masthead__mark { display: grid; width: 1.65rem; height: 1.65rem; place-items: center; border-radius: 0.45rem; background: linear-gradient(145deg, var(--audentra-purple), var(--audentra-blue)); color: #fff; font-size: 0.85rem; font-weight: 900; }
-.brew-masthead__brand strong { color: var(--audentra-navy); font-size: 0.86rem; letter-spacing: -0.02em; }
+.brew-masthead { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: 0.7rem 1.1rem; border: 1px solid var(--audentra-line); border-radius: 0.9rem; background: #fff; box-shadow: 0 6px 20px rgb(10 31 68 / 4%); }
 .brew-masthead__title { display: flex; gap: 0.6rem; align-items: center; }
 .brew-masthead__title strong { display: block; color: var(--audentra-navy); font-size: 0.82rem; letter-spacing: -0.015em; }
 .brew-masthead__title small { color: #78829a; font-size: 0.56rem; }
@@ -20932,10 +20929,8 @@ a {
 .brew-masthead__meta { display: flex; gap: 0.6rem; align-items: center; }
 .brew-masthead__updated { display: inline-flex; gap: 0.3rem; align-items: center; color: #78829a; font-size: 0.57rem; white-space: nowrap; }
 .brew-masthead__updated i { color: var(--audentra-teal); font-style: normal; }
-.brew-masthead__bell { position: relative; width: 1.95rem; height: 1.95rem; border: 1px solid var(--audentra-line); border-radius: 50%; background: #fff; font-size: 0.7rem; line-height: 1; cursor: pointer; }
-.brew-masthead__bell i { position: absolute; top: -0.18rem; right: -0.18rem; display: grid; min-width: 0.92rem; height: 0.92rem; place-items: center; padding: 0 0.16rem; border-radius: 999px; background: #e0483c; color: #fff; font-size: 0.46rem; font-style: normal; font-weight: 900; }
 .brew-masthead__avatar { display: grid; width: 1.95rem; height: 1.95rem; place-items: center; border: 0; border-radius: 50%; background: var(--audentra-soft-purple); color: var(--audentra-purple); font-size: 0.56rem; font-weight: 900; cursor: pointer; }
-.brew-masthead__bell:hover, .brew-masthead__avatar:hover { box-shadow: 0 0 0 3px rgb(106 56 255 / 12%); }
+.brew-masthead__avatar:hover { box-shadow: 0 0 0 3px rgb(106 56 255 / 12%); }
 
 /* hero ---------------------------------------------------------------------- */
 .brew-hero { display: grid; grid-template-columns: minmax(16rem, 1fr) minmax(0, 1.3fr); gap: clamp(1.2rem, 4vw, 3rem); align-items: start; padding: 1.5rem 1.4rem; border: 1px solid var(--audentra-line); border-radius: 0.9rem; background: radial-gradient(circle at 96% -20%, rgb(106 56 255 / 7%), transparent 22rem), #fff; box-shadow: 0 6px 20px rgb(10 31 68 / 4%); }
@@ -20952,7 +20947,7 @@ a {
 .brew-glance__head { display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.45rem; color: var(--audentra-navy); font-size: 0.6rem; font-weight: 800; }
 .brew-glance__icon { display: grid; width: 1.35rem; height: 1.35rem; place-items: center; border-radius: 0.35rem; background: var(--audentra-soft-purple); color: var(--audentra-purple); font-size: 0.62rem; font-style: normal; }
 .brew-glance__icon--calendar { background: var(--audentra-soft-blue); color: var(--audentra-blue); }
-.brew-glance__icon--link { background: transparent; color: var(--audentra-blue); }
+.brew-glance__icon--action { background: var(--audentra-soft-teal); color: #087d68; }
 /* Outlook's own square, unpadded and untinted: the card is naming somebody
    else's mailbox, so its mark is not wrapped in one of our tiles. */
 .brew-glance__icon--plain { background: transparent; }
@@ -20961,13 +20956,6 @@ a {
 .brew-glance > em { margin-top: 0.42rem; color: #d0453a; font-size: 0.66rem; font-style: normal; font-weight: 600; }
 .brew-glance__link { display: inline-flex; gap: 0.3rem; align-items: center; margin-top: auto; padding-top: 0.65rem; color: var(--audentra-blue); font-size: 0.66rem; font-weight: 600; }
 .brew-glance__link i { font-style: normal; }
-.brew-glance--links { cursor: default; }
-.brew-glance--links:hover { transform: none; border-color: var(--audentra-line); box-shadow: 0 5px 16px rgb(10 31 68 / 3%); }
-.brew-glance--links ul { display: grid; margin: 0; padding: 0; list-style: none; }
-.brew-glance--links li + li { border-top: 1px solid #f0f2f7; }
-.brew-glance--links button { display: flex; justify-content: space-between; gap: 0.5rem; align-items: center; width: 100%; padding: 0.42rem 0; border: 0; background: transparent; color: #37445c; font-size: 0.68rem; font-weight: 500; text-align: left; cursor: pointer; }
-.brew-glance--links button:hover { color: var(--audentra-purple); }
-.brew-glance--links button svg { flex: none; color: #b3bccc; }
 
 /* shared section heads ------------------------------------------------------- */
 /* A band's head is a title, not an eyebrow: a marked glyph, the section's name
@@ -21703,10 +21691,6 @@ a {
 /* The briefing reads live records, so it needs first-class ways to say
    "nothing happened", "we do not measure that", and "the read failed" —
    three different answers the old synthetic content never had to give. */
-.brew-hero__bullets { display: grid; gap: 0.42rem; margin: 0.8rem 0 0; padding-left: 0; color: #5f6a7e; font-size: 0.63rem; line-height: 1.55; list-style: none; }
-.brew-hero__bullets li { padding-left: 0.85rem; text-indent: -0.85rem; }
-.brew-hero__bullets li::before { display: inline-block; width: 0.85rem; color: var(--audentra-purple); font-weight: 900; text-indent: 0; content: "\2014"; }
-.brew-hero__bullets li::marker { color: var(--audentra-purple); }
 .brew-unavailable { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; width: min(100%, 52rem); margin: 0 auto; padding: 1.6rem; border: 1px solid var(--audentra-line); border-radius: 1.1rem; background: #fff; box-shadow: 0 10px 34px rgb(10 31 68 / 6%); }
 .brew-unavailable > div { flex: 1; min-width: 18rem; }
 .brew-unavailable h1 { margin: 0; color: var(--audentra-navy); font-size: 1.05rem; font-weight: 800; letter-spacing: -0.02em; }
@@ -21777,7 +21761,6 @@ a {
 @media (width <= 46rem) {
   .brew { gap: 0.65rem; }
   .brew-masthead { gap: 0.6rem; padding: 0.65rem 0.8rem; }
-  .brew-masthead__brand { padding-right: 0.7rem; }
   .brew-masthead__title small { display: none; }
   .brew-masthead__updated { font-size: 0.53rem; }
 
@@ -21785,7 +21768,6 @@ a {
   /* Inbox and calendar read fine side by side on a phone; the link list does not. */
   .brew-hero__cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .brew-glance { min-height: 0; }
-  .brew-glance--links { grid-column: 1 / -1; }
 
   .brew-insights, .brew-pulse, .brew-changes, .brew-coverage { padding: 0.9rem 0.8rem; }
   .brew-section-head { flex-direction: column; gap: 0.6rem; }

@@ -382,17 +382,13 @@ export interface BrewPriority {
   boardQuery: StaffActionCenterQuery | null;
 }
 
-export interface BrewQuickLink {
-  id: string;
-  label: string;
-  destination: MorningBrewDestination;
-}
-
 export interface BrewGlance {
   requests: number;
   requestsAwaitingReply: number;
   meetings: number;
   meetingsHighPriority: number;
+  priorities: number;
+  prioritiesHighPriority: number;
 }
 
 /** Who the brief is written for. The demo corpus names its own reader. */
@@ -409,7 +405,6 @@ export interface BrewBriefing {
   /** The admissions cycle every figure in the brief is counted against. */
   cycleLabel: string;
   deck: string;
-  bullets: string[];
   readTimeMinutes: number;
   updatedAt: string;
   windowLabel: string;
@@ -421,7 +416,6 @@ export interface BrewBriefing {
   meetings: BrewMeeting[];
   requests: BrewRequest[];
   priorities: BrewPriority[];
-  quickLinks: BrewQuickLink[];
   glance: BrewGlance;
   coverage: {
     notes: string[];

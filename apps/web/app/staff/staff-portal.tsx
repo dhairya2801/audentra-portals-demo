@@ -41,17 +41,14 @@ import {
   createStaffKnowledgeCard,
   createStaffWorkItem,
   draftStaffConfigurationWithEdward,
-  getStaffActionCenter,
   getStaffInquiryThread,
   getStaffOperationsWorkspace,
   signOutStaff,
-  simulateStaffOutreach,
   updateStaffClub,
   updateStaffCorePlay,
   updateStaffInquiry,
   updateStaffKnowledgeCard,
   updateStaffManagedConfiguration,
-  updateStaffWorkItem,
   uploadStaffPortalMedia,
 } from "../lib/api-client";
 import {
@@ -60,6 +57,15 @@ import {
   WorkItemCard,
 } from "./staff-action-center";
 import { ActionCenterDetail } from "./action-center-detail";
+import {
+  DEMO_INQUIRIES,
+  DEMO_OUTREACH_RUNS,
+  DEMO_PORTAL_INVENTORY,
+  DEMO_PUBLISHED_KNOWLEDGE,
+  demoActionCenter,
+  demoMoveWorkItem,
+  demoPersonalActionCenter,
+} from "./demo-workspace";
 import { ActionRulesEditor } from "./action-rules-editor";
 import { JourneyFlowBuilder } from "./journey-flow-builder";
 import { InstitutionProfileView } from "./institution-profile/institution-profile";
@@ -498,19 +504,17 @@ function OverviewView({
   workspace: StaffOperationsWorkspace;
   navigate: (view: StaffView) => void;
 }) {
-  const openItems = workspace.personalActionCenter.tasks.filter(
-    (item) => item.status !== "done",
-  );
-  const urgent = workspace.personalActionCenter.students.filter(
+  // Today, the Action Center and the Task board read the demo corpus rather
+  // than the tenant — see `demo-workspace.ts` for why. Every other view on this
+  // page still reads the real workspace.
+  const personal = demoPersonalActionCenter(workspace.currentStaff);
+  const inquiries = DEMO_INQUIRIES;
+  const openItems = personal.tasks.filter((item) => item.status !== "done");
+  const urgent = personal.students.filter(
     (student) =>
       student.risk.band === "critical" || student.risk.band === "high",
   );
-  const newInquiries = workspace.inquiries.filter(
-    (item) => item.status === "new",
-  );
-  const publishedKnowledge = workspace.knowledgeBase.filter(
-    (item) => item.status === "published",
-  );
+  const newInquiries = inquiries.filter((item) => item.status === "new");
 
   return (
     <>
@@ -531,7 +535,7 @@ function OverviewView({
         <MetricCard
           label="Open work"
           value={openItems.length}
-          detail={`${workspace.personalActionCenter.counts.inProgress} in progress`}
+          detail={`${personal.counts.inProgress} in progress`}
         />
         <MetricCard
           label="Needs attention"
@@ -547,7 +551,7 @@ function OverviewView({
         />
         <MetricCard
           label="Trusted guidance"
-          value={publishedKnowledge.length}
+          value={DEMO_PUBLISHED_KNOWLEDGE}
           detail="Published knowledge cards"
           tone="green"
         />
@@ -595,7 +599,7 @@ function OverviewView({
             </button>
           </header>
           <div className="staff-inquiry-preview">
-            {workspace.inquiries.slice(0, 3).map((inquiry) => (
+            {inquiries.slice(0, 3).map((inquiry) => (
               <button type="button" onClick={() => navigate("messages")} key={inquiry.id}>
                 <span>{inquiry.student.preferredName.slice(0, 1)}</span>
                 <span>
@@ -624,7 +628,7 @@ function OverviewView({
           </button>
         </header>
         <div className="staff-experience-strip">
-          {workspace.portalInventory.slice(0, 5).map((item) => (
+          {DEMO_PORTAL_INVENTORY.slice(0, 5).map((item) => (
             <article key={item.id}>
               <span>{item.label.slice(0, 1)}</span>
               <div>
@@ -667,13 +671,11 @@ function OverviewView({
 
 function TaskBoardView({
   workspace,
-  refresh,
   initialWorkItemId = null,
   initialQuery = null,
   onDetailClosed,
 }: {
   workspace: StaffOperationsWorkspace;
-  refresh: () => void;
   initialWorkItemId?: string | null;
   initialQuery?: StaffActionCenterQuery | null;
   onDetailClosed?: () => void;
@@ -685,13 +687,24 @@ function TaskBoardView({
   );
   const [debouncedQuery, setDebouncedQuery] = useState(filters.query);
   const draggedId = useRef<string | null>(null);
+  // The signed-in person, held in a ref so the workspace poll handing back an
+  // equal-but-new object does not give `reloadLoaded` a new identity.
+  const staffRef = useRef(workspace.currentStaff);
+  useEffect(() => {
+    staffRef.current = workspace.currentStaff;
+  }, [workspace.currentStaff]);
   const [dropTarget, setDropTarget] =
     useState<StaffWorkItemStatus | null>(null);
   const [boardMessage, setBoardMessage] = useState<string | null>(null);
 
   // The board is server-paged. `board` is the last page envelope (counts,
   // facets, page) and `items` is everything loaded so far, in server order.
-  const [board, setBoard] = useState<StaffActionCenter>(workspace.actionCenter);
+  // The board is the demo corpus, not the tenant's queue — see
+  // `demo-workspace.ts`. Filtering, paging and dragging all run against it in
+  // memory, so the columns behave exactly as they do against the platform.
+  const [board, setBoard] = useState<StaffActionCenter>(() =>
+    demoActionCenter(buildActionCenterQuery(emptyTaskBoardFilters), workspace.currentStaff),
+  );
   const [items, setItems] = useState<StaffWorkItem[]>([]);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -728,9 +741,9 @@ function TaskBoardView({
         let envelope: StaffActionCenter | null = null;
         for (let offset = 0; offset < target; offset += TASK_BOARD_MAX_LIMIT) {
           const limit = Math.min(TASK_BOARD_MAX_LIMIT, target - offset);
-          envelope = await getStaffActionCenter(
+          envelope = demoActionCenter(
             buildActionCenterQuery(activeFilters, { limit, offset }),
-            controller.signal,
+            staffRef.current,
           );
           collected.push(...envelope.items);
           if (!envelope.page.hasMore) break;
@@ -768,23 +781,6 @@ function TaskBoardView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeQueryKey]);
 
-  // The workspace poll and realtime events refresh the workspace every ~10s;
-  // piggyback on that to keep the loaded pages current without a second timer.
-  const workspaceStamp = workspace.actionCenter.generatedAt;
-  const lastStamp = useRef(workspaceStamp);
-  useEffect(() => {
-    if (lastStamp.current === workspaceStamp) return;
-    lastStamp.current = workspaceStamp;
-    if (loadState !== "ready" || loadingMore) return;
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (!cancelled) void reloadLoaded({ silent: true });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaceStamp, loadState, loadingMore, reloadLoaded]);
-
   const loadMore = async () => {
     if (loadingMore || !board.page.hasMore) return;
     const sequence = ++requestSequence.current;
@@ -793,12 +789,12 @@ function TaskBoardView({
     activeController.current = controller;
     setLoadingMore(true);
     try {
-      const envelope = await getStaffActionCenter(
+      const envelope = demoActionCenter(
         buildActionCenterQuery(activeFilters, {
           limit: TASK_BOARD_PAGE_SIZE,
           offset: items.length,
         }),
-        controller.signal,
+        staffRef.current,
       );
       if (sequence !== requestSequence.current) return;
       setBoard(envelope);
@@ -819,8 +815,8 @@ function TaskBoardView({
   };
 
   const counts = board.counts;
-  const facets = board.facets ?? workspace.actionCenter.facets;
-  const staffDirectory = board.staff.length ? board.staff : workspace.actionCenter.staff;
+  const facets = board.facets;
+  const staffDirectory = board.staff;
   const grouped = useMemo(() => groupWorkItemsByStatus(items), [items]);
   const itemsById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const visibleColumns = useMemo(() => {
@@ -876,14 +872,10 @@ function TaskBoardView({
   ) => setFilters((current) => ({ ...current, [key]: value }));
 
   const afterMutation = () => {
-    refresh();
     void reloadLoaded({ silent: true });
   };
 
-  const moveItem = async (
-    itemId: string,
-    status: StaffWorkItemStatus,
-  ) => {
+  const moveItem = (itemId: string, status: StaffWorkItemStatus) => {
     const item = itemsById.get(itemId);
     if (!item || item.status === status) return;
     if (!["todo", "in_progress"].includes(status)) {
@@ -893,27 +885,11 @@ function TaskBoardView({
       );
       return;
     }
-    setBoardMessage(`Moving ${item.key}...`);
-    try {
-      await updateStaffWorkItem(item.id, {
-        expectedVersion: item.version,
-        status,
-        note: `Moved to ${status.replaceAll("_", " ")} on the task board.`,
-      });
-      setBoardMessage(
-        `${item.key} moved to ${status.replaceAll("_", " ")}.`,
-      );
-    } catch (error) {
-      setBoardMessage(
-        error instanceof Error
-          ? error.message
-          : "The task could not be moved.",
-      );
-    } finally {
-      draggedId.current = null;
-      setDropTarget(null);
-      afterMutation();
-    }
+    demoMoveWorkItem(item.id, status);
+    setBoardMessage(`${item.key} moved to ${status.replaceAll("_", " ")}.`);
+    draggedId.current = null;
+    setDropTarget(null);
+    afterMutation();
   };
 
   const total = board.page?.total ?? items.length;
@@ -1264,6 +1240,7 @@ function TaskBoardView({
         <TaskDetailDialog
           workItemId={openDetailId}
           workspace={workspace}
+          center={board}
           onClose={() => {
             setOpenDetailId(null);
             onDetailClosed?.();
@@ -1661,11 +1638,13 @@ function CreateTaskDialog({
 function TaskDetailDialog({
   workItemId,
   workspace,
+  center,
   onClose,
   onChanged,
 }: {
   workItemId: string;
   workspace: StaffOperationsWorkspace;
+  center: StaffActionCenter;
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -1678,7 +1657,7 @@ function TaskDetailDialog({
       <ActionCenterDetail
         key={workItemId}
         workItemId={workItemId}
-        center={workspace.actionCenter}
+        center={center}
         currentStaffId={workspace.currentStaff.id}
         presentation="dialog"
         onBack={onClose}
@@ -3869,12 +3848,18 @@ function OutreachView({
   workspace: StaffOperationsWorkspace;
   refresh: () => void;
 }) {
-  const personal = workspace.personalActionCenter;
+  // The demo corpus, not the tenant — see `demo-workspace.ts`.
+  const [personalStamp, setPersonalStamp] = useState(0);
+  const personal = useMemo(
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    () => demoPersonalActionCenter(workspace.currentStaff),
+    [workspace.currentStaff, personalStamp],
+  );
   const [selectedStudentId, setSelectedStudentId] = useState(
     personal.students[0]?.id ?? null,
   );
   const [taskMessage, setTaskMessage] = useState<string | null>(null);
-  const action = useApiAction(simulateStaffOutreach);
+  const [runs, setRuns] = useState(DEMO_OUTREACH_RUNS);
   const [result, setResult] = useState<string | null>(null);
   const selectedStudent =
     personal.students.find(
@@ -3888,50 +3873,40 @@ function OutreachView({
       ) ?? null
     : null;
 
-  const moveRecommendedTask = async (status: StaffWorkItemStatus) => {
+  // The move is written to the demo board in memory, so the task board shows
+  // it too and the counts above follow it — without a request leaving the page.
+  const moveRecommendedTask = (status: StaffWorkItemStatus) => {
     if (!selectedTask) return;
-    setTaskMessage(`Updating ${selectedTask.key}...`);
-    try {
-      await updateStaffWorkItem(selectedTask.id, {
-        expectedVersion: selectedTask.version,
-        status,
-        note:
-          status === "done"
-            ? "Completed from the personal Action Center."
-            : "Started from the personal Action Center.",
-      });
-      setTaskMessage(
-        status === "done"
-          ? `${selectedTask.key} completed.`
-          : `${selectedTask.key} is now in progress.`,
-      );
-      refresh();
-    } catch (error) {
-      setTaskMessage(
-        error instanceof Error
-          ? error.message
-          : "The recommended task could not be updated.",
-      );
-      refresh();
-    }
+    demoMoveWorkItem(selectedTask.id, status);
+    setPersonalStamp((current) => current + 1);
+    setTaskMessage(
+      status === "done"
+        ? `${selectedTask.key} completed.`
+        : `${selectedTask.key} is now in progress.`,
+    );
   };
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
+  // The simulation is saved to the demo's own run history; nothing is sent and
+  // nothing is written to the platform.
+  const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    try {
-      const run = await action.run({
+    const requestedCount = Number(form.get("requestedCount"));
+    setRuns((current) => [
+      {
+        id: `demo-run-${current.length + 1}-${Date.now()}`,
         title: String(form.get("title")),
         audience: String(form.get("audience")),
         channel: form.get("channel") as "email" | "sms" | "voice",
-        requestedCount: Number(form.get("requestedCount")),
-      });
-      setResult(
-        `Simulation created for ${run.requestedCount} students. No external contact was sent.`,
-      );
-      refresh();
-    } catch {
-      setResult(null);
-    }
+        requestedCount,
+        status: "simulation_only",
+        createdBy: personal.staff.name,
+        createdAt: new Date().toISOString(),
+      },
+      ...current,
+    ]);
+    setResult(
+      `Simulation created for ${requestedCount} students. No external contact was sent.`,
+    );
   };
   return (
     <>
@@ -4059,7 +4034,7 @@ function OutreachView({
                     <button
                       className="button button--secondary"
                       type="button"
-                      onClick={() => void moveRecommendedTask("in_progress")}
+                      onClick={() => moveRecommendedTask("in_progress")}
                     >
                       Start action
                     </button>
@@ -4068,7 +4043,7 @@ function OutreachView({
                     <button
                       className="button button--primary"
                       type="button"
-                      onClick={() => void moveRecommendedTask("done")}
+                      onClick={() => moveRecommendedTask("done")}
                     >
                       Mark complete
                     </button>
@@ -4175,20 +4150,9 @@ function OutreachView({
                 audit-flow testing only.
               </p>
             </div>
-            {action.message ? (
-              <p className="field-error" role="alert">
-                {action.message}
-              </p>
-            ) : null}
             {result ? <p className="staff-action-success">{result}</p> : null}
-            <button
-              className="button button--primary"
-              type="submit"
-              disabled={action.status === "loading"}
-            >
-              {action.status === "loading"
-                ? "Creating simulation…"
-                : "Create simulation"}
+            <button className="button button--primary" type="submit">
+              Create simulation
             </button>
           </form>
         </section>
@@ -4200,13 +4164,13 @@ function OutreachView({
             </div>
           </header>
           <div className="staff-run-history">
-            {workspace.outreachRuns.length === 0 ? (
+            {runs.length === 0 ? (
               <div className="staff-empty-panel">
                 <h3>No simulated runs yet</h3>
                 <p>Create the first preview to test the future workflow.</p>
               </div>
             ) : (
-              workspace.outreachRuns.map((run) => (
+              runs.map((run) => (
                 <article key={run.id}>
                   <span>{run.channel.slice(0, 1).toUpperCase()}</span>
                   <div>
@@ -4267,9 +4231,13 @@ function StaffSidebar({
   workspace: StaffOperationsWorkspace;
   navigate: (view: StaffView) => void;
 }) {
-  const openTasks =
-    workspace.actionCenter.counts.todo +
-    workspace.actionCenter.counts.inProgress;
+  // Counts the demo board the Task board shows, so the badge and the columns
+  // cannot disagree in front of the room.
+  const demoBoard = demoActionCenter(
+    { status: "open", limit: 1 },
+    workspace.currentStaff,
+  );
+  const openTasks = demoBoard.counts.todo + demoBoard.counts.inProgress;
   const inquiries = workspace.inquiries.filter(
     (item) => item.status === "new",
   ).length;
@@ -4320,7 +4288,9 @@ function StaffWorkspaceShell({
   workspace: StaffOperationsWorkspace;
   refresh: () => void;
 }) {
-  const [view, setView] = useState<StaffView>("overview");
+  // Morning Brew is where the day starts, so it is where a sign-in lands; the
+  // hash below still opens any view directly.
+  const [view, setView] = useState<StaffView>("morning_brew");
   // The topbar search: what is typed there opens the Students view filtered
   // to it (Enter), and ⌘K / Ctrl+K focuses the box from anywhere.
   const [globalSearch, setGlobalSearch] = useState("");
@@ -4550,7 +4520,6 @@ function StaffWorkspaceShell({
           <TaskBoardView
             key={requestedWorkItemId ?? `task-board-${taskBoardRequest?.key ?? 0}`}
             workspace={workspace}
-            refresh={refresh}
             initialWorkItemId={requestedWorkItemId}
             initialQuery={taskBoardRequest?.query ?? null}
             onDetailClosed={() => setRequestedWorkItemId(null)}

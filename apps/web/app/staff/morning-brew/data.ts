@@ -7,7 +7,6 @@ import type {
   BrewInsight,
   BrewNewsItem,
   BrewPreferences,
-  BrewQuickLink,
   BrewSourceId,
   BrewTopicId,
 } from "./types";
@@ -103,13 +102,6 @@ function readTimeFor(preferences: BrewPreferences): number {
 
 /* ------------------------------------------------------------------- builder */
 
-export const BREW_QUICK_LINKS: BrewQuickLink[] = [
-  { id: "overview", label: "Enrollment Dashboard", destination: "overview" },
-  { id: "tasks", label: "Team Updates", destination: "tasks" },
-  { id: "knowledge", label: "Reports Center", destination: "knowledge" },
-  { id: "edward", label: "Ask Edward", destination: "edward" },
-];
-
 /**
  * The news list is a constant, so "building" it is only ever filtering: the
  * topics the reader follows, bounded by the depth they asked for. No story is
@@ -150,10 +142,7 @@ function insightsFor(
   return [...followed, ...rest].slice(0, BREW_INSIGHT_COUNT);
 }
 
-/**
- * The deck the corpus wrote, and the bullets under it when the read-across is
- * switched on. Nothing here composes a sentence.
- */
+/** The deck the corpus wrote. Nothing here composes a sentence. */
 function deckFor(source: BrewDemoSource): string {
   return source.synthesis.headline;
 }
@@ -198,9 +187,15 @@ export function buildBrewBriefing(
     .filter((request) => topics.has(request.topic) || request.priority === "urgent")
     .slice(0, requestLimit(preferences));
 
-  const priorities = source.priorities
-    .filter((priority) => topics.has(priority.topic))
-    .slice(0, priorityLimit(preferences));
+  // Bound to what actually ships, for the same reason the calendar is: the
+  // Action Center card at the top counts the list the Action Center panel
+  // prints, and a card reading "9 queues" above a switched-off section would be
+  // the page contradicting itself.
+  const priorities = actions
+    ? source.priorities
+        .filter((priority) => topics.has(priority.topic))
+        .slice(0, priorityLimit(preferences))
+    : [];
 
   return {
     // The demo brief is written for one named reader, so the greeting is the
@@ -209,7 +204,6 @@ export function buildBrewBriefing(
     reader: source.reader,
     cycleLabel: source.cycleLabel,
     deck: deckFor(source),
-    bullets: intelligence ? source.synthesis.bullets : [],
     readTimeMinutes: readTimeFor(preferences),
     updatedAt: source.generatedAt,
     windowLabel: source.windowLabel,
@@ -220,8 +214,7 @@ export function buildBrewBriefing(
     news: news ? newsFor(preferences, topics) : [],
     meetings,
     requests: email ? requests : [],
-    priorities: actions ? priorities : [],
-    quickLinks: BREW_QUICK_LINKS,
+    priorities,
     glance: {
       // The mailbox total, which is larger than the curated slice below it.
       requests: email ? source.glance.requests : 0,
@@ -230,6 +223,8 @@ export function buildBrewBriefing(
       // can never disagree in front of the reader.
       meetings: meetings.length,
       meetingsHighPriority: meetings.filter((meeting) => meeting.priority === "high").length,
+      priorities: priorities.length,
+      prioritiesHighPriority: priorities.filter((priority) => priority.level === "High").length,
     },
     coverage: source.coverage,
   };

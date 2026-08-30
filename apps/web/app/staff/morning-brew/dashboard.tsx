@@ -380,9 +380,6 @@ export function MorningBrewDashboard({
   const generatedAt = new Date(briefing.updatedAt);
   const updatedClock = clockFormatter.format(generatedAt);
   const fullDate = dateFormatter.format(generatedAt);
-  const alerts =
-    briefing.glance.requestsAwaitingReply +
-    briefing.priorities.filter((priority) => priority.level === "High").length;
   const includedCount = BREW_SOURCES.filter(
     (source) => preferences.sources[source.id].enabled,
   ).length;
@@ -395,6 +392,7 @@ export function MorningBrewDashboard({
   const calendarLevel = levelOf(preferences, "calendar");
   const showRequests = preferences.sources.email.enabled;
   const emailLevel = levelOf(preferences, "email");
+  const showActions = preferences.sources.actions.enabled;
   const actionLevel = levelOf(preferences, "actions");
   const newsLevel = levelOf(preferences, "news");
   const pulseLevel = levelOf(preferences, "pulse");
@@ -410,12 +408,6 @@ export function MorningBrewDashboard({
   return (
     <div className="brew">
       <header className="brew-masthead">
-        <div className="brew-masthead__brand">
-          <span className="brew-masthead__mark" aria-hidden="true">
-            A
-          </span>
-          <strong>Audentra</strong>
-        </div>
         <div className="brew-masthead__title">
           <span className="brew-cup" aria-hidden="true" />
           <div>
@@ -427,15 +419,6 @@ export function MorningBrewDashboard({
           <span className="brew-masthead__updated">
             <Glyph name="refresh" size={12} /> Last updated {updatedClock}
           </span>
-          <button
-            className="brew-masthead__bell"
-            type="button"
-            onClick={() => navigate("messages")}
-            aria-label={`${alerts} items need attention`}
-          >
-            <span aria-hidden="true">🔔</span>
-            {alerts ? <i aria-hidden="true">{alerts}</i> : null}
-          </button>
           <button
             className="brew-masthead__avatar"
             type="button"
@@ -455,15 +438,6 @@ export function MorningBrewDashboard({
           <p className="brew-hero__meta">
             <Glyph name="clock" size={14} /> Read time: ~{briefing.readTimeMinutes} min
           </p>
-          {/* The read-across belongs to Institutional Intelligence, so it only
-              appears when the reader asked that section for the long version. */}
-          {intelligenceLevel === "deep" && briefing.bullets.length ? (
-            <ul className="brew-hero__bullets">
-              {briefing.bullets.map((bullet) => (
-                <li key={bullet}>{bullet}</li>
-              ))}
-            </ul>
-          ) : null}
         </div>
 
         <div className="brew-hero__cards">
@@ -521,24 +495,35 @@ export function MorningBrewDashboard({
             </span>
           </button>
 
-          <div className="brew-glance brew-glance--links">
+          {/* The third card is a count like the two beside it, not a menu: the
+              queues waiting on a decision this morning, read from the same
+              list the Action Center panel prints further down. */}
+          <button
+            className="brew-glance"
+            type="button"
+            onClick={() =>
+              showActions
+                ? onOpenDetail({ kind: "priority", id: briefing.priorities[0]?.id ?? "" })
+                : onManageConnections()
+            }
+          >
             <span className="brew-glance__head">
-              <i className="brew-glance__icon brew-glance__icon--link" aria-hidden="true">
-                <Glyph name="links" size={15} />
+              <i className="brew-glance__icon brew-glance__icon--action" aria-hidden="true">
+                <Glyph name="actions" size={15} />
               </i>
-              Quick links
+              Action center
             </span>
-            <ul>
-              {briefing.quickLinks.map((link) => (
-                <li key={link.id}>
-                  <button type="button" onClick={() => navigate(link.destination)}>
-                    {link.label}
-                    <Glyph name="chevron" size={12} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+            <strong>{showActions ? countFormatter.format(briefing.glance.priorities) : "—"}</strong>
+            <small>{showActions ? "Queues waiting on you" : "Turned off"}</small>
+            <em>
+              {showActions
+                ? `${briefing.glance.prioritiesHighPriority} High priority`
+                : "Switch it on to see the queues"}
+            </em>
+            <span className="brew-glance__link">
+              {showActions ? "View queues" : "Turn it on"} <Glyph name="arrow" size={13} />
+            </span>
+          </button>
         </div>
       </section>
 
