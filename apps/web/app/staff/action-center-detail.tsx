@@ -1718,7 +1718,7 @@ function DocumentOutcomeCard({
   const title =
     latestDecision?.decision === "accepted"
       ? "Document accepted"
-      : latestDecision?.decision === "rejected"
+      : latestDecision?.decision === "changes_requested"
         ? "Changes requested"
         : "Student document activity";
 

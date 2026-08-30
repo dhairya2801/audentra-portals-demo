@@ -653,7 +653,7 @@ function parsedTasks(
             task.document_categories,
         ),
         autoResolveDocuments:
-          input.autoResolveDocuments ?? input.auto_resolve_documents ?? false,
+          input.autoResolveDocuments === true || input.auto_resolve_documents === true,
         aboutYouRequiredFields: (() => {
           const configured = stringList(
             input.required_fields ?? input.requiredFields,
