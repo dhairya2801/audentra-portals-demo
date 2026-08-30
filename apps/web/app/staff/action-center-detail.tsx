@@ -1704,17 +1704,9 @@ function ConversationSignalsCard({ interaction }: { interaction: StaffInteractio
 
 function documentsForTaskOutcome(detail: StaffWorkItemDetail) {
   const { source } = detail.workItem;
-  if (source?.type === "document") {
-    const sourceDocument = detail.relatedDocuments.find((document) => document.id === source.id);
-    return sourceDocument ? [sourceDocument] : detail.relatedDocuments;
-  }
-
-  const taskCreatedAt = Date.parse(detail.workItem.createdAt);
-  if (Number.isNaN(taskCreatedAt)) return [];
-  return detail.relatedDocuments.filter((document) => {
-    const documentCreatedAt = Date.parse(document.createdAt);
-    return !Number.isNaN(documentCreatedAt) && documentCreatedAt >= taskCreatedAt;
-  });
+  if (source?.type !== "document") return [];
+  const sourceDocument = detail.relatedDocuments.find((document) => document.id === source.id);
+  return sourceDocument ? [sourceDocument] : [];
 }
 
 function DocumentOutcomeCard({

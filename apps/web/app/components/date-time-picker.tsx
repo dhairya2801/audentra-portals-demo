@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 
 type DateTimePickerProps = {
   "aria-describedby"?: string;
@@ -52,16 +52,14 @@ export function DateTimePicker({
 }: DateTimePickerProps) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
-  const [selection, setSelection] = useState(() => splitDateTime(value ?? defaultValue));
+  const [internalSelection, setInternalSelection] = useState(() =>
+    splitDateTime(value ?? defaultValue),
+  );
   const isControlled = value !== undefined;
-
-  useEffect(() => {
-    if (isControlled) setSelection(splitDateTime(value));
-  }, [isControlled, value]);
+  const selection = isControlled ? splitDateTime(value) : internalSelection;
 
   const commit = (date: string, time: string) => {
-    const next = { date, time };
-    setSelection(next);
+    if (!isControlled) setInternalSelection({ date, time });
     onChange?.(serializeDateTime(date, time));
   };
 
