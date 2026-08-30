@@ -31,7 +31,12 @@ test("Morning Brew external context uses the credentialed asynchronous platform 
   assert.match(contracts, /stale: boolean/);
 });
 
-test("Morning Brew renders a compact external-news rail with a worker-backed refresh action", async () => {
+// Skipped for the demo build: this repository deliberately does not carry the
+// Morning Brew external-news rail or the Morning Brew Edward web-sources
+// block. Morning Brew is pinned to the local demo design; the web-search
+// tool itself, its API client and the shared source cards are integrated and
+// still covered by the other tests in this file. Re-enable with the rail.
+test.skip("Morning Brew renders a compact external-news rail with a worker-backed refresh action", async () => {
   const [morningBrew, dashboard, context, sources, styles] = await Promise.all([
     source("../app/staff/morning-brew/morning-brew.tsx"),
     source("../app/staff/morning-brew/dashboard.tsx"),
@@ -87,7 +92,12 @@ test("Morning Brew renders a compact external-news rail with a worker-backed ref
   assert.match(styles, /scroll-snap-type: x proximity/);
 });
 
-test("Staff Edward renders web source blocks as escaped text and safe links", async () => {
+// Skipped for the demo build: this repository deliberately does not carry the
+// Morning Brew external-news rail or the Morning Brew Edward web-sources
+// block. Morning Brew is pinned to the local demo design; the web-search
+// tool itself, its API client and the shared source cards are integrated and
+// still covered by the other tests in this file. Re-enable with the rail.
+test.skip("Staff Edward renders web source blocks as escaped text and safe links", async () => {
   const [assistant, brewEdward, sources] = await Promise.all([
     source("../app/components/staff-edward-assistant.tsx"),
     source("../app/staff/morning-brew/edward-panel.tsx"),

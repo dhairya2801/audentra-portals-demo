@@ -72,7 +72,6 @@ import { JourneyFlowBuilder } from "./journey-flow-builder";
 import { InstitutionProfileView } from "./institution-profile/institution-profile";
 import { MorningBrewView } from "./morning-brew/morning-brew";
 import { NotificationCenter } from "./notification-center";
-import { StaffMailView } from "./staff-mail";
 import { connectStaffRealtime, type StaffRealtimeEvent } from "./staff-realtime";
 import {
   buildActionCenterQuery,
@@ -99,7 +98,6 @@ type StaffView =
   | "knowledge"
   | "core_plays"
   | "messages"
-  | "mail"
   | "campus_life"
   | "academics"
   | "institution_profile"
@@ -207,7 +205,6 @@ const viewOrder: StaffView[] = [
   "knowledge",
   "core_plays",
   "messages",
-  "mail",
   "campus_life",
   "academics",
   "institution_profile",
@@ -232,7 +229,6 @@ const navigation: Array<{
       { id: "tasks", label: "Task board", icon: "✓", badge: "tasks" },
       { id: "students", label: "Students", icon: "S" },
       { id: "messages", label: "Messages", icon: "M", badge: "inquiries" },
-      { id: "mail", label: "Mailboxes", icon: "@" },
     ],
   },
   {
@@ -339,11 +335,6 @@ const viewCopy: Record<
     title: "Message portal",
     description:
       "Triage student inquiries, assign an owner, respond, and notify the student inbox.",
-  },
-  mail: {
-    eyebrow: "Delegated communications",
-    title: "Mailboxes",
-    description: "Connect and search only the university mailboxes granted to you.",
   },
   campus_life: {
     eyebrow: "Student-facing content",
@@ -4544,8 +4535,6 @@ function StaffWorkspaceShell({
             refresh={refresh}
             subscribeToRealtimeInvalidation={subscribeToRealtimeInvalidation}
           />
-        ) : view === "mail" ? (
-          <StaffMailView staffEmail={workspace.currentStaff.email} />
         ) : view === "campus_life" ? (
           <CampusLifeView workspace={workspace} refresh={refresh} />
         ) : view === "academics" ? (

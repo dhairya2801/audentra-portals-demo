@@ -22974,6 +22974,7 @@ h1, h2, h3, h4,
 .brew-chip--critical { background: #fbe0dc; color: #8f2318; }
 .brew-coverage__note--muted { color: #98a1b3; }
 @media (max-width: 520px) {
+}
 
 /* Enrollment document decisions: one visible staff action and one student-safe trail. */
 .action-document-review {
