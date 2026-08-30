@@ -1,0 +1,330 @@
+name: Deploy selected portal ref
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Branch, tag, or full commit SHA from this repository.
+        required: true
+        type: string
+        default: main
+      target:
+        description: Deployment target. Feature refs belong in Development.
+        required: true
+        type: choice
+        options:
+          - development
+          - production
+      production_confirmation:
+        description: Enter DEPLOY_CURRENT for a production/current retry.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    name: Resolve trusted source and target
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      api_service: ${{ steps.target.outputs.api_service }}
+      concurrency_group: ${{ steps.target.outputs.concurrency_group }}
+      deployment_service_account: ${{ steps.target.outputs.deployment_service_account }}
+      github_environment: ${{ steps.target.outputs.github_environment }}
+      max_instances: ${{ steps.target.outputs.max_instances }}
+      portal_service: ${{ steps.target.outputs.portal_service }}
+      runtime_service_account: ${{ steps.target.outputs.runtime_service_account }}
+      source_sha: ${{ steps.target.outputs.source_sha }}
+      workload_identity_provider: ${{ steps.target.outputs.workload_identity_provider }}
+    steps:
+      - name: Require deployment policy from trusted main
+        run: |
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "Dispatch this workflow from main; select feature code with source_ref." >&2
+            exit 1
+          fi
+
+      - name: Check out trusted deployment policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+          path: trusted
+
+      - name: Check out selected source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.source_ref }}
+          path: source
+
+      - id: target
+        name: Pin source and select isolated resources
+        env:
+          PRODUCTION_CONFIRMATION: ${{ inputs.production_confirmation }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          source_sha="$(git -C source rev-parse HEAD)"
+          trusted_sha="$(git -C trusted rev-parse HEAD)"
+          if [[ ! "${source_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "The selected ref did not resolve to an immutable commit." >&2
+            exit 1
+          fi
+          echo "source_sha=${source_sha}" >>"${GITHUB_OUTPUT}"
+
+          if [[ "${TARGET}" == "production" ]]; then
+            if [[ "${source_sha}" != "${trusted_sha}" ]]; then
+              echo "Production/current accepts only the exact trusted main commit." >&2
+              exit 1
+            fi
+            if [[ "${PRODUCTION_CONFIRMATION}" != "DEPLOY_CURRENT" ]]; then
+              echo "Enter DEPLOY_CURRENT to deploy the current synthetic environment." >&2
+              exit 1
+            fi
+            {
+              echo "api_service=audentra-api-preview"
+              echo "concurrency_group=audentra-portals-deploy-production"
+              echo "deployment_service_account=audentra-portals-cd@audentra.iam.gserviceaccount.com"
+              echo "github_environment=preview"
+              echo "max_instances=3"
+              echo "portal_service=audentra-portals-preview"
+              echo "runtime_service_account=audentra-portals-runtime@audentra.iam.gserviceaccount.com"
+              echo "workload_identity_provider=projects/906906351296/locations/global/workloadIdentityPools/github-audentra-portals/providers/github"
+            } >>"${GITHUB_OUTPUT}"
+          else
+            {
+              echo "api_service=audentra-api-development"
+              echo "concurrency_group=audentra-portals-deploy-development"
+              echo "deployment_service_account=audentra-portals-dev-cd@audentra.iam.gserviceaccount.com"
+              echo "github_environment=development"
+              echo "max_instances=1"
+              echo "portal_service=audentra-portals-development"
+              echo "runtime_service_account=audentra-portals-dev-runtime@audentra.iam.gserviceaccount.com"
+              echo "workload_identity_provider=projects/906906351296/locations/global/workloadIdentityPools/github-audentra-portals-dev/providers/github"
+            } >>"${GITHUB_OUTPUT}"
+          fi
+
+  validate:
+    name: Validate selected source
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Check out selected immutable source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.resolve.outputs.source_sha }}
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6.3.0
+        with:
+          node-version: 22.23.1
+          cache: npm
+
+      - run: npm ci
+      - run: npm audit --omit=dev --workspaces
+      - run: npm --workspace @vv/contracts run typecheck
+      - run: npm --workspace @vv/web run typecheck
+      - run: npm --workspace @vv/web run lint
+      - run: npm --workspace @vv/web test
+
+  build:
+    name: Build selected source without cloud credentials
+    needs:
+      - resolve
+      - validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out validated immutable source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.resolve.outputs.source_sha }}
+
+      - name: Build and package the credential-free portal image
+        env:
+          SOURCE_SHA: ${{ needs.resolve.outputs.source_sha }}
+        run: |
+          docker build \
+            --file infra/docker/web.Dockerfile \
+            --build-arg NEXT_PUBLIC_API_BASE_URL= \
+            --build-arg NEXT_PUBLIC_SITE_URL= \
+            --tag "audentra-portals:manual-${SOURCE_SHA}" \
+            .
+          docker save \
+            --output audentra-portals-image.tar \
+            "audentra-portals:manual-${SOURCE_SHA}"
+
+      - name: Upload credential-free image artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: audentra-portals-${{ needs.resolve.outputs.source_sha }}
+          path: audentra-portals-image.tar
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    name: Deploy selected ref to ${{ inputs.target }}
+    needs:
+      - resolve
+      - build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: ${{ needs.resolve.outputs.github_environment }}
+    concurrency:
+      group: ${{ needs.resolve.outputs.concurrency_group }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      API_SERVICE: ${{ needs.resolve.outputs.api_service }}
+      ARTIFACT_IMAGE: web
+      ARTIFACT_REPOSITORY: audentra-portals
+      GCP_PROJECT_ID: audentra
+      GCP_REGION: us-central1
+      GCP_SERVICE_ACCOUNT: ${{ needs.resolve.outputs.deployment_service_account }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ needs.resolve.outputs.workload_identity_provider }}
+      MAX_INSTANCES: ${{ needs.resolve.outputs.max_instances }}
+      PORTAL_SERVICE: ${{ needs.resolve.outputs.portal_service }}
+      RUNTIME_SERVICE_ACCOUNT: ${{ needs.resolve.outputs.runtime_service_account }}
+      SOURCE_SHA: ${{ needs.resolve.outputs.source_sha }}
+    steps:
+      - name: Download validated image artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: audentra-portals-${{ needs.resolve.outputs.source_sha }}
+          path: .deployment-artifact
+
+      - name: Load validated image before cloud authentication
+        run: docker load --input .deployment-artifact/audentra-portals-image.tar
+
+      - id: google-auth
+        name: Exchange trusted GitHub OIDC token for target credentials
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+
+      - name: Install Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Verify provisioned target boundary
+        run: |
+          gcloud run services describe "${API_SERVICE}" \
+            --project="${GCP_PROJECT_ID}" --region="${GCP_REGION}" >/dev/null
+          gcloud run services describe "${PORTAL_SERVICE}" \
+            --project="${GCP_PROJECT_ID}" --region="${GCP_REGION}" >/dev/null
+
+      - name: Publish immutable selected-ref image
+        run: |
+          gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+          image_tag_uri="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPOSITORY}/${ARTIFACT_IMAGE}:${SOURCE_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker tag "audentra-portals:manual-${SOURCE_SHA}" "${image_tag_uri}"
+          docker push "${image_tag_uri}"
+          image_uri="$(gcloud artifacts docker images describe "${image_tag_uri}" \
+            --format='value(image_summary.fully_qualified_digest)')"
+          if [[ "${image_uri}" != *@sha256:* ]]; then
+            echo "Artifact Registry did not return an immutable image digest." >&2
+            exit 1
+          fi
+          echo "IMAGE_TAG_URI=${image_tag_uri}" >>"${GITHUB_ENV}"
+          echo "IMAGE_URI=${image_uri}" >>"${GITHUB_ENV}"
+
+      - id: deploy-portal
+        name: Deploy portal with authenticated private-platform proxy
+        run: |
+          api_url="$(gcloud run services describe "${API_SERVICE}" \
+            --project="${GCP_PROJECT_ID}" \
+            --region="${GCP_REGION}" \
+            --format='value(status.url)')"
+          test -n "${api_url}"
+          revision_suffix="${SOURCE_SHA:0:8}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          gcloud run deploy "${PORTAL_SERVICE}" \
+            --project="${GCP_PROJECT_ID}" \
+            --region="${GCP_REGION}" \
+            --platform=managed \
+            --image="${IMAGE_URI}" \
+            --service-account="${RUNTIME_SERVICE_ACCOUNT}" \
+            --port=3000 \
+            --ingress=all \
+            --cpu=1 \
+            --memory=512Mi \
+            --concurrency=40 \
+            --timeout=300 \
+            --min-instances=0 \
+            --max-instances="${MAX_INSTANCES}" \
+            --revision-suffix="${revision_suffix}" \
+            --update-env-vars="PLATFORM_API_ORIGIN=${api_url},PLATFORM_API_AUDIENCE=${api_url},PLATFORM_API_AUTH_MODE=google,VINEXT_TRUST_PROXY=1" \
+            --labels="managed-by=github-actions,source-sha=${SOURCE_SHA}" \
+            --quiet
+          portal_url="$(gcloud run services describe "${PORTAL_SERVICE}" \
+            --project="${GCP_PROJECT_ID}" \
+            --region="${GCP_REGION}" \
+            --format='value(status.url)')"
+          test -n "${portal_url}"
+          echo "portal_url=${portal_url}" >>"${GITHUB_OUTPUT}"
+
+      - name: Verify deployed revision and same-origin platform bridge
+        env:
+          PORTAL_URL: ${{ steps.deploy-portal.outputs.portal_url }}
+        run: |
+          published_image="$(gcloud artifacts docker images describe "${IMAGE_TAG_URI}" \
+            --format='value(image_summary.fully_qualified_digest)')"
+          test "${published_image}" = "${IMAGE_URI}"
+          latest_created_revision="$(gcloud run services describe "${PORTAL_SERVICE}" \
+            --project="${GCP_PROJECT_ID}" --region="${GCP_REGION}" \
+            --format='value(status.latestCreatedRevisionName)')"
+          latest_ready_revision="$(gcloud run services describe "${PORTAL_SERVICE}" \
+            --project="${GCP_PROJECT_ID}" --region="${GCP_REGION}" \
+            --format='value(status.latestReadyRevisionName)')"
+          test -n "${latest_created_revision}"
+          test "${latest_created_revision}" = "${latest_ready_revision}"
+          deployed_image="$(gcloud run services describe "${PORTAL_SERVICE}" \
+            --project="${GCP_PROJECT_ID}" --region="${GCP_REGION}" \
+            --format='value(spec.template.spec.containers[0].image)')"
+          test "${deployed_image}" = "${IMAGE_URI}"
+
+          for attempt in {1..18}; do
+            portal_ok=false
+            proxy_ok=false
+            if curl --fail --silent --show-error "${PORTAL_URL}/" >/dev/null; then
+              portal_ok=true
+            fi
+            if curl --fail --silent --show-error "${PORTAL_URL}/v1/tenant/bootstrap" >/dev/null; then
+              proxy_ok=true
+            fi
+            if [[ "${portal_ok}" == "true" && "${proxy_ok}" == "true" ]]; then
+              exit 0
+            fi
+            if [[ "${attempt}" -eq 18 ]]; then
+              echo "Portal or same-origin private-platform readiness failed." >&2
+              exit 1
+            fi
+            sleep 5
+          done
+
+      - name: Publish deployment summary
+        env:
+          PORTAL_URL: ${{ steps.deploy-portal.outputs.portal_url }}
+        run: |
+          {
+            echo "### Audentra portal deployment"
+            echo "- Source: \`${SOURCE_SHA}\`"
+            echo "- Target service: \`${PORTAL_SERVICE}\`"
+            echo "- Immutable image: \`${IMAGE_URI}\`"
+            echo "- Portal URL: ${PORTAL_URL}"
+            echo "- Private platform bridge: verified through \`/v1/tenant/bootstrap\`"
+          } >>"${GITHUB_STEP_SUMMARY}"
