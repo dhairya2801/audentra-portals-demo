@@ -2806,9 +2806,9 @@ test("enrollment document decisions stay atomic, explainable, and visible to the
     readFile(new URL("../../../packages/contracts/src/index.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(detail, /Enrollment document decision/);
+  assert.match(detail, /Document check-in/);
   assert.match(detail, /Reason for requested changes/);
-  assert.match(detail, /Student-facing decision note/);
+  assert.match(detail, /A note for the student/);
   assert.doesNotMatch(detail, /Internal staff note/);
   assert.match(detail, /crypto\.randomUUID\(\)/);
   assert.match(legacyInspector, /reviewIntentRef = useRef/);

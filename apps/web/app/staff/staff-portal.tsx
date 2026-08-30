@@ -25,6 +25,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { DateTimePicker } from "../components/date-time-picker";
 import { TenantLink as Link } from "../components/tenant-link";
 import { StaffEdwardAssistant } from "../components/staff-edward-assistant";
 import { PortalMark } from "../components/portal-ui";
@@ -255,15 +256,7 @@ const createTaskActionTypes: Array<{
   value: StaffActionType;
   label: string;
 }> = [
-  { value: "enrollment_follow_up", label: "Enrollment follow-up" },
-  { value: "onboarding_assistance", label: "Onboarding assistance" },
-  { value: "document_review", label: "Document review" },
-  { value: "missing_information", label: "Missing information" },
-  { value: "external_verification", label: "External verification" },
-  { value: "deadline_risk", label: "Deadline risk" },
-  { value: "staff_decision", label: "Staff decision" },
-  { value: "communication_response", label: "Communication response" },
-  { value: "blocked_dependency", label: "Blocked dependency" },
+  { value: "enrollment_follow_up", label: "Reach-out task" },
 ];
 
 const viewCopy: Record<
@@ -1317,15 +1310,17 @@ function CreateTaskDialog({
           </select>
         </label>
         <label>
-          <span>Task category</span>
-          <select name="actionType" defaultValue="">
-            <option value="">Use the flow default</option>
+          <span>Task type</span>
+          <select name="actionType" defaultValue="enrollment_follow_up">
             {createTaskActionTypes.map((option) => (
               <option value={option.value} key={option.value}>
                 {option.label}
               </option>
             ))}
           </select>
+          <small className="staff-create-task-form__hint">
+            Document approval or rejection tasks are created automatically when a student submits a file.
+          </small>
         </label>
         <label>
           <span>Team / component</span>
@@ -1388,7 +1383,7 @@ function CreateTaskDialog({
         </label>
         <label className="staff-create-task-form__wide">
           <span>Due date and time</span>
-          <input name="dueAt" type="datetime-local" />
+          <DateTimePicker name="dueAt" />
         </label>
         {error ? (
           <p className="field-error staff-create-task-form__wide" role="alert">
@@ -1950,18 +1945,16 @@ function EventEditor({
         <div className="staff-form-grid">
           <label>
             Starts (UTC)
-            <input
+            <DateTimePicker
               name="startsAt"
-              type="datetime-local"
               defaultValue={campusEvent ? utcInputValue(campusEvent.startsAt) : ""}
               required
             />
           </label>
           <label>
             Ends (UTC)
-            <input
+            <DateTimePicker
               name="endsAt"
-              type="datetime-local"
               defaultValue={campusEvent ? utcInputValue(campusEvent.endsAt) : ""}
               required
             />
@@ -2069,9 +2062,8 @@ function EventEditor({
           <div className="staff-form-grid">
             <label>
               Advertise from (UTC)
-              <input
+              <DateTimePicker
                 name="advertisementStartsAt"
-                type="datetime-local"
                 defaultValue={
                   campusEvent?.advertisementStartsAt
                     ? utcInputValue(campusEvent.advertisementStartsAt)
@@ -2081,9 +2073,8 @@ function EventEditor({
             </label>
             <label>
               Advertise until (UTC)
-              <input
+              <DateTimePicker
                 name="advertisementEndsAt"
-                type="datetime-local"
                 defaultValue={
                   campusEvent?.advertisementEndsAt
                     ? utcInputValue(campusEvent.advertisementEndsAt)

@@ -910,8 +910,13 @@ export type StudentDocumentProcessingMode =
 export function documentProcessingModeForCategory(
   category: StudentDocumentCategory,
 ): StudentDocumentProcessingMode {
-  if (category === "identity" || category === "transcript") return "agentic";
-  if (category === "financial_aid") return "classification_only";
+  if (
+    category === "identity" ||
+    category === "transcript" ||
+    category === "financial_aid"
+  ) {
+    return "agentic";
+  }
   return "manual_review";
 }
 
@@ -943,6 +948,22 @@ export interface ExtractedDocumentVisualRegion {
   confidence: number;
 }
 
+export interface StudentDocumentValidity {
+  status: "valid" | "invalid" | "uncertain";
+  confidence: number;
+  rationale: string;
+}
+
+export interface StudentDocumentAutoResolution {
+  status:
+    | "accepted"
+    | "rejected"
+    | "needs_student_confirmation"
+    | "needs_review";
+  confidence: number | null;
+  reason: string;
+}
+
 export type StudentDocumentContextTargetType =
   | "profile"
   | "onboarding"
@@ -963,7 +984,8 @@ export interface StudentDocumentContextMatch {
   confidence: number;
   rationale: string;
   applied: boolean;
-  reviewRequired: true;
+  reviewRequired: boolean;
+  studentConfirmationRequired?: boolean;
   href: string | null;
 }
 
@@ -1036,6 +1058,8 @@ export interface StudentDocumentExtraction {
   institutionName: string | null;
   issueDate: string | null;
   academicTerm: string | null;
+  validity?: StudentDocumentValidity;
+  autoResolution?: StudentDocumentAutoResolution;
   fields: ExtractedDocumentField[];
   courses?: ExtractedTranscriptCourse[];
   visualRegions?: ExtractedDocumentVisualRegion[];
@@ -1065,6 +1089,7 @@ export interface StudentDocumentReviewDecision {
   note: string | null;
   reviewerName: string;
   synthetic?: boolean;
+  automated?: boolean;
 }
 
 export interface StudentDocument {
@@ -2413,6 +2438,7 @@ export interface CreateStudentDocumentInput {
 
 export interface ConfirmStudentDocumentExtractionInput {
   acceptedFieldKeys: string[];
+  applyRequirementId?: string;
 }
 
 export interface EdwardChatMessage {

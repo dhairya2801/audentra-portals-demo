@@ -39,6 +39,7 @@ import {
   updateStaffWorkItem,
   uploadStaffCallRecording,
 } from "../lib/api-client";
+import { DateTimePicker } from "../components/date-time-picker";
 import { useApiResource } from "../hooks/use-api-resource";
 
 type DetailTab = "overview" | "next_step" | "outcomes" | "comments" | "history";
@@ -94,6 +95,15 @@ function ActionChannelIcon({
     <svg viewBox="0 0 24 24" role="img" aria-label="Enrollment action">
       <rect x="5" y="3.5" width="14" height="17" rx="2" />
       <path d="M9 3.5h6V7H9zM8.5 11h7M8.5 15h5" />
+    </svg>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M20 7v5h-5M4 17v-5h5" />
+      <path d="M18.2 9A7 7 0 0 0 6.1 6.1L4 9M5.8 15A7 7 0 0 0 17.9 17.9L20 15" />
     </svg>
   );
 }
@@ -496,10 +506,7 @@ export function ActionCenterDetail({
               void retryAi(activeInteraction ? "both" : "student_summary")
             }
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M20 7v5h-5M4 17v-5h5" />
-              <path d="M18.2 9A7 7 0 0 0 6.1 6.1L4 9M5.8 15A7 7 0 0 0 17.9 17.9L20 15" />
-            </svg>
+            <RefreshIcon />
           </button>
         </div>
       </header>
@@ -786,23 +793,24 @@ function OverviewTab({
               <p className="eyebrow">Suggested approach (AI)</p>
               <h2>{aiLabel(insight.state)}</h2>
             </div>
-            <span className={`action-ai-state action-ai-state--${insight.state}`}>
-              {aiLabel(insight.state)}
-            </span>
+            <div className="action-card-heading__actions">
+              <span className={`action-ai-state action-ai-state--${insight.state}`}>
+                {aiLabel(insight.state)}
+              </span>
+              <button
+                className="action-icon-button action-ai-refresh"
+                type="button"
+                disabled={Boolean(busy) || isAiBusy(insight.state)}
+                aria-label="Refresh task insight"
+                title="Refresh task insight"
+                onClick={() => onRetry("task_insight")}
+              >
+                <RefreshIcon />
+              </button>
+            </div>
           </div>
           <p>{insight.suggestedApproach ?? "The suggested approach is waiting for the task insight run."}</p>
           {insight.suggestedChannel ? <p><strong>Recommended channel:</strong> {readable(insight.suggestedChannel)}</p> : null}
-          <button
-            type="button"
-            disabled={Boolean(busy) || isAiBusy(insight.state)}
-            onClick={() => onRetry("task_insight")}
-          >
-            {isAiBusy(insight.state)
-              ? "Task insight refresh queued"
-              : insight.state === "failed_retryable" || insight.state === "dead_letter"
-                ? "Retry task insight"
-                : "Refresh task insight"}
-          </button>
         </section>
       </div>
 
@@ -812,9 +820,21 @@ function OverviewTab({
               <p className="eyebrow">Student summary (AI)</p>
               <h2>{aiLabel(summary.state)}</h2>
             </div>
-            <span className={`action-ai-state action-ai-state--${summary.state}`}>
-              {aiLabel(summary.state)}
-            </span>
+            <div className="action-card-heading__actions">
+              <span className={`action-ai-state action-ai-state--${summary.state}`}>
+                {aiLabel(summary.state)}
+              </span>
+              <button
+                className="action-icon-button action-ai-refresh"
+                type="button"
+                disabled={Boolean(busy) || isAiBusy(summary.state)}
+                aria-label="Refresh student summary"
+                title="Refresh student summary"
+                onClick={() => onRetry("student_summary")}
+              >
+                <RefreshIcon />
+              </button>
+            </div>
           </div>
           <p>
             {summary.summary ??
@@ -823,17 +843,6 @@ function OverviewTab({
           {summary.keyFacts.length > 0 ? (
             <ul>{summary.keyFacts.map((fact) => <li key={fact}>{fact}</li>)}</ul>
           ) : null}
-          <button
-            type="button"
-            disabled={Boolean(busy) || isAiBusy(summary.state)}
-            onClick={() => onRetry("student_summary")}
-          >
-            {isAiBusy(summary.state)
-              ? "Student summary refresh queued"
-              : summary.state === "failed_retryable" || summary.state === "dead_letter"
-                ? "Retry student summary"
-                : "Refresh student summary"}
-          </button>
       </section>
 
       {!terminalStatuses.has(item.status) ? (
@@ -871,7 +880,7 @@ function OverviewTab({
             <label className="action-form-span">Blocker or cancellation detail
               <textarea name="blockerDetail" defaultValue={item.blocker?.detail ?? ""} />
             </label>
-            <label>Review blocker at<input name="blockerReviewAt" type="datetime-local" /></label>
+            <label>Review blocker at<DateTimePicker name="blockerReviewAt" /></label>
             <label>Cancellation reason<input name="terminalReason" defaultValue={item.terminalReason ?? ""} /></label>
             <label className="action-form-span">Audit note<textarea name="note" /></label>
           </div>
@@ -962,20 +971,20 @@ function DocumentReviewPanel({
     <section className="action-card action-document-review" aria-labelledby="document-review-title">
       <div className="action-card-heading">
         <div>
-          <p className="eyebrow">Enrollment document decision</p>
-          <h2 id="document-review-title">Approve or request a replacement</h2>
+          <p className="eyebrow">Document check-in</p>
+          <h2 id="document-review-title">Review it and choose the next step</h2>
         </div>
         <span>{reviewableDocuments.length} awaiting decision</span>
       </div>
       <p className="action-document-review__lede">
-        The decision updates this enrollment step, its audit trail, and the student&apos;s
-        document history together. Private staff context is never shown to the student.
+        A thoughtful decision keeps the student&apos;s enrollment moving. They will only see the
+        note you choose to share.
       </p>
 
       <form onSubmit={submitDecision}>
         <div className="action-form-grid">
           <label className="action-form-span">
-            Uploaded file
+            Document ready for review
             <select
               value={selectedDocument.id}
               onChange={(event) => {
@@ -1020,7 +1029,7 @@ function DocumentReviewPanel({
           {selectedIsReviewable ? (
             <>
               <fieldset className="action-form-span action-document-review__decision">
-                <legend>Decision</legend>
+                <legend>What happens next?</legend>
                 <label>
                   <input
                     type="radio"
@@ -1080,7 +1089,7 @@ function DocumentReviewPanel({
               ) : null}
 
               <label className="action-form-span">
-                Student-facing decision note
+                A note for the student
                 <textarea
                   required
                   minLength={3}
@@ -1089,15 +1098,17 @@ function DocumentReviewPanel({
                   value={note}
                   placeholder={
                     decision === "accepted"
-                      ? "Confirm what was accepted."
-                      : "Explain exactly what the student should replace or correct."
+                      ? "Let them know what is all set."
+                      : "Explain what needs updating and how to send it back."
                   }
                   onChange={(event) => {
                     setNote(event.target.value);
                     intentRef.current = null;
                   }}
                 />
-                <small>This appears in the student&apos;s document and enrollment history.</small>
+                <small>
+                  Keep it clear and kind - this note appears in the student&apos;s document history.
+                </small>
               </label>
 
               <label className="action-form-span action-document-review__notify">
@@ -1109,9 +1120,13 @@ function DocumentReviewPanel({
                     intentRef.current = null;
                   }}
                 />
-                Send the student an inbox notification
+                Let the student know in their inbox
               </label>
-              <button type="submit" disabled={!canSubmit}>
+              <button
+                className={`action-document-review__submit action-document-review__submit--${decision}`}
+                type="submit"
+                disabled={!canSubmit}
+              >
                 {busy === "document-review"
                   ? "Saving decision..."
                   : decision === "accepted"
@@ -1121,7 +1136,7 @@ function DocumentReviewPanel({
             </>
           ) : (
             <p className="action-form-span action-document-review__settled" role="status">
-              This file is {readable(selectedDocument.status)} and has no pending decision.
+              This document is all set and has no decision waiting.
             </p>
           )}
         </div>
@@ -1215,13 +1230,20 @@ function NextStepTab({
       setEmailBusy(false);
     }
   };
+  if (detail.workItem.actionType === "document_review") {
+    return (
+      <div className="action-panel-stack">
+        <DocumentReviewPanel
+          detail={detail}
+          busy={busy}
+          onReviewDocument={onReviewDocument}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="action-panel-stack">
-      <DocumentReviewPanel
-        detail={detail}
-        busy={busy}
-        onReviewDocument={onReviewDocument}
-      />
       <section className="action-card">
         <p className="eyebrow">1. Choose how you want to reach out</p>
         <h2>Pick the channel that fits the next action</h2>
@@ -1680,6 +1702,63 @@ function ConversationSignalsCard({ interaction }: { interaction: StaffInteractio
   );
 }
 
+function documentsForTaskOutcome(detail: StaffWorkItemDetail) {
+  const { source } = detail.workItem;
+  if (source?.type !== "document") return [];
+  const sourceDocument = detail.relatedDocuments.find((document) => document.id === source.id);
+  return sourceDocument ? [sourceDocument] : [];
+}
+
+function DocumentOutcomeCard({
+  documents,
+}: {
+  documents: ReturnType<typeof documentsForTaskOutcome>;
+}) {
+  const latestDecision = documents.find((document) => document.review)?.review ?? null;
+  const title =
+    latestDecision?.decision === "accepted"
+      ? "Document accepted"
+      : latestDecision?.decision === "changes_requested"
+        ? "Changes requested"
+        : "Student document activity";
+
+  return (
+    <section className="action-card action-transcript-card">
+      <div className="action-card-heading">
+        <div>
+          <p className="eyebrow">2. Student document outcome</p>
+          <h2>{title}</h2>
+        </div>
+        <span>{documents.length} {documents.length === 1 ? "file" : "files"}</span>
+      </div>
+      <ol className="action-transcript">
+        {documents.map((document) => (
+          <li key={document.id}>
+            <div>
+              <strong>{document.fileName}</strong>
+              <span>Submitted {dateTime(document.createdAt)}</span>
+            </div>
+            <p>{readable(document.category)} - {readable(document.status)}</p>
+            {document.review ? (
+              <small>
+                {readable(document.review.decision)} by {document.review.reviewerName} on {dateTime(document.review.decidedAt)}
+                {document.review.note ? ` - ${document.review.note}` : ""}
+              </small>
+            ) : (
+              <small>Student submission recorded; review is still in progress.</small>
+            )}
+            {document.contentUrl ? (
+              <a href={getStaffDocumentContentUrl(document.contentUrl)} target="_blank" rel="noreferrer">
+                Open original
+              </a>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 function OutcomesTab({
   detail,
   interaction,
@@ -1703,6 +1782,19 @@ function OutcomesTab({
   onRetryTranscription: (recording: StaffCallRecording) => Promise<boolean>;
   onComplete: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
+  const documents = documentsForTaskOutcome(detail);
+  const isDocumentTask = detail.workItem.source?.type === "document";
+  const communicationCount = detail.interactions.reduce(
+    (count, candidate) => count + candidate.communications.length,
+    0,
+  );
+  const latestDocumentDecision = documents.find((document) => document.review)?.review ?? null;
+  const taskOutcome =
+    latestDocumentDecision?.decision ??
+    interaction?.outcome?.outcomeCode ??
+    (terminalStatuses.has(detail.workItem.status) ? detail.workItem.status : "awaiting_student_action");
+  const canRecordContactOutcome = Boolean(interaction) || !isDocumentTask;
+
   return (
     <div className="action-panel-stack">
       {detail.interactions.length > 1 ? (
@@ -1719,69 +1811,88 @@ function OutcomesTab({
 
       <div className="action-outcome-grid">
         <section className="action-card">
-          <p className="eyebrow">1. Interaction outcome</p>
-          <h2>{interaction?.outcome?.outcomeCode ? readable(interaction.outcome.outcomeCode) : "Awaiting outcome"}</h2>
+          <p className="eyebrow">1. Task outcome</p>
+          <h2>{readable(taskOutcome)}</h2>
           <dl className="action-fact-list">
-            <div><dt>Resolution</dt><dd>{interaction?.outcome?.resolutionCode ? readable(interaction.outcome.resolutionCode) : "Not generated"}</dd></div>
+            <div><dt>Current state</dt><dd>{readable(detail.workItem.status)}</dd></div>
+            <div><dt>Student action</dt><dd>{documents.length ? `${documents.length} document ${documents.length === 1 ? "submitted" : "submissions"}` : "No document activity for this task"}</dd></div>
+            <div><dt>Contact activity</dt><dd>{communicationCount ? `${communicationCount} ${communicationCount === 1 ? "event" : "events"}` : "Not started"}</dd></div>
             <div><dt>Next step</dt><dd>{interaction?.outcome?.nextStep ?? detail.workItem.nextStep ?? "Not set"}</dd></div>
-            <div><dt>Follow-up</dt><dd>{interaction?.outcome?.followUpRequired ? "Required" : "Not indicated"}</dd></div>
-            <div><dt>Coverage</dt><dd>{interaction ? `${interaction.coveredSourceVersion} of ${interaction.sourceVersion}` : "No sources"}</dd></div>
           </dl>
         </section>
-        {interaction &&
-        (interaction.selectedChannel === "voice" || interaction.recordings.length > 0) ? (
-          <CallRecordingPanel
-            interaction={interaction}
-            busy={busy}
-            onUpload={onUploadRecording}
-            onRetry={onRetryTranscription}
-          />
+
+        {documents.length ? <DocumentOutcomeCard documents={documents} /> : null}
+
+        {interaction ? (
+          <>
+            <section className="action-card">
+              <p className="eyebrow">3. Reach-out outcome</p>
+              <h2>{interaction.outcome?.outcomeCode ? readable(interaction.outcome.outcomeCode) : "Awaiting contact outcome"}</h2>
+              <dl className="action-fact-list">
+                <div><dt>Resolution</dt><dd>{interaction.outcome?.resolutionCode ? readable(interaction.outcome.resolutionCode) : "Not recorded"}</dd></div>
+                <div><dt>Channel</dt><dd>{interaction.selectedChannel ? readable(interaction.selectedChannel) : "Not selected"}</dd></div>
+                <div><dt>Follow-up</dt><dd>{interaction.outcome?.followUpRequired ? "Required" : "Not indicated"}</dd></div>
+                <div><dt>Coverage</dt><dd>{interaction.coveredSourceVersion} of {interaction.sourceVersion}</dd></div>
+              </dl>
+            </section>
+
+            {interaction.selectedChannel === "voice" || interaction.recordings.length > 0 ? (
+              <CallRecordingPanel
+                interaction={interaction}
+                busy={busy}
+                onUpload={onUploadRecording}
+                onRetry={onRetryTranscription}
+              />
+            ) : null}
+
+            <section className="action-card action-transcript-card">
+              <div className="action-card-heading">
+                <div><p className="eyebrow">Reach-out evidence</p><h2>{interaction.communications.length ? "Communication timeline" : "Outreach started"}</h2></div>
+                <span>{interaction.communications.length} events</span>
+              </div>
+              {interaction.communications.length ? (
+                <ol className="action-transcript">
+                  {interaction.communications.map((communication) => (
+                    <li key={communication.id}>
+                      <div>
+                        <strong>{communication.direction === "inbound" ? detail.workItem.student.preferredName : "Staff"}</strong>
+                        <span>{communication.channel} - {dateTime(communication.occurredAt)}</span>
+                      </div>
+                      <p>{communication.body ?? "No text was captured for this event."}</p>
+                      <small>{readable(communication.deliveryStatus)}</small>
+                    </li>
+                  ))}
+                </ol>
+              ) : <p>No staff or student contact has been recorded yet.</p>}
+            </section>
+
+            <section className="action-card action-ai-card">
+              <div className="action-card-heading">
+                <div><p className="eyebrow">AI reach-out summary</p><h2>{aiLabel(interaction.aiState)}</h2></div>
+                <span className={`action-ai-state action-ai-state--${interaction.aiState}`}>
+                  {aiLabel(interaction.aiState)}
+                </span>
+              </div>
+              <p>{interaction.outcome?.summary ?? (interaction.communications.length ? "The source communication is visible while the summary is generated." : "AI outcome analysis begins after staff or the student records a communication.")}</p>
+              {interaction.outcome?.channelResults.length ? (
+                <ul>{interaction.outcome.channelResults.map((result) => <li key={`${result.channel}:${result.result}`}>{result.channel}: {result.result}</li>)}</ul>
+              ) : null}
+              {enrichmentTiming(interaction) ? (
+                <small className="action-enrichment-timing">
+                  {enrichmentTiming(interaction)}
+                </small>
+              ) : null}
+            </section>
+            {interaction.communications.length || interaction.outcome ? <ConversationSignalsCard interaction={interaction} /> : null}
+          </>
         ) : null}
-        <section className="action-card action-transcript-card">
-          <div className="action-card-heading">
-            <div><p className="eyebrow">Source evidence</p><h2>Communication timeline</h2></div>
-            <span>{interaction?.communications.length ?? 0} events</span>
-          </div>
-          {interaction?.communications.length ? (
-            <ol className="action-transcript">
-              {interaction.communications.map((communication) => (
-                <li key={communication.id}>
-                  <div>
-                    <strong>{communication.direction === "inbound" ? detail.workItem.student.preferredName : "Staff"}</strong>
-                    <span>{communication.channel} - {dateTime(communication.occurredAt)}</span>
-                  </div>
-                  <p>{communication.body ?? "No text was captured for this event."}</p>
-                  <small>{readable(communication.deliveryStatus)}</small>
-                </li>
-              ))}
-            </ol>
-          ) : <p>No communication has been recorded.</p>}
-        </section>
-        <section className="action-card action-ai-card">
-          <div className="action-card-heading">
-            <div><p className="eyebrow">3. AI outcome summary</p><h2>{interaction ? aiLabel(interaction.aiState) : "Not requested"}</h2></div>
-            <span className={`action-ai-state action-ai-state--${interaction?.aiState ?? "not_requested"}`}>
-              {aiLabel(interaction?.aiState ?? "not_requested")}
-            </span>
-          </div>
-          <p>{interaction?.outcome?.summary ?? "The source communication is visible while the summary is generated."}</p>
-          {interaction?.outcome?.channelResults.length ? (
-            <ul>{interaction.outcome.channelResults.map((result) => <li key={`${result.channel}:${result.result}`}>{result.channel}: {result.result}</li>)}</ul>
-          ) : null}
-          {interaction && enrichmentTiming(interaction) ? (
-            <small className="action-enrichment-timing">
-              {enrichmentTiming(interaction)}
-            </small>
-          ) : null}
-        </section>
-        <ConversationSignalsCard interaction={interaction} />
       </div>
 
-      {!terminalStatuses.has(detail.workItem.status) ? (
+      {!terminalStatuses.has(detail.workItem.status) && canRecordContactOutcome ? (
         <form className="action-card action-completion-form" onSubmit={onComplete}>
-          <p className="eyebrow">Record the official outcome</p>
+          <p className="eyebrow">Record the official contact outcome</p>
           <h2>Complete or schedule follow-up</h2>
-          <p>AI text is advisory. These fields are the staff-confirmed CRM outcome.</p>
+          <p>These fields describe staff and student contact. Document decisions remain in the document outcome above.</p>
           <div className="action-form-grid">
             <label>Outcome
               <select name="outcomeCode" required defaultValue={interaction?.outcome?.outcomeCode ?? "student_reached"}>
@@ -1802,9 +1913,9 @@ function OutcomesTab({
               </select>
             </label>
             <label className="action-form-span">Next step<textarea name="nextStep" defaultValue={interaction?.outcome?.nextStep ?? detail.workItem.nextStep ?? ""} /></label>
-            <label>Follow up at<input name="followUpAt" type="datetime-local" /></label>
+            <label>Follow up at<DateTimePicker name="followUpAt" /></label>
           </div>
-          <button type="submit" disabled={Boolean(busy)}>Save official outcome</button>
+          <button type="submit" disabled={Boolean(busy)}>Save contact outcome</button>
         </form>
       ) : null}
 
@@ -1812,7 +1923,7 @@ function OutcomesTab({
         <p className="action-processing-note">AI enrichment is running in the background. You can leave this page safely.</p>
       ) : null}
       {detail.aiState === "dead_letter" ? (
-        <button type="button" onClick={() => onRetry("both")} disabled={Boolean(busy)}>Retry all AI projections</button>
+        <button type="button" onClick={() => onRetry(interaction ? "both" : "student_summary")} disabled={Boolean(busy)}>Retry available AI projections</button>
       ) : null}
     </div>
   );

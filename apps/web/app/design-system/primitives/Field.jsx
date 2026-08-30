@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import Icon from '../Icon.jsx';
+import { DateTimePicker } from '../../components/date-time-picker';
 
 /**
  * One field, and the only way this product says a field is wrong.
@@ -53,16 +54,28 @@ export default function Field({
       <span className="field-label">{label}</span>
 
       <span className="field-control">
-        <input
-          id={id}
-          type={type}
-          value={value}
-          autoComplete={autoComplete}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy || undefined}
-          onChange={(event) => onChange(event.target.value)}
-          {...rest}
-        />
+        {type === 'datetime-local' ? (
+          <DateTimePicker
+            id={id}
+            value={value}
+            autoComplete={autoComplete}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={describedBy || undefined}
+            onChange={onChange}
+            {...rest}
+          />
+        ) : (
+          <input
+            id={id}
+            type={type}
+            value={value}
+            autoComplete={autoComplete}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={describedBy || undefined}
+            onChange={(event) => onChange(event.target.value)}
+            {...rest}
+          />
+        )}
         {error ? <Icon name="alert" size={15} /> : null}
       </span>
 
