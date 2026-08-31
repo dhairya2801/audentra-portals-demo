@@ -10,6 +10,7 @@ import { useState } from "react";
  */
 const PORTRAITS: Record<string, string> = {
   "SYN-ADV-001": "/images/staff/SYN-ADV-001.jpg",
+  "SYN-STF-VP": "/images/staff/SYN-STF-VP.jpg",
   "desmond-vasquez": "/images/staff/desmond-vasquez.jpg",
   "sylvie-vasquez": "/images/staff/sylvie-vasquez.jpg",
 };

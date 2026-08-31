@@ -197,33 +197,45 @@ function DetailShell({
   );
 }
 
+/** How to open a reply to this person: honorific and surname, or first name. */
+function salutationFor(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  const honorifics = new Set(["dr.", "dr", "prof.", "prof", "mr.", "mrs.", "ms.", "rev."]);
+  if (parts.length > 1 && honorifics.has(parts[0].toLowerCase())) {
+    return `${parts[0]} ${parts[parts.length - 1]}`;
+  }
+  return parts[0];
+}
+
 /**
  * Edward's column beside an item from the day.
  *
- * The left column is the record: who is in the meeting, what the student wrote,
- * what the queue holds. This column is the assistant's read of it and the thing
- * he can hand over — a reply, a prep sheet, a plan — in a box the reader edits
- * before they use it. The text is Edward's draft, not the record, so it is
- * always editable and never saved anywhere on their behalf.
+ * The left column is the record. This column is Edward: a line saying what he
+ * makes of it, and then either the thing he has drafted — a reply, a prep
+ * sheet — in a box the reader edits before they use it, or, where a draft would
+ * be the wrong offer, the numbers behind the item. Nothing here is sent, and
+ * nothing is written back to the record.
  */
 function EdwardInsights({
+  heading,
   read,
-  points,
-  draftLabel,
-  draftHint,
   draft,
+  draftHint,
+  facts,
   onAskEdward,
   askContext,
 }: {
+  heading: string;
   read: string;
-  points: string[];
-  draftLabel: string;
-  draftHint: string;
-  draft: string;
+  /** The editable draft. Omit it where the useful answer is the numbers. */
+  draft?: string;
+  draftHint?: string;
+  /** Read-only figures, for a queue where there is nothing to write yet. */
+  facts?: { label: string; value: string }[];
   onAskEdward: (request: EdwardRequest) => void;
   askContext: string;
 }) {
-  const [text, setText] = useState(draft);
+  const [text, setText] = useState(draft ?? "");
   const [copied, setCopied] = useState(false);
 
   return (
@@ -234,56 +246,65 @@ function EdwardInsights({
         </span>
         <div>
           <p className="brew-eyebrow">Edward Insights</p>
-          <strong>{draftLabel}</strong>
+          <strong>{heading}</strong>
         </div>
       </header>
 
       <p className="brew-insights-read">{read}</p>
 
-      {points.length ? (
-        <ul className="brew-insights-points">
-          {points.map((point) => (
-            <li key={point}>{point}</li>
+      {facts?.length ? (
+        <dl className="brew-insights-facts">
+          {facts.map((fact) => (
+            <div key={fact.label}>
+              <dt>{fact.label}</dt>
+              <dd>{fact.value}</dd>
+            </div>
           ))}
-        </ul>
+        </dl>
       ) : null}
 
-      <label className="brew-insights-draft">
-        <span>{draftHint}</span>
-        <textarea
-          value={text}
-          rows={10}
-          spellCheck
-          onChange={(event) => {
-            setText(event.target.value);
-            setCopied(false);
-          }}
-        />
-      </label>
+      {draft !== undefined ? (
+        <label className="brew-insights-draft">
+          <span>{draftHint}</span>
+          <textarea
+            value={text}
+            rows={12}
+            spellCheck
+            onChange={(event) => {
+              setText(event.target.value);
+              setCopied(false);
+            }}
+          />
+        </label>
+      ) : null}
 
       <div className="brew-insights-actions">
-        <button
-          className="button button--secondary"
-          type="button"
-          onClick={() => {
-            void navigator.clipboard?.writeText(text).then(
-              () => setCopied(true),
-              () => setCopied(false),
-            );
-          }}
-        >
-          {copied ? "Copied" : "Copy"}
-        </button>
-        <button
-          className="button button--secondary"
-          type="button"
-          onClick={() => {
-            setText(draft);
-            setCopied(false);
-          }}
-        >
-          Reset
-        </button>
+        {draft !== undefined ? (
+          <>
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => {
+                void navigator.clipboard?.writeText(text).then(
+                  () => setCopied(true),
+                  () => setCopied(false),
+                );
+              }}
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => {
+                setText(draft);
+                setCopied(false);
+              }}
+            >
+              Reset
+            </button>
+          </>
+        ) : null}
         <button
           className="button button--primary"
           type="button"
@@ -294,7 +315,9 @@ function EdwardInsights({
       </div>
 
       <p className="brew-insights-note">
-        Edward drafts; nothing here is sent, and nothing is saved to the record.
+        {draft !== undefined
+          ? "Edward drafts; nothing here is sent, and nothing is saved to the record."
+          : "Read from today’s records. Edward changes nothing."}
       </p>
     </aside>
   );
@@ -690,21 +713,27 @@ export function MorningBrewDetail({
         }
         aside={
           <EdwardInsights
+            heading="Prep me for this meeting"
             read={`A ${meeting.durationMinutes}-minute meeting with ${meeting.attendees.length} ${
               meeting.attendees.length === 1 ? "guest" : "guests"
             } at ${meeting.timeLabel}. Here is what to walk in knowing.`}
-            points={[
-              meeting.prep,
-              `Guests: ${meeting.attendees.slice(0, 3).join(", ")}${
-                meeting.attendees.length > 3 ? ` +${meeting.attendees.length - 3} more` : ""
-              }`,
-              meeting.organizer
-                ? "You are hosting, so the agenda is yours to set."
-                : "Somebody else is hosting; you are there to answer on the numbers.",
-            ]}
-            draftLabel="Prep me for this meeting"
             draftHint="Your prep sheet — edit before you walk in"
-            draft={`${meeting.title} — ${meeting.timeLabel}\n\nWhat this meeting is for\n${meeting.detail}\n\nWhat I need to say\n· ${meeting.prep}\n\nNumbers to have ready\n· Deposits 2,450 of 3,200, 11 days to the deadline\n· 324 verification files open; 88 waiting on our review\n· Transfer applications 14% ahead of last year\n\nWhat I want to leave with\n· A named owner for the verification queue\n· Agreement to hold the May 31 date`}
+            draft={[
+              `${meeting.title} · ${meeting.timeLabel} · ${meeting.durationMinutes} min`,
+              "",
+              "Why it is on the calendar",
+              meeting.detail,
+              "",
+              "The one thing to do before you walk in",
+              meeting.prep,
+              "",
+              "In the room",
+              meeting.attendees.map((name) => `· ${name}`).join("\n"),
+              "",
+              meeting.organizer
+                ? "You are hosting. Open on the decision you need rather than the recap — everyone here has already read the numbers."
+                : "Somebody else is hosting. You are there for the enrolment answer, so keep yours to two minutes and offer the detail after.",
+            ].join("\n")}
             onAskEdward={onAskEdward}
             askContext={`the ${meeting.title} meeting at ${meeting.timeLabel}`}
           />
@@ -763,19 +792,28 @@ export function MorningBrewDetail({
         actions={openWorkspace("messages")}
         aside={
           <EdwardInsights
-            read={`${request.fromName} (${request.fromRole}) wrote ${request.receivedLabel}. ${
+            heading="Draft a reply"
+            read={`${request.fromName}, ${request.fromRole}, wrote ${request.receivedLabel}. ${
+              request.unread ? "It is still unread." : "It has been opened but not answered."
+            } Here is a reply you can send.`}
+            draftHint="Edward's draft — read it before you send it"
+            draft={[
+              `Hi ${salutationFor(request.fromName)},`,
+              "",
+              request.unread
+                ? "Thanks for this, and apologies for the slow reply — it reached me at the end of yesterday."
+                : "Thanks for the nudge. I have had a proper look now.",
+              "",
               request.assigneeName
-                ? `${request.assigneeName} owns the thread.`
-                : "Nobody owns the thread yet."
-            }`}
-            points={[
-              request.summary,
-              request.unread ? "Still unread — no reply has gone out." : "Opened, not yet answered.",
-              "The canonical thread lives in Messages; this draft is not saved there.",
-            ]}
-            draftLabel="Draft a reply"
-            draftHint="Edward's draft — edit it before you send anything"
-            draft={`Hi ${request.fromName.split(" ")[0]},\n\nThank you for writing — you are asking the right question, and here is where it stands.\n\n${request.summary}\n\nWhat happens next: I have put this in front of the team that owns it today, and you will have a firm date from us within two working days. If anything changes before then I will write again rather than wait.\n\nIf it is easier to talk it through, I have time this week and am happy to call.\n\nBest regards,\nVivian Hale\nVice President for Enrollment Management`}
+                ? `${request.assigneeName} has it, and I have asked for a date rather than another status update.`
+                : "I am putting a name against it today rather than leaving it sitting in the queue.",
+              "",
+              "The honest position: I would rather give you a number I can stand behind than one that moves again next week. You will have it by Friday, and if anything shifts before then I will write rather than let the date pass quietly.",
+              "",
+              "If it is quicker to talk it through, I have half an hour on Thursday afternoon.",
+              "",
+              "Vivian",
+            ].join("\n")}
             onAskEdward={onAskEdward}
             askContext={`the email from ${request.fromName} about ${request.subject}`}
           />
@@ -790,8 +828,9 @@ export function MorningBrewDetail({
               : "Nobody is assigned to this conversation yet."}
           </p>
           <p className="brew-detail__note">
-            The full thread lives in Messages. Morning Brew shows the opening message only, and
-            never a draft reply — replies are written against the canonical conversation.
+            The full thread lives in Messages. Morning Brew shows the opening message only;
+            Edward&rsquo;s draft beside it is yours to edit and send from there, and is not
+            written back to the conversation.
           </p>
         </section>
       </DetailShell>
@@ -822,25 +861,21 @@ export function MorningBrewDetail({
         actions={openWorkspace(priority.destination, priority.boardQuery)}
         aside={
           <EdwardInsights
-            read={`${formatBrewNumber(priority.count)} in this queue, ${priority.window.toLowerCase()}. ${
+            heading="What this queue is made of"
+            read={`${formatBrewNumber(priority.count)} sitting here ${priority.window.toLowerCase()}. ${
               priority.ownedByReader
                 ? "It is yours to move."
-                : "Somebody else owns the move; yours is to report it."
+                : "The move belongs to another office; yours is to keep it visible."
             }`}
-            points={[
-              priority.detail,
-              ...priority.steps.slice(0, 2),
-              ...priority.breakdown.slice(0, 2).map((row) => `${row.label}: ${row.value}`),
+            facts={[
+              ...priority.breakdown.map((row) => ({ label: row.label, value: row.value })),
+              { label: "Priority", value: priority.level },
+              {
+                label: "Owner",
+                value: priority.ownedByReader ? "You" : "Another office",
+              },
+              { label: "Steps queued", value: String(priority.steps.length) },
             ]}
-            draftLabel="Work this queue"
-            draftHint="A plan you can paste into the task, edited as you like"
-            draft={`${priority.title}\n\nWhere it stands\n${priority.detail}\n\nThe move\n${priority.steps
-              .map((step) => `· ${step}`)
-              .join("\n")}\n\nWhat the queue is made of\n${priority.breakdown
-              .map((row) => `· ${row.label}: ${row.value}`)
-              .join("\n")}\n\nWho and when\n· Owner: ${
-              priority.ownedByReader ? "me" : "the office that holds the queue"
-            }\n· Window: ${priority.window}\n· Report back at the next stand-up`}
             onAskEdward={onAskEdward}
             askContext={`the ${priority.title} queue`}
           />

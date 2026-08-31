@@ -21364,11 +21364,12 @@ a {
    lands, and a colour that is the whole judgement. Green clears the target,
    amber is close enough to still move, red is not going to get there. */
 .brew-kpi__projection {
-  display: grid; gap: 0.02rem; margin-top: 0.5rem; padding: 0.4rem 0.5rem;
-  border: 1px solid; border-radius: 0.45rem; text-align: left;
+  display: grid; gap: 0.02rem; align-self: end; width: max-content; max-width: 100%;
+  margin: 0.05rem 0 0.45rem auto; padding: 0.32rem 0.45rem;
+  border: 1px solid; border-radius: 0.45rem; text-align: right;
 }
 .brew-kpi__projection small { font-size: 0.52rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
-.brew-kpi__projection strong { font-size: 0.95rem; font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+.brew-kpi__projection strong { font-size: 0.88rem; font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
 .brew-kpi__projection em { color: #67718a; font-size: 0.55rem; font-style: normal; }
 .brew-kpi__projection.is-on-track { border-color: #b7e3cd; background: #f0fbf5; }
 .brew-kpi__projection.is-on-track small, .brew-kpi__projection.is-on-track strong { color: #0f7a54; }
@@ -21387,6 +21388,7 @@ a {
 /* At a glance the card is the figure and its movement and nothing else, so the
    row closes up rather than reserving the space a bar would have taken. */
 .brew-pulse--glance .brew-kpi { padding-bottom: 0.15rem; }
+.brew-pulse--deep .brew-kpi { min-height: 17.5rem; }
 
 /* since yesterday ------------------------------------------------------------ */
 
@@ -21926,8 +21928,13 @@ a {
 }
 .brew-insights-head strong { display: block; color: var(--audentra-navy); font-size: 0.82rem; letter-spacing: -0.015em; }
 .brew-insights-read { margin: 0; color: #46506a; font-size: 0.72rem; line-height: 1.55; }
-.brew-insights-points { display: grid; gap: 0.3rem; margin: 0; padding-left: 0.95rem; color: #5f6a7e; font-size: 0.68rem; line-height: 1.5; }
-.brew-insights-points li::marker { color: var(--audentra-purple); }
+/* Where a draft would be the wrong offer, the column shows the queue's own
+   figures instead: label on the left, number on the right, nothing to edit. */
+.brew-insights-facts { display: grid; gap: 0.02rem; margin: 0; }
+.brew-insights-facts > div { display: flex; justify-content: space-between; gap: 0.8rem; align-items: baseline; padding: 0.42rem 0; border-bottom: 1px solid #eeebfa; }
+.brew-insights-facts > div:last-child { border-bottom: 0; }
+.brew-insights-facts dt { color: #6b7488; font-size: 0.67rem; }
+.brew-insights-facts dd { margin: 0; color: var(--audentra-navy); font-size: 0.7rem; font-weight: 700; text-align: right; }
 .brew-insights-draft { display: grid; gap: 0.3rem; }
 .brew-insights-draft > span { color: #78829a; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 .brew-insights-draft textarea {

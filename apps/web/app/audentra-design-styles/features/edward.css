@@ -26,6 +26,11 @@
   font-weight: var(--fw-bold);
   display: grid;
   box-shadow: 0 6px 13px #4d3bb33d, inset 0 1px #ffffff4d;
+  /* A single capital in a serif face sits above the middle of a line box with
+     the default leading, which left the E visibly high in the tile. Setting the
+     leading to the glyph's own height centres it at every size the mark is
+     drawn at. */
+  line-height: 1;
 }
 
 .edward-mark.small {
