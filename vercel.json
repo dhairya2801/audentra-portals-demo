@@ -6,7 +6,9 @@
   "build": {
     "env": {
       "NEXT_PUBLIC_DEMO_STUDENT_LOGIN_ENABLED": "true",
-      "NEXT_PUBLIC_DEMO_STAFF_LOGIN_ENABLED": "true"
+      "NEXT_PUBLIC_DEMO_STAFF_LOGIN_ENABLED": "true",
+      "NEXT_PUBLIC_EDWARD_DEBUG_ENABLED": "true",
+      "NEXT_PUBLIC_DEFAULT_TENANT_SLUG": "aster"
     }
   }
 }
