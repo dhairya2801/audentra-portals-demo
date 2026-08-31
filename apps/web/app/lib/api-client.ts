@@ -109,6 +109,8 @@ import type {
   StaffSession,
   StaffSignInInput,
   StaffSignUpInput,
+  CreateStaffStudentNoteInput,
+  StaffStudentNote,
   StaffStudentRecord,
   StaffWorkItem,
   StaffWorkItemDetail,
@@ -1779,6 +1781,24 @@ export function getStaffStudentRecord(
       headers: staffHeaders,
       signal,
     },
+  );
+}
+
+export function createStaffStudentNote(
+  studentId: string,
+  input: CreateStaffStudentNoteInput,
+) {
+  return request<StaffStudentNote>(
+    `/v1/staff/students/${encodeURIComponent(studentId)}/notes`,
+    {
+      method: "POST",
+      headers: {
+        ...staffHeaders,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
   );
 }
 

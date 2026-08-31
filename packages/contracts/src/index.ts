@@ -1841,12 +1841,87 @@ export interface StaffActionCenter {
   generatedAt: string;
 }
 
+export interface StaffStudentApplicationSnapshot {
+  id: string;
+  sourceSystem: string;
+  applicationTerm: string;
+  decisionPlan: string;
+  status:
+    | "draft"
+    | "submitted"
+    | "complete"
+    | "under_review"
+    | "admitted"
+    | "denied"
+    | "waitlisted"
+    | "enrolled";
+  submittedAt: string | null;
+  completedAt: string | null;
+  decidedAt: string | null;
+  completenessPercent: number;
+  academicProfile: Record<string, unknown>;
+  programChoices: Record<string, unknown>[];
+  essays: Record<string, unknown>[];
+  recommendations: Record<string, unknown>[];
+  artifacts: Record<string, unknown>[];
+  contactSnapshot: Record<string, unknown>;
+  version: number;
+  updatedAt: string;
+}
+
+export interface StaffStudentTimelineItem {
+  id: string;
+  category:
+    | "application"
+    | "document"
+    | "enrollment"
+    | "website"
+    | "note"
+    | "staff_task";
+  occurredAt: string;
+  title: string;
+  summary: string;
+  actorName: string | null;
+  source: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface StaffStudentNote {
+  id: string;
+  category: "general" | "admissions" | "enrollment" | "financial" | "engagement" | "academic";
+  visibility: "staff" | "admissions" | "financial_aid";
+  body: string;
+  pinned: boolean;
+  version: number;
+  author: StaffMemberSummary;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateStaffStudentNoteInput {
+  category?: StaffStudentNote["category"];
+  visibility?: StaffStudentNote["visibility"];
+  body: string;
+  pinned?: boolean;
+}
+
 export interface StaffStudentRecord {
   student: StaffWorkItem["student"];
   onboarding: StudentOnboarding;
   profile: StudentProfile;
   requirements: StudentRequirementList;
   documents: StudentDocumentList;
+  application: StaffStudentApplicationSnapshot | null;
+  timeline: {
+    items: StaffStudentTimelineItem[];
+    websiteActivityAvailable: boolean;
+    generatedAt: string;
+  };
+  notes: {
+    items: StaffStudentNote[];
+    total: number;
+  };
+  financials: StudentFinancials;
   syntheticTestRecord?: boolean;
   operation?: StaffStudentOperation | null;
 }

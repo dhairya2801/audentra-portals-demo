@@ -2847,6 +2847,17 @@ test("staff CRM distinguishes canonical students from preview cohort records", a
   assert.match(source, /Canonical student record/);
 });
 
+test("staff CRM keeps implementation provenance out of the Student 360 header", async () => {
+  const source = await readFile(
+    new URL("../app/staff/student-360.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /Student 360 · Class of/);
+  assert.doesNotMatch(source, /operation\.syntheticSeed \? "preview" : "success"/);
+  assert.doesNotMatch(source, /Canonical student record/);
+});
+
 test("the Action Center keeps evidence durable while AI and scheduled rules run asynchronously", async () => {
   const [detail, rules, notifications, api, contracts] = await Promise.all([
     readFile(new URL("../app/staff/action-center-detail.tsx", import.meta.url), "utf8"),

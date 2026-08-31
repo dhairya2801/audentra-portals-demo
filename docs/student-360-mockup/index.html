@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Standalone Audentra Student 360 staff portal design prototype">
+  <title>Audentra Student 360 Prototype</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <svg class="svg-sprite" aria-hidden="true">
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.8-3.8"></path></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"></path></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m3 7 9 6 9-6"></path></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m20 6-11 11-5-5"></path></symbol>
+    <symbol id="i-check-square" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"></rect><path d="m8 12 3 3 5-6"></path></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M16 3v4M8 3v4M3 10h18"></path></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"></path></symbol>
+    <symbol id="i-dollar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M16 8.5c-.7-1-1.9-1.5-3.5-1.5-2 0-3.5 1-3.5 2.5S10.4 12 12.5 12s3.5 1 3.5 2.5-1.5 2.5-3.5 2.5c-1.6 0-2.8-.5-3.5-1.5M12.5 5v14"></path></symbol>
+    <symbol id="i-flow" viewBox="0 0 24 24"><rect x="3" y="3" width="6" height="6" rx="1"></rect><rect x="15" y="15" width="6" height="6" rx="1"></rect><path d="M9 6h4a4 4 0 0 1 4 4v5M15 18h-4a4 4 0 0 1-4-4V9"></path></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.09A1.7 1.7 0 0 0 9 19.36a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.09 14H3v-4h.09A1.7 1.7 0 0 0 4.64 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.09V3h4v.09A1.7 1.7 0 0 0 15 4.64a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.37 9 1.7 1.7 0 0 0 20.91 10H21v4h-.09A1.7 1.7 0 0 0 19.4 15Z"></path></symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"></path></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"></path></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.63a2 2 0 0 1-.45 2.11L8 9.73a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.85.29 1.73.5 2.63.62A2 2 0 0 1 22 16.92Z"></path></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 1.4 4.6L18 9l-4.6 1.4L12 15l-1.4-4.6L6 9l4.6-1.4L12 3ZM5 15l.8 2.2L8 18l-2.2.8L5 21l-.8-2.2L2 18l2.2-.8L5 15ZM19 14l.7 1.8 1.8.7-1.8.7L19 19l-.7-1.8-1.8-.7 1.8-.7L19 14Z"></path></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.4 2.5 17a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.4a2 2 0 0 0-3.4 0Z"></path><path d="M12 9v4M12 17h.01"></path></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path><path d="M14 2v6h6M8 13h8M8 17h6"></path></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path><circle cx="12" cy="12" r="3"></circle></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="m14 4 6 6-3 1-4 4-1 5-2-2-2-2 5-1 4-4 1-3-6-6-3 3Z"></path></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"></path></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 3h7v7M10 14 21 3M21 14v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h6"></path></symbol>
+  </svg>
+
+  <div class="prototype-shell">
+    <aside class="sidebar" aria-label="Staff portal navigation">
+      <div class="brand-block">
+        <span class="brand-mark">A</span>
+        <span><strong>Audentra</strong><small>Staff workspace</small></span>
+      </div>
+      <nav class="primary-nav">
+        <a class="nav-item active" href="#students"><svg><use href="#i-users"></use></svg><span>Students</span></a>
+        <a class="nav-item" href="#communications"><svg><use href="#i-mail"></use></svg><span>Communications</span></a>
+        <a class="nav-item" href="#tasks"><svg><use href="#i-check-square"></use></svg><span>Tasks</span><b>8</b></a>
+        <a class="nav-item" href="#calendar"><svg><use href="#i-calendar"></use></svg><span>Calendar</span></a>
+        <a class="nav-item" href="#reports"><svg><use href="#i-chart"></use></svg><span>Reports</span></a>
+        <a class="nav-item" href="#financials"><svg><use href="#i-dollar"></use></svg><span>Financials</span></a>
+        <a class="nav-item" href="#workflows"><svg><use href="#i-flow"></use></svg><span>Workflows</span></a>
+      </nav>
+      <div class="sidebar-spacer"></div>
+      <div class="advisor-card">
+        <span class="mini-avatar">JW</span>
+        <span><strong>Jamie Wilson</strong><small>Enrollment advisor</small></span>
+        <svg><use href="#i-chevron"></use></svg>
+      </div>
+      <a class="nav-item sidebar-setting" href="#settings"><svg><use href="#i-settings"></use></svg><span>Settings</span></a>
+    </aside>
+
+    <main class="workspace">
+      <header class="utility-bar">
+        <div class="workspace-title"><span class="eyebrow">Student operations</span><strong>Student directory</strong></div>
+        <div class="utility-search search-wrap">
+          <svg><use href="#i-search"></use></svg>
+          <label class="sr-only" for="student-search">Search students</label>
+          <input id="student-search" type="search" autocomplete="off" placeholder="Search name, email, applicant ID, or student ID">
+          <kbd>Ctrl K</kbd>
+          <div class="search-results" id="search-results" aria-live="polite"></div>
+        </div>
+        <div class="utility-actions">
+          <button class="icon-button notification-button" type="button" aria-label="Notifications"><svg><use href="#i-bell"></use></svg><span>5</span></button>
+          <button class="help-button" type="button">Help</button>
+        </div>
+      </header>
+
+      <section class="directory-controls" aria-label="Student directory filters">
+        <div class="filter-row">
+          <button class="filter-button" id="filter-button" type="button" aria-expanded="false"><svg><use href="#i-filter"></use></svg> Filters <span class="filter-count">4</span></button>
+          <button class="filter-chip" type="button">Fall 2026 <span>&times;</span></button>
+          <button class="filter-chip" type="button">Computer Science <span>&times;</span></button>
+          <button class="filter-chip attention" type="button">High + medium risk <span>&times;</span></button>
+          <button class="filter-chip" type="button">Active enrollment <span>&times;</span></button>
+          <button class="clear-filters" type="button">Clear all</button>
+          <label class="sort-control">Sort
+            <select id="directory-sort">
+              <option value="risk">Highest melt risk</option>
+              <option value="urgent">Most urgent task</option>
+              <option value="activity">Recent activity</option>
+              <option value="name">Student name</option>
+              <option value="progress">Enrollment progress</option>
+            </select>
+          </label>
+        </div>
+        <div class="directory-meta"><span><strong>128</strong> matching students</span><span class="prototype-tag">Standalone prototype - dummy data</span></div>
+        <div class="filter-panel" id="filter-panel" hidden>
+          <div class="filter-panel-head"><div><span class="eyebrow">Refine directory</span><h2>Student filters</h2></div><button class="icon-button" id="close-filter" type="button" aria-label="Close filters">&times;</button></div>
+          <div class="filter-grid">
+            <label>Program<select><option>Any program</option><option selected>Computer Science</option><option>Engineering</option><option>Business</option><option>Nursing</option></select></label>
+            <label>Entry term<select><option>Any term</option><option selected>Fall 2026</option><option>Spring 2027</option></select></label>
+            <label>Enrollment stage<select><option>Any stage</option><option>Decision</option><option>Deposit</option><option selected>Onboarding</option><option>Registration</option></select></label>
+            <label>Assigned advisor<select><option>Any advisor</option><option selected>Jamie Wilson</option><option>Marcus Chen</option></select></label>
+          </div>
+          <fieldset><legend>Melt-risk band</legend><label><input type="checkbox" checked> High</label><label><input type="checkbox" checked> Medium</label><label><input type="checkbox"> Low</label><label><input type="checkbox"> Not scored</label></fieldset>
+          <fieldset><legend>Needs attention</legend><label><input type="checkbox" checked> Overdue task</label><label><input type="checkbox"> Missing document</label><label><input type="checkbox"> Unread note</label></fieldset>
+          <div class="filter-panel-actions"><button class="button secondary" type="button">Reset</button><button class="button primary" id="apply-filter" type="button">Show 128 students</button></div>
+        </div>
+      </section>
+
+      <section class="student-record" aria-label="Selected student record">
+        <header class="student-hero">
+          <div class="student-identity">
+            <div class="student-avatar" data-bind="initials">MR</div>
+            <div>
+              <span class="eyebrow">Selected student</span>
+              <h1 data-bind="name">Maya Rodriguez</h1>
+              <div class="identity-meta"><span>AID: <b data-bind="aid">10093872</b></span><i></i><span>Student ID: <b data-bind="studentId">20387465</b></span></div>
+              <div class="academic-line"><strong data-bind="program">BS Computer Science</strong><span>&middot;</span><span data-bind="term">Fall 2026</span><span>&middot;</span><span>First year</span></div>
+            </div>
+          </div>
+          <div class="student-contact">
+            <div class="risk-row"><span class="status-badge danger" data-bind="risk">High melt risk</span><span class="status-badge warning">Immunization overdue</span></div>
+            <a href="mailto:maya.rodriguez@example.edu"><svg><use href="#i-mail"></use></svg><span data-bind="email">maya.rodriguez@example.edu</span></a>
+            <a href="tel:+14155550187"><svg><use href="#i-phone"></use></svg><span data-bind="phone">(415) 555-0187</span></a>
+          </div>
+          <div class="next-action">
+            <span><svg><use href="#i-spark"></use></svg> Next best action</span>
+            <strong>Resolve immunization hold</strong>
+            <p>Review the personalized outreach draft before 4:00 PM.</p>
+            <button class="text-action" type="button" data-go-tab="progress">Open outreach <svg><use href="#i-arrow"></use></svg></button>
+          </div>
+          <div class="record-nav">
+            <button class="compact-button" type="button" data-cycle="previous">Previous</button>
+            <button class="compact-button" type="button" data-cycle="next">Next <svg><use href="#i-arrow"></use></svg></button>
+            <button class="icon-button" type="button" aria-label="More student actions"><svg><use href="#i-more"></use></svg></button>
+          </div>
+        </header>
+
+        <nav class="record-tabs" aria-label="Student record sections" role="tablist">
+          <button class="record-tab active" id="tab-overview" role="tab" aria-selected="true" aria-controls="panel-overview" data-tab="overview">Overview</button>
+          <button class="record-tab" id="tab-timeline" role="tab" aria-selected="false" aria-controls="panel-timeline" data-tab="timeline">Timeline <span>14</span></button>
+          <button class="record-tab" id="tab-application" role="tab" aria-selected="false" aria-controls="panel-application" data-tab="application">Application</button>
+          <button class="record-tab" id="tab-documents" role="tab" aria-selected="false" aria-controls="panel-documents" data-tab="documents">Documents <span>2</span></button>
+          <button class="record-tab" id="tab-progress" role="tab" aria-selected="false" aria-controls="panel-progress" data-tab="progress">Enrollment Progress</button>
+          <button class="record-tab" id="tab-notes" role="tab" aria-selected="false" aria-controls="panel-notes" data-tab="notes">Notes <span>3</span></button>
+          <button class="record-tab" id="tab-financials" role="tab" aria-selected="false" aria-controls="panel-financials" data-tab="financials">Financials</button>
+        </nav>
+
+        <div class="record-body">
+          <section class="tab-panel active" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" data-panel="overview">
+            <div class="panel-intro"><div><span class="eyebrow">At a glance</span><h2>Enrollment command center</h2><p>What changed, what needs attention, and what should happen next.</p></div><div class="updated-stamp"><svg><use href="#i-clock"></use></svg> Updated 8 minutes ago</div></div>
+            <article class="journey-card card">
+              <div class="card-heading"><div><span class="eyebrow">Enrollment journey</span><h3>Onboarding is in progress</h3></div><button class="link-button" type="button" data-go-tab="progress">View full progress <svg><use href="#i-arrow"></use></svg></button></div>
+              <div class="journey-track" aria-label="Four of seven enrollment stages complete">
+                <div class="journey-step complete"><span><svg><use href="#i-check"></use></svg></span><b>Inquiry</b><small>Oct 12</small></div>
+                <div class="journey-step complete"><span><svg><use href="#i-check"></use></svg></span><b>Application</b><small>Nov 2</small></div>
+                <div class="journey-step complete"><span><svg><use href="#i-check"></use></svg></span><b>Admitted</b><small>Dec 15</small></div>
+                <div class="journey-step complete"><span><svg><use href="#i-check"></use></svg></span><b>Decision</b><small>May 10</small></div>
+                <div class="journey-step current"><span>5</span><b>Onboarding</b><small>Current</small></div>
+                <div class="journey-step"><span>6</span><b>Registration</b><small>Jun 18</small></div>
+                <div class="journey-step"><span>7</span><b>Enrolled</b><small>Aug 24</small></div>
+              </div>
+            </article>
+
+            <div class="metric-grid">
+              <article class="metric-card"><div class="metric-label">Melt risk <button class="info-dot" type="button" title="Prototype score, not connected to a model">i</button></div><div class="metric-main"><strong class="coral">High</strong><span>72<small>/100</small></span></div><div class="sparkline" aria-hidden="true"><i style="height:24%"></i><i style="height:38%"></i><i style="height:31%"></i><i style="height:52%"></i><i style="height:66%"></i><i style="height:61%"></i><i style="height:83%"></i></div><p>Up 9 points after two missed deadlines.</p></article>
+              <article class="metric-card"><div class="metric-label">Outstanding work</div><div class="metric-main"><strong>5</strong><span class="metric-icon"><svg><use href="#i-check-square"></use></svg></span></div><p><b class="coral">2 overdue</b> and 3 due this week.</p></article>
+              <article class="metric-card"><div class="metric-label">Aid coverage</div><div class="metric-main"><strong>68%</strong><span>$21,420</span></div><div class="progress-bar"><i style="width:68%"></i></div><p>Of $31,500 tuition and fees.</p></article>
+              <article class="metric-card"><div class="metric-label">Staff notes</div><div class="metric-main"><strong>3</strong><span class="metric-icon"><svg><use href="#i-edit"></use></svg></span></div><p>Unread since last record review.</p></article>
+            </div>
+
+            <div class="overview-grid">
+              <article class="priority-card card span-2">
+                <div class="card-heading"><div><span class="eyebrow coral">Priority attention</span><h3>Two items need staff action</h3></div><span class="subtle-label">Ranked by urgency</span></div>
+                <div class="attention-list">
+                  <div class="attention-item danger-item"><span class="attention-icon"><svg><use href="#i-alert"></use></svg></span><div><div class="item-title"><strong>Immunization record is 6 days overdue</strong><span class="status-badge danger">Overdue</span></div><p>MMR dose 2 documentation is required to clear the onboarding hold.</p><small>Enrollment Progress &middot; Due May 8</small></div><button class="button secondary" type="button" data-go-tab="progress">Review</button></div>
+                  <div class="attention-item warning-item"><span class="attention-icon"><svg><use href="#i-spark"></use></svg></span><div><div class="item-title"><strong>Personalized outreach draft is ready</strong><span class="status-badge ai">AI-assisted</span></div><p>Draft references the missing health record and upcoming deposit confirmation.</p><small>Human review required &middot; Generated 12 minutes ago</small></div><button class="button secondary" type="button" data-toast="Outreach draft opened in prototype">Open draft</button></div>
+                </div>
+              </article>
+
+              <article class="timeline-preview card">
+                <div class="card-heading"><div><span class="eyebrow">Recent timeline</span><h3>Latest activity</h3></div><button class="link-button" type="button" data-go-tab="timeline">View all</button></div>
+                <ol class="mini-timeline">
+                  <li class="alert"><span><svg><use href="#i-alert"></use></svg></span><div><small>Today, 9:42 AM</small><strong>Requirement became overdue</strong><p>Immunization record remains missing.</p></div></li>
+                  <li><span><svg><use href="#i-mail"></use></svg></span><div><small>Yesterday, 4:18 PM</small><strong>Financial aid email opened</strong><p>Award notification viewed on mobile.</p></div></li>
+                  <li><span><svg><use href="#i-file"></use></svg></span><div><small>May 12, 2:31 PM</small><strong>Residency proof uploaded</strong><p>Document is waiting for staff review.</p></div></li>
+                </ol>
+              </article>
+
+              <article class="document-readiness card">
+                <div class="card-heading"><div><span class="eyebrow">Documents</span><h3>8 of 10 ready</h3></div><button class="link-button" type="button" data-go-tab="documents">View all</button></div>
+                <div class="readiness-score"><div><strong>80%</strong><span>ready</span></div><div class="progress-bar"><i style="width:80%"></i></div></div>
+                <ul class="status-list"><li><span>Admissions records</span><b>5 of 5</b></li><li><span>Enrollment documents</span><b>3 of 5</b></li><li class="needs-attention"><span>Immunization record</span><b>Missing</b></li><li class="needs-review"><span>Proof of residency</span><b>Review</b></li></ul>
+              </article>
+
+              <article class="finance-preview card">
+                <div class="card-heading"><div><span class="eyebrow">Financials</span><h3>Cost composition</h3></div><button class="link-button" type="button" data-go-tab="financials">View details</button></div>
+                <div class="financial-total"><span>Tuition and fees</span><strong>$31,500</strong></div>
+                <div class="composition-bar" aria-label="68 percent covered, 32 percent remaining"><i class="aid" style="width:47.6%"></i><i class="loan" style="width:20.4%"></i><i class="remaining" style="width:32%"></i></div>
+                <div class="composition-legend"><span><i class="aid-dot"></i>Aid <b>$15,000</b></span><span><i class="loan-dot"></i>Loans <b>$6,420</b></span><span><i class="balance-dot"></i>Balance <b>$10,080</b></span></div>
+                <div class="deposit-line"><span>Enrollment deposit</span><strong>$1,000 paid</strong></div>
+              </article>
+
+              <article class="application-preview card">
+                <div class="card-heading"><div><span class="eyebrow">Admissions snapshot</span><h3>Strong academic file</h3></div><button class="link-button" type="button" data-go-tab="application">Open application</button></div>
+                <div class="application-metrics"><div><span>Weighted GPA</span><strong>3.78</strong><small>4.0 scale</small></div><div><span>Completeness</span><strong>94%</strong><small>At submission</small></div><div><span>Decision</span><strong>Admit</strong><small>Regular decision</small></div></div>
+                <dl class="compact-facts"><div><dt>Submitted</dt><dd>Nov 2, 2025</dd></div><div><dt>Admitted</dt><dd>Dec 15, 2025</dd></div><div><dt>First choice</dt><dd>Computer Science</dd></div></dl>
+              </article>
+            </div>
+          </section>
+
+          <section class="tab-panel" id="panel-timeline" role="tabpanel" aria-labelledby="tab-timeline" data-panel="timeline" hidden>
+            <div class="panel-intro"><div><span class="eyebrow">Activity ledger</span><h2>Student timeline</h2><p>Enrollment milestones, communication, document changes, and approved portal activity.</p></div><div class="updated-stamp"><svg><use href="#i-clock"></use></svg> 47 events since application</div></div>
+            <div class="timeline-toolbar card">
+              <div class="compact-search"><svg><use href="#i-search"></use></svg><input id="timeline-search" type="search" placeholder="Search activity"></div>
+              <select id="timeline-category" aria-label="Timeline category"><option value="all">All event types</option><option value="milestone">Enrollment milestones</option><option value="document">Documents</option><option value="communication">Communication</option><option value="website">Website activity</option><option value="financial">Financial</option></select>
+              <select aria-label="Timeline date range"><option>All dates</option><option>Last 30 days</option><option>Last 90 days</option></select>
+              <label class="switch-control"><input id="website-toggle" type="checkbox" checked><span class="switch"><i></i></span><span><strong>Website activity</strong><small id="website-toggle-copy">Showing 4 portal visits</small></span></label>
+            </div>
+            <div class="timeline-layout">
+              <aside class="timeline-summary card"><span class="eyebrow">Event summary</span><h3>May 2026</h3><div class="summary-stat"><strong id="visible-event-count">9</strong><span>visible events</span></div><ul><li><i class="blue"></i>Milestones <b>2</b></li><li><i class="slate"></i>Documents <b>1</b></li><li><i class="amber"></i>Communication <b>1</b></li><li><i class="coral"></i>Website activity <b id="web-event-count">4</b></li><li><i class="blue"></i>Financial <b>1</b></li></ul><p class="privacy-note"><svg><use href="#i-eye"></use></svg> Portal activity records approved first-party pages only. No typed content is captured.</p></aside>
+              <div class="full-timeline card">
+                <div class="timeline-date"><span>Today</span><i></i></div>
+                <article class="timeline-event" data-type="milestone" data-search="immunization requirement overdue enrollment"><span class="event-icon alert"><svg><use href="#i-alert"></use></svg></span><div class="event-time">9:42 AM</div><div class="event-content"><div><strong>Immunization requirement became overdue</strong><span class="event-type">Enrollment</span></div><p>MMR dose 2 evidence was not received by the May 8 deadline. The onboarding hold remains active.</p><footer>System event <span>&middot;</span> Enrollment Progress</footer></div></article>
+                <article class="timeline-event website-event" data-type="website" data-search="visited financial aid award portal website"><span class="event-icon website"><svg><use href="#i-eye"></use></svg></span><div class="event-time">8:17 AM</div><div class="event-content"><div><strong>Visited Financial Aid Award</strong><span class="event-type">Website activity</span></div><p>Viewed the award summary for 3 minutes from a mobile device.</p><footer>Student portal <span>&middot;</span> /financial-aid/award</footer></div></article>
+                <div class="timeline-date"><span>May 13</span><i></i></div>
+                <article class="timeline-event" data-type="communication" data-search="email opened financial aid notification"><span class="event-icon communication"><svg><use href="#i-mail"></use></svg></span><div class="event-time">4:18 PM</div><div class="event-content"><div><strong>Financial aid notification opened</strong><span class="event-type">Communication</span></div><p>The student opened "Your Audentra aid offer is ready" on mobile.</p><footer>Automated campaign <span>&middot;</span> Delivered May 13 at 4:02 PM</footer></div></article>
+                <article class="timeline-event website-event" data-type="website" data-search="visited enrollment checklist portal website"><span class="event-icon website"><svg><use href="#i-eye"></use></svg></span><div class="event-time">4:21 PM</div><div class="event-content"><div><strong>Visited Enrollment Progress</strong><span class="event-type">Website activity</span></div><p>Viewed the immunization requirement and residence hall steps.</p><footer>Student portal <span>&middot;</span> /enrollment/progress</footer></div></article>
+                <div class="timeline-date"><span>May 12</span><i></i></div>
+                <article class="timeline-event" data-type="document" data-search="residency proof uploaded document"><span class="event-icon document"><svg><use href="#i-file"></use></svg></span><div class="event-time">2:31 PM</div><div class="event-content"><div><strong>Proof of residency uploaded</strong><span class="event-type">Document</span></div><p>California utility statement.pdf was received and queued for staff review.</p><footer>Uploaded by Maya Rodriguez <span>&middot;</span> 1.4 MB</footer></div></article>
+                <article class="timeline-event" data-type="milestone" data-search="orientation completed enrollment step"><span class="event-icon milestone"><svg><use href="#i-check"></use></svg></span><div class="event-time">2:28 PM</div><div class="event-content"><div><strong>Orientation session selected</strong><span class="event-type">Enrollment</span></div><p>Student selected June 22, 9:00 AM on-campus orientation.</p><footer>Completed by student <span>&middot;</span> Onboarding</footer></div></article>
+                <article class="timeline-event website-event" data-type="website" data-search="visited orientation scheduler website"><span class="event-icon website"><svg><use href="#i-eye"></use></svg></span><div class="event-time">2:24 PM</div><div class="event-content"><div><strong>Visited Orientation Scheduler</strong><span class="event-type">Website activity</span></div><p>Compared two available on-campus sessions.</p><footer>Student portal <span>&middot;</span> /orientation/schedule</footer></div></article>
+                <div class="timeline-date"><span>May 10</span><i></i></div>
+                <article class="timeline-event" data-type="financial" data-search="deposit paid payment financial enrollment"><span class="event-icon financial"><svg><use href="#i-dollar"></use></svg></span><div class="event-time">11:03 AM</div><div class="event-content"><div><strong>$1,000 enrollment deposit recorded</strong><span class="event-type">Financial</span></div><p>Card payment was confirmed and the Decision stage was completed.</p><footer>Payment reference DEMO-42018 <span>&middot;</span> Receipt sent</footer></div></article>
+                <article class="timeline-event website-event" data-type="website" data-search="visited deposit payment website"><span class="event-icon website"><svg><use href="#i-eye"></use></svg></span><div class="event-time">10:57 AM</div><div class="event-content"><div><strong>Visited Enrollment Deposit</strong><span class="event-type">Website activity</span></div><p>Reviewed deposit terms before completing payment.</p><footer>Student portal <span>&middot;</span> /enrollment/deposit</footer></div></article>
+                <div class="empty-events" id="empty-events" hidden>No timeline events match these filters.</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="tab-panel" id="panel-application" role="tabpanel" aria-labelledby="tab-application" data-panel="application" hidden>
+            <div class="panel-intro"><div><span class="eyebrow">Admissions history</span><h2>Application record</h2><p>A read-only snapshot of the evidence reviewed before admission.</p></div><div class="snapshot-badge"><svg><use href="#i-clock"></use></svg><span><strong>Snapshot captured</strong><small>December 15, 2025</small></span></div></div>
+            <div class="application-status card"><div><span class="eyebrow">Application 2026-10482</span><h3>Regular Decision - Admitted</h3><p>Submitted November 2, 2025 and completed November 19, 2025.</p></div><div class="completion-ring"><strong>94%</strong><span>complete at review</span></div><dl><div><dt>Source</dt><dd>Common Application</dd></div><div><dt>Decision date</dt><dd>Dec 15, 2025</dd></div><div><dt>Admissions owner</dt><dd>Eric Rangel</dd></div></dl></div>
+            <div class="application-grid">
+              <article class="card academic-card"><div class="card-heading"><div><span class="eyebrow">Academic profile</span><h3>Secondary school record</h3></div><span class="status-badge neutral">Verified</span></div><div class="academic-stats"><div><strong>3.78</strong><span>Weighted GPA</span><small>4.0 scale</small></div><div><strong>3.62</strong><span>Unweighted GPA</span><small>4.0 scale</small></div><div><strong>18/286</strong><span>Class rank</span><small>Top 7%</small></div><div><strong>31</strong><span>ACT composite</span><small>Superscore</small></div></div><dl class="detail-list"><div><dt>High school</dt><dd>Redwood Bay High School</dd></div><div><dt>Curriculum</dt><dd>Honors + 6 AP courses</dd></div><div><dt>Graduation</dt><dd>June 2026</dd></div><div><dt>Academic trend</dt><dd>Consistently improving</dd></div></dl></article>
+              <article class="card program-card"><div class="card-heading"><div><span class="eyebrow">Academic interest</span><h3>Program choices</h3></div></div><ol class="ranked-list"><li><span>1</span><div><strong>BS Computer Science</strong><small>College of Engineering</small></div><b>Admitted</b></li><li><span>2</span><div><strong>BS Data Science</strong><small>College of Science</small></div><b>Alternate</b></li></ol><div class="interest-tags"><span>Human-centered AI</span><span>Robotics</span><span>Community technology</span></div></article>
+              <article class="card essay-card span-2"><div class="card-heading"><div><span class="eyebrow">Written response</span><h3>Personal statement</h3></div><button class="button secondary" type="button" data-toast="Essay preview opened">Read full essay</button></div><blockquote>"The first program I wrote did not solve a grand problem. It helped my grandmother sort the photographs she had been afraid to lose..."</blockquote><p>Maya connects family history, community service, and an interest in accessible computing. The essay was submitted with the original application and is preserved as read-only admissions evidence.</p><footer><span>Common App personal essay</span><span>618 of 650 words</span><span>No revisions after submission</span></footer></article>
+              <article class="card file-stack"><div class="card-heading"><div><span class="eyebrow">Application files</span><h3>Core evidence</h3></div></div><button class="file-row" type="button" data-toast="Resume preview opened"><span class="file-icon"><svg><use href="#i-file"></use></svg></span><span><strong>Maya_Rodriguez_Resume.pdf</strong><small>Activities and experience &middot; 2 pages</small></span><b>Preview</b></button><button class="file-row" type="button" data-toast="Transcript preview opened"><span class="file-icon"><svg><use href="#i-file"></use></svg></span><span><strong>Official_HS_Transcript.pdf</strong><small>Verified by admissions &middot; 4 pages</small></span><b>Preview</b></button><button class="file-row" type="button" data-toast="Supplement preview opened"><span class="file-icon"><svg><use href="#i-file"></use></svg></span><span><strong>Engineering_Supplement.pdf</strong><small>Supplemental response &middot; 1 page</small></span><b>Preview</b></button></article>
+              <article class="card recommendations"><div class="card-heading"><div><span class="eyebrow">Recommendations</span><h3>Three letters received</h3></div><span class="status-badge neutral">Complete</span></div><div class="recommendation"><span class="mini-avatar cobalt">AL</span><div><strong>Angela Liu</strong><p>AP Computer Science teacher</p><small>Received Oct 28, 2025</small></div><button type="button" data-toast="Recommendation details opened">View</button></div><div class="recommendation"><span class="mini-avatar amber">DM</span><div><strong>Daniel Morales</strong><p>School counselor</p><small>Received Nov 3, 2025</small></div><button type="button" data-toast="Recommendation details opened">View</button></div><div class="recommendation"><span class="mini-avatar coral-bg">SB</span><div><strong>Simone Brooks</strong><p>Community lab director</p><small>Received Nov 7, 2025</small></div><button type="button" data-toast="Recommendation details opened">View</button></div></article>
+              <article class="card snapshot-contact span-2"><div class="card-heading"><div><span class="eyebrow">Application-time profile</span><h3>Contact and residency snapshot</h3></div><span class="subtle-label">Historical - not current profile</span></div><dl class="detail-list four-col"><div><dt>Home address</dt><dd>118 Beacon Way, Oakland, CA</dd></div><div><dt>Residency</dt><dd>California resident</dd></div><div><dt>Citizenship</dt><dd>United States</dd></div><div><dt>Preferred contact</dt><dd>Email</dd></div><div><dt>First generation</dt><dd>Yes</dd></div><div><dt>Language</dt><dd>English, Spanish</dd></div><div><dt>Parent/guardian</dt><dd>Elena Rodriguez</dd></div><div><dt>Application fee</dt><dd>Waived</dd></div></dl></article>
+            </div>
+          </section>
+
+          <section class="tab-panel" id="panel-documents" role="tabpanel" aria-labelledby="tab-documents" data-panel="documents" hidden>
+            <div class="panel-intro"><div><span class="eyebrow">Record library</span><h2>Documents</h2><p>Admissions evidence and enrollment documents in one review queue.</p></div><button class="button primary" type="button" data-toast="Document request composer opened"><svg><use href="#i-mail"></use></svg> Request document</button></div>
+            <div class="document-summary-grid"><article class="summary-tile"><span>Overall readiness</span><strong>80%</strong><div class="progress-bar"><i style="width:80%"></i></div></article><article class="summary-tile"><span>Ready</span><strong>8</strong><small>Approved or verified</small></article><article class="summary-tile attention"><span>Needs review</span><strong>1</strong><small>Residency proof</small></article><article class="summary-tile danger-tile"><span>Missing / overdue</span><strong>1</strong><small>Immunization record</small></article></div>
+            <div class="document-toolbar card"><div class="compact-search"><svg><use href="#i-search"></use></svg><input id="document-search" type="search" placeholder="Search document name or type"></div><select id="document-stage"><option value="all">All stages</option><option value="admissions">Admissions</option><option value="enrollment">Enrollment</option></select><select id="document-status"><option value="all">All statuses</option><option value="ready">Ready</option><option value="review">Needs review</option><option value="missing">Missing</option></select><span id="document-count">10 documents</span></div>
+            <div class="document-table-wrap card"><table class="document-table"><thead><tr><th>Document</th><th>Stage</th><th>Source</th><th>Received</th><th>Status</th><th>Reviewer</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody id="document-table-body">
+              <tr data-stage="admissions" data-status="ready"><td><span class="doc-type-icon"><svg><use href="#i-file"></use></svg></span><div><strong>Official high school transcript</strong><small>Official_HS_Transcript.pdf &middot; 1.8 MB</small></div></td><td>Admissions</td><td>School counselor</td><td>Nov 12, 2025</td><td><span class="table-status ready">Verified</span></td><td>Eric Rangel</td><td><button class="row-action" type="button" data-toast="Transcript preview opened">Preview</button></td></tr>
+              <tr data-stage="admissions" data-status="ready"><td><span class="doc-type-icon"><svg><use href="#i-file"></use></svg></span><div><strong>Student resume</strong><small>Maya_Rodriguez_Resume.pdf &middot; 420 KB</small></div></td><td>Admissions</td><td>Student</td><td>Nov 2, 2025</td><td><span class="table-status ready">Accepted</span></td><td>Eric Rangel</td><td><button class="row-action" type="button" data-toast="Resume preview opened">Preview</button></td></tr>
+              <tr data-stage="admissions" data-status="ready"><td><span class="doc-type-icon"><svg><use href="#i-file"></use></svg></span><div><strong>Personal statement</strong><small>Common App response &middot; 618 words</small></div></td><td>Admissions</td><td>Common App</td><td>Nov 2, 2025</td><td><span class="table-status ready">Accepted</span></td><td>Eric Rangel</td><td><button class="row-action" type="button" data-go-tab="application">View</button></td></tr>
+              <tr data-stage="admissions" data-status="ready"><td><span class="doc-type-icon"><svg><use href="#i-file"></use></svg></span><div><strong>Recommendations (3)</strong><small>Teacher, counselor, community</small></div></td><td>Admissions</td><td>Recommenders</td><td>Nov 7, 2025</td><td><span class="table-status ready">Complete</span></td><td>Eric Rangel</td><td><button class="row-action" type="button" data-go-tab="application">View</button></td></tr>
+              <tr data-stage="admissions" data-status="ready"><td><span class="doc-type-icon"><svg><use href="#i-file"></use></svg></span><div><strong>ACT score report</strong><small>Composite 31 &middot; official</small></div></td><td>Admissions</td><td>ACT</td><td>Oct 30, 2025</td><td><span class="table-status ready">Verified</span></td><td>System</td><td><button class="row-action" type="button" data-toast="Score report opened">View</button></td></tr>
+              <tr data-stage="enrollment" data-status="ready"><td><span class="doc-type-icon"><svg><use href="#i-file"></use></svg></span><div><strong>Deposit receipt</strong><small>Payment DEMO-42018 &middot; $1,000</small></div></td><td>Enrollment</td><td>Payment system</td><td>May 10, 2026</td><td><span class="table-status ready">Recorded</span></td><td>System</td><td><button class="row-action" type="button" data-go-tab="financials">View</button></td></tr>
+              <tr data-stage="enrollment" data-status="review"><td><span class="doc-type-icon review"><svg><use href="#i-file"></use></svg></span><div><strong>Proof of residency</strong><small>California_utility_statement.pdf &middot; 1.4 MB</small></div></td><td>Enrollment</td><td>Student</td><td>May 12, 2026</td><td><span class="table-status review">Needs review</span></td><td>Unassigned</td><td><button class="row-action" type="button" data-go-tab="progress">Review</button></td></tr>
+              <tr data-stage="enrollment" data-status="missing"><td><span class="doc-type-icon missing"><svg><use href="#i-alert"></use></svg></span><div><strong>Immunization record</strong><small>MMR dose 2 evidence required</small></div></td><td>Enrollment</td><td>Student</td><td>Not received</td><td><span class="table-status missing">6 days overdue</span></td><td>Jamie Wilson</td><td><button class="row-action" type="button" data-go-tab="progress">Resolve</button></td></tr>
+              <tr data-stage="enrollment" data-status="ready"><td><span class="doc-type-icon"><svg><use href="#i-file"></use></svg></span><div><strong>Housing agreement</strong><small>Signed electronically</small></div></td><td>Enrollment</td><td>Student</td><td>May 6, 2026</td><td><span class="table-status ready">Complete</span></td><td>System</td><td><button class="row-action" type="button" data-toast="Housing agreement opened">View</button></td></tr>
+              <tr data-stage="enrollment" data-status="ready"><td><span class="doc-type-icon"><svg><use href="#i-file"></use></svg></span><div><strong>Financial aid acceptance</strong><small>Award year 2026-27</small></div></td><td>Enrollment</td><td>Student</td><td>May 13, 2026</td><td><span class="table-status ready">Complete</span></td><td>Financial Aid</td><td><button class="row-action" type="button" data-go-tab="financials">View</button></td></tr>
+            </tbody></table><div class="empty-table" id="empty-documents" hidden>No documents match these filters.</div></div>
+          </section>
+
+          <section class="tab-panel" id="panel-progress" role="tabpanel" aria-labelledby="tab-progress" data-panel="progress" hidden>
+            <div class="panel-intro"><div><span class="eyebrow">Current journey</span><h2>Enrollment Progress</h2><p>Stage requirements, evidence, and staff work from decision through arrival.</p></div><button class="button primary" type="button" data-toast="Task creation panel opened"><svg><use href="#i-check-square"></use></svg> Create task</button></div>
+            <article class="progress-hero card"><div class="progress-copy"><span class="eyebrow">Stage 5 of 7</span><h3>Onboarding and compliance</h3><p>Four of seven requirements are complete. One overdue item is blocking registration readiness.</p><div class="progress-bar large"><i style="width:61%"></i></div><div class="progress-meta"><span><strong>61%</strong> overall</span><span><strong>Jun 18</strong> target</span><span><strong>1</strong> active hold</span></div></div><div class="stage-forecast"><span>Expected stage completion</span><strong>May 24</strong><small>10 days remaining</small><p>At risk if health documentation is not received by May 17.</p></div></article>
+            <div class="stage-rail card"><div class="stage-node complete"><span><svg><use href="#i-check"></use></svg></span><b>Admitted</b><small>Dec 15</small></div><div class="stage-node complete"><span><svg><use href="#i-check"></use></svg></span><b>Decision</b><small>May 10</small></div><div class="stage-node complete"><span><svg><use href="#i-check"></use></svg></span><b>Deposit</b><small>May 10</small></div><div class="stage-node current"><span>4</span><b>Onboarding</b><small>Current</small></div><div class="stage-node"><span>5</span><b>Registration</b><small>Jun 18</small></div><div class="stage-node"><span>6</span><b>Move-in</b><small>Aug 20</small></div><div class="stage-node"><span>7</span><b>Enrolled</b><small>Aug 24</small></div></div>
+            <div class="progress-grid">
+              <div class="requirements-column">
+                <div class="section-heading"><div><span class="eyebrow">Stage requirements</span><h3>Onboarding tasks</h3></div><div class="segmented-control"><button class="active" type="button">Open 3</button><button type="button">Complete 4</button><button type="button">All 7</button></div></div>
+                <article class="requirement-card overdue"><div class="requirement-status"><span class="requirement-icon"><svg><use href="#i-alert"></use></svg></span><div><span class="eyebrow coral">Overdue 6 days</span><h3>Upload immunization record</h3></div><span class="status-badge danger">Blocking</span></div><p>MMR dose 2 documentation is required before course registration can be released.</p><div class="requirement-meta"><span><b>Owner</b> Student</span><span><b>Due</b> May 8, 2026</span><span><b>Dependency</b> Registration hold</span></div><div class="requirement-actions"><button class="button secondary" type="button" data-toast="Requirement details opened">View requirement</button><button class="button primary coral-button" type="button" data-toast="AI outreach draft opened for human review"><svg><use href="#i-spark"></use></svg> Review outreach draft</button></div></article>
+                <article class="requirement-card review-needed"><div class="requirement-status"><span class="requirement-icon"><svg><use href="#i-file"></use></svg></span><div><span class="eyebrow amber-text">Staff review</span><h3>Verify proof of residency</h3></div><span class="status-badge warning">Due today</span></div><p>The student uploaded a California utility statement on May 12. Confirm name, address, and issue date.</p><div class="evidence-file"><svg><use href="#i-file"></use></svg><span><strong>California_utility_statement.pdf</strong><small>1.4 MB &middot; Uploaded by student</small></span><button type="button" data-toast="Residency evidence preview opened">Preview</button></div><div class="requirement-actions"><button class="button reject" type="button" data-task-action="rejected">Reject and request new</button><button class="button primary" type="button" data-task-action="approved">Approve evidence</button></div></article>
+                <article class="requirement-card"><div class="requirement-status"><span class="requirement-icon"><svg><use href="#i-calendar"></use></svg></span><div><span class="eyebrow">Upcoming</span><h3>Complete placement survey</h3></div><span class="status-badge neutral">Due May 19</span></div><p>Math and writing placement responses are needed before the advising appointment.</p><div class="requirement-meta"><span><b>Owner</b> Student</span><span><b>Due</b> May 19, 2026</span><span><b>Dependency</b> Advising</span></div><div class="requirement-actions"><button class="button secondary" type="button" data-toast="Reminder scheduled">Schedule reminder</button><button class="button primary" type="button" data-toast="Placement survey link copied">Copy student link</button></div></article>
+              </div>
+              <aside class="task-column">
+                <article class="card ai-task-card"><div class="card-heading"><div><span class="eyebrow">Suggested work</span><h3>AI-assisted outreach</h3></div><span class="status-badge ai"><svg><use href="#i-spark"></use></svg> AI-assisted</span></div><p>"Hi Maya, I noticed your immunization record is still outstanding. I can help if you are having trouble locating the form..."</p><div class="ai-guardrail"><svg><use href="#i-eye"></use></svg><span><strong>Human review required</strong><small>Generated from approved student-record fields. No message has been sent.</small></span></div><button class="button primary wide" type="button" data-toast="Draft opened for editing">Review and edit draft</button></article>
+                <article class="card stage-checklist"><div class="card-heading"><div><span class="eyebrow">Completed this stage</span><h3>4 requirements</h3></div></div><ul><li><span><svg><use href="#i-check"></use></svg></span><div><strong>Enrollment deposit</strong><small>Paid May 10</small></div></li><li><span><svg><use href="#i-check"></use></svg></span><div><strong>Orientation selection</strong><small>Completed May 12</small></div></li><li><span><svg><use href="#i-check"></use></svg></span><div><strong>Housing agreement</strong><small>Signed May 6</small></div></li><li><span><svg><use href="#i-check"></use></svg></span><div><strong>Financial aid response</strong><small>Accepted May 13</small></div></li></ul></article>
+                <article class="card hold-card"><span class="eyebrow coral">Active hold</span><h3>Registration compliance</h3><p>Prevents course registration until the health record is approved or an exception is granted.</p><button class="link-button" type="button" data-toast="Hold history opened">View hold history <svg><use href="#i-arrow"></use></svg></button></article>
+              </aside>
+            </div>
+          </section>
+
+          <section class="tab-panel" id="panel-notes" role="tabpanel" aria-labelledby="tab-notes" data-panel="notes" hidden>
+            <div class="panel-intro"><div><span class="eyebrow">Staff collaboration</span><h2>Notes</h2><p>Time-ordered institutional context, decisions, and student support history.</p></div><div class="notes-view-controls"><label>Order<select id="notes-sort"><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label><button class="button secondary" type="button" data-toast="Note filters opened"><svg><use href="#i-filter"></use></svg> Filters</button></div></div>
+            <div class="notes-layout">
+              <div class="notes-main">
+                <form class="note-composer card" id="note-form"><div class="composer-head"><span class="mini-avatar">JW</span><div><strong>Add a staff note</strong><small>Notes are audited and visible according to the selected access level.</small></div></div><label class="sr-only" for="note-text">Note text</label><textarea id="note-text" rows="4" placeholder="Add context, an outcome, or a next step..."></textarea><div class="composer-actions"><label>Category<select id="note-category"><option>Advising</option><option>Outreach</option><option>Document review</option><option>Financial aid</option><option>General</option></select></label><label>Visibility<select id="note-visibility"><option>Enrollment team</option><option>Admissions + enrollment</option><option>Financial aid team</option><option>Private to me</option></select></label><button class="button primary" type="submit">Add note</button></div></form>
+                <div class="notes-feed" id="notes-feed">
+                  <article class="note-card card pinned" data-time="2026-05-14T10:16:00"><div class="note-author"><span class="mini-avatar cobalt">JW</span><div><strong>Jamie Wilson</strong><small>Today at 10:16 AM &middot; Enrollment advising</small></div><span class="pinned-label"><svg><use href="#i-pin"></use></svg> Pinned</span></div><p>Maya called about the immunization hold. She has the first MMR record but is waiting for the clinic to send dose 2. We agreed that she will upload both documents by Friday. If the clinic cannot provide it, route to Health Services for a temporary exception review.</p><div class="note-footer"><span class="status-badge neutral">Enrollment team</span><span>Related: Immunization requirement</span><button type="button" data-toast="Note action menu opened"><svg><use href="#i-more"></use></svg></button></div></article>
+                  <article class="note-card card" data-time="2026-05-13T16:42:00"><div class="note-author"><span class="mini-avatar amber">AP</span><div><strong>Aisha Patel</strong><small>Yesterday at 4:42 PM &middot; Financial aid</small></div><span class="new-label">New</span></div><p>Reviewed the award package after the student opened the notification. Institutional aid is final. Federal loan acceptance remains optional; no additional verification documents are required.</p><div class="note-footer"><span class="status-badge neutral">Admissions + enrollment</span><span>Related: 2026-27 aid award</span><button type="button" data-toast="Note action menu opened"><svg><use href="#i-more"></use></svg></button></div></article>
+                  <article class="note-card card" data-time="2026-05-12T15:04:00"><div class="note-author"><span class="mini-avatar coral-bg">MC</span><div><strong>Marcus Chen</strong><small>May 12 at 3:04 PM &middot; Document review</small></div></div><p>The residency upload is readable and appears current. It still needs an assigned reviewer to confirm the account holder and service address before approval.</p><div class="note-footer"><span class="status-badge neutral">Enrollment team</span><span>Related: Proof of residency</span><button type="button" data-toast="Note action menu opened"><svg><use href="#i-more"></use></svg></button></div></article>
+                  <article class="note-card card" data-time="2026-05-08T09:30:00"><div class="note-author"><span class="mini-avatar">JW</span><div><strong>Jamie Wilson</strong><small>May 8 at 9:30 AM &middot; Outreach</small></div></div><p>Sent a first reminder for health documentation. Message included the upload link, accepted document formats, and Health Services contact details.</p><div class="note-footer"><span class="status-badge neutral">Enrollment team</span><span>Related: Outreach task ENR-284</span><button type="button" data-toast="Note action menu opened"><svg><use href="#i-more"></use></svg></button></div></article>
+                </div>
+              </div>
+              <aside class="notes-sidebar">
+                <article class="card"><span class="eyebrow">Record context</span><h3>Note summary</h3><dl class="note-stats"><div><dt>Total notes</dt><dd id="note-total">12</dd></div><div><dt>Unread</dt><dd>3</dd></div><div><dt>Pinned</dt><dd>1</dd></div><div><dt>Last contact</dt><dd>Today</dd></div></dl></article>
+                <article class="card"><span class="eyebrow">Frequent contributors</span><h3>Student support team</h3><ul class="contributor-list"><li><span class="mini-avatar">JW</span><div><strong>Jamie Wilson</strong><small>6 notes &middot; Advisor</small></div></li><li><span class="mini-avatar amber">AP</span><div><strong>Aisha Patel</strong><small>3 notes &middot; Financial aid</small></div></li><li><span class="mini-avatar coral-bg">MC</span><div><strong>Marcus Chen</strong><small>2 notes &middot; Operations</small></div></li></ul></article>
+                <article class="card compliance-card"><svg><use href="#i-eye"></use></svg><div><strong>Institutional record</strong><p>Notes may be subject to student-record access rules. Keep entries factual, relevant, and necessary.</p></div></article>
+              </aside>
+            </div>
+          </section>
+
+          <section class="tab-panel" id="panel-financials" role="tabpanel" aria-labelledby="tab-financials" data-panel="financials" hidden>
+            <div class="panel-intro"><div><span class="eyebrow">2026-27 academic year</span><h2>Financials</h2><p>A student-aligned view of cost, funding, payments, and outstanding commitments.</p></div><button class="button secondary" type="button" data-toast="Student financial view opened"><svg><use href="#i-external"></use></svg> Preview student view</button></div>
+            <div class="financial-hero card"><div class="balance-block"><span class="eyebrow">Current outstanding balance</span><strong>$10,080</strong><p>After accepted aid, loans, and the $1,000 enrollment deposit.</p><div class="due-callout"><svg><use href="#i-calendar"></use></svg><span><strong>$3,360 due June 15</strong><small>First of three scheduled installments</small></span></div></div><div class="coverage-visual"><div class="coverage-head"><span>Total tuition and fees</span><strong>$31,500</strong></div><div class="funding-bar"><i class="gift-aid" style="width:47.62%"><span>48%</span></i><i class="borrowed" style="width:20.38%"><span>20%</span></i><i class="paid" style="width:3.17%"></i><i class="family" style="width:28.83%"><span>29%</span></i></div><div class="funding-legend"><span><i class="gift-aid-dot"></i>Gift aid <b>$15,000</b></span><span><i class="borrowed-dot"></i>Loans <b>$6,420</b></span><span><i class="paid-dot"></i>Paid <b>$1,000</b></span><span><i class="family-dot"></i>Remaining <b>$9,080</b></span></div><p class="estimate-note">Amounts reflect accepted awards as of May 14. Disbursement occurs after enrollment verification.</p></div></div>
+            <div class="financial-grid">
+              <article class="card cost-breakdown"><div class="card-heading"><div><span class="eyebrow">Cost of attendance</span><h3>Tuition and direct charges</h3></div><strong>$31,500</strong></div><dl class="money-list"><div><dt>Tuition</dt><dd>$25,800</dd></div><div><dt>Mandatory fees</dt><dd>$2,200</dd></div><div><dt>Housing deposit and prepayment</dt><dd>$1,500</dd></div><div><dt>Meal plan prepayment</dt><dd>$2,000</dd></div><div class="total"><dt>Total direct charges</dt><dd>$31,500</dd></div></dl></article>
+              <article class="card funding-detail"><div class="card-heading"><div><span class="eyebrow">Funding</span><h3>Aid and accepted loans</h3></div><span class="status-badge neutral">68% covered</span></div><div class="funding-row"><span class="funding-symbol grant">A</span><div><strong>Audentra Opportunity Grant</strong><small>Gift aid &middot; Accepted</small></div><b>$9,500</b></div><div class="funding-row"><span class="funding-symbol scholarship">S</span><div><strong>Engineering Scholars Award</strong><small>Scholarship &middot; Accepted</small></div><b>$5,500</b></div><div class="funding-row"><span class="funding-symbol loan">L</span><div><strong>Federal Direct Subsidized Loan</strong><small>Loan &middot; Accepted</small></div><b>$3,500</b></div><div class="funding-row"><span class="funding-symbol loan">L</span><div><strong>Federal Direct Unsubsidized Loan</strong><small>Loan &middot; Accepted</small></div><b>$2,920</b></div></article>
+              <article class="card deposit-card"><div class="card-heading"><div><span class="eyebrow">Enrollment deposit</span><h3>Paid in full</h3></div><span class="deposit-check"><svg><use href="#i-check"></use></svg></span></div><strong class="deposit-amount">$1,000</strong><dl class="detail-list"><div><dt>Payment date</dt><dd>May 10, 2026</dd></div><div><dt>Payment method</dt><dd>Card ending 1482</dd></div><div><dt>Receipt</dt><dd>DEMO-42018</dd></div><div><dt>Applied to balance</dt><dd>Yes</dd></div></dl><button class="button secondary wide" type="button" data-toast="Deposit receipt opened">View receipt</button></article>
+              <article class="card payment-plan"><div class="card-heading"><div><span class="eyebrow">Payment schedule</span><h3>Three installments</h3></div><span class="status-badge warning">Not enrolled</span></div><div class="installment current"><span>1</span><div><strong>June 15, 2026</strong><small>First installment</small></div><b>$3,360</b></div><div class="installment"><span>2</span><div><strong>July 15, 2026</strong><small>Second installment</small></div><b>$3,360</b></div><div class="installment"><span>3</span><div><strong>August 15, 2026</strong><small>Final installment</small></div><b>$3,360</b></div><button class="button primary wide" type="button" data-toast="Payment-plan guidance opened">Send payment-plan guidance</button></article>
+              <article class="card financial-context span-2"><div><span class="eyebrow">Staff context</span><h3>Financial readiness notes</h3><p>The student opened the award notification and accepted both federal loans. No verification documents are outstanding. Family payment plan enrollment has not started.</p></div><div class="context-actions"><button class="button secondary" type="button" data-go-tab="notes">View financial notes</button><button class="button primary" type="button" data-toast="Financial aid message composer opened"><svg><use href="#i-mail"></use></svg> Send guidance</button></div></article>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -75,6 +75,7 @@ import { InstitutionProfileView } from "./institution-profile/institution-profil
 import { MorningBrewView } from "./morning-brew/morning-brew";
 import { NotificationCenter } from "./notification-center";
 import { connectStaffRealtime, type StaffRealtimeEvent } from "./staff-realtime";
+import { Student360Workspace } from "./student-360";
 import {
   buildActionCenterQuery,
   emptyTaskBoardFilters,
@@ -94,6 +95,7 @@ type StaffView =
   | "morning_brew"
   | "overview"
   | "tasks"
+  | "student_360"
   | "students"
   | "journeys"
   | "outreach"
@@ -201,6 +203,7 @@ const viewOrder: StaffView[] = [
   "morning_brew",
   "overview",
   "tasks",
+  "student_360",
   "students",
   "journeys",
   "outreach",
@@ -221,16 +224,20 @@ interface StaffNavItem {
 }
 
 /**
- * The three views the workspace is actually worked from, always in sight.
+ * The four views the workspace is actually worked from, always in sight.
  *
  * Everything else the portal can open still exists and still routes; it sits
  * under one fold below, closed until asked for, so the sidebar reads as the
- * day's three places rather than thirteen of equal weight.
+ * day's four places rather than fourteen of equal weight. Student 360 sits
+ * last of the four because it is where the other three send you: the brief
+ * names a student, the queue and the board carry their work, and this is the
+ * record you open to answer for any of it.
  */
 const primaryNavigation: StaffNavItem[] = [
   { id: "morning_brew", label: "Morning Brew", icon: "\u2726" },
   { id: "outreach", label: "Action center", icon: "\u2197" },
   { id: "tasks", label: "Task board", icon: "\u2713", badge: "tasks" },
+  { id: "student_360", label: "Student 360", icon: "\u25CE" },
 ];
 
 const developingNavigation: StaffNavItem[] = [
@@ -295,6 +302,12 @@ const viewCopy: Record<
     title: "Task board",
     description:
       "Coordinate student work Jira-style, assign owners, and keep every colleague on the same shared record.",
+  },
+  student_360: {
+    eyebrow: "One student, whole",
+    title: "Student 360",
+    description:
+      "Every side of one student in one record — application, enrollment, aid, academics, campus life, documents, and the staff work and conversations attached to them.",
   },
   students: {
     eyebrow: "Student operations",
@@ -4550,6 +4563,15 @@ function StaffWorkspaceShell({
             initialQuery={taskBoardRequest?.query ?? null}
             onDetailClosed={() => setRequestedWorkItemId(null)}
           />
+        ) : view === "student_360" ? (
+          <>
+            <PageHeading view="student_360" />
+            <Student360Workspace
+              workspace={workspace}
+              refresh={refresh}
+              onOpenWorkItem={openWorkItem}
+            />
+          </>
         ) : view === "students" ? (
           <StudentsView
             key={`students:${globalSearch}`}
