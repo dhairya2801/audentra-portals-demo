@@ -374,6 +374,11 @@ export interface BrewRequest {
   receivedLabel: string;
   waitingLabel: string;
   assigneeName: string | null;
+  /**
+   * The reply Edward offers beside this message, written to this message.
+   * A draft, not a record: the reader edits it and sends it from Messages.
+   */
+  draftReply: string;
   destination: MorningBrewDestination;
 }
 

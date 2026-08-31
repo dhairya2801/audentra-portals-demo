@@ -727,12 +727,25 @@ export function MorningBrewDetail({
               "The one thing to do before you walk in",
               meeting.prep,
               "",
-              "In the room",
-              meeting.attendees.map((name) => `· ${name}`).join("\n"),
+              "Numbers to have ready",
+              "· Deposits 2,450 of 3,200, with 11 days to the May 31 deadline",
+              "· 324 verification files open; 88 of them waiting on our own review",
+              "· Commuter deposit rate 46.4%, down 6.4 points in seven days",
+              "· Transfer applications 2,604, 14% ahead of last year",
+              "",
+              "The question you will be asked",
+              meeting.organizer
+                ? "“What do you need from us today?” — have the ask ready in one sentence, with the number behind it."
+                : "“Where does the entering class land?” — give the range, 3,050 to 3,240, and say what closes it.",
+              "",
+              "What to leave with",
+              meeting.organizer
+                ? "A named owner for the verification queue and agreement to hold the May 31 date."
+                : "A decision, or a date by which the decision will be made. Not another meeting.",
               "",
               meeting.organizer
                 ? "You are hosting. Open on the decision you need rather than the recap — everyone here has already read the numbers."
-                : "Somebody else is hosting. You are there for the enrolment answer, so keep yours to two minutes and offer the detail after.",
+                : "Somebody else is hosting. Keep your part to two minutes and offer the detail afterwards.",
             ].join("\n")}
             onAskEdward={onAskEdward}
             askContext={`the ${meeting.title} meeting at ${meeting.timeLabel}`}
@@ -797,23 +810,7 @@ export function MorningBrewDetail({
               request.unread ? "It is still unread." : "It has been opened but not answered."
             } Here is a reply you can send.`}
             draftHint="Edward's draft — read it before you send it"
-            draft={[
-              `Hi ${salutationFor(request.fromName)},`,
-              "",
-              request.unread
-                ? "Thanks for this, and apologies for the slow reply — it reached me at the end of yesterday."
-                : "Thanks for the nudge. I have had a proper look now.",
-              "",
-              request.assigneeName
-                ? `${request.assigneeName} has it, and I have asked for a date rather than another status update.`
-                : "I am putting a name against it today rather than leaving it sitting in the queue.",
-              "",
-              "The honest position: I would rather give you a number I can stand behind than one that moves again next week. You will have it by Friday, and if anything shifts before then I will write rather than let the date pass quietly.",
-              "",
-              "If it is quicker to talk it through, I have half an hour on Thursday afternoon.",
-              "",
-              "Vivian",
-            ].join("\n")}
+            draft={request.draftReply}
             onAskEdward={onAskEdward}
             askContext={`the email from ${request.fromName} about ${request.subject}`}
           />

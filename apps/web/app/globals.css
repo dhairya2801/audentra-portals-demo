@@ -5285,7 +5285,11 @@
   cursor: pointer;
 }
 
-.edward-launcher > span:last-child {
+/* The launcher's label, when it is a span carrying two lines. The mark is a
+   span too, and on the launchers that carry a bare text label it is also the
+   last one — this rule would then override its own centring and drive the E
+   into the corner, so the mark is excluded by name. */
+.edward-launcher > span:last-child:not(.edward-mark) {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -21344,7 +21348,7 @@ a {
    history and runs the whole axis in grey, this year is measured and carries
    the card's colour, and the forecast is arithmetic on the current pace, so it
    is dotted and starts on today's point rather than beside it. */
-.brew-kpi__chart { margin-top: 0.65rem; margin-bottom: 0.15rem; }
+.brew-kpi__chart { flex: 1 1 auto; min-height: 0; margin-top: 0.65rem; margin-bottom: 0.15rem; }
 .brew-kpi__chart svg { display: block; width: 100%; height: 3.6rem; }
 .brew-trend { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .brew-trend--previous { stroke: #c3cad8; stroke-width: 1.4; }
@@ -21365,7 +21369,9 @@ a {
    amber is close enough to still move, red is not going to get there. */
 .brew-kpi__projection {
   display: grid; gap: 0.02rem; align-self: end; width: max-content; max-width: 100%;
-  margin: 0.05rem 0 0.45rem auto; padding: 0.32rem 0.45rem;
+  /* The chart above takes the slack, so this sits at the same height on every
+     card even where the movement cluster is a line shorter. */
+  margin: 0 0 0.45rem auto; padding: 0.32rem 0.45rem;
   border: 1px solid; border-radius: 0.45rem; text-align: right;
 }
 .brew-kpi__projection small { font-size: 0.52rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }

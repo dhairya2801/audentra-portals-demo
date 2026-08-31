@@ -1587,6 +1587,8 @@ export const DEMO_REQUESTS: BrewRequest[] = [
     receivedLabel: "9:00 PM",
     waitingLabel: "Waiting since last night",
     assigneeName: null,
+        draftReply:
+      "Marcus,\n\nYes to the $240K, with one condition.\n\nMoving it out of the summer campaign costs us about 40 inquiries at the top of the funnel. I will take that trade, because the commuter cohort is where we are actually losing the class — the deposit rate there fell 6.4 points in a week and 312 of those students are sitting behind an aid file, not a decision.\n\nThe number for the packet: $240K reallocated, 82 deposits at risk, $1.6M of net tuition behind them. I would rather write it as \"protects up to $1.6M\" than promise a recovery figure we cannot evidence.\n\nYou will have it Friday morning, before the packet closes.\n\nVivian",
     destination: "messages",
   },
   {
@@ -1604,6 +1606,8 @@ export const DEMO_REQUESTS: BrewRequest[] = [
     receivedLabel: "6:30 AM",
     waitingLabel: "Waiting 1 hour",
     assigneeName: null,
+        draftReply:
+      "Eleanor,\n\nA range is the right call, and I would have asked for one.\n\nFor June I will bring 3,050 to 3,240 on the entering class. The spread is the commuter cohort: 494 admits without a deposit, 312 of them waiting on verification. If the aid queue clears by June 6 we land at the top of that; if it does not, the bottom.\n\nI will bring the two assumptions written out so the finance committee can push on them rather than take the range on trust.\n\nSend me the slide template when you have it and I will fit it to that.\n\nVivian",
     destination: "messages",
   },
   {
@@ -1621,6 +1625,8 @@ export const DEMO_REQUESTS: BrewRequest[] = [
     receivedLabel: "6:45 AM",
     waitingLabel: "Waiting 45 minutes",
     assigneeName: "Dana Ruiz",
+        draftReply:
+      "Dana,\n\nYes — do the two, and make them the two with the deepest files rather than the two that are easiest to staff.\n\nThe constraint is not the evenings, it is what happens after. Credit evaluations are running nine days behind the application date, so an event that produces fifty interested transfers before June 15 produces fifty people waiting on a number we cannot give them. I am funding an extra evaluator through the same date to cover it.\n\nBook them, and copy me on the invitation so I can come to the first one.\n\nVivian",
     destination: "messages",
   },
   {
@@ -1638,6 +1644,8 @@ export const DEMO_REQUESTS: BrewRequest[] = [
     receivedLabel: "7:15 AM",
     waitingLabel: "Waiting 15 minutes",
     assigneeName: null,
+        draftReply:
+      "Camille,\n\nThat order works. Two things from me so he is not surprised.\n\nOn the scholarship reallocation I am saying yes to the $240K and I will have the figure to him Friday.\n\nOn the entering class I will bring a range rather than a single number — 3,050 to 3,240 — because the spread is real and it closes when the verification queue does. Finance has asked for the same, so the two conversations should hear the same answer.\n\nFifteen minutes would do it if he is short.\n\nVivian",
     destination: "messages",
   },
   {
@@ -1655,6 +1663,8 @@ export const DEMO_REQUESTS: BrewRequest[] = [
     receivedLabel: "6:12 AM",
     waitingLabel: "Waiting 1 hour",
     assigneeName: null,
+        draftReply:
+      "Rachel,\n\nUnderstood, and you will have it before the 2nd.\n\nThe range is $104.6M to $109.8M against the $110.0M plan line. Three assumptions sit under it, and they are the ones worth arguing with:\n\nOne, the entering class lands between 3,050 and 3,240. Two, net tuition holds at $19,500 per enrolled student — if the merit bands move on the 720 unreleased packages that number rises and the range moves with it. Three, melt runs at last cycle's rate; orientation registration says it may run worse.\n\nI would rather show you the workings than the point estimate. Half an hour on Monday?\n\nVivian",
     destination: "messages",
   },
   {
@@ -1672,6 +1682,8 @@ export const DEMO_REQUESTS: BrewRequest[] = [
     receivedLabel: "5:58 AM",
     waitingLabel: "Waiting 2 hours",
     assigneeName: null,
+        draftReply:
+      "Hana,\n\nApproved. Take the two reviewers through June 6 and start Monday.\n\nClearing 210 in a week and still watching the queue grow is the argument, not a failure — 38 arriving against 30 cleared is arithmetic and no amount of pushing fixes it from inside the team.\n\nTwo asks. Put the 312 undeposited commuter files at the front, because those are the ones costing us deposits rather than time. And report the queue against arrivals from now on, not against its own size, so a good week stops reading like a bad one.\n\nCome to me directly if the June 6 date starts slipping.\n\nVivian",
     destination: "messages",
   },
   {
@@ -1689,6 +1701,8 @@ export const DEMO_REQUESTS: BrewRequest[] = [
     receivedLabel: "Yesterday 4:40 PM",
     waitingLabel: "Waiting 15 hours",
     assigneeName: "Priya Raman",
+        draftReply:
+      "Priya,\n\nSend the question. You are right that most of them do not need a bed.\n\nSend it to the 261 commuter admits only, keep it to one line, and make it genuinely yes-or-no — anything longer and we will be chasing answers instead of releasing rooms. Release whatever comes back negative straight away rather than holding it to the deadline.\n\nThat should leave you about 171 to actually assign, which is a week of work rather than a month of it. If the number comes back much higher than that, tell me before you start assigning.\n\nVivian",
     destination: "messages",
   },
   {
@@ -1706,6 +1720,8 @@ export const DEMO_REQUESTS: BrewRequest[] = [
     receivedLabel: "Yesterday 2:15 PM",
     waitingLabel: "Waiting 17 hours",
     assigneeName: "Imani Brooks",
+        draftReply:
+      "Imani,\n\nThank you for showing me first — you were right to.\n\nDo not frame it as a move. Offer Session 6 as a choice, say plainly that Session 3 is full, and give them a date to reply by. Families who picked Session 3 for a reason will tell you, and the ones who picked it because it was first on the list will happily take the swap.\n\nThen use the same mail-out to reach the 946 deposited students who have not registered at all. That group worries me more than the 44 — unregistered students melt at roughly twice the rate.\n\nSend me the draft and I will turn it round the same day.\n\nVivian",
     destination: "campus_life",
   },
   {
@@ -1723,6 +1739,8 @@ export const DEMO_REQUESTS: BrewRequest[] = [
     receivedLabel: "Yesterday 11:05 AM",
     waitingLabel: "Waiting 20 hours",
     assigneeName: "Alicia Moreno",
+        draftReply:
+      "Alicia,\n\n$4.10 against $1.60 is not a rounding difference, so yes — reallocate before the buy is committed.\n\nMove the spend to GA and NC and hold the other three markets flat rather than cutting them to zero; one cycle of data is enough to shift weight, not enough to abandon a market we may want next year.\n\nWhat I need before I take it further: the same figures with the commuter and residential splits separated. If the return is concentrated in commuter students it changes where the scholarship money goes, not just where the marketing does.\n\nGood piece of work. Send it through and I will put it in front of the provost.\n\nVivian",
     destination: "outreach",
   },
 ];
