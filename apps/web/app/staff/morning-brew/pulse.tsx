@@ -292,7 +292,21 @@ function PulseCard({
         </span>
       ) : null}
 
-      {showChart ? <p className="brew-kpi__note">{kpi.trendNote}</p> : null}
+      {/* Deep Dive answers "where is this heading" with the figure and a
+          colour, not a sentence: the projection the drawn pace reaches, and
+          whether that clears the target printed above it. */}
+      {showChart && kpi.projection ? (
+        <span
+          className={`brew-kpi__projection is-${kpi.projection.status.replaceAll("_", "-")}`}
+          title={kpi.trendNote}
+        >
+          <small>Projected</small>
+          <strong>{kpi.projection.display}</strong>
+          <em>{kpi.projection.byLabel}</em>
+        </span>
+      ) : showChart ? (
+        <p className="brew-kpi__note">{kpi.trendNote}</p>
+      ) : null}
     </div>
   );
 }

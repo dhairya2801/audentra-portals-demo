@@ -246,12 +246,18 @@ function NewsSection({
                   {item.title}
                 </a>
               </h3>
+              {/* Read time carries the same clock the hero's does, so the two
+                  places that estimate a read look like one habit. */}
               {level === "glance" ? (
-                <p className="brew-news-card__read">{item.readMinutes} min read</p>
+                <p className="brew-news-card__read">
+                  <Glyph name="clock" size={11} /> {item.readMinutes} min read
+                </p>
               ) : (
                 <>
                   <p className="brew-news-card__bearing">{item.bearing}</p>
-                  <p className="brew-news-card__read">{item.readMinutes} min read</p>
+                  <p className="brew-news-card__read">
+                    <Glyph name="clock" size={11} /> {item.readMinutes} min read
+                  </p>
                 </>
               )}
             </div>
@@ -297,7 +303,7 @@ const MEETING_VIEWS: PanelView<BrewMeeting>[] = [
   },
   {
     id: "mine",
-    label: "Mine",
+    label: "Hosted",
     empty: "You are not the organizer of anything today.",
     filter: (meeting) => meeting.organizer,
   },

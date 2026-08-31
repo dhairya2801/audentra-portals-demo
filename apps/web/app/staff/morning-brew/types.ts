@@ -271,6 +271,21 @@ export interface BrewKpi {
   dueLabel: string | null;
   /** One line under the progress bar, at Deep Dive, reading the trend. */
   trendNote: string;
+  /**
+   * Where the current pace lands, and whether that clears the target.
+   *
+   * Deep Dive shows this instead of the trend sentence: a reader who asked for
+   * trajectory wants the number the line is heading for and a colour saying
+   * whether to worry, not a paragraph they have to parse. `status` is the
+   * corpus's own reading against `target`, not something the card computes.
+   */
+  projection: {
+    /** The figure the pace reaches, as the card prints it: "4,470", "$104.6M". */
+    display: string;
+    /** When it lands: "by May 1". */
+    byLabel: string;
+    status: "on_track" | "at_risk" | "off_target";
+  } | null;
   cohort: StaffBrewCohortRef;
   /** Empty where nothing can be compared against; the card then says so. */
   comparisons: BrewKpiComparison[];

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AudentraLogo } from "./components/audentra-logo";
 
 export default function PortalLandingPage() {
   return (
@@ -7,11 +8,7 @@ export default function PortalLandingPage() {
       <div className="portal-landing__glow portal-landing__glow--two" aria-hidden="true" />
 
       <header className="portal-landing__header">
-        <img
-          className="audentra-logo"
-          src="/audentra-logo.png"
-          alt="Audentra"
-        />
+        <AudentraLogo height={40} />
         <span>Higher Education Intelligence Platform</span>
       </header>
 

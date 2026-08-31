@@ -175,6 +175,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     dueLabel: "Due by Jun 30",
     trendNote:
       "Last week's pace reaches 16,040 by month end — short of 20,000.",
+    projection: { display: "16,040", byLabel: "by Jun 30", status: "off_target" },
     cohort: cohortOf(
       "applications",
       "Fall 2025 applicants",
@@ -219,6 +220,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     dueLabel: "Due by Jun 15",
     trendNote:
       "At roughly 65 decisions a day the round closes near 6,710, short of 8,500.",
+    projection: { display: "6,710", byLabel: "by Jun 15", status: "off_target" },
     cohort: cohortOf(
       "admits",
       "admitted students",
@@ -262,6 +264,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     dueLabel: "Due by May 31",
     trendNote:
       "Flat for six days; the current pace reaches about 2,716 by May 31.",
+    projection: { display: "2,716", byLabel: "by May 31", status: "at_risk" },
     cohort: cohortOf(
       "deposit_paid",
       "students with a posted deposit",
@@ -306,6 +309,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     dueLabel: "Due by May 31",
     trendNote:
       "Admits are growing faster than deposits, so the rate falls even on days the count rises.",
+    projection: { display: "38.4%", byLabel: "by May 31", status: "at_risk" },
     cohort: cohortOf(
       "deposit_rate",
       "admitted students by deposit state",
@@ -349,6 +353,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     dueLabel: "Due by Aug 15",
     trendNote:
       "This line tracks deposits with a two-day lag; the current pace lands near $104.6M.",
+    projection: { display: "$104.6M", byLabel: "by Aug 15", status: "at_risk" },
     cohort: cohortOf(
       "net_tuition",
       "enrolled students by aid package",
@@ -393,6 +398,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     dueLabel: "Due by Aug 15",
     trendNote:
       "Held within half a point for nine days; the 26.0% target needs 140 more deposits.",
+    projection: { display: "25.4%", byLabel: "by Aug 15", status: "at_risk" },
     cohort: cohortOf(
       "yield",
       "admitted students projected to enrol",
@@ -437,6 +443,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     dueLabel: "Target met May 14",
     trendNote:
       "Past target six days ago and still climbing, 14% ahead of last year.",
+    projection: { display: "2,810", byLabel: "by Jun 30", status: "on_track" },
     cohort: cohortOf(
       "transfer_applications",
       "transfer applicants",
@@ -482,6 +489,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     dueLabel: null,
     trendNote:
       "At 30 cleared a day against 38 arriving, the queue reaches roughly 372 by month end.",
+    projection: { display: "372", byLabel: "by May 31", status: "off_target" },
     cohort: cohortOf(
       "verification_open",
       "students with an open verification file",
@@ -526,6 +534,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     dueLabel: "Due by Jun 6",
     trendNote:
       "Packaging runs at about 30 a day; the June 6 date needs 43.",
+    projection: { display: "1,880", byLabel: "by Jun 6", status: "at_risk" },
     cohort: cohortOf(
       "aid_packaged",
       "students with a released aid package",
@@ -570,6 +579,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     dueLabel: "Due by Jun 1",
     trendNote:
       "About 25 a day with 11 days left, which reaches 1,402 of the 1,600.",
+    projection: { display: "1,402", byLabel: "by May 31", status: "at_risk" },
     cohort: cohortOf(
       "housing_signed",
       "students with a signed housing contract",
@@ -613,6 +623,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     dueLabel: "Due by Jun 17",
     trendNote:
       "61% of deposited students are registered with four weeks to go.",
+    projection: { display: "2,180", byLabel: "by Jun 17", status: "at_risk" },
     cohort: cohortOf(
       "orientation_registered",
       "deposited students registered for orientation",
@@ -656,6 +667,7 @@ export const DEMO_KPIS: BrewKpi[] = [
     dueLabel: "Due by Jun 30",
     trendNote:
       "Weekday visits hold steady; weekend events run 12% behind last year.",
+    projection: { display: "4,470", byLabel: "by Jun 1", status: "on_track" },
     cohort: cohortOf(
       "campus_visits",
       "students who have visited campus",

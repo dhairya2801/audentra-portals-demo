@@ -35,7 +35,7 @@ import { isParentPortalPath, parentPortalHref } from "../lib/parent-portal-route
 import Icon from "../design-system/Icon.jsx";
 import Avatar from "../design-system/primitives/Avatar.jsx";
 import { IconButton } from "../design-system/primitives/Button.jsx";
-import AudentraMark from "../design-system/marks/AudentraMark.jsx";
+import { AudentraLogo } from "./audentra-logo";
 import Popover from "../design-system/patterns/Popover.jsx";
 import {
   NAV,
@@ -956,7 +956,7 @@ export function PortalShell({
             </div>
           )}
           <p className="powered-by">
-            Powered by <AudentraMark height={13} /> <strong>Audentra</strong>
+            Powered by <AudentraLogo height={16} />
           </p>
         </div>
       </aside>

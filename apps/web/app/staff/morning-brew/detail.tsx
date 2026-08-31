@@ -1,7 +1,7 @@
 "use client";
 
 import type { StaffActionCenterQuery } from "@vv/contracts";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { topicById } from "./catalog";
 import { formatBrewNumber } from "./data";
@@ -121,6 +121,7 @@ function DetailShell({
   meta,
   actions,
   children,
+  aside,
   onBack,
 }: {
   eyebrow: string;
@@ -131,6 +132,8 @@ function DetailShell({
   meta?: React.ReactNode;
   actions?: React.ReactNode;
   children: React.ReactNode;
+  /** The right column: Edward's read of this item, and what he can draft for it. */
+  aside?: React.ReactNode;
   onBack: () => void;
 }) {
   const panel = useRef<HTMLDivElement | null>(null);
@@ -181,9 +184,119 @@ function DetailShell({
         </header>
         {meta ? <div className="brew-detail__meta">{meta}</div> : null}
         {actions ? <div className="brew-detail__actions">{actions}</div> : null}
-        <div className="brew-detail__body">{children}</div>
+        {aside ? (
+          <div className="brew-detail__split">
+            <div className="brew-detail__body">{children}</div>
+            {aside}
+          </div>
+        ) : (
+          <div className="brew-detail__body">{children}</div>
+        )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Edward's column beside an item from the day.
+ *
+ * The left column is the record: who is in the meeting, what the student wrote,
+ * what the queue holds. This column is the assistant's read of it and the thing
+ * he can hand over — a reply, a prep sheet, a plan — in a box the reader edits
+ * before they use it. The text is Edward's draft, not the record, so it is
+ * always editable and never saved anywhere on their behalf.
+ */
+function EdwardInsights({
+  read,
+  points,
+  draftLabel,
+  draftHint,
+  draft,
+  onAskEdward,
+  askContext,
+}: {
+  read: string;
+  points: string[];
+  draftLabel: string;
+  draftHint: string;
+  draft: string;
+  onAskEdward: (request: EdwardRequest) => void;
+  askContext: string;
+}) {
+  const [text, setText] = useState(draft);
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <aside className="brew-detail__aside" aria-label="Edward Insights">
+      <header className="brew-insights-head">
+        <span className="brew-insights-mark" aria-hidden="true">
+          E
+        </span>
+        <div>
+          <p className="brew-eyebrow">Edward Insights</p>
+          <strong>{draftLabel}</strong>
+        </div>
+      </header>
+
+      <p className="brew-insights-read">{read}</p>
+
+      {points.length ? (
+        <ul className="brew-insights-points">
+          {points.map((point) => (
+            <li key={point}>{point}</li>
+          ))}
+        </ul>
+      ) : null}
+
+      <label className="brew-insights-draft">
+        <span>{draftHint}</span>
+        <textarea
+          value={text}
+          rows={10}
+          spellCheck
+          onChange={(event) => {
+            setText(event.target.value);
+            setCopied(false);
+          }}
+        />
+      </label>
+
+      <div className="brew-insights-actions">
+        <button
+          className="button button--secondary"
+          type="button"
+          onClick={() => {
+            void navigator.clipboard?.writeText(text).then(
+              () => setCopied(true),
+              () => setCopied(false),
+            );
+          }}
+        >
+          {copied ? "Copied" : "Copy"}
+        </button>
+        <button
+          className="button button--secondary"
+          type="button"
+          onClick={() => {
+            setText(draft);
+            setCopied(false);
+          }}
+        >
+          Reset
+        </button>
+        <button
+          className="button button--primary"
+          type="button"
+          onClick={() => onAskEdward({ mode: "ask", context: askContext })}
+        >
+          Ask Edward
+        </button>
+      </div>
+
+      <p className="brew-insights-note">
+        Edward drafts; nothing here is sent, and nothing is saved to the record.
+      </p>
+    </aside>
   );
 }
 
@@ -566,7 +679,36 @@ export function MorningBrewDetail({
             </span>
           </>
         }
-        actions={openWorkspace(meeting.destination)}
+        actions={
+          <button
+            className="button button--primary"
+            type="button"
+            onClick={() => navigate(meeting.destination)}
+          >
+            Open Outlook <span aria-hidden="true">→</span>
+          </button>
+        }
+        aside={
+          <EdwardInsights
+            read={`A ${meeting.durationMinutes}-minute meeting with ${meeting.attendees.length} ${
+              meeting.attendees.length === 1 ? "guest" : "guests"
+            } at ${meeting.timeLabel}. Here is what to walk in knowing.`}
+            points={[
+              meeting.prep,
+              `Guests: ${meeting.attendees.slice(0, 3).join(", ")}${
+                meeting.attendees.length > 3 ? ` +${meeting.attendees.length - 3} more` : ""
+              }`,
+              meeting.organizer
+                ? "You are hosting, so the agenda is yours to set."
+                : "Somebody else is hosting; you are there to answer on the numbers.",
+            ]}
+            draftLabel="Prep me for this meeting"
+            draftHint="Your prep sheet — edit before you walk in"
+            draft={`${meeting.title} — ${meeting.timeLabel}\n\nWhat this meeting is for\n${meeting.detail}\n\nWhat I need to say\n· ${meeting.prep}\n\nNumbers to have ready\n· Deposits 2,450 of 3,200, 11 days to the deadline\n· 324 verification files open; 88 waiting on our review\n· Transfer applications 14% ahead of last year\n\nWhat I want to leave with\n· A named owner for the verification queue\n· Agreement to hold the May 31 date`}
+            onAskEdward={onAskEdward}
+            askContext={`the ${meeting.title} meeting at ${meeting.timeLabel}`}
+          />
+        }
       >
         <p className="brew-detail__lede">{meeting.detail}</p>
         <section className="brew-detail__section">
@@ -587,7 +729,7 @@ export function MorningBrewDetail({
             <li>An accepted invitation on your calendar for today</li>
             <li>
               {meeting.organizer
-                ? "You are the organizer, so it appears under Mine"
+                ? "You are the organizer, so it appears under Hosted"
                 : "Organized by somebody else and accepted by you"}
             </li>
             <li>Priority is the invitation&rsquo;s own, not a score we computed</li>
@@ -619,6 +761,25 @@ export function MorningBrewDetail({
           </>
         }
         actions={openWorkspace("messages")}
+        aside={
+          <EdwardInsights
+            read={`${request.fromName} (${request.fromRole}) wrote ${request.receivedLabel}. ${
+              request.assigneeName
+                ? `${request.assigneeName} owns the thread.`
+                : "Nobody owns the thread yet."
+            }`}
+            points={[
+              request.summary,
+              request.unread ? "Still unread — no reply has gone out." : "Opened, not yet answered.",
+              "The canonical thread lives in Messages; this draft is not saved there.",
+            ]}
+            draftLabel="Draft a reply"
+            draftHint="Edward's draft — edit it before you send anything"
+            draft={`Hi ${request.fromName.split(" ")[0]},\n\nThank you for writing — you are asking the right question, and here is where it stands.\n\n${request.summary}\n\nWhat happens next: I have put this in front of the team that owns it today, and you will have a firm date from us within two working days. If anything changes before then I will write again rather than wait.\n\nIf it is easier to talk it through, I have time this week and am happy to call.\n\nBest regards,\nVivian Hale\nVice President for Enrollment Management`}
+            onAskEdward={onAskEdward}
+            askContext={`the email from ${request.fromName} about ${request.subject}`}
+          />
+        }
       >
         <p className="brew-detail__lede">{request.summary}</p>
         <section className="brew-detail__section">
@@ -659,6 +820,31 @@ export function MorningBrewDetail({
           </>
         }
         actions={openWorkspace(priority.destination, priority.boardQuery)}
+        aside={
+          <EdwardInsights
+            read={`${formatBrewNumber(priority.count)} in this queue, ${priority.window.toLowerCase()}. ${
+              priority.ownedByReader
+                ? "It is yours to move."
+                : "Somebody else owns the move; yours is to report it."
+            }`}
+            points={[
+              priority.detail,
+              ...priority.steps.slice(0, 2),
+              ...priority.breakdown.slice(0, 2).map((row) => `${row.label}: ${row.value}`),
+            ]}
+            draftLabel="Work this queue"
+            draftHint="A plan you can paste into the task, edited as you like"
+            draft={`${priority.title}\n\nWhere it stands\n${priority.detail}\n\nThe move\n${priority.steps
+              .map((step) => `· ${step}`)
+              .join("\n")}\n\nWhat the queue is made of\n${priority.breakdown
+              .map((row) => `· ${row.label}: ${row.value}`)
+              .join("\n")}\n\nWho and when\n· Owner: ${
+              priority.ownedByReader ? "me" : "the office that holds the queue"
+            }\n· Window: ${priority.window}\n· Report back at the next stand-up`}
+            onAskEdward={onAskEdward}
+            askContext={`the ${priority.title} queue`}
+          />
+        }
       >
         <p className="brew-detail__lede">{priority.detail}</p>
 

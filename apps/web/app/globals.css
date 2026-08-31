@@ -12262,9 +12262,16 @@ a {
 
 .staff-board {
   display: grid;
-  grid-template-columns: repeat(3, minmax(14rem, 1fr));
+  /* One track per visible column, however many that is. The tracks stretch to
+     fill the board, so the row is centred by construction; centring it with
+     `justify-content` instead clips the first column the moment the columns
+     overflow, which is what happens the second a sixth status is shown. */
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(14rem, 1fr);
   gap: 0.8rem;
+  width: 100%;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
 }
 
 .staff-board-column {
@@ -13150,6 +13157,21 @@ a {
   text-align: left;
   cursor: pointer;
 }
+
+/* The Developing fold: everything the workspace can open that the day does not
+   start in. The toggle is a nav row like the others, so the sidebar keeps one
+   rhythm; only its sign and count say it is a fold rather than a destination. */
+.staff-sidebar__developing { margin-top: 0.5rem; padding-top: 0.65rem; border-top: 1px solid rgb(255 255 255 / 8%); }
+.staff-sidebar--workspace nav .staff-sidebar__fold { color: #93a3bd; }
+.staff-sidebar--workspace nav .staff-sidebar__fold strong { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.01em; }
+.staff-sidebar--workspace nav .staff-sidebar__fold > span { font-size: 0.82rem; font-weight: 700; }
+.staff-sidebar--workspace nav .staff-sidebar__fold > i {
+  min-width: 1.15rem; padding: 0 0.3rem; border-radius: 999px;
+  background: rgb(255 255 255 / 9%); color: #b9c5d8;
+  font-size: 0.56rem; font-style: normal; font-weight: 800; text-align: center;
+}
+.staff-sidebar--workspace nav .staff-sidebar__fold[aria-expanded="true"] { color: #e6ecf6; }
+.staff-sidebar__developing > div { display: grid; gap: 0.23rem; margin-top: 0.2rem; }
 
 .staff-sidebar--workspace nav button:hover {
   background: rgb(255 255 255 / 6%);
@@ -15771,7 +15793,7 @@ a {
 .staff-task-board {
   height: var(--staff-task-workbench-height);
   min-height: 0;
-  padding: 0.35rem;
+  padding: 0.55rem;
   border: 1px solid #dfe5dd;
   border-radius: 1rem;
   background: rgb(232 236 230 / 72%);
@@ -21338,6 +21360,23 @@ a {
 .brew-trend-key .is-actual { color: #0f9174; }
 .brew-trend-key .is-forecast::before { border-top-style: dotted; }
 /* One sentence reading the line, which is the whole point of drawing it. */
+/* The projected-status block under a Deep Dive line: a figure, the date it
+   lands, and a colour that is the whole judgement. Green clears the target,
+   amber is close enough to still move, red is not going to get there. */
+.brew-kpi__projection {
+  display: grid; gap: 0.02rem; margin-top: 0.5rem; padding: 0.4rem 0.5rem;
+  border: 1px solid; border-radius: 0.45rem; text-align: left;
+}
+.brew-kpi__projection small { font-size: 0.52rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
+.brew-kpi__projection strong { font-size: 0.95rem; font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+.brew-kpi__projection em { color: #67718a; font-size: 0.55rem; font-style: normal; }
+.brew-kpi__projection.is-on-track { border-color: #b7e3cd; background: #f0fbf5; }
+.brew-kpi__projection.is-on-track small, .brew-kpi__projection.is-on-track strong { color: #0f7a54; }
+.brew-kpi__projection.is-at-risk { border-color: #f0dcae; background: #fffaef; }
+.brew-kpi__projection.is-at-risk small, .brew-kpi__projection.is-at-risk strong { color: #8a6300; }
+.brew-kpi__projection.is-off-target { border-color: #f0c9c4; background: #fff5f4; }
+.brew-kpi__projection.is-off-target small, .brew-kpi__projection.is-off-target strong { color: #b3251c; }
+
 .brew-kpi__note { margin: 0.5rem 0 0; color: #78829a; font-size: 0.58rem; line-height: 1.5; }
 /* padding-bottom is stated because the vendored `footer` rule reserves 76px of
    Edward corner at the foot of every footer element, which read as a hole
@@ -21446,7 +21485,8 @@ a {
 .brew-news-card__body { display: grid; gap: 0.32rem; min-width: 0; }
 .brew-news-card__byline { display: flex; justify-content: space-between; gap: 0.5rem; align-items: baseline; color: #78829a; font-size: 0.64rem; font-weight: 500; }
 .brew-news-card__byline b { color: #a2abbc; font-weight: 500; white-space: nowrap; }
-.brew-news-card__read { margin: 0; color: #98a1b3; font-size: 0.62rem; font-weight: 500; }
+.brew-news-card__read { display: inline-flex; gap: 0.28rem; align-items: center; margin: 0; color: #98a1b3; font-size: 0.62rem; font-weight: 500; }
+.brew-news-card__read svg { flex: none; color: #a9b2c2; }
 .brew-news-card h3 { margin: 0; color: var(--audentra-navy); font-size: 0.74rem; font-weight: 800; letter-spacing: -0.012em; line-height: 1.4; }
 .brew-news-card h3 a { color: inherit; text-decoration: none; }
 .brew-news-card h3 a:hover { color: var(--audentra-purple); text-decoration: underline; }
@@ -21867,6 +21907,38 @@ a {
 .brew-detail__meta { display: flex; flex-wrap: wrap; gap: 0.5rem 0.85rem; align-items: center; margin-top: 0.7rem; color: #78829a; font-size: 0.6rem; }
 .brew-detail__meta b { color: var(--audentra-navy); }
 .brew-detail__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.9rem; }
+/* The drill-down reads as two columns: the record on the left, Edward's read
+   and his draft on the right. Under 1000px they stack, record first, because
+   the record is what the reader came for. */
+.brew-detail__split { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(19rem, 0.95fr); gap: 1.4rem; align-items: start; }
+@media (max-width: 1000px) { .brew-detail__split { grid-template-columns: minmax(0, 1fr); } }
+
+.brew-detail__aside {
+  display: grid; gap: 0.7rem; padding: 1rem;
+  border: 1px solid #e2e0f6; border-radius: 0.85rem;
+  background: linear-gradient(180deg, #faf9ff, #fff);
+}
+.brew-insights-head { display: flex; gap: 0.6rem; align-items: center; }
+.brew-insights-mark {
+  display: grid; width: 1.85rem; height: 1.85rem; flex: none; place-items: center;
+  border-radius: 0.55rem; background: linear-gradient(145deg, var(--audentra-purple), var(--audentra-blue));
+  color: #fff; font-size: 0.8rem; font-weight: 900;
+}
+.brew-insights-head strong { display: block; color: var(--audentra-navy); font-size: 0.82rem; letter-spacing: -0.015em; }
+.brew-insights-read { margin: 0; color: #46506a; font-size: 0.72rem; line-height: 1.55; }
+.brew-insights-points { display: grid; gap: 0.3rem; margin: 0; padding-left: 0.95rem; color: #5f6a7e; font-size: 0.68rem; line-height: 1.5; }
+.brew-insights-points li::marker { color: var(--audentra-purple); }
+.brew-insights-draft { display: grid; gap: 0.3rem; }
+.brew-insights-draft > span { color: #78829a; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.brew-insights-draft textarea {
+  width: 100%; padding: 0.65rem 0.7rem; border: 1px solid #ddd8f4; border-radius: 0.55rem;
+  background: #fff; color: #2c3550; font-family: inherit; font-size: 0.7rem; line-height: 1.6; resize: vertical;
+}
+.brew-insights-draft textarea:focus-visible { outline: 3px solid rgb(106 56 255 / 18%); outline-offset: 1px; border-color: #b9a5ff; }
+.brew-insights-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.brew-insights-actions .button { padding: 0.4rem 0.7rem; font-size: 0.68rem; }
+.brew-insights-note { margin: 0; color: #98a1b3; font-size: 0.58rem; line-height: 1.5; }
+
 .brew-detail__body { margin-top: 1.2rem; padding-top: 1.1rem; border-top: 1px solid var(--audentra-line); }
 .brew-detail__body > p { margin: 0 0 0.8rem; color: #4d5870; font-size: 0.7rem; line-height: 1.7; }
 .brew-detail__lede { color: var(--audentra-navy) !important; font-size: 0.8rem !important; font-weight: 600; line-height: 1.6 !important; }

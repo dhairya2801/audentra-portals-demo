@@ -57,6 +57,7 @@ import {
   StudentInspector,
   WorkItemCard,
 } from "./staff-action-center";
+import { AudentraLogo } from "../components/audentra-logo";
 import { ActionCenterDetail } from "./action-center-detail";
 import {
   DEMO_INQUIRIES,
@@ -211,43 +212,37 @@ const viewOrder: StaffView[] = [
   "edward",
 ];
 
-const navigation: Array<{
+interface StaffNavItem {
+  id: StaffView;
   label: string;
-  items: Array<{
-    id: StaffView;
-    label: string;
-    icon: string;
-    badge?: "inquiries" | "tasks";
-  }>;
-}> = [
-  {
-    label: "Workspace",
-    items: [
-      { id: "morning_brew", label: "Morning Brew", icon: "✦" },
-      { id: "overview", label: "Today", icon: "⌂" },
-      { id: "outreach", label: "Action center", icon: "↗" },
-      { id: "tasks", label: "Task board", icon: "✓", badge: "tasks" },
-      { id: "students", label: "Students", icon: "S" },
-      { id: "messages", label: "Messages", icon: "M", badge: "inquiries" },
-    ],
-  },
-  {
-    label: "Student experience",
-    items: [
-      { id: "journeys", label: "Journeys", icon: "J" },
-      { id: "campus_life", label: "Campus life", icon: "C" },
-      { id: "academics", label: "Academics", icon: "A" },
-    ],
-  },
-  {
-    label: "Enablement",
-    items: [
-      { id: "institution_profile", label: "Institution profile", icon: "I" },
-      { id: "knowledge", label: "Knowledge base", icon: "K" },
-      { id: "core_plays", label: "Core plays", icon: "P" },
-      { id: "edward", label: "Edward", icon: "E" },
-    ],
-  },
+  icon: string;
+  badge?: "inquiries" | "tasks";
+}
+
+/**
+ * The three views the workspace is actually worked from, always in sight.
+ *
+ * Everything else the portal can open still exists and still routes; it sits
+ * under one fold below, closed until asked for, so the sidebar reads as the
+ * day's three places rather than thirteen of equal weight.
+ */
+const primaryNavigation: StaffNavItem[] = [
+  { id: "morning_brew", label: "Morning Brew", icon: "\u2726" },
+  { id: "outreach", label: "Action center", icon: "\u2197" },
+  { id: "tasks", label: "Task board", icon: "\u2713", badge: "tasks" },
+];
+
+const developingNavigation: StaffNavItem[] = [
+  { id: "overview", label: "Today", icon: "\u2302" },
+  { id: "students", label: "Students", icon: "S" },
+  { id: "messages", label: "Messages", icon: "M", badge: "inquiries" },
+  { id: "journeys", label: "Journeys", icon: "J" },
+  { id: "campus_life", label: "Campus life", icon: "C" },
+  { id: "academics", label: "Academics", icon: "A" },
+  { id: "institution_profile", label: "Institution profile", icon: "I" },
+  { id: "knowledge", label: "Knowledge base", icon: "K" },
+  { id: "core_plays", label: "Core plays", icon: "P" },
+  { id: "edward", label: "Edward", icon: "E" },
 ];
 
 const workColumns: Array<{
@@ -715,7 +710,21 @@ function TaskBoardView({
     () => ({ ...filters, query: debouncedQuery }),
     [filters, debouncedQuery],
   );
-  const activeQueryKey = JSON.stringify(buildActionCenterQuery(activeFilters, { offset: 0 }));
+  /**
+   * What the board actually asks for. The default status filter is "open",
+   * which is the four working columns; the board also shows Done, because that
+   * is the column a card is dragged into and the reader wants to see it land.
+   * So an "open" board asks for everything and renders the columns it wants —
+   * Cancelled stays behind an explicit choice in the status filter.
+   */
+  const boardFilters = useMemo(
+    () =>
+      activeFilters.status === "open"
+        ? { ...activeFilters, status: "all" as TaskStatusFilter }
+        : activeFilters,
+    [activeFilters],
+  );
+  const activeQueryKey = JSON.stringify(buildActionCenterQuery(boardFilters, { offset: 0 }));
 
   /**
    * Re-fetch everything the reader has loaded so far (at least one page), in
@@ -735,7 +744,7 @@ function TaskBoardView({
         for (let offset = 0; offset < target; offset += TASK_BOARD_MAX_LIMIT) {
           const limit = Math.min(TASK_BOARD_MAX_LIMIT, target - offset);
           envelope = demoActionCenter(
-            buildActionCenterQuery(activeFilters, { limit, offset }),
+            buildActionCenterQuery(boardFilters, { limit, offset }),
             staffRef.current,
           );
           collected.push(...envelope.items);
@@ -755,7 +764,7 @@ function TaskBoardView({
         setLoadState("error");
       }
     },
-    [activeFilters],
+    [boardFilters],
   );
 
   // A new query starts again from the first page.
@@ -783,7 +792,7 @@ function TaskBoardView({
     setLoadingMore(true);
     try {
       const envelope = demoActionCenter(
-        buildActionCenterQuery(activeFilters, {
+        buildActionCenterQuery(boardFilters, {
           limit: TASK_BOARD_PAGE_SIZE,
           offset: items.length,
         }),
@@ -814,6 +823,7 @@ function TaskBoardView({
   const itemsById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const visibleColumns = useMemo(() => {
     const statuses = new Set(visibleWorkStatuses(filters.status));
+    if (filters.status === "open") statuses.add("done");
     return workColumns.filter((column) => statuses.has(column.status));
   }, [filters.status]);
 
@@ -4232,35 +4242,54 @@ function StaffSidebar({
   const inquiries = workspace.inquiries.filter(
     (item) => item.status === "new",
   ).length;
+  const [developingOpen, setDevelopingOpen] = useState(
+    // A view opened by hash or deep link should not sit behind a closed fold.
+    () => developingNavigation.some((item) => item.id === view),
+  );
+  const badgeFor = (item: StaffNavItem) =>
+    item.badge === "tasks" ? openTasks : item.badge === "inquiries" ? inquiries : 0;
+
+  const navButton = (item: StaffNavItem) => {
+    const badge = badgeFor(item);
+    return (
+      <button
+        className={view === item.id ? "staff-sidebar__active" : undefined}
+        type="button"
+        aria-current={view === item.id ? "page" : undefined}
+        onClick={() => navigate(item.id)}
+        key={item.id}
+      >
+        <span aria-hidden="true">{item.icon}</span>
+        <strong>{item.label}</strong>
+        {badge > 0 ? <i>{badge}</i> : null}
+      </button>
+    );
+  };
+
   return (
     <aside className="staff-sidebar staff-sidebar--workspace">
       <nav aria-label="Staff workspace">
-        {navigation.map((group) => (
-          <section key={group.label}>
-            <p>{group.label}</p>
-            {group.items.map((item) => {
-              const badge =
-                item.badge === "tasks"
-                  ? openTasks
-                  : item.badge === "inquiries"
-                    ? inquiries
-                    : 0;
-              return (
-                <button
-                  className={view === item.id ? "staff-sidebar__active" : undefined}
-                  type="button"
-                  aria-current={view === item.id ? "page" : undefined}
-                  onClick={() => navigate(item.id)}
-                  key={item.id}
-                >
-                  <span aria-hidden="true">{item.icon}</span>
-                  <strong>{item.label}</strong>
-                  {badge > 0 ? <i>{badge}</i> : null}
-                </button>
-              );
-            })}
-          </section>
-        ))}
+        <section>
+          <p>Workspace</p>
+          {primaryNavigation.map(navButton)}
+        </section>
+
+        <section className="staff-sidebar__developing">
+          <button
+            className="staff-sidebar__fold"
+            type="button"
+            aria-expanded={developingOpen}
+            aria-controls="staff-nav-developing"
+            onClick={() => setDevelopingOpen((current) => !current)}
+          >
+            <span aria-hidden="true">{developingOpen ? "\u2212" : "+"}</span>
+            <strong>Developing</strong>
+            <i>{developingNavigation.length}</i>
+          </button>
+          <div id="staff-nav-developing" hidden={!developingOpen}>
+            {developingNavigation.map(navButton)}
+          </div>
+        </section>
       </nav>
       <div className="staff-sidebar__note">
         <strong>Institutional intelligence</strong>
@@ -4395,11 +4424,7 @@ function StaffWorkspaceShell({
           <span />
         </button>
         <div className="staff-brand">
-          <PortalMark />
-          <div>
-            <strong>Audentra</strong>
-            <span>Higher Education Intelligence</span>
-          </div>
+          <AudentraLogo height={30} />
         </div>
         <label className="staff-global-search">
           <span aria-hidden="true">⌕</span>
