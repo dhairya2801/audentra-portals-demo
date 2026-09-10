@@ -18,8 +18,10 @@ test('approved assets match every source-of-truth byte and contain no meeting at
 
 test('staff route keeps authenticated loading and canonical deep links around the approved mock', () => {
   const portal = readFileSync(new URL('../app/staff/staff-portal.tsx', import.meta.url), 'utf8');
-  assert.match(portal, /if \(view === "tasks" && !requestedWorkItemId\)/);
-  assert.match(portal, /return <ApprovedTaskBoard/);
+  assert.match(portal, /view === "tasks" && !requestedWorkItemId/);
+  assert.match(portal, /<ApprovedTaskBoard \/>/);
+  assert.match(portal, /<ApprovedBoardNavigation/);
+  assert.match(portal, /<Student360Workspace/);
   assert.match(portal, /initialWorkItemId=\{requestedWorkItemId\}/);
   assert.match(portal, /getStaffOperationsWorkspace/);
   const bridge = read('portal-bridge.js').toString();

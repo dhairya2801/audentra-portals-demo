@@ -1,0 +1,16 @@
+.frame { position: fixed; left: 15.25rem; top: 4.65rem; width: calc(100% - 15.25rem); height: calc(100dvh - 4.65rem); border: 0; z-index: 10; background: #f5f5f8; }
+.expanded { inset: 0; width: 100%; height: 100dvh; z-index: 100; }
+.tree { margin: 4px 0 10px 7px; padding-left: 5px; border-left: 1px solid #ffffff24; }
+.tree .space { display: flex; gap: 5px; align-items: center; width: 100%; min-height: 31px; padding: 5px 3px; background: transparent; border: 0; color: #d8e0ee; text-align: left; border-radius: 4px; }
+.tree .space > strong { font-size: 11px; font-weight: 600; }
+.tree .space .spaceIcon { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 4px; color: #c5b8ff; background: #c5b8ff15; }
+.tree .space .spaceIcon[data-color=blue] { color: #8bc4ff; background: #8bc4ff15; }
+.tree .space .spaceIcon[data-color=teal] { color: #84d6cf; background: #84d6cf15; }
+.tree .board { display: flex; gap: 5px; align-items: center; width: calc(100% - 18px); min-height: 29px; margin-left: 18px; padding: 5px 7px; border: 0; border-radius: 4px; background: transparent; color: #adbbd1; text-align: left; }
+.tree .board > span { width: auto; height: auto; background: transparent; border: 0; font-size: 10.5px; color: inherit; display: block; }
+.tree .board > small { margin-left: auto; font-size: 10px; color: #8da0be; }
+.tree .board.selected { color: #fff; background: #7665cf55; box-shadow: inset 2px 0 #b7aaff; }
+.tree .board.selected > small { color: #dbd3ff; }
+.tree .space:hover,.tree .board:hover { background: #ffffff12; }
+.tree button:focus-visible { outline: 2px solid #b7aaff; outline-offset: 1px; }
+@media (max-width: 900px) { .frame { left: 0; width: 100%; } .expanded { top: 0; height: 100dvh; } }

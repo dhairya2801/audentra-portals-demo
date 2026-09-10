@@ -31,7 +31,7 @@ import {
   useState,
 } from "react";
 import { DateTimePicker } from "../components/date-time-picker";
-import { ApprovedTaskBoard } from "./approved-task-board";
+import { ApprovedTaskBoard, ApprovedBoardNavigation } from "./approved-task-board";
 import { TenantLink as Link } from "../components/tenant-link";
 import { StaffEdwardAssistant } from "../components/staff-edward-assistant";
 import { PortalMark } from "../components/portal-ui";
@@ -4285,7 +4285,10 @@ function StaffSidebar({
       <nav aria-label="Staff workspace">
         <section>
           <p>Workspace</p>
-          {primaryNavigation.map(navButton)}
+          {primaryNavigation.map(item => <div key={item.id}>
+            {navButton(item)}
+            {item.id === "tasks" && view === "tasks" ? <ApprovedBoardNavigation onSelect={() => navigate("tasks")} /> : null}
+          </div>)}
         </section>
 
         <section className="staff-sidebar__developing">
@@ -4406,7 +4409,10 @@ function StaffWorkspaceShell({
     if (next !== "tasks") setTaskBoardRequest(null);
     setView(next);
     setMobileNavOpen(false);
-    window.history.replaceState(null, "", `#${next}`);
+    const destination = new URL(window.location.href);
+    destination.searchParams.delete("actionTask");
+    destination.hash = next;
+    window.history.replaceState(null, "", destination);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -4422,15 +4428,6 @@ function StaffWorkspaceShell({
     window.history.replaceState(null, "", "#tasks");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-
-  // Preserve the approved full-viewport mock and its own shell. Explicit links
-  // to canonical work items retain the existing backend-backed detail handler.
-  if (view === "tasks" && !requestedWorkItemId) {
-    return <ApprovedTaskBoard onNavigate={(destination) => {
-      // Demo/main predates Student 360; keep its existing student route there.
-      navigate(viewOrder.includes(destination as StaffView) ? destination as StaffView : "students");
-    }} />;
-  }
 
   return (
     <div className="staff-shell staff-shell--workspace">
@@ -4555,6 +4552,8 @@ function StaffWorkspaceShell({
           <MorningBrewView workspace={workspace} navigate={navigate} />
         ) : view === "overview" ? (
           <OverviewView workspace={workspace} navigate={navigate} />
+        ) : view === "tasks" && !requestedWorkItemId ? (
+          <ApprovedTaskBoard />
         ) : view === "tasks" ? (
           <TaskBoardView
             key={requestedWorkItemId ?? `task-board-${taskBoardRequest?.key ?? 0}`}
@@ -4604,7 +4603,7 @@ function StaffWorkspaceShell({
           <EdwardView staffName={workspace.currentStaff.name} />
         )}
       </main>
-      {view !== "edward" ? (
+      {view !== "edward" && view !== "tasks" ? (
         <StaffEdwardAssistant staffName={workspace.currentStaff.name} />
       ) : null}
     </div>

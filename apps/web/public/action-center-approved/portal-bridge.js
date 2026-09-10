@@ -1,35 +1,34 @@
-// Portal-only integration. The approved prototype files stay byte-for-byte intact.
+// Portal-only navigation adapter. Approved workspace modules remain unchanged.
 import { toast } from './src/ui.js';
+import { SPACES, BOARDS } from './src/data.js';
+import { view, switchBoard } from './src/board.js';
+import { store } from './src/store.js';
 
-const destinations = {
-  'Morning Brew': 'morning_brew',
-  'Student 360': 'student_360',
-  'Messages': 'messages',
-  'Institution profile': 'institution_profile',
-  'Academics': 'academics',
-  'Campus Life': 'campus_life',
-  'Knowledge base': 'knowledge',
-};
-
+let previous = '';
+function publish() {
+  const state = {
+    type: 'audentra:approved-board:state',
+    dialogOpen: !!document.querySelector('dialog[open]'),
+    navigation: { board: view.board, spaces: SPACES.map(space => ({
+      id: space.id, name: space.name, color: space.color,
+      boards: space.boards.map(id => ({ id, name: BOARDS[id].name, count: store.tasks.filter(task => task.board === id && task.status !== 'completed').length })),
+    })) },
+  };
+  const encoded = JSON.stringify(state);
+  if (encoded !== previous) { previous = encoded; parent.postMessage(state, location.origin); }
+}
+new MutationObserver(publish).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['open'] });
+window.addEventListener('message', event => {
+  if (event.origin !== location.origin || event.source !== parent) return;
+  if (event.data?.type === 'audentra:approved-board:select' && BOARDS[event.data.board]) switchBoard(event.data.board);
+});
 document.addEventListener('click', event => {
-  const target = event.target.closest('[data-action], a.brand');
-  if (!target) return;
-  const action = target.dataset.action;
-  const destination = target.matches('a.brand') ? 'morning_brew' : destinations[action?.replace(/^shell:/, '')];
-  if (destination) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    parent.postMessage({ type: 'audentra:approved-board:navigate', destination }, location.origin);
-  } else if (action === 'copy-task') {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    const key = document.querySelector('.detail-breadcrumb strong')?.textContent;
-    if (!key) return;
-    const url = new URL(parent.location.href);
-    url.searchParams.set('actionTask', key);
-    url.hash = 'tasks';
-    navigator.clipboard?.writeText(url.href)
-      .then(() => toast(`${key} link copied`))
-      .catch(() => toast('Task link: ' + url.href));
-  }
+  if (!event.target.closest('[data-action="copy-task"]')) return;
+  event.preventDefault(); event.stopImmediatePropagation();
+  const key = document.querySelector('.detail-breadcrumb strong')?.textContent;
+  if (!key) return;
+  const url = new URL(parent.location.href);
+  url.searchParams.set('actionTask', key); url.hash = 'tasks';
+  navigator.clipboard?.writeText(url.href).then(() => toast(`${key} link copied`)).catch(() => toast('Task link: ' + url.href));
 }, true);
+publish();

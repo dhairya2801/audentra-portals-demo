@@ -1,41 +1,37 @@
 # Approved Task Board integration
 
-The staff Task Board tab displays the exact approved `tmp_actioncenter` prototype
-at commit `9593ee09a36537ccdd04a558a4ff7f26e52a1c9a`. HTML, CSS, ES modules, fonts,
-icons and seed data are vendored unchanged in `apps/web/public/action-center-approved`.
-`source-manifest.json` records SHA-256 hashes, checked by the Node integration test.
-Meeting attachments, screenshots and prototype development dependencies are excluded.
+The staff Task Board tab uses the approved `tmp_actioncenter` workspace at commit
+`9593ee09a36537ccdd04a558a4ff7f26e52a1c9a`. Its HTML, CSS, ES modules, fonts, icons,
+seed data, review tables and workflows remain unchanged in
+`apps/web/public/action-center-approved`. `source-manifest.json` records the
+SHA-256 hashes checked by the integration test.
 
-`ApprovedTaskBoard` uses a full-viewport same-origin iframe so portal global CSS,
-font metrics and containing blocks cannot alter the approved board or native dialogs.
-The existing staff route still performs authentication and loads its canonical
-workspace. No new route, backend endpoint, dependency or authentication shortcut
-is introduced. The approved prototype already includes the surrounding Audentra
-shell, so the host does not render a second shell or Edward overlay around it.
+The original staff top bar and entire sidebar stay in place. Selecting Task board
+reveals Financial Aid, Enrollment and Campus Life projects directly beneath that
+item. Their counts and selected board are published by `portal-bridge.js` from
+the approved mock's own data. Switching projects uses its existing `switchBoard`.
+Student 360 remains a separate primary staff navigation destination.
 
-`portal-bridge.js` is the only runtime adapter. It connects existing surrounding
-navigation to staff views and makes copied task links reopen the authenticated
-staff route (`?actionTask=ENR-184#tasks`). Messages are checked for both origin and
-iframe source. Prototype board/detail/assignment/workflow interactions are untouched.
-Explicit canonical work-item links from other portal pages keep their previous
-backend-backed detail handler; the normal Task Board tab always shows the approved UI.
+`ApprovedTaskBoard` isolates the workspace from portal global CSS. Its adapter hides
+only the prototype's duplicate shell. Task dialogs expand the iframe to the full
+viewport, preserving their document preview, review table, context and workflow
+layout. Closing a dialog restores the board alongside the original staff sidebar.
+The host's scroll settings are restored when leaving Task Board.
 
-The approved board remains a UI demo: seeded people, extraction, decisions,
-communications, payment entries and automation are local mock state, persisted in
-the prototype's existing browser-local storage. None write canonical platform data.
-Board query links from Morning Brew open the approved default board; backend query
-criteria are not mapped onto unrelated mock records. Reset demo restores the seed.
+Messages are checked for origin and iframe source. Copied links reopen the existing
+authenticated staff route (`?actionTask=ENR-184#tasks`). Explicit canonical work-item
+links retain the previous backend-backed detail handler. No backend behavior or
+new authentication path is introduced.
 
-## Validation
+The board remains a UI demo: extraction, decisions, communications, payments and
+automation use seeded records and browser-local persistence. Reset demo restores
+the seed. Backend query criteria from other views are not applied to unrelated
+mock records. Student 360 retains its existing canonical reads and demo fallbacks.
 
-Run `node --test apps/web/tests/approved-task-board.test.mjs` for asset integrity and
-route isolation. The connected browser journey is
-`tools/browser-e2e/specs/approved-task-board.spec.ts`; use `E2E_BASE_URL` to select a
-running local or deployed portal. It signs in through the visible demo login,
-opens Task Board, completes mock review and request flows and returns to the portal.
-This is mock integration acceptance, not proof of backend processing or delivery.
-
-The normal desktop comparison uses 1440×900 and 1920×1080 viewports. The adapter
-temporarily removes the host page's scrollbar and reserved gutter while mounted,
-then restores them on exit. Without this, the otherwise unchanged board is ten
-pixels narrower than its approved source.
+Run `node --test apps/web/tests/approved-task-board.test.mjs` for asset integrity
+and route checks. The connected browser journey is
+`tools/browser-e2e/specs/approved-task-board.spec.ts`; select a running portal with
+`E2E_BASE_URL`. It uses visible staff demo sign-in and covers the original sidebar,
+project navigation, review decisions, request automation, Student 360, persistence,
+and real copied task links. This validates the mock integration, not backend
+processing or communication delivery.
