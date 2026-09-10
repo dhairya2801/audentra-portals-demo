@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Immutable, separately verified source-of-truth prototype assets.
+    "public/action-center-approved/src/**",
   ]),
 ]);
 

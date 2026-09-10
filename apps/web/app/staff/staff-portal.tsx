@@ -31,6 +31,7 @@ import {
   useState,
 } from "react";
 import { DateTimePicker } from "../components/date-time-picker";
+import { ApprovedTaskBoard } from "./approved-task-board";
 import { TenantLink as Link } from "../components/tenant-link";
 import { StaffEdwardAssistant } from "../components/staff-edward-assistant";
 import { PortalMark } from "../components/portal-ui";
@@ -4408,6 +4409,15 @@ function StaffWorkspaceShell({
     window.history.replaceState(null, "", "#tasks");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  // Preserve the approved full-viewport mock and its own shell. Explicit links
+  // to canonical work items retain the existing backend-backed detail handler.
+  if (view === "tasks" && !requestedWorkItemId) {
+    return <ApprovedTaskBoard onNavigate={(destination) => {
+      // Demo/main predates Student 360; keep its existing student route there.
+      navigate(viewOrder.includes(destination as StaffView) ? destination as StaffView : "students");
+    }} />;
+  }
 
   return (
     <div className="staff-shell staff-shell--workspace">
