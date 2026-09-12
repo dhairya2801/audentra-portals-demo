@@ -52,6 +52,7 @@ export type PortalSection =
   | "enrollment"
   | "financials"
   | "financial_aid"
+  | "financial_expenses"
   | "classrooms"
   | "campus_life"
   | "edward"
@@ -74,6 +75,7 @@ const destinationOf: Partial<Record<PortalSection, string>> = {
   housing: "housing",
   financials: "financials-overview",
   financial_aid: "financials-aid",
+  financial_expenses: "financials-expenses",
   payments: "financials-payments",
   campus_life: "events",
   clubs: "clubs",
@@ -84,7 +86,7 @@ const destinationOf: Partial<Record<PortalSection, string>> = {
 
 /** The delegate scope a section is read under. */
 function scopeOf(section: PortalSection): FerpaPortalScope {
-  return (section === "financial_aid" ? "financials" : section === "clubs" ? "campus_life" : section) as FerpaPortalScope;
+  return (["financial_aid", "financial_expenses"].includes(section) ? "financials" : section === "clubs" ? "campus_life" : section) as FerpaPortalScope;
 }
 
 const sectionOfDestination: Record<string, PortalSection> = Object.fromEntries(
@@ -343,6 +345,7 @@ export function PortalShell({
   tabs,
   rail,
   actions,
+  bareContent = false,
   children,
 }: {
   active: PortalSection;
@@ -358,6 +361,8 @@ export function PortalShell({
   tabs?: ReactNode;
   rail?: ReactNode;
   actions?: ReactNode;
+  /** Use custom page content inside the standard navigation and assistant. */
+  bareContent?: boolean;
   children: ReactNode;
 }) {
   const tenantRuntime = useTenant();
@@ -1093,7 +1098,8 @@ export function PortalShell({
           </div>
         ) : null}
 
-        <main className="content-wrap" id="main-content" tabIndex={-1}>
+        <main className="content-wrap" id="main-content" tabIndex={-1} style={bareContent ? { padding: 0, maxWidth: "none" } : undefined}>
+          {bareContent && activeAllowed ? children : (
           <PageShell
             destination={destination}
             hero={heroCopy}
@@ -1125,6 +1131,7 @@ export function PortalShell({
               </div>
             )}
           </PageShell>
+          )}
         </main>
       </section>
 

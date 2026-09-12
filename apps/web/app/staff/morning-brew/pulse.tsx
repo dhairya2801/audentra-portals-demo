@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { topicById } from "./catalog";
+import { EdwardButton } from "./cards";
+import { movementLabel, movementTone, targetStatus } from "./presentation";
 import { edwardKpiGreeting } from "./data";
 import { Glyph } from "./glyphs";
 import type { BrewDetailLevelId, BrewKpi, BrewKpiComparison } from "./types";
-
-/** How long one comparison holds the card before the cluster advances. */
-const ROTATE_MS = 3400;
 
 function prefersReducedMotion() {
   return (
@@ -24,14 +24,14 @@ const arrowFor = (direction: BrewKpiComparison["direction"]) =>
  * is good news and a rising one is not, and a card that painted every downward
  * arrow red would tell the reader the opposite of what happened.
  */
-function Movement({ comparison }: { comparison: BrewKpiComparison }) {
+export function Movement({ comparison }: { comparison: BrewKpiComparison }) {
   return (
     <span className="brew-move">
-      <b className={comparison.favorable ? "is-good" : "is-watch"}>
+      <b className={movementTone(comparison)}>
         <i aria-hidden="true">{arrowFor(comparison.direction)}</i> {comparison.delta}
         {comparison.percent ? <em>{comparison.percent}</em> : null}
       </b>
-      <small>{comparison.label}</small>
+      <small>{movementLabel(comparison.label)}</small>
     </span>
   );
 }
@@ -69,7 +69,7 @@ const CHART_PAD = 6;
  * counted, which is why it is drawn as a different kind of line rather than as
  * more of the same one.
  */
-function TrendChart({ kpi, favorable }: { kpi: BrewKpi; favorable: boolean }) {
+export function TrendChart({ kpi, favorable }: { kpi: BrewKpi; favorable: boolean }) {
   const clipId = useId();
   const actual = kpi.series;
   const forecast = kpi.forecast;
@@ -155,7 +155,7 @@ function TrendChart({ kpi, favorable }: { kpi: BrewKpi; favorable: boolean }) {
  * fact, and at a sixth of the band's width it wrapped onto two lines anyway.
  * The convention is identical on every card, so it belongs to the section.
  */
-function TrendKey() {
+export function TrendKey() {
   return (
     <span className="brew-trend-key">
       <span className="is-previous">Last year</span>
@@ -167,21 +167,8 @@ function TrendKey() {
 
 /* --------------------------------------------------------------------- card */
 
-/**
- * A KPI card: one figure, and the distances it can be read from.
- *
- * The headline number never moves. What rotates is the comparison beside it —
- * every window takes its turn in the same place, one at a time, so the card
- * shows one reading rather than four competing for the same glance. The dots
- * under it say how many windows there are and which one is up. Pointing at the
- * card stops the rotation, because a number that changes while you are reading
- * it is a number you cannot read.
- *
- * What the card carries under the figure is the reader's own answer for the
- * Pulse: nothing at a glance, the goal and the progress toward it with context,
- * and thirty days of the line with a sentence reading it at depth.
- */
-function PulseCard({
+/** Rotating comparisons, shared across setup previews and the briefing. */
+export function PulseCard({
   kpi,
   level,
   readerFirstName,
@@ -191,39 +178,38 @@ function PulseCard({
   kpi: BrewKpi;
   level: BrewDetailLevelId;
   readerFirstName: string;
-  onOpen: () => void;
-  onAskEdward: () => void;
+  onOpen?: () => void;
+  onAskEdward?: () => void;
 }) {
-  const [offset, setOffset] = useState(0);
-  const [held, setHeld] = useState(false);
-  const total = kpi.comparisons.length;
-  const rotates = total > 1;
-
+  const [comparisonIndex, setComparisonIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
   useEffect(() => {
-    if (!rotates || held || prefersReducedMotion()) return;
-    const timer = window.setInterval(
-      () => setOffset((current) => (current + 1) % total),
-      ROTATE_MS,
-    );
+    if (paused || kpi.comparisons.length < 2) return;
+    const timer = window.setInterval(() => {
+      if (!prefersReducedMotion()) {
+        setComparisonIndex((index) => (index + 1) % kpi.comparisons.length);
+      }
+    }, 3400);
     return () => window.clearInterval(timer);
-  }, [rotates, held, total]);
-
-  const current = total ? kpi.comparisons[offset % total] : null;
+  }, [paused, kpi.comparisons.length]);
+  const current = kpi.comparisons[comparisonIndex % kpi.comparisons.length] ?? null;
   const showTarget = level !== "glance";
   const showChart = level === "deep";
-  const hasTarget = kpi.target !== null && kpi.progressPercent !== null;
 
   return (
     <div
+      data-topic={kpi.topic}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false);
+      }}
       className={kpi.unavailable ? "brew-kpi brew-kpi--muted" : "brew-kpi"}
-      onMouseEnter={() => setHeld(true)}
-      onMouseLeave={() => setHeld(false)}
-      onFocus={() => setHeld(true)}
-      onBlur={() => setHeld(false)}
     >
       <span className="brew-kpi__head">
         <i aria-hidden="true">
-          <Glyph name={kpi.icon} size={15} />
+          <Glyph name={topicById(kpi.topic)?.icon ?? "students"} size={15} />
         </i>
         {/* Stretched over the whole card, so the figure and everything under
             it opens the drill-down while the Edward chip stays its own
@@ -231,26 +217,15 @@ function PulseCard({
         <button className="brew-stretch" type="button" onClick={onOpen}>
           {kpi.label}
         </button>
-        <button
-          className="brew-kpi__edward"
-          type="button"
-          onClick={onAskEdward}
-          title={edwardKpiGreeting(readerFirstName, kpi.label)}
-          aria-label={edwardKpiGreeting(readerFirstName, kpi.label)}
-        >
-          <span aria-hidden="true">E</span>
-        </button>
+        <EdwardButton label={edwardKpiGreeting(readerFirstName, kpi.label)} onClick={onAskEdward} />
       </span>
 
       <span className="brew-kpi__figure">
         <strong className="brew-kpi__value">
           {kpi.display}
-          {showTarget && hasTarget ? (
-            <em className="brew-kpi__of"> / {kpi.targetDisplay}</em>
-          ) : null}
+
         </strong>
         {current ? (
-          // Keyed on the window so each turn of the cluster re-runs the fade.
           <span className="brew-kpi__primary" key={current.id}>
             <Movement comparison={current} />
           </span>
@@ -259,10 +234,17 @@ function PulseCard({
         )}
       </span>
 
-      {rotates ? (
-        <span className="brew-kpi__ticks" aria-hidden="true">
+      {kpi.comparisons.length > 1 ? (
+        <span className="brew-kpi__ticks" role="group" aria-label={`${kpi.label} comparison period`}>
           {kpi.comparisons.map((comparison, index) => (
-            <i className={index === offset % total ? "is-on" : undefined} key={comparison.id} />
+            <button
+              type="button"
+              key={comparison.id}
+              aria-label={movementLabel(comparison.label)}
+              title={movementLabel(comparison.label)}
+              aria-pressed={index === comparisonIndex}
+              onClick={() => setComparisonIndex(index)}
+            ><i className={index === comparisonIndex ? "is-on" : ""} /></button>
           ))}
         </span>
       ) : null}
@@ -270,46 +252,31 @@ function PulseCard({
       {/* The whole cluster, spoken once, for anyone who cannot watch it turn. */}
       <span className="sr-only">
         {kpi.comparisons
-          .map((comparison) => `${comparison.delta} ${comparison.label}`)
+          .map((comparison) => `${comparison.delta} ${movementLabel(comparison.label)}`)
           .join(". ")}
       </span>
 
       {showChart ? <TrendChart kpi={kpi} favorable={spanFavorable(kpi)} /> : null}
 
-      {/* Deep Dive answers "where is this heading" with the figure and a
-          colour, not a sentence: the projection the drawn pace reaches, and
-          whether that clears the target printed above it. */}
-      {showChart && kpi.projection ? (
-        <span
-          className={`brew-kpi__projection is-${kpi.projection.status.replaceAll("_", "-")}`}
-          title={kpi.trendNote}
-        >
-          <small>Projected</small>
-          <strong>{kpi.projection.display}</strong>
-          <em>{kpi.projection.byLabel}</em>
-        </span>
-      ) : showChart ? (
-        <p className="brew-kpi__note">{kpi.trendNote}</p>
-      ) : null}
-
-      {showTarget && hasTarget ? (
-        <>
-          <span className="brew-kpi__target">
-            <small>{kpi.dueLabel ?? `Target ${kpi.targetDisplay}`}</small>
-            <b>{kpi.progressPercent}%</b>
-          </span>
-          <span className="brew-kpi__bar" aria-hidden="true">
-            <i style={{ width: `${Math.min(100, kpi.progressPercent ?? 0)}%` }} />
-          </span>
-        </>
-      ) : showTarget ? (
-        <span className="brew-kpi__target brew-kpi__target--plain">
-          <small>{kpi.window}</small>
-        </span>
-      ) : null}
+      {showTarget ? <KpiGoal kpi={kpi} /> : null}
+      {showChart && !kpi.projection ? <p className="brew-kpi__note">{kpi.trendNote}</p> : null}
 
     </div>
   );
+}
+
+/** Shared goal readout. Status comes from the supplied projection; movement
+ * comes from the metric's own favorable flag, never the arrow direction. */
+export function KpiGoal({ kpi }: { kpi: BrewKpi }) {
+  const hasTarget = kpi.target !== null && kpi.progressPercent !== null;
+  return <div className={`brew-goal ${kpi.projection ? `is-${kpi.projection.status}` : ""}`}>
+    {hasTarget ? <>
+      <div className="brew-goal__target"><span>Goal <b>{kpi.targetDisplay}</b></span><small>{kpi.dueLabel}</small></div>
+      <span className="brew-kpi__bar" aria-hidden="true"><i style={{ width: `${Math.max(0, Math.min(100, kpi.progressPercent ?? 0))}%` }} /></span>
+      <span className="sr-only">{kpi.progressPercent}% of target</span>
+    </> : <small>{kpi.window}</small>}
+    {kpi.projection ? <div className="brew-goal__outlook"><b>{targetStatus[kpi.projection.status]}</b><p>Projected to reach {kpi.projection.display} {kpi.projection.byLabel}</p></div> : null}
+  </div>;
 }
 
 /* ------------------------------------------------------------------ section */
@@ -370,9 +337,7 @@ export function InstitutionalPulse({
   readerFirstName,
   onOpenKpi,
   onAskEdwardFor,
-  onOpenDashboard,
   refreshedAt,
-  cycleLabel,
 }: {
   kpis: BrewKpi[];
   level: BrewDetailLevelId;
@@ -380,14 +345,15 @@ export function InstitutionalPulse({
   onOpenKpi: (id: string) => void;
   /** Edward, opened on one figure rather than on the funnel. */
   onAskEdwardFor: (kpi: BrewKpi) => void;
-  onOpenDashboard: () => void;
   refreshedAt: string;
-  cycleLabel: string;
 }) {
   const [reelTrack, reel] = useReel();
   if (!kpis.length) return null;
 
   const paging = !reel.atStart || !reel.atEnd;
+  // Keep each domain together, preserving the first-seen group and metric order.
+  const topicOrder = [...new Set(kpis.map((kpi) => kpi.topic))];
+  const groupedKpis = topicOrder.flatMap((topic) => kpis.filter((kpi) => kpi.topic === topic));
 
   return (
     <section className={`brew-pulse brew-pulse--${level}`} aria-labelledby="brew-pulse-title">
@@ -397,7 +363,7 @@ export function InstitutionalPulse({
             <Glyph name="pulse" size={20} />
           </i>
           Institutional Pulse
-          <small>Performance vs targets and previous periods</small>
+          <small>Your goals, progress and outlook</small>
         </h2>
         <div className="brew-section-head__actions">
           {paging ? (
@@ -420,14 +386,12 @@ export function InstitutionalPulse({
               </button>
             </span>
           ) : null}
-          <button className="brew-link" type="button" onClick={onOpenDashboard}>
-            View full dashboard <Glyph name="arrow" size={13} />
-          </button>
+
         </div>
       </header>
 
       <div className="brew-kpi-reel" ref={reelTrack} tabIndex={0} aria-label="Institutional metrics">
-        {kpis.map((kpi) => (
+        {groupedKpis.map((kpi) => (
           <PulseCard
             kpi={kpi}
             level={level}
@@ -440,10 +404,9 @@ export function InstitutionalPulse({
       </div>
 
       <footer className="brew-pulse__foot">
-        <span>All goals for {cycleLabel}</span>
         {level === "deep" ? <TrendKey /> : null}
         <span>
-          Data refreshed {refreshedAt} <Glyph name="refresh" size={12} />
+          Updated {refreshedAt}
         </span>
       </footer>
     </section>

@@ -26,7 +26,7 @@ import ts from "typescript";
  * a data: URL cannot resolve a relative specifier.
  */
 const SOURCE_DIR = new URL("../app/staff/morning-brew/", import.meta.url);
-const MODULES = ["data", "catalog", "demo-brew", "news", "preferences", "types"];
+const MODULES = ["data", "catalog", "demo-brew", "news", "preferences", "types", "presentation"];
 
 let compiledDir = null;
 
@@ -423,9 +423,18 @@ test("a source only ever reads at a depth it actually offers", async () => {
   assert.equal(supportedLevel("news", "deep"), "context");
   assert.equal(supportedLevel("news", "glance"), "glance");
   assert.equal(supportedLevel("pulse", "deep"), "deep");
+  for (const id of ["calendar", "email"]) {
+    assert.deepEqual(sourceById(id).levels, ["glance", "context"]);
+    assert.equal(supportedLevel(id, "deep"), "context");
+  }
 
   const stored = await preferences({ sources: await sources({ news: { detail: "deep" } }) });
   assert.equal(levelOf(stored, "news"), "context");
+  const { browserBrewPreferenceStore } = await loadPreferences();
+  const legacy = await preferences({ sources: await sources({ calendar: { detail: "deep" }, email: { detail: "deep" } }) });
+  const normalized = browserBrewPreferenceStore.save("depth-test", legacy);
+  assert.equal(normalized.sources.calendar.detail, "context");
+  assert.equal(normalized.sources.email.detail, "context");
   // And the band still builds rather than falling over on the missing level.
   assert.equal(buildBrewBriefing(await brew(), stored).news.length, 4);
 });
@@ -545,4 +554,38 @@ test("a v6 reader keeps their sources and re-picks their topics", async () => {
   } finally {
     delete globalThis.window;
   }
+});
+
+
+test("read-time estimate responds to topics and detail without changing the corpus", async () => {
+  const { buildBrewBriefing } = await load();
+  const source = await brew();
+  const narrow = buildBrewBriefing(source, await preferences({ topics: ["enrollment"] }));
+  const wide = buildBrewBriefing(source, await preferences({ topics: ALL_TOPICS }));
+  const deep = buildBrewBriefing(source, await preferences({ topics: ALL_TOPICS, sources: await sources({ pulse: { detail: "deep" } }) }));
+  assert.ok(wide.readTimeMinutes > narrow.readTimeMinutes);
+  assert.ok(deep.readTimeMinutes > wide.readTimeMinutes);
+});
+
+test("email timestamps use Eastern calendar dates, including midnight and DST", async () => {
+  const { formatEmailTimestamp: format } = await importMorningBrewModule("presentation");
+  const reference = "2025-05-22T11:30:00Z";
+  assert.equal(format("2025-05-22T06:42:00-04:00", reference), "6:42 AM");
+  assert.equal(format("2025-05-21T17:18:00-04:00", reference), "Yesterday, 5:18 PM");
+  assert.equal(format("2025-05-20T15:15:00-04:00", reference), "Tuesday, 3:15 PM");
+  assert.equal(format("2025-05-11T15:15:00-04:00", reference), "May 11");
+  assert.equal(format("2024-12-31T15:15:00-05:00", reference), "Dec 31, 2024");
+  assert.equal(format("2025-03-08T23:30:00-05:00", "2025-03-09T07:30:00-04:00"), "Yesterday, 11:30 PM");
+  assert.equal(format("2025-05-22T01:00:00Z", reference), "Yesterday, 9:00 PM");
+  assert.equal(format("invalid", reference, "Date unavailable"), "Date unavailable");
+});
+
+test("movement tone follows metric intent and flat changes stay neutral", async () => {
+  const { movementTone, movementLabel, initialsOf } = await importMorningBrewModule("presentation");
+  assert.equal(movementTone({ direction: "down", favorable: true }), "is-good");
+  assert.equal(movementTone({ direction: "up", favorable: false }), "is-watch");
+  assert.equal(movementTone({ direction: "flat", favorable: false }), "is-neutral");
+  assert.equal(movementLabel("vs yesterday"), "Since yesterday");
+  assert.equal(movementLabel("vs last 7 days"), "Over the last 7 days");
+  assert.equal(initialsOf("Dr. Marcus Okonjo"), "MO");
 });

@@ -49,7 +49,7 @@ export const GROUPS = {
 export const GROUP_HEROES = {
   financials: {
     kicker: 'My Financials · 2026–27 academic year',
-    title: 'What the year costs, and what covers it.',
+    title: 'Know what’s covered. Plan what’s next.',
     lede: 'What the year costs, what’s covering it, and what still needs you, with the person who can change it.',
     motif: 'wallet',
   },
@@ -175,7 +175,7 @@ export const DESTINATIONS = [
   },
   {
     id: 'financials-aid',
-    label: 'Financial aid',
+    label: 'Loans & aid',
     route: '/financials/aid',
     icon: 'award',
     group: 'financials',
@@ -185,10 +185,11 @@ export const DESTINATIONS = [
     next: 'profile',
     built: true,
   },
+  { id: 'financials-expenses', label: 'Expenses', route: '/financials/expenses', icon: 'receipt', group: 'financials', lede: 'Tuition, housing, meals and coverage in one place.', built: true },
   {
     id: 'financials-payments',
     label: 'Payments',
-    route: '/payments',
+    route: '/financials/payments',
     icon: 'card',
     group: 'financials',
     lede: 'What Aster bills you, when each payment is due, and what it has recorded.',
@@ -465,7 +466,7 @@ export const NAV = [
     kind: 'group',
     id: 'financials',
     label: GROUPS.financials,
-    items: ['financials-overview', 'financials-aid', 'financials-payments'],
+    items: ['financials-overview', 'financials-payments', 'financials-expenses', 'financials-aid'],
   },
   { kind: 'group', id: 'campus', label: GROUPS.campus, items: ['events', 'clubs'] },
 ];

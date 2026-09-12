@@ -1,7 +1,9 @@
 "use client";
 
+import "./morning-brew.css";
+
 import type { StaffOperationsWorkspace } from "@vv/contracts";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildBrewBriefing } from "./data";
 import { demoBrewSource } from "./demo-brew";
 import { MorningBrewDashboard } from "./dashboard";
@@ -44,7 +46,7 @@ export function MorningBrewView({
 }) {
   const scope = `demo:${workspace.currentStaff.id}`;
 
-  // The corpus is one pinned morning — June 24, 2027, 7:02 AM ET — because
+  // The corpus is one pinned morning — May 20, 2025, 7:30 AM ET — because
   // every relative label in it is counted from that date.
   const source = useMemo(() => demoBrewSource(), []);
 
@@ -53,6 +55,9 @@ export function MorningBrewView({
   const [direction, setDirection] = useState<1 | -1>(1);
   const [draft, setDraft] = useState<OnboardingDraft>(() => draftFrom(DEFAULT_BREW_PREFERENCES));
   const [saved, setSaved] = useState<BrewPreferences | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [replies, setReplies] = useState<Record<string, string>>({});
+  const detailOpener = useRef<HTMLElement | null>(null);
   const [detail, setDetail] = useState<BrewDetailRef | null>(null);
   const [edward, setEdward] = useState<EdwardRequest | null>(null);
 
@@ -145,13 +150,13 @@ export function MorningBrewView({
 
   const openDetail = useCallback((ref: BrewDetailRef) => {
     if (!ref.id) return;
+    if (!document.querySelector(".brew-detail-layer")) detailOpener.current = document.activeElement as HTMLElement;
     setDetail(ref);
-    scrollToTop();
   }, []);
 
   const closeDetail = useCallback(() => {
     setDetail(null);
-    scrollToTop();
+    requestAnimationFrame(() => detailOpener.current?.focus());
   }, []);
 
   if (mode === "loading") {
@@ -180,9 +185,12 @@ export function MorningBrewView({
       <MorningBrewOnboarding
         step={step}
         direction={direction}
-        staffName={briefing.reader.name}
         draft={draft}
         preview={draftBriefing}
+        sample={buildBrewBriefing(source, {
+          ...preferences, topics: draft.topics,
+          sources: Object.fromEntries(Object.entries(draft.sources).map(([id, source]) => [id, { ...source, enabled: true, detail: "deep" }])) as BrewPreferences["sources"],
+        })}
         customizing={Boolean(saved?.onboardingComplete)}
         onToggleTopic={(topic: BrewTopicId) =>
           setDraft((current) => ({
@@ -207,25 +215,32 @@ export function MorningBrewView({
 
   return (
     <>
-      {detail ? (
-        <MorningBrewDetail
-          detail={detail}
-          briefing={briefing}
-          onBack={closeDetail}
-          navigate={navigate}
-          onAskEdward={setEdward}
-        />
-      ) : (
+      <div inert={Boolean(detail || edward)}>
         <MorningBrewDashboard
           briefing={briefing}
           preferences={preferences}
-          navigate={navigate}
+          replies={replies}
           onOpenDetail={openDetail}
           onAskEdward={setEdward}
           onCustomize={() => openOnboarding(1)}
           onManageConnections={() => openOnboarding(2)}
         />
-      )}
+      </div>
+      {detail ? (
+        <MorningBrewDetail
+          detail={detail}
+          briefing={briefing}
+          onBack={closeDetail}
+          onOpenDetail={openDetail}
+          onManagePreferences={() => openOnboarding(2)}
+          drafts={drafts}
+          onDraftChange={(id, text) => setDrafts(current => ({ ...current, [id]: text }))}
+          replies={replies}
+          onDemoReply={(id, text) => setReplies(current => ({ ...current, [id]: text }))}
+          navigate={navigate}
+          onAskEdward={setEdward}
+        />
+      ) : null}
       <EdwardPanel request={edward} briefing={briefing} onClose={() => setEdward(null)} />
     </>
   );

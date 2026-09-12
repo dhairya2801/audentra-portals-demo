@@ -5,6 +5,8 @@ import { useTenant } from "../../components/tenant-provider";
 import { BREW_SOURCES } from "./catalog";
 import { edwardKpiGreeting, levelOf } from "./data";
 import { Glyph, OutlookMark } from "./glyphs";
+import { CalendarRow, EdwardButton, EmailRow, IntelligenceCard, NewsCard, PriorityRow } from "./cards";
+import { emailPresentation, initialsOf } from "./presentation";
 import { InstitutionalPulse } from "./pulse";
 import type {
   BrewBriefing,
@@ -16,7 +18,6 @@ import type {
   BrewPriority,
   BrewRequest,
   EdwardRequest,
-  MorningBrewNavigate,
 } from "./types";
 
 const ET = "America/New_York";
@@ -46,22 +47,6 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", {
  */
 const PANEL_ROWS = 4;
 const PANEL_MORE = 5;
-
-const initialsOf = (name: string) =>
-  name
-    .split(" ")
-    .map((part) => part.slice(0, 1))
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
-/** High / Medium / Low, said the same way in all three panels. */
-const LEVEL_LABEL: Record<string, string> = {
-  high: "High",
-  urgent: "High",
-  medium: "Medium",
-  low: "Low",
-};
 
 /* ---------------------------------------------------------------- day panel */
 
@@ -172,24 +157,6 @@ function DayPanel<T extends { id: string }>({
   );
 }
 
-/** The first three guests, then a count. The row is a pointer, not a roster. */
-function Attendees({ names }: { names: string[] }) {
-  if (!names.length) return null;
-  const shown = names.slice(0, 3);
-  const rest = names.length - shown.length;
-  return (
-    <span className="brew-attendees">
-      {shown.map((name) => (
-        <i title={name} key={name}>
-          <Glyph name="applications" size={10} />
-        </i>
-      ))}
-      {rest > 0 ? <b>+{rest}</b> : null}
-      <span className="sr-only">{names.join(", ")}</span>
-    </span>
-  );
-}
-
 /* --------------------------------------------------------------------- news */
 
 /**
@@ -201,12 +168,10 @@ function Attendees({ names }: { names: string[] }) {
 function NewsSection({
   news,
   level,
-  onViewAll,
 }: {
   news: BrewNewsItem[];
   /** At "With Context" each story says what it lands on here. */
   level: BrewDetailLevelId;
-  onViewAll: () => void;
 }) {
   return (
     <section className="brew-news" aria-labelledby="brew-news-title">
@@ -218,50 +183,12 @@ function NewsSection({
           Higher Ed News
           <small>Curated for you</small>
         </h2>
-        <div className="brew-section-head__actions">
-          <button className="brew-link" type="button" onClick={onViewAll}>
-            View all news <Glyph name="arrow" size={13} />
-          </button>
-        </div>
+
       </header>
 
       <ol className="brew-news__rail">
         {news.map((item) => (
-          <li className="brew-news-card" key={item.id}>
-            <img
-              className="brew-news-card__cover"
-              src={item.image}
-              alt={item.imageAlt}
-              loading="lazy"
-              width={200}
-              height={200}
-            />
-            <div className="brew-news-card__body">
-              <span className="brew-news-card__byline">
-                {item.publisher}
-                <b>{item.publishedLabel}</b>
-              </span>
-              <h3>
-                <a href={item.url} target="_blank" rel="noreferrer noopener">
-                  {item.title}
-                </a>
-              </h3>
-              {/* Read time carries the same clock the hero's does, so the two
-                  places that estimate a read look like one habit. */}
-              {level === "glance" ? (
-                <p className="brew-news-card__read">
-                  <Glyph name="clock" size={11} /> {item.readMinutes} min read
-                </p>
-              ) : (
-                <>
-                  <p className="brew-news-card__bearing">{item.bearing}</p>
-                  <p className="brew-news-card__read">
-                    <Glyph name="clock" size={11} /> {item.readMinutes} min read
-                  </p>
-                </>
-              )}
-            </div>
-          </li>
+          <NewsCard key={item.id} item={item} level={level} />
         ))}
       </ol>
 
@@ -274,9 +201,7 @@ function NewsSection({
 
 function EdwardChip({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button className="brew-edward-chip" type="button" onClick={onClick}>
-      <span aria-hidden="true">E</span> {label}
-    </button>
+    <EdwardButton label={`Ask Edward · ${label}`} onClick={onClick} />
   );
 }
 
@@ -291,7 +216,7 @@ const MEETING_VIEWS: PanelView<BrewMeeting>[] = [
   },
   {
     id: "high",
-    label: "High",
+    label: "Important",
     empty: "Nothing today is marked high priority.",
     filter: (meeting) => meeting.priority === "high",
   },
@@ -329,10 +254,10 @@ const REQUEST_VIEWS: PanelView<BrewRequest>[] = [
     filter: (request) => request.unread,
   },
   {
-    id: "urgent",
-    label: "Urgent",
-    empty: "Nothing in the inbox is marked urgent.",
-    filter: (request) => request.priority === "urgent",
+    id: "pending",
+    label: "Pending response",
+    empty: "No email is waiting for your response.",
+    filter: (request) => emailPresentation(request).pendingResponse,
   },
 ];
 
@@ -345,7 +270,7 @@ const PRIORITY_VIEWS: PanelView<BrewPriority>[] = [
   },
   {
     id: "high",
-    label: "High",
+    label: "Important",
     empty: "Nothing is running at high priority.",
     filter: (priority) => priority.level === "High",
   },
@@ -368,15 +293,15 @@ const PRIORITY_VIEWS: PanelView<BrewPriority>[] = [
 export function MorningBrewDashboard({
   briefing,
   preferences,
-  navigate,
   onOpenDetail,
   onAskEdward,
   onCustomize,
   onManageConnections,
+  replies = {},
 }: {
   briefing: BrewBriefing;
+  replies?: Record<string, string>;
   preferences: BrewPreferences;
-  navigate: MorningBrewNavigate;
   onOpenDetail: (ref: BrewDetailRef) => void;
   onAskEdward: (request: EdwardRequest) => void;
   onCustomize: () => void;
@@ -405,7 +330,6 @@ export function MorningBrewDashboard({
   // How much of a finding is printed is the reader's own answer for
   // Institutional Intelligence, not a separate setting they had to find.
   const intelligenceLevel = levelOf(preferences, "intelligence");
-  const showReading = intelligenceLevel !== "glance";
   const showPriorities = briefing.priorities.length > 0;
   const showDayGrid = showMeetings || showRequests || showPriorities;
   const emptyBriefing =
@@ -423,7 +347,7 @@ export function MorningBrewDashboard({
         </div>
         <div className="brew-masthead__meta">
           <span className="brew-masthead__updated">
-            <Glyph name="refresh" size={12} /> Last updated {updatedClock}
+            <Glyph name="clock" size={12} /> Updated {updatedClock}
           </span>
           <button
             className="brew-masthead__avatar"
@@ -442,7 +366,7 @@ export function MorningBrewDashboard({
           <h1>Good Morning {briefing.greetingName},</h1>
           <p className="brew-hero__deck">{briefing.deck}</p>
           <p className="brew-hero__meta">
-            <Glyph name="clock" size={14} /> Read time: ~{briefing.readTimeMinutes} min
+            <Glyph name="clock" size={14} /> Estimated read time · {briefing.readTimeMinutes} min
           </p>
         </div>
 
@@ -462,11 +386,11 @@ export function MorningBrewDashboard({
               </i>
               Outlook
             </span>
-            <strong>{showRequests ? countFormatter.format(briefing.glance.requests) : "—"}</strong>
-            <small>{showRequests ? "Unread emails" : "Turned off"}</small>
+            <strong>{showRequests ? countFormatter.format(briefing.requests.length) : "—"}</strong>
+            <small>{showRequests ? "Emails in your brief" : "Turned off"}</small>
             <em>
               {showRequests
-                ? `${briefing.glance.requestsAwaitingReply} High priority`
+                ? `${briefing.requests.filter(request => emailPresentation(request).pendingResponse && !replies[request.id]).length} pending response`
                 : "Switch it on to see who is waiting"}
             </em>
             <span className="brew-glance__link">
@@ -493,7 +417,7 @@ export function MorningBrewDashboard({
             <small>{showMeetings ? "Meetings today" : "Turned off"}</small>
             <em>
               {showMeetings
-                ? `${briefing.glance.meetingsHighPriority} High priority`
+                ? `${briefing.glance.meetingsHighPriority} important meetings`
                 : "Switch it on to see the day"}
             </em>
             <span className="brew-glance__link">
@@ -563,82 +487,14 @@ export function MorningBrewDashboard({
               Institutional Intelligence
               <small>Insights that may impact enrollment and your attention today.</small>
             </h2>
-            <div className="brew-section-head__actions">
-              <EdwardChip
-                label="Ask for the students"
-                onClick={() => onAskEdward({ mode: "insights", context: "today's attention list" })}
-              />
-              <button className="brew-link" type="button" onClick={() => navigate("students")}>
-                View all insights <Glyph name="arrow" size={13} />
-              </button>
-            </div>
+
           </header>
 
           <div className="brew-insight-grid">
-            {briefing.insights.map((insight, index) => (
-              <article className={`brew-insight brew-insight--${insight.severity}`} key={insight.id}>
-                <div className="brew-insight__top">
-                  <span className="brew-insight__rank" aria-hidden="true">
-                    {index + 1}
-                  </span>
-                  <h3>
-                    <button
-                      className="brew-stretch"
-                      type="button"
-                      onClick={() => onOpenDetail({ kind: "insight", id: insight.id })}
-                    >
-                      {insight.title}
-                    </button>
-                  </h3>
-                  <span className={`brew-chip brew-chip--${insight.severity}`}>
-                    {insight.severity === "positive"
-                      ? "Positive"
-                      : insight.severity === "high"
-                        ? "High"
-                        : "Medium"}
-                  </span>
-                </div>
-
-                <p className="brew-insight__summary">{insight.summary}</p>
-                <p className="brew-insight__projection">{insight.projection}</p>
-
-                {showReading ? (
-                  <p className="brew-insight__stats">{insight.stats[intelligenceLevel]}</p>
-                ) : null}
-                {showReading ? (
-                  <p className="brew-insight__reading">
-                    {intelligenceLevel === "deep" ? insight.deepDive : insight.context}
-                  </p>
-                ) : null}
-
-                <div className="brew-insight__impact">
-                  <small>{insight.impactLabel}</small>
-                  <div>
-                    {insight.impact.map((chip) => (
-                      <span className={`brew-impact brew-impact--${chip.tone}`} key={chip.label}>
-                        {chip.label}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="brew-insight__action">
-                  <small>Recommended action</small>
-                  <p>{insight.recommendations[intelligenceLevel]}</p>
-                </div>
-
-                <footer className="brew-insight__foot">
-                  <span>Impact: {insight.impactLevel}</span>
-                  <span>Confidence: {insight.confidence}%</span>
-                  <button
-                    className="brew-link"
-                    type="button"
-                    onClick={() => onOpenDetail({ kind: "insight", id: insight.id })}
-                  >
-                    View details <Glyph name="arrow" size={13} />
-                  </button>
-                </footer>
-              </article>
+            {briefing.insights.map((insight) => (
+              <IntelligenceCard key={insight.id} insight={insight} level={intelligenceLevel}
+                onOpen={() => onOpenDetail({ kind: "insight", id: insight.id })}
+                onAskEdward={() => onAskEdward({ mode: "cohort", context: insight.cohort.question })} />
             ))}
           </div>
         </section>
@@ -649,7 +505,6 @@ export function MorningBrewDashboard({
         level={pulseLevel}
         readerFirstName={briefing.reader.firstName}
         refreshedAt={`${updatedClock} ET`}
-        cycleLabel={briefing.cycleLabel}
         onOpenKpi={(id: string) => onOpenDetail({ kind: "kpi", id })}
         onAskEdwardFor={(kpi) =>
           onAskEdward({
@@ -658,7 +513,6 @@ export function MorningBrewDashboard({
             greeting: edwardKpiGreeting(briefing.reader.firstName, kpi.label),
           })
         }
-        onOpenDashboard={() => navigate("overview")}
       />
 
       {showDayGrid ? (
@@ -685,39 +539,7 @@ export function MorningBrewDashboard({
               view={meetingView}
               onView={setMeetingView}
               emptyMessage="Nothing is on today's calendar for the topics you follow."
-              render={(meeting) => (
-                <li key={meeting.id}>
-                  <span className={`brew-dot brew-dot--${meeting.priority}`} aria-hidden="true" />
-                  <time>
-                    {meeting.timeLabel}
-                    <small>{meeting.durationMinutes} min</small>
-                  </time>
-                  <div>
-                    <h3>
-                      <button
-                        className="brew-stretch"
-                        type="button"
-                        onClick={() => onOpenDetail({ kind: "meeting", id: meeting.id })}
-                      >
-                        {meeting.title}
-                      </button>
-                    </h3>
-                    <p>{meeting.detail}</p>
-                    {calendarLevel !== "glance" && meeting.priority === "high" ? (
-                      <p className="brew-prep-line">
-                        <span aria-hidden="true">✎</span> {meeting.prep}
-                      </p>
-                    ) : null}
-                    <Attendees names={meeting.attendees} />
-                    {calendarLevel === "deep" ? (
-                      <p className="brew-guests">{meeting.attendees.join(", ")}</p>
-                    ) : null}
-                  </div>
-                  <span className={`brew-chip brew-chip--${meeting.priority}`}>
-                    {LEVEL_LABEL[meeting.priority]}
-                  </span>
-                </li>
-              )}
+              render={(meeting) => <CalendarRow key={meeting.id} meeting={meeting} level={calendarLevel} onOpen={() => onOpenDetail({ kind: "meeting", id: meeting.id })} />}
             />
           ) : null}
 
@@ -736,52 +558,11 @@ export function MorningBrewDashboard({
                 />
               }
               items={briefing.requests}
-              views={REQUEST_VIEWS}
+              views={REQUEST_VIEWS.map(view => ({ ...view, filter: (request: BrewRequest) => (view.id === "pending" || view.id === "unread") && replies[request.id] ? false : view.filter(request) }))}
               view={requestView}
               onView={setRequestView}
               emptyMessage="Nothing is waiting on a reply from you this morning."
-              render={(request) => (
-                <li key={request.id}>
-                  <span
-                    className={`brew-dot brew-dot--${
-                      request.priority === "urgent" ? "high" : request.priority
-                    }`}
-                    aria-hidden="true"
-                  />
-                  <time>{request.receivedLabel}</time>
-                  <div>
-                    <h3>
-                      <button
-                        className="brew-stretch"
-                        type="button"
-                        onClick={() => onOpenDetail({ kind: "request", id: request.id })}
-                      >
-                        {request.subject}
-                      </button>
-                    </h3>
-                    <p className="brew-email__body">{request.summary}</p>
-                    <p className="brew-email__from">
-                      {request.fromName} <span>· {request.fromRole}</span>
-                    </p>
-                    {/* "With Context" is where a row starts saying what it is
-                        waiting on, which is the cue the setup card promises. */}
-                    {emailLevel !== "glance" ? (
-                      <p className="brew-row__cue">
-                        {request.waitingLabel}
-                        {request.assigneeName ? ` · with ${request.assigneeName}` : " · unassigned"}
-                        {emailLevel === "deep" && request.important ? " · flagged important" : ""}
-                      </p>
-                    ) : null}
-                  </div>
-                  <span
-                    className={`brew-chip brew-chip--${
-                      request.priority === "urgent" ? "high" : request.priority
-                    }`}
-                  >
-                    {LEVEL_LABEL[request.priority]}
-                  </span>
-                </li>
-              )}
+              render={(request) => <EmailRow key={request.id} request={request} level={emailLevel} referenceDate={briefing.updatedAt} replied={Boolean(replies[request.id])} onOpen={() => onOpenDetail({ kind: "request", id: request.id })} />}
             />
           ) : null}
 
@@ -802,53 +583,7 @@ export function MorningBrewDashboard({
               view={priorityView}
               onView={setPriorityView}
               emptyMessage="No queue needs a decision from you this morning."
-              render={(priority) => (
-                <li key={priority.id}>
-                  <span
-                    className={`brew-priority-flag brew-priority-flag--${priority.level.toLowerCase()}`}
-                    aria-hidden="true"
-                  >
-                    <Glyph name="flag" size={16} />
-                  </span>
-                  <div>
-                    <span className="brew-row__top">
-                      <h3>
-                        <button
-                          className="brew-stretch"
-                          type="button"
-                          onClick={() => onOpenDetail({ kind: "priority", id: priority.id })}
-                        >
-                          {priority.title}
-                        </button>
-                      </h3>
-                      <i className={`brew-chip brew-chip--${priority.level.toLowerCase()}`}>
-                        {priority.level}
-                      </i>
-                    </span>
-                    <p>{priority.detail}</p>
-                    {/* "With Context" adds the next step and who owns it, which
-                        is the difference between a queue and a decision. */}
-                    {actionLevel !== "glance" ? (
-                      <p className="brew-prep-line">
-                        <span aria-hidden="true">→</span> {priority.steps[0]}
-                      </p>
-                    ) : null}
-                    {actionLevel !== "glance" ? (
-                      <p className="brew-row__cue">
-                        {priority.window}
-                        {priority.ownedByReader ? " · yours to move" : " · someone else's to report"}
-                      </p>
-                    ) : null}
-                    {actionLevel === "deep" ? (
-                      <p className="brew-row__facts">
-                        {priority.breakdown
-                          .map((row) => `${row.label}: ${row.value}`)
-                          .join("  ·  ")}
-                      </p>
-                    ) : null}
-                  </div>
-                </li>
-              )}
+              render={(priority) => <PriorityRow key={priority.id} priority={priority} level={actionLevel} onOpen={() => onOpenDetail({ kind: "priority", id: priority.id })} />}
             />
           ) : null}
 
@@ -882,7 +617,6 @@ export function MorningBrewDashboard({
         <NewsSection
           news={briefing.news}
           level={newsLevel}
-          onViewAll={() => navigate("knowledge")}
         />
       ) : null}
 

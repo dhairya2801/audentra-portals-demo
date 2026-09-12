@@ -45,6 +45,7 @@ export function EdwardPanel({
   const [question, setQuestion] = useState("");
   const [sending, setSending] = useState(false);
   const [seededRequest, setSeededRequest] = useState(request);
+  const panelRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
   const conversationIdRef = useRef<string | null>(null);
@@ -131,8 +132,9 @@ export function EdwardPanel({
 
   useEffect(() => {
     if (!request) return;
+    const opener = document.activeElement as HTMLElement | null;
     const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 140);
-    return () => window.clearTimeout(focusTimer);
+    return () => { window.clearTimeout(focusTimer); opener?.focus({ preventScroll: true }); };
   }, [request]);
 
   useEffect(() => {
@@ -146,6 +148,12 @@ export function EdwardPanel({
     if (!request) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
+      if (event.key === "Tab" && panelRef.current) {
+        const elements = [...panelRef.current.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), a[href]')];
+        const first = elements[0], last = elements.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -164,7 +172,7 @@ export function EdwardPanel({
       role="presentation"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
-      <aside className="brew-edward" role="dialog" aria-modal="true" aria-labelledby="brew-edward-title">
+      <aside ref={panelRef} className="brew-edward" role="dialog" aria-modal="true" aria-labelledby="brew-edward-title">
         <header>
           <span className="brew-edward__mark" aria-hidden="true">
             E<i />

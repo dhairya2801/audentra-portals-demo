@@ -1,7 +1,11 @@
 "use client";
 
 import type { StaffActionCenterQuery } from "@vv/contracts";
-import { useEffect, useRef, useState } from "react";
+import { DetailShell } from "./detail-shell";
+import { DayDetail } from "./day-detail";
+import { KpiGoal, TrendChart, TrendKey } from "./pulse";
+import { movementLabel, movementTone } from "./presentation";
+import { useState } from "react";
 
 import { topicById } from "./catalog";
 import { formatBrewNumber } from "./data";
@@ -9,6 +13,7 @@ import { Glyph } from "./glyphs";
 import type {
   BrewBriefing,
   BrewDetailRef,
+  BrewKpi,
   EdwardRequest,
   MorningBrewDestination,
   MorningBrewNavigate,
@@ -27,84 +32,6 @@ const DESTINATION_LABELS: Record<MorningBrewDestination, string> = {
   edward: "Edward",
 };
 
-const WIDTH = 680;
-const HEIGHT = 150;
-const PAD = 10;
-const SLOT = (series: { label: string }[]) => (WIDTH - PAD * 2) / series.length;
-const CENTRE = (series: { label: string }[], index: number) =>
-  PAD + SLOT(series) * index + SLOT(series) / 2;
-
-function ChartGrid() {
-  return (
-    <>
-      {[0, 0.25, 0.5, 0.75, 1].map((step) => (
-        <line
-          className="brew-chart__grid"
-          x1={PAD}
-          x2={WIDTH - PAD}
-          y1={HEIGHT * step}
-          y2={HEIGHT * step}
-          key={step}
-        />
-      ))}
-    </>
-  );
-}
-
-/**
- * Composition, zero-anchored so the bars stay comparable.
- *
- * This is the only chart Morning Brew draws, because a count of students in
- * each bucket is the only series the platform actually holds. There is no
- * history table behind these numbers, so there is no trend line to draw and no
- * benchmark to draw it against.
- */
-function CompositionPlot({ series }: { series: { label: string; value: number }[] }) {
-  const max = Math.max(...series.map((point) => point.value), 1);
-  const barWidth = Math.min(48, SLOT(series) * 0.5);
-  const yFor = (value: number) => HEIGHT - (value / max) * HEIGHT;
-
-  return (
-    <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Students in each group">
-      <ChartGrid />
-      {series.map((point, index) => {
-        const centre = CENTRE(series, index);
-        return (
-          <rect
-            className="brew-chart__bar"
-            x={centre - barWidth / 2}
-            y={yFor(point.value)}
-            width={barWidth}
-            height={Math.max(2, HEIGHT - yFor(point.value))}
-            rx={3}
-            key={point.label}
-          />
-        );
-      })}
-    </svg>
-  );
-}
-
-function BrewChart({ series, unit }: { series: { label: string; value: number }[]; unit: string }) {
-  if (series.length < 2) return null;
-  return (
-    <figure className="brew-chart">
-      <figcaption>
-        <span>{unit}</span>
-      </figcaption>
-      <CompositionPlot series={series} />
-      <div
-        className="brew-chart__axis"
-        style={{ gridTemplateColumns: `repeat(${series.length}, minmax(0, 1fr))` }}
-      >
-        {series.map((point) => (
-          <span key={point.label}>{point.label}</span>
-        ))}
-      </div>
-    </figure>
-  );
-}
-
 /**
  * The drill-down, as a dialog over the brief rather than a page in place of it.
  *
@@ -113,100 +40,6 @@ function BrewChart({ series, unit }: { series: { label: string; value: number }[
  * dismisses it. Escape closes, the backdrop closes, focus moves into the panel
  * on open and the page underneath cannot be scrolled while it is up.
  */
-function DetailShell({
-  eyebrow,
-  title,
-  mark,
-  accent = "purple",
-  meta,
-  actions,
-  children,
-  aside,
-  onBack,
-}: {
-  eyebrow: string;
-  title: string;
-  /** The glyph the card carried, so the panel opens as the same object. */
-  mark?: React.ReactNode;
-  accent?: "purple" | "blue" | "teal" | "navy" | "amber";
-  meta?: React.ReactNode;
-  actions?: React.ReactNode;
-  children: React.ReactNode;
-  /** The right column: Edward's read of this item, and what he can draft for it. */
-  aside?: React.ReactNode;
-  onBack: () => void;
-}) {
-  const panel = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onBack();
-    };
-    const { overflow } = document.body.style;
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", onKey);
-    panel.current?.focus();
-    return () => {
-      document.body.style.overflow = overflow;
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [onBack]);
-
-  return (
-    <div
-      className="brew-detail-layer"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onBack();
-      }}
-    >
-      <div
-        className="brew-detail"
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        tabIndex={-1}
-        ref={panel}
-      >
-        <header className="brew-detail__head">
-          {mark ? (
-            <span className={`brew-detail__mark brew-detail__mark--${accent}`} aria-hidden="true">
-              {mark}
-            </span>
-          ) : null}
-          <div>
-            <p className="brew-eyebrow">{eyebrow}</p>
-            <h1>{title}</h1>
-          </div>
-          <button className="brew-detail__close" type="button" onClick={onBack} aria-label="Close">
-            <span aria-hidden="true">✕</span>
-          </button>
-        </header>
-        {meta ? <div className="brew-detail__meta">{meta}</div> : null}
-        {actions ? <div className="brew-detail__actions">{actions}</div> : null}
-        {aside ? (
-          <div className="brew-detail__split">
-            <div className="brew-detail__body">{children}</div>
-            {aside}
-          </div>
-        ) : (
-          <div className="brew-detail__body">{children}</div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** How to open a reply to this person: honorific and surname, or first name. */
-function salutationFor(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/);
-  const honorifics = new Set(["dr.", "dr", "prof.", "prof", "mr.", "mrs.", "ms.", "rev."]);
-  if (parts.length > 1 && honorifics.has(parts[0].toLowerCase())) {
-    return `${parts[0]} ${parts[parts.length - 1]}`;
-  }
-  return parts[0];
-}
-
 /**
  * Edward's column beside an item from the day.
  *
@@ -385,8 +218,20 @@ export function MorningBrewDetail({
   onBack,
   navigate,
   onAskEdward,
+  onOpenDetail,
+  onManagePreferences,
+  drafts,
+  onDraftChange,
+  replies,
+  onDemoReply,
 }: {
   detail: BrewDetailRef;
+  onOpenDetail: (detail: BrewDetailRef) => void;
+  onManagePreferences: () => void;
+  drafts: Record<string, string>;
+  onDraftChange: (id: string, text: string) => void;
+  replies: Record<string, string>;
+  onDemoReply: (id: string, text: string) => void;
   briefing: BrewBriefing;
   onBack: () => void;
   navigate: MorningBrewNavigate;
@@ -420,35 +265,19 @@ export function MorningBrewDetail({
             ? `${topic?.title ?? "Enrollment"} · ${insight.label}`
             : `${topic?.title ?? "Enrollment"} · Institutional Intelligence`
         }
-        mark={<Glyph name="sparkle" size={20} />}
+        mark={<Glyph name={topic?.icon ?? "students"} size={20} />}
+        className="brew-detail--intelligence"
+        onAskEdward={() => onAskEdward({ mode: "cohort", context: insight.cohort.question })}
         accent="amber"
         title={insight.title}
         onBack={onBack}
         meta={
           <>
-            <span className={`brew-chip brew-chip--${insight.severity}`}>
-              {insight.severity === "positive"
-                ? "Clear"
-                : insight.severity === "high"
-                  ? "High"
-                  : "Medium"}
-            </span>
-            <span>Priority: {insight.impactLevel}</span>
+            <span>Potential impact · {insight.impactLevel}</span>
             <span>{insight.stats.deep}</span>
           </>
         }
-        actions={
-          <>
-            {openWorkspace(insight.destination)}
-            <button
-              className="brew-edward-chip"
-              type="button"
-              onClick={() => onAskEdward({ mode: "cohort", context: insight.cohort.question })}
-            >
-              <span aria-hidden="true">E</span> Ask Edward for these students
-            </button>
-          </>
-        }
+        actions={openWorkspace(insight.destination)}
       >
         <p className="brew-detail__lede">{insight.summary}</p>
 
@@ -476,13 +305,6 @@ export function MorningBrewDetail({
         {insight.detail.breakdown.length ? (
           <section className="brew-detail__section">
             <h2>What is blocking them</h2>
-            <BrewChart
-              series={insight.detail.breakdown.map((row) => ({
-                label: row.title,
-                value: row.students,
-              }))}
-              unit="Students with this requirement open"
-            />
             <table className="brew-table">
               <thead>
                 <tr>
@@ -560,50 +382,19 @@ export function MorningBrewDetail({
     return (
       <DetailShell
         eyebrow={`${topic?.title ?? "Enrollment"} · Institutional Pulse`}
-        mark={<Glyph name={kpi.icon} size={20} />}
+        mark={<Glyph name={topic?.icon ?? "students"} size={20} />}
         accent="teal"
         title={kpi.label}
         onBack={onBack}
-        meta={
-          <>
-            <b>{value}</b>
-            <span>{kpi.window}</span>
-          </>
-        }
-        actions={
-          <>
-            {openWorkspace("students")}
-            <button
-              className="brew-edward-chip"
-              type="button"
-              onClick={() => onAskEdward({ mode: "cohort", context: kpi.cohort.question })}
-            >
-              <span aria-hidden="true">E</span> Ask Edward for these students
-            </button>
-          </>
-        }
+        className="brew-detail--metric"
+        onAskEdward={() => onAskEdward({ mode: "cohort", context: kpi.cohort.question })}
+        actions={openWorkspace("students")}
       >
         <p className="brew-detail__lede">{kpi.detail.definition}</p>
 
-        <section className="brew-detail__section">
-          <h2>Where it stands</h2>
-          <div className="brew-stat-grid">
-            <div className="brew-stat">
-              <small>Value</small>
-              <strong>{value}</strong>
-              <p>{kpi.window}</p>
-            </div>
-            {kpi.targetDisplay && kpi.progressPercent !== null ? (
-              <div className="brew-stat">
-                <small>Progress to target</small>
-                <strong>{kpi.progressPercent}%</strong>
-                <p>
-                  Target {kpi.targetDisplay}
-                  {kpi.dueLabel ? ` · ${kpi.dueLabel}` : ""}
-                </p>
-              </div>
-            ) : null}
-          </div>
+        <section className="brew-metric-overview" aria-label="Current value and outlook">
+          <div><small>Current value</small><strong>{value}</strong><p>{kpi.window}</p><KpiGoal kpi={kpi} /></div>
+          <div><TrendChart kpi={kpi} favorable={(kpi.comparisons.find(c => c.label.includes("30 days")) ?? kpi.comparisons[0])?.favorable ?? true} /><TrendKey /></div>
         </section>
 
         {kpi.comparisons.length ? (
@@ -614,14 +405,14 @@ export function MorningBrewDetail({
             <ul className="brew-move-list">
               {kpi.comparisons.map((comparison) => (
                 <li key={comparison.id}>
-                  <span>{comparison.label}</span>
-                  <b className={comparison.favorable ? "is-good" : "is-watch"}>
+                  <span>{movementLabel(comparison.label, true)}</span>
+                  <b className={movementTone(comparison)}>
                     <i aria-hidden="true">
                       {comparison.direction === "up" ? "▲" : comparison.direction === "down" ? "▼" : "■"}
                     </i>{" "}
                     {comparison.delta}
                   </b>
-                  <em>{comparison.percent ?? "—"}</em>
+                  {comparison.percent ? <em>{comparison.percent}</em> : null}
                 </li>
               ))}
             </ul>
@@ -631,31 +422,7 @@ export function MorningBrewDetail({
         {kpi.detail.segments.length ? (
           <section className="brew-detail__section">
             <h2>Composition</h2>
-            <BrewChart
-              series={kpi.detail.segments.map((segment) => ({
-                label: segment.label,
-                value: segment.value,
-              }))}
-              unit="Students"
-            />
-            <table className="brew-table">
-              <thead>
-                <tr>
-                  <th scope="col">Group</th>
-                  <th scope="col">Students</th>
-                  <th scope="col">Share</th>
-                </tr>
-              </thead>
-              <tbody>
-                {kpi.detail.segments.map((segment) => (
-                  <tr key={segment.label}>
-                    <th scope="row">{segment.label}</th>
-                    <td>{segment.value}</td>
-                    <td>{segment.percent === null ? "—" : `${segment.percent}%`}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <MetricComposition kpi={kpi} />
           </section>
         ) : null}
 
@@ -673,165 +440,8 @@ export function MorningBrewDetail({
     );
   }
 
-  if (detail.kind === "meeting") {
-    const meeting = briefing.meetings.find((item) => item.id === detail.id);
-    if (!meeting) return <NotFound onBack={onBack} />;
-    const topic = topicById(meeting.topic);
-
-    return (
-      <DetailShell
-        eyebrow={`${topic?.title ?? "Enrollment"} · Calendar`}
-        mark={<Glyph name="calendar" size={20} />}
-        accent="purple"
-        title={meeting.title}
-        onBack={onBack}
-        meta={
-          <>
-            <span className={`brew-chip brew-chip--${meeting.priority}`}>
-              {meeting.priority === "high"
-                ? "High"
-                : meeting.priority === "medium"
-                  ? "Medium"
-                  : "Low"}
-            </span>
-            <span>{meeting.timeLabel}</span>
-            <span>{meeting.durationMinutes} min</span>
-            <span>
-              {meeting.attendees.length}{" "}
-              {meeting.attendees.length === 1 ? "guest" : "guests"}
-            </span>
-          </>
-        }
-        actions={
-          <button
-            className="button button--primary"
-            type="button"
-            onClick={() => navigate(meeting.destination)}
-          >
-            Open Outlook <span aria-hidden="true">→</span>
-          </button>
-        }
-        aside={
-          <EdwardInsights
-            heading="Prep me for this meeting"
-            read={`A ${meeting.durationMinutes}-minute meeting with ${meeting.attendees.length} ${
-              meeting.attendees.length === 1 ? "guest" : "guests"
-            } at ${meeting.timeLabel}. Here is what to walk in knowing.`}
-            draftHint="Your prep sheet — edit before you walk in"
-            draft={[
-              `${meeting.title} · ${meeting.timeLabel} · ${meeting.durationMinutes} min`,
-              "",
-              "Why it is on the calendar",
-              meeting.detail,
-              "",
-              "The one thing to do before you walk in",
-              meeting.prep,
-              "",
-              "Numbers to have ready",
-              "· Deposits 2,450 of 3,200, with 11 days to the May 31 deadline",
-              "· 324 verification files open; 88 of them waiting on our own review",
-              "· Commuter deposit rate 46.4%, down 6.4 points in seven days",
-              "· Transfer applications 2,604, 14% ahead of last year",
-              "",
-              "The question you will be asked",
-              meeting.organizer
-                ? "“What do you need from us today?” — have the ask ready in one sentence, with the number behind it."
-                : "“Where does the entering class land?” — give the range, 3,050 to 3,240, and say what closes it.",
-              "",
-              "What to leave with",
-              meeting.organizer
-                ? "A named owner for the verification queue and agreement to hold the May 31 date."
-                : "A decision, or a date by which the decision will be made. Not another meeting.",
-              "",
-              meeting.organizer
-                ? "You are hosting. Open on the decision you need rather than the recap — everyone here has already read the numbers."
-                : "Somebody else is hosting. Keep your part to two minutes and offer the detail afterwards.",
-            ].join("\n")}
-            onAskEdward={onAskEdward}
-            askContext={`the ${meeting.title} meeting at ${meeting.timeLabel}`}
-          />
-        }
-      >
-        <p className="brew-detail__lede">{meeting.detail}</p>
-        <section className="brew-detail__section">
-          <h2>Before you walk in</h2>
-          <p className="brew-detail__paragraph">{meeting.prep}</p>
-        </section>
-        <section className="brew-detail__section">
-          <h2>Who is in it</h2>
-          <ul className="brew-note-list">
-            {meeting.attendees.map((name) => (
-              <li key={name}>{name}</li>
-            ))}
-          </ul>
-        </section>
-        <section className="brew-detail__section brew-detail__section--evidence">
-          <h2>How this reached the brief</h2>
-          <ul className="brew-note-list">
-            <li>An accepted invitation on your calendar for today</li>
-            <li>
-              {meeting.organizer
-                ? "You are the organizer, so it appears under Hosted"
-                : "Organized by somebody else and accepted by you"}
-            </li>
-            <li>Priority is the invitation&rsquo;s own, not a score we computed</li>
-          </ul>
-        </section>
-      </DetailShell>
-    );
-  }
-
-  if (detail.kind === "request") {
-    const request = briefing.requests.find((item) => item.id === detail.id);
-    if (!request) return <NotFound onBack={onBack} />;
-
-    return (
-      <DetailShell
-        eyebrow="Email"
-        title={request.subject}
-        mark={<Glyph name="mail" size={20} />}
-        accent="purple"
-        onBack={onBack}
-        meta={
-          <>
-            <span className={`brew-chip brew-chip--${request.status === "new" ? "high" : "medium"}`}>
-              {request.unread ? "Unread" : request.status === "new" ? "No reply yet" : "Open"}
-            </span>
-            <span>{request.fromName}</span>
-            <span>{request.fromRole}</span>
-            <span>Received {request.receivedLabel}</span>
-          </>
-        }
-        actions={openWorkspace("messages")}
-        aside={
-          <EdwardInsights
-            heading="Draft a reply"
-            read={`${request.fromName}, ${request.fromRole}, wrote ${request.receivedLabel}. ${
-              request.unread ? "It is still unread." : "It has been opened but not answered."
-            } Here is a reply you can send.`}
-            draftHint="Edward's draft — read it before you send it"
-            draft={request.draftReply}
-            onAskEdward={onAskEdward}
-            askContext={`the email from ${request.fromName} about ${request.subject}`}
-          />
-        }
-      >
-        <p className="brew-detail__lede">{request.summary}</p>
-        <section className="brew-detail__section">
-          <h2>Ownership</h2>
-          <p className="brew-detail__paragraph">
-            {request.assigneeName
-              ? `Assigned to ${request.assigneeName}.`
-              : "Nobody is assigned to this conversation yet."}
-          </p>
-          <p className="brew-detail__note">
-            The full thread lives in Messages. Morning Brew shows the opening message only;
-            Edward&rsquo;s draft beside it is yours to edit and send from there, and is not
-            written back to the conversation.
-          </p>
-        </section>
-      </DetailShell>
-    );
+  if (detail.kind === "meeting" || detail.kind === "request") {
+    return <DayDetail detail={detail} briefing={briefing} onBack={onBack} onAskEdward={onAskEdward} onOpenDetail={onOpenDetail} onManagePreferences={onManagePreferences} drafts={drafts} onDraftChange={onDraftChange} replies={replies} onDemoReply={onDemoReply} />;
   }
 
   if (detail.kind === "priority") {
@@ -842,14 +452,15 @@ export function MorningBrewDetail({
     return (
       <DetailShell
         eyebrow={`${topic?.title ?? "Enrollment"} · Action Center`}
-        mark={<Glyph name={priority.icon} size={20} />}
+        mark={<Glyph name={topic?.icon ?? "actions"} size={20} />}
+        onAskEdward={() => onAskEdward({ mode: "ask", context: priority.title })}
         accent="blue"
         title={priority.title}
         onBack={onBack}
         meta={
           <>
             <span className={`brew-chip brew-chip--${priority.level.toLowerCase()}`}>
-              {priority.level}
+              Priority · {priority.level}
             </span>
             <span>{priority.window}</span>
             <b>{formatBrewNumber(priority.count)}</b>
@@ -909,4 +520,22 @@ export function MorningBrewDetail({
   }
 
   return <NotFound onBack={onBack} />;
+}
+
+const COMPOSITION_COLORS = ["#6546d7", "#2488bf", "#14a58a", "#d29935", "#a470b3"];
+function MetricComposition({ kpi }: { kpi: BrewKpi }) {
+  const segments = kpi.detail.segments;
+  const total = segments.reduce((sum, segment) => sum + segment.value, 0);
+  // Only draw a whole when the supplied parts actually equal the count.
+  const whole = total > 0 && !/[%$]/.test(kpi.display) && total === kpi.value && segments.every(segment => segment.value >= 0);
+  return <div className={whole ? "brew-composition" : "brew-composition brew-composition--table"}>
+    {whole ? <div className="brew-donut"><svg viewBox="0 0 120 120" role="img" aria-label={`${kpi.label}: ${kpi.display} total; breakdown in the adjacent legend`}>
+      {segments.map((segment, index) => {
+        const share = segment.value / total * 100;
+        const offset = -segments.slice(0, index).reduce((sum, item) => sum + item.value, 0) / total * 100;
+        return <circle key={segment.label} cx="60" cy="60" r="47" fill="none" stroke={COMPOSITION_COLORS[index % COMPOSITION_COLORS.length]} strokeWidth="13" pathLength="100" strokeDasharray={`${share} ${100 - share}`} strokeDashoffset={offset} transform="rotate(-90 60 60)" />;
+      })}
+    </svg><span><strong>{kpi.display}</strong><small>Total</small></span></div> : null}
+    <table className="brew-table"><thead><tr><th scope="col">Group</th><th scope="col">Value</th><th scope="col">Share</th></tr></thead><tbody>{segments.map((segment, index) => <tr key={segment.label}><th scope="row">{whole ? <i className="brew-composition__key" style={{ background: COMPOSITION_COLORS[index % COMPOSITION_COLORS.length] }} /> : null}{segment.label}</th><td>{formatBrewNumber(segment.value)}</td><td>{segment.percent === null ? "—" : `${segment.percent}%`}</td></tr>)}</tbody></table>
+  </div>;
 }

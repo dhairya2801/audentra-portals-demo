@@ -1,4 +1,5 @@
 import {
+  supportedLevel,
   BREW_SOURCE_IDS,
   BREW_TOPIC_IDS,
   DEFAULT_BREW_SOURCES,
@@ -75,7 +76,7 @@ function normalizeSources(value: unknown): Record<BrewSourceId, BrewSourcePrefer
         {
           enabled: typeof enabled === "boolean" ? enabled : fallback.enabled,
           detail: DETAIL_LEVELS.has(String(detail))
-            ? (detail as BrewDetailLevelId)
+            ? supportedLevel(id, detail as BrewDetailLevelId)
             : fallback.detail,
         },
       ];

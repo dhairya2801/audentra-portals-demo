@@ -1,0 +1,36 @@
+{
+  "tool": "Built-in image_gen",
+  "purpose": "Illustrative fictional Aster campus and dining imagery",
+  "images": [
+    {
+      "name": "housing-hall",
+      "prompt": "Editorial architectural photograph for a fictional university residence hall detail page. Beautiful warm brick collegiate residence hall, arched entry, ivy accents, mature oak trees, beautifully maintained green courtyard, sunny golden afternoon, inviting realistic student campus, premium university prospectus photography, wide landscape composition, no text or watermark, not a luxury hotel. Natural colors, refined, realistic.",
+      "file": "concept4-housing-hall.png"
+    },
+    {
+      "name": "housing-room",
+      "prompt": "Editorial interior photograph for a fictional university housing detail page. Beautiful realistic shared double dorm room, two neatly styled twin beds with ivory linen and muted sage throws, warm oak desks, study lamps, large windows with leafy campus views, afternoon sunlight, books and a few plants, inviting thoughtfully designed compact student room. Wide landscape architectural photograph, natural textures, no people, no text or watermark.",
+      "file": "concept4-housing-room.png"
+    },
+    {
+      "name": "housing-suite",
+      "prompt": "Editorial architectural interior photograph for a fictional university student suite detail page. Beautiful contemporary shared apartment living room with warm oak floor, cream sofa, muted terracotta cushions, plants, small dining table and bright compact kitchen, generous windows overlooking leafy campus. Comfortable achievable student housing, natural afternoon light, wide landscape composition, authentic materials, no text, no watermark.",
+      "file": "concept4-housing-suite.png"
+    },
+    {
+      "name": "dining-meal",
+      "prompt": "Premium editorial food photograph for a university meal plan detail page. Beautiful fresh lunch on a warm pale oak dining table: ceramic bowl with grilled chicken, roasted colorful vegetables, leafy greens and grains, small bowl of fruit, glass of water, fork and linen napkin. Sunlit campus cafe atmosphere softly blurred behind, generous inviting composition, wide landscape, natural vibrant colors, real appetizing food, no text or watermark.",
+      "file": "concept4-dining-meal.png"
+    },
+    {
+      "name": "dining-hall",
+      "prompt": "Premium editorial architectural photograph for a fictional university dining hall detail page. Beautiful bright contemporary collegiate dining commons with lofty windows overlooking trees, warm oak communal tables, cream and sage seating, pendant lights, inviting greenery, softly visible fresh-food serving stations in distance. Welcoming lively space, a few distant adult students subtly out of focus, golden morning natural light, wide landscape, no logos text or watermark.",
+      "file": "concept4-dining-hall.png"
+    },
+    {
+      "name": "dining-cafe",
+      "prompt": "Premium editorial food and lifestyle photograph for a university flexible meal plan detail page. An inviting campus cafe table by a sunny window: ceramic cappuccino, delicious toasted sandwich with leafy greens and tomato, colorful fruit bowl, small notebook nearby. Warm honey oak and forest green accents, garden softly blurred outside, beautiful natural light and authentic food textures, wide landscape photograph, no text or watermark.",
+      "file": "concept4-dining-cafe.png"
+    }
+  ]
+}

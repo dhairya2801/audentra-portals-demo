@@ -50,7 +50,7 @@ export const BREW_TOPICS: BrewTopic[] = [
     icon: "deposit",
     accent: "teal",
     recommended: true,
-    recommendation: "Where an admit quietly stops converting",
+    recommendation: "Enrollment progress and student readiness",
   },
   {
     id: "housing",
@@ -70,7 +70,7 @@ export const BREW_TOPICS: BrewTopic[] = [
     icon: "events",
     accent: "navy",
     recommended: false,
-    recommendation: "The yield lever that is not a discount",
+    recommendation: "Student engagement and campus readiness",
   },
 ];
 
@@ -93,21 +93,21 @@ export const BREW_SOURCES: BrewSourceDefinition[] = [
         title: "At a Glance",
         kicker: "The essentials",
         description:
-          "The figure and where it moved. Each card cycles its comparison windows in one place—yesterday, the last 7 and 30 days, and the same day last year—so one card carries one reading at a time.",
+          "The current figure, with rotating comparisons for yesterday, last week, last month and last year.",
         tag: "Fast scan",
       },
       context: {
         title: "With Context",
         kicker: "Goals & progress",
         description:
-          "Add the goal beside the figure—650 of 900, 72% of the way there, due by the date it has to be met. You can see what is on pace and what is not without opening anything.",
+          "See the goal, deadline and projected outcome together. Know immediately whether you’re on target, at risk or off target.",
         tag: "Decision context",
       },
       deep: {
         title: "Deep Dive",
         kicker: "The whole run",
         description:
-          "Add thirty days as a chart—last year behind it, this year's actuals on top, and the pace you are running at continued as a dotted line—with one sentence reading the trend.",
+          "Add a compact trend chart alongside the same goal and outlook. Compare actual progress, last year and the projected path.",
         tag: "Deeper insight",
       },
     },
@@ -162,27 +162,27 @@ export const BREW_SOURCES: BrewSourceDefinition[] = [
     icon: "calendar",
     accent: "purple",
     recommended: true,
-    levels: ["glance", "context", "deep"],
+    levels: ["glance", "context"],
     details: {
       glance: {
         title: "At a Glance",
         kicker: "The essentials",
         description:
-          "Today in time order: when it starts, how long it runs, who is in it, and how urgent it is.",
+          "See today’s meetings, times, attendees and whether you’re hosting.",
         tag: "Fast scan",
       },
       context: {
         title: "With Context",
         kicker: "What to do about it",
         description:
-          "Add the prep line on every high-priority meeting—the one thing to have read or decided before you walk in.",
+          "Add the preparation that matters for each meeting, so you arrive ready to decide.",
         tag: "Decision context",
       },
       deep: {
         title: "Deep Dive",
         kicker: "The whole day",
         description:
-          "Add the full guest list on every meeting, so you can see whose time today is really being spent and where the same room meets twice.",
+          "See the full attendee list with meeting preparation. Open any meeting for an editable prep sheet.",
         tag: "Deeper insight",
       },
     },
@@ -197,27 +197,27 @@ export const BREW_SOURCES: BrewSourceDefinition[] = [
     icon: "outlook",
     accent: "blue",
     recommended: true,
-    levels: ["glance", "context", "deep"],
+    levels: ["glance", "context"],
     details: {
       glance: {
         title: "At a Glance",
         kicker: "The essentials",
         description:
-          "See your highest-priority messages with sender, subject, time, and a quick summary—so you can scan what matters in seconds.",
+          "Scan sender, role, subject and time, with a clear signal for unread, pending response or flagged email.",
         tag: "Fast scan",
       },
       context: {
         title: "With Context",
         kicker: "Why it matters",
         description:
-          "Add priority signals and action cues so you can quickly understand what needs a response, a review, or a follow-up.",
+          "Add the message preview to understand the request without opening every email.",
         tag: "Decision context",
       },
       deep: {
         title: "Deep Dive",
         kicker: "What it means for you",
         description:
-          "Go beyond individual messages with inbox patterns, response priorities, and follow-up insights to help you manage communication more proactively.",
+          "See how long each request has been waiting. Open a message to review the context and edit a draft reply.",
         tag: "Deeper insight",
       },
     },
@@ -262,7 +262,7 @@ export const BREW_SOURCES: BrewSourceDefinition[] = [
     title: "Institutional Intelligence",
     kicker: "See what your data is telling you",
     description:
-      "We read across your canonical records for the three things most likely to change your enrollment outcome this week—what is moving, what it costs if it keeps moving, and the one action that would turn it.",
+      "Three institutional developments to watch: what changed, the potential impact and the next action to consider.",
     source: "Applications, payments, requirements, and aid records",
     icon: "sparkle",
     accent: "amber",
@@ -287,7 +287,7 @@ export const BREW_SOURCES: BrewSourceDefinition[] = [
         title: "Deep Dive",
         kicker: "The whole argument",
         description:
-          "Add the full reasoning—every figure the finding rests on, the range around it, and a recommendation stated tightly enough to act on this week.",
+          "Add the full reasoning and people in the cohort to follow up with, alongside a recommendation you can act on this week.",
         tag: "Deeper insight",
       },
     },

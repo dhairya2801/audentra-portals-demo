@@ -90,14 +90,14 @@ const newsLimit = (preferences: BrewPreferences) =>
 export const BREW_INSIGHT_COUNT = 3;
 
 /**
- * A minute per switched-on source, and a second minute for one asked for in
- * full. It is a reading estimate over what is actually on the page, not a
- * setting the reader chose and we then honour.
+ * A local reading estimate based on selected topics, sources and depth.
+ * This affects presentation only; it does not change institutional calculations.
  */
 function readTimeFor(preferences: BrewPreferences): number {
-  const on = Object.values(preferences.sources).filter((source) => source.enabled);
-  const deep = on.filter((source) => source.detail === "deep").length;
-  return Math.max(1, Math.round(on.length * 0.4 + deep * 0.5));
+  const on = Object.entries(preferences.sources).filter(([, source]) => source.enabled);
+  const depth = { glance: 0.3, context: 0.5, deep: 0.8 };
+  const minutes = on.reduce((total, [id, source]) => total + depth[supportedLevel(id as BrewSourceId, source.detail)], 0);
+  return Math.round(minutes * (0.5 + preferences.topics.length * 0.2) * 10) / 10;
 }
 
 /* ------------------------------------------------------------------- builder */

@@ -10,9 +10,23 @@ async function loadApiClient() {
   );
   const parentPortalRoutes =
     "data:text/javascript,export%20const%20isParentPortalPath%3D()%3D%3Efalse%3B";
+  const taskBoardSource = await readFile(
+    new URL("../app/staff/task-board-utils.ts", import.meta.url),
+    "utf8",
+  );
+  const taskBoardCompiled = ts.transpileModule(taskBoardSource, {
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const taskBoardUrl = `data:text/javascript;base64,${Buffer.from(taskBoardCompiled).toString("base64")}`;
   const executable = source.replace(
     'from "./parent-portal-routes";',
     `from ${JSON.stringify(parentPortalRoutes)};`,
+  ).replace(
+    'from "../staff/task-board-utils";',
+    `from ${JSON.stringify(taskBoardUrl)};`,
   );
   const compiled = ts.transpileModule(executable, {
     compilerOptions: {
