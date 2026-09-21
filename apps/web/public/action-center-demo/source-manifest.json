@@ -1,0 +1,46 @@
+{
+  "sourceRepository": "git@github.com:dhairya2801/audentra-portals-demo.git",
+  "sourceRef": "main",
+  "sourceCommit": "d4569a9924b60491618c2fdf6d6630caa870f339",
+  "sourcePath": "apps/web/public/action-center-approved/",
+  "sourceUrl": "https://test.audentra.ai/action-center-approved/",
+  "capturedAt": "2026-09-14",
+  "description": "Unmodified deploy-remote task-board mock, including its portal navigation and copy-link adapter.",
+  "files": {
+    "assets/Geist-LICENSE.txt": "71609cbb5c78b5870d712eab73a31d76622635c6ed034ab5cee3b9ecbda8685f",
+    "assets/NOTICE.md": "ea2ace8c558692d4cf8b60e9134bfb01a3b20d458b35bbce727f237c753a57ac",
+    "assets/audentra.svg": "f448178d0b2cc969e71579cea7a05f8469e8d4a4736b8cd3f2cef07837df05af",
+    "assets/geist-latin.woff2": "19f9c92546aa300c312235e3125af1b81394d8db9a4bc4a425cd5b641d2d54e1",
+    "index.html": "5cd1df15e6d267edd1fcbaa9b4844e7cbf25af30dea9b3ec2a9c866ce5ccef00",
+    "portal-bridge.js": "a32f37252bdeb7df78a073afd0402c306cd92144d08b1e653b620160c8c9459a",
+    "src/app.js": "727f0394408adab0657a9f00c148eb991652528113a5e9a46b34dbe91cb45eb0",
+    "src/board.js": "9ee09ee3912299ab2ceea22faf1d3077cdc816f82deab2da8a55c272c995d11c",
+    "src/data.js": "faaf182c3b44e8173419af5d66b4df857ff8915d83e8475f84da7cf7ef73d794",
+    "src/detail.js": "a7facd927d785c959d173160b0427900ee75e0b34cd7b16e88ef4a88718f8f1b",
+    "src/documents.js": "f3f9b1b2f1a02fe7af3ad49370ec9423384274610796f86791afb07b37c60ef3",
+    "src/icon-paths.js": "ff6c10d95163f20fcb3e296cb055fdbe3b3fc5bd40ba0832e581739876d18871",
+    "src/operations.js": "1e00c713ccd264c6a292d0d794a551a5463bc258be2d19e540921eee70664a32",
+    "src/requests.js": "5046debff7feaede15ad3e50af64c2742c0b8b90cab4385be53089df409fa93f",
+    "src/review-model.js": "cea2b8a0f3b2d4d51565b009d4cec09ff357b429fced86f4170420b6f8fa0d76",
+    "src/store.js": "cf460358b4d91ea6c338037ee64e35ca8c058c0fc06a3ca9665e5a715248ca45",
+    "src/ui.js": "19edbf5e2dcd2edddb1941e69fe09245524b16e401289bf22572a6c335bf3067",
+    "src/workflow.js": "dd3433ac9bbdbc54800bd8f52ccd6d979f08af8ddf9d165f7647873af68c4f4b",
+    "styles.css": "d5b076c52056189859dd2155e2420965943f0014eae90155b25c0fa40a7ef07c"
+  },
+  "integration": {
+    "step": 2,
+    "description": "Original hashes remain the visual baseline; styles.css is unchanged. Canonical identities and original uploads are connected. Parsing and workflow commands stay simulated.",
+    "adaptedFiles": [
+      "src/app.js",
+      "src/board.js",
+      "src/documents.js",
+      "src/review-model.js",
+      "src/store.js",
+      "src/ui.js"
+    ],
+    "addedFiles": [
+      "src/identities.js",
+      "src/originals.js"
+    ]
+  }
+}

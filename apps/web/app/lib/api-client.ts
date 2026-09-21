@@ -1,4 +1,7 @@
 import type {
+  DemoResetStatus,
+  DemoResetInput,
+  DemoResetResult,
   AcceptOfferResponse,
   ActivityEventInput,
   AskEdwardInput,
@@ -34,6 +37,12 @@ import type {
   DeferStudentExperienceUpdatesResult,
   DecideStudentExperienceUpdateInput,
   EdwardFeedbackInput,
+  EdwardActionIntent,
+  EdwardActionReceipt,
+  ConfirmEdwardActionInput,
+  CancelEdwardActionInput,
+  StaffEmailSendIntent,
+  ConfirmStaffEmailSendIntentInput,
   EdwardResponseFeedback,
   StudentAppointment,
   StudentAppointmentList,
@@ -45,8 +54,11 @@ import type {
   DemoStaffSignInInput,
   RescheduleStudentAppointmentInput,
   StaffAppointmentCalendar,
+  StaffAssistantConversationMessagesResponse,
   StaffCaseload,
   StaffMe,
+  StaffStudentSearch,
+  StaffStudentSearchQuery,
   StudentAdvising,
   UpdateStaffAppointmentInput,
   StudentAcademics,
@@ -82,7 +94,6 @@ import type {
   StaffActionRuleList,
   StaffCorePlay,
   StaffDocumentDecisionResult,
-  StaffDocumentReviewOptions,
   StaffEdwardPreview,
   StaffEdwardPreviewInput,
   StaffEdwardConfigurationDraft,
@@ -93,28 +104,20 @@ import type {
   StaffManagedConfiguration,
   StaffManagedConfigurationKind,
   StaffMorningBrew,
-  StaffMorningBrewExternalContext,
-  StaffAuthOptions,
-  StaffEmailSendIntent,
-  StaffIdentityProvider,
-  StaffMailboxList,
-  StaffMailMessageList,
   StaffNotificationList,
   StaffNotificationReadResult,
   StaffOperationsWorkspace,
   StaffOutreachRun,
   StaffPortalMediaUpload,
-  StaffWebSearchInput,
-  StaffWebSearchResponse,
   StaffSession,
   StaffSignInInput,
   StaffSignUpInput,
-  CreateStaffStudentNoteInput,
-  StaffStudentNote,
   StaffStudentRecord,
   StaffWorkItem,
   StaffWorkItemDetail,
   StartStaffInteractionInput,
+  SaveStaffOutreachDraftInput,
+  SaveStaffOutreachDraftResult,
   SubmitStudentRequirementResponseInput,
   SubmitStudentRequirementResponseResult,
   StudentClub,
@@ -133,12 +136,9 @@ import type {
   UpdateStudentProfileInput,
   FerpaDelegateLinkIssueResult,
   DelegateSession,
-  ConfirmStaffEmailSendIntentInput,
-  CreateStaffEmailSendIntentInput,
-  SearchStaffMailInput,
 } from "@vv/contracts";
 import { actionCenterQueryToParams } from "../staff/task-board-utils";
-import type { EdwardExecutionMode } from "./edward-lab";
+import type { EdwardExecutionMode, EdwardReadPlanner } from "./edward-lab";
 import { isParentPortalPath } from "./parent-portal-routes";
 
 const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
@@ -151,6 +151,7 @@ export const API_BASE_URL = (configuredApiBaseUrl || "").replace(/\/+$/, "");
 // so this module carries no runtime dependency on Lab code; `edward-lab.ts`
 // exports the same constant and a test pins the two together.
 const EDWARD_EXECUTION_MODE_HEADER = "X-Edward-Mode";
+const EDWARD_READ_PLANNER_HEADER = "x-edward-read-planner";
 const PORTAL_SESSION_MODE_HEADER = "X-Audentra-Session-Mode";
 const DELEGATE_SESSION_MODE_KEY = "vv:delegate-session-mode";
 
@@ -305,8 +306,7 @@ async function request<T>(
     throw await parseError(response);
   }
 
-  const result =
-    response.status === 204 ? (undefined as T) : ((await response.json()) as T);
+  const result = (await response.json()) as T;
   if (
     typeof window !== "undefined" &&
     (init.method ?? "GET").toUpperCase() !== "GET" &&
@@ -1012,122 +1012,30 @@ export function signOutStaff() {
   );
 }
 
-export function getStaffAuthOptions(tenantSlug: string, signal?: AbortSignal) {
-  const query = new URLSearchParams({ tenantSlug });
-  return request<StaffAuthOptions>(`/v1/auth/staff/options?${query}`, { signal });
+export function getDemoResetStatus(signal?: AbortSignal) {
+  return request<DemoResetStatus>("/v1/staff/demo/reset", { method: "GET", signal });
 }
 
-function absoluteApiUrl(path: string) {
-  if (API_BASE_URL) return `${API_BASE_URL}${path}`;
-  if (typeof window !== "undefined") return new URL(path, window.location.origin).toString();
-  return path;
-}
-
-export function staffSsoStartUrl(
-  provider: StaffIdentityProvider,
-  tenantSlug: string,
-  returnTo: string,
-) {
-  const query = new URLSearchParams({ tenantSlug, returnTo });
-  return absoluteApiUrl(
-    `/v1/auth/staff/sso/${encodeURIComponent(provider)}/start?${query}`,
-  );
-}
-
-export function staffMailboxConnectUrl(input: {
-  provider: StaffIdentityProvider;
-  mailboxKind: "personal" | "shared";
-  address: string;
-  returnTo: string;
-}) {
-  const query = new URLSearchParams({
-    mailboxKind: input.mailboxKind,
-    address: input.address,
-    returnTo: input.returnTo,
-  });
-  return absoluteApiUrl(
-    `/v1/staff/mail/oauth/${encodeURIComponent(input.provider)}/start?${query}`,
-  );
-}
-
-export function getStaffMailboxes(signal?: AbortSignal) {
-  return request<StaffMailboxList>("/v1/staff/mailboxes", {
-    method: "GET",
-    headers: staffHeaders,
-    signal,
-  });
-}
-
-export function disconnectStaffMailbox(mailboxId: string) {
-  return request<void>(
-    `/v1/staff/mailboxes/${encodeURIComponent(mailboxId)}/connection`,
-    { method: "DELETE", headers: staffHeaders },
-  );
-}
-
-export function getRecentStaffMail(
-  mailboxId: string,
-  limit = 25,
-  signal?: AbortSignal,
-) {
-  const query = new URLSearchParams({ mailboxId, limit: String(limit) });
-  return request<StaffMailMessageList>(`/v1/staff/mail/messages?${query}`, {
-    method: "GET",
-    headers: staffHeaders,
-    signal,
-  });
-}
-
-export function searchStaffMail(input: SearchStaffMailInput) {
-  return request<StaffMailMessageList>("/v1/staff/mail/search", {
+export function resetDemo() {
+  return request<DemoResetResult>("/v1/staff/demo/reset", {
     method: "POST",
-    headers: { ...staffHeaders, "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirmation: "RESET DEMO" } satisfies DemoResetInput),
   });
 }
 
-export function createStaffEmailSendIntent(
-  input: CreateStaffEmailSendIntentInput,
-) {
-  return request<StaffEmailSendIntent>("/v1/staff/mail/send-intents", {
-    method: "POST",
-    headers: { ...staffHeaders, "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-}
-
-export function confirmStaffEmailSendIntent(
-  intentId: string,
-  input: ConfirmStaffEmailSendIntentInput,
-  idempotencyKey: string,
-) {
-  return request<StaffEmailSendIntent>(
-    `/v1/staff/mail/send-intents/${encodeURIComponent(intentId)}/confirm`,
-    {
-      method: "POST",
-      headers: {
-        ...staffHeaders,
-        "Content-Type": "application/json",
-        "Idempotency-Key": idempotencyKey,
-      },
-      body: JSON.stringify(input),
-    },
-  );
-}
-
-const staffHeaders = {
-  "X-Demo-Actor-Type": "staff",
-} as const;
+// Staff requests use the credentialed session cookie, including demo sign-ins.
+// Never send development actor headers from the portal: after sign-out those
+// headers would reopen the runtime default staff identity without a session.
 
 export function getStaffMe(signal?: AbortSignal) {
-  return request<StaffMe>("/v1/staff/me", { method: "GET", headers: staffHeaders, signal });
+  return request<StaffMe>("/v1/staff/me", { method: "GET", signal });
 }
 
 export function getStaffCaseload(role: string | null, signal?: AbortSignal) {
   const suffix = role ? `?role=${encodeURIComponent(role)}` : "";
   return request<StaffCaseload>(`/v1/staff/caseload${suffix}`, {
     method: "GET",
-    headers: staffHeaders,
     signal,
   });
 }
@@ -1143,7 +1051,6 @@ export function getStaffAppointments(
   const suffix = search.size > 0 ? `?${search.toString()}` : "";
   return request<StaffAppointmentCalendar>(`/v1/staff/appointments${suffix}`, {
     method: "GET",
-    headers: staffHeaders,
     signal,
   });
 }
@@ -1153,10 +1060,26 @@ export function updateStaffAppointment(appointmentId: string, input: UpdateStaff
     `/v1/staff/appointments/${encodeURIComponent(appointmentId)}`,
     {
       method: "PATCH",
-      headers: { ...staffHeaders, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     },
   );
+}
+
+/**
+ * One bounded page of the tenant roster, matched server-side. The Students
+ * view searches through this rather than filtering a browser copy.
+ */
+export function searchStaffStudents(query: StaffStudentSearchQuery = {}, signal?: AbortSignal) {
+  const params = new URLSearchParams();
+  if (query.query?.trim()) params.set("query", query.query.trim());
+  if (query.studentId) params.set("studentId", query.studentId);
+  if (query.limit) params.set("limit", String(query.limit));
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+  return request<StaffStudentSearch>(`/v1/staff/students${suffix}`, {
+    method: "GET",
+    signal,
+  });
 }
 
 /**
@@ -1171,7 +1094,6 @@ export function getStaffActionCenter(
   const suffix = params.size > 0 ? `?${params.toString()}` : "";
   return request<StaffActionCenter>(`/v1/staff/action-center${suffix}`, {
     method: "GET",
-    headers: staffHeaders,
     signal,
   });
 }
@@ -1215,7 +1137,6 @@ export function getStaffWorkItemDetail(
     `/v1/staff/work-items/${encodeURIComponent(workItemId)}`,
     {
       method: "GET",
-      headers: staffHeaders,
       signal,
     },
   );
@@ -1224,7 +1145,6 @@ export function getStaffWorkItemDetail(
 export function getStaffOperationsWorkspace(signal?: AbortSignal) {
   return request<StaffOperationsWorkspace>("/v1/staff/workspace", {
     method: "GET",
-    headers: staffHeaders,
     signal,
   });
 }
@@ -1238,69 +1158,8 @@ export function getStaffOperationsWorkspace(signal?: AbortSignal) {
 export function getStaffMorningBrew(signal?: AbortSignal) {
   return request<StaffMorningBrew>("/v1/staff/morning-brew", {
     method: "GET",
-    headers: staffHeaders,
     signal,
   });
-}
-
-/**
- * Read the canonical external-news state prepared for the staff member's
- * Morning Brew. The platform owns provider credentials, scheduling, and
- * query construction; this browser request carries no search text.
- */
-export function getStaffMorningBrewExternalContext(signal?: AbortSignal) {
-  return request<StaffMorningBrewExternalContext>(
-    "/v1/staff/morning-brew/external-context",
-    {
-      method: "GET",
-      headers: staffHeaders,
-      signal,
-    },
-    { notifyStudentRecordChanged: false },
-  );
-}
-
-/**
- * Ask the platform to refresh the asynchronous Morning Brew external-news
- * context. It is intentionally input-free: no provider query or credential
- * can originate from the browser.
- */
-export function triggerStaffMorningBrewExternalContext(signal?: AbortSignal) {
-  return request<StaffMorningBrewExternalContext>(
-    "/v1/staff/morning-brew/external-context",
-    {
-      method: "POST",
-      headers: staffHeaders,
-      signal,
-    },
-    { notifyStudentRecordChanged: false },
-  );
-}
-
-/**
- * Searches public web sources through the authenticated platform boundary.
- * The browser never talks to the search provider or receives its credential.
- */
-export function searchStaffWeb(
-  input: StaffWebSearchInput,
-  signal?: AbortSignal,
-) {
-  return request<StaffWebSearchResponse>(
-    "/v1/staff/web-search",
-    {
-      method: "POST",
-      headers: {
-        ...staffHeaders,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(input),
-      signal,
-    },
-    {
-      // Searching public sources does not mutate a student record.
-      notifyStudentRecordChanged: false,
-    },
-  );
 }
 
 export function getStaffManagedConfiguration(
@@ -1311,7 +1170,6 @@ export function getStaffManagedConfiguration(
     `/v1/staff/configurations/${kind}`,
     {
       method: "GET",
-      headers: staffHeaders,
       signal,
     },
   );
@@ -1326,7 +1184,6 @@ export function updateStaffManagedConfiguration(
     {
       method: "PUT",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(input),
@@ -1342,7 +1199,6 @@ export function uploadStaffPortalMedia(file: File) {
     "/v1/staff/media",
     {
       method: "POST",
-      headers: staffHeaders,
       body,
     },
     { notifyStudentRecordChanged: false },
@@ -1357,7 +1213,6 @@ export function draftStaffConfigurationWithEdward(
     {
       method: "POST",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(input),
@@ -1375,7 +1230,6 @@ export function updateStaffKnowledgeCard(
     {
       method: "PATCH",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(input),
@@ -1390,7 +1244,6 @@ export function createStaffKnowledgeCard(input: CreateStaffKnowledgeCardInput) {
     {
       method: "POST",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(input),
@@ -1408,7 +1261,6 @@ export function updateStaffCorePlay(
     {
       method: "PATCH",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(input),
@@ -1423,7 +1275,6 @@ export function createStaffCorePlay(input: CreateStaffCorePlayInput) {
     {
       method: "POST",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(input),
@@ -1441,7 +1292,6 @@ export function updateStaffInquiry(
     {
       method: "PATCH",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(input),
@@ -1459,7 +1309,6 @@ export function updateStaffClub(
     {
       method: "PATCH",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(input),
@@ -1474,7 +1323,6 @@ export function createStaffClub(input: CreateStaffClubInput) {
     {
       method: "POST",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(input),
@@ -1487,7 +1335,6 @@ export function simulateStaffOutreach(input: SimulateStaffOutreachInput) {
   return request<StaffOutreachRun>("/v1/staff/outreach/simulate", {
     method: "POST",
     headers: {
-      ...staffHeaders,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(input),
@@ -1498,7 +1345,6 @@ export function previewStaffEdward(input: StaffEdwardPreviewInput) {
   return request<StaffEdwardPreview>("/v1/staff/edward/preview", {
     method: "POST",
     headers: {
-      ...staffHeaders,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(input),
@@ -1514,7 +1360,6 @@ export function updateStaffWorkItem(
     {
       method: "PATCH",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(input),
@@ -1527,7 +1372,6 @@ export function getStaffInquiryThread(inquiryId: string, signal?: AbortSignal) {
   return request<StaffInquiryThread>(
     `/v1/staff/inquiries/${encodeURIComponent(inquiryId)}/thread`,
     {
-      headers: staffHeaders,
       signal,
     },
     { notifyStudentRecordChanged: false },
@@ -1543,7 +1387,6 @@ export function createStaffWorkItem(
     {
       method: "POST",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
         "Idempotency-Key": idempotencyKey,
       },
@@ -1563,12 +1406,19 @@ export function createStaffWorkComment(
     {
       method: "POST",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
         "Idempotency-Key": idempotencyKey,
       },
       body: JSON.stringify(input),
     },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function saveStaffOutreachDraft(workItemId: string, input: SaveStaffOutreachDraftInput, idempotencyKey: string) {
+  return request<SaveStaffOutreachDraftResult>(
+    `/v1/staff/work-items/${encodeURIComponent(workItemId)}/outreach-draft`,
+    { method: "PUT", headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey }, body: JSON.stringify(input) },
     { notifyStudentRecordChanged: false },
   );
 }
@@ -1583,7 +1433,6 @@ export function startStaffInteraction(
     {
       method: "POST",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
         "Idempotency-Key": idempotencyKey,
       },
@@ -1603,7 +1452,6 @@ export function recordStaffCommunication(
     {
       method: "POST",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
         "Idempotency-Key": idempotencyKey,
       },
@@ -1622,7 +1470,6 @@ export function completeStaffInteraction(
     {
       method: "POST",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(input),
@@ -1640,7 +1487,6 @@ export function requestStaffAiRefresh(
     {
       method: "POST",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(input),
@@ -1663,7 +1509,6 @@ export function uploadStaffCallRecording(
     {
       method: "POST",
       headers: {
-        ...staffHeaders,
         "Idempotency-Key": idempotencyKey,
       },
       body,
@@ -1681,7 +1526,6 @@ export function retryStaffCallTranscription(
     {
       method: "POST",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(input),
@@ -1701,7 +1545,6 @@ export async function getStaffCallRecordingContent(
       credentials: "include",
       headers: {
         Accept: "audio/*,video/*",
-        ...staffHeaders,
       },
       signal,
     },
@@ -1713,7 +1556,6 @@ export async function getStaffCallRecordingContent(
 export function getStaffActionRules(signal?: AbortSignal) {
   return request<StaffActionRuleList>("/v1/staff/action-rules", {
     method: "GET",
-    headers: staffHeaders,
     signal,
   });
 }
@@ -1721,7 +1563,6 @@ export function getStaffActionRules(signal?: AbortSignal) {
 export function getStaffNotifications(signal?: AbortSignal) {
   return request<StaffNotificationList>("/v1/staff/notifications", {
     method: "GET",
-    headers: staffHeaders,
     signal,
   });
 }
@@ -1731,7 +1572,6 @@ export function markStaffNotificationRead(notificationId: string) {
     `/v1/staff/notifications/${encodeURIComponent(notificationId)}/read`,
     {
       method: "POST",
-      headers: staffHeaders,
     },
     { notifyStudentRecordChanged: false },
   );
@@ -1743,7 +1583,6 @@ export function createStaffActionRule(input: CreateStaffActionRuleInput) {
     {
       method: "POST",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(input),
@@ -1761,7 +1600,6 @@ export function updateStaffActionRule(
     {
       method: "PATCH",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(input),
@@ -1778,27 +1616,8 @@ export function getStaffStudentRecord(
     `/v1/staff/students/${encodeURIComponent(studentId)}`,
     {
       method: "GET",
-      headers: staffHeaders,
       signal,
     },
-  );
-}
-
-export function createStaffStudentNote(
-  studentId: string,
-  input: CreateStaffStudentNoteInput,
-) {
-  return request<StaffStudentNote>(
-    `/v1/staff/students/${encodeURIComponent(studentId)}/notes`,
-    {
-      method: "POST",
-      headers: {
-        ...staffHeaders,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(input),
-    },
-    { notifyStudentRecordChanged: false },
   );
 }
 
@@ -1811,7 +1630,6 @@ export function updateStaffStudentPreferences(
     {
       method: "PATCH",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(input),
@@ -1823,30 +1641,17 @@ export function updateStaffStudentPreferences(
 export function reviewStaffDocument(
   documentId: string,
   input: ReviewStaffDocumentInput,
-  idempotencyKey: string,
+  idempotencyKey = crypto.randomUUID(),
 ) {
   return request<StaffDocumentDecisionResult>(
     `/v1/staff/documents/${encodeURIComponent(documentId)}/decision`,
     {
       method: "POST",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
         "Idempotency-Key": idempotencyKey,
       },
       body: JSON.stringify(input),
-    },
-    { notifyStudentRecordChanged: false },
-  );
-}
-
-export function getStaffDocumentReviewOptions(signal?: AbortSignal) {
-  return request<StaffDocumentReviewOptions>(
-    "/v1/staff/documents/review-options",
-    {
-      method: "GET",
-      headers: staffHeaders,
-      signal,
     },
     { notifyStudentRecordChanged: false },
   );
@@ -1857,13 +1662,7 @@ export function getStaffDocumentContentUrl(path: string) {
 }
 
 function tenantAwareDocumentUrl(path: string) {
-  const browserOrigin = typeof window === "undefined" ? "" : window.location.origin;
-  const baseOrigin = API_BASE_URL || browserOrigin;
-  if (!baseOrigin) return path.startsWith("/") ? path : `/${path}`;
-
-  const normalizedBase = new URL(`${baseOrigin}/`);
-  const documentUrl = new URL(path, normalizedBase);
-  return documentUrl.origin === normalizedBase.origin ? documentUrl.toString() : normalizedBase.toString();
+  return new URL(path, `${API_BASE_URL}/`).toString();
 }
 
 export function createAssistantConversation(
@@ -1927,10 +1726,27 @@ export function refreshAssistantVoiceSessionToken(voiceSessionId: string) {
  * request exactly as before. The platform honours the header only where its
  * own development/evaluation controls are enabled and never in production.
  */
+export interface EdwardLabRequestOptions {
+  executionMode?: EdwardExecutionMode;
+  /**
+   * Edward Lab control: pins the read planner for one turn via the
+   * platform's `x-edward-read-planner` header. Honoured only where Lab
+   * controls are enabled; ignored (never rejected) elsewhere.
+   */
+  readPlanner?: EdwardReadPlanner;
+}
+
+function labHeaders(options: EdwardLabRequestOptions): Record<string, string> {
+  return {
+    ...(options.executionMode ? { [EDWARD_EXECUTION_MODE_HEADER]: options.executionMode } : {}),
+    ...(options.readPlanner ? { [EDWARD_READ_PLANNER_HEADER]: options.readPlanner } : {}),
+  };
+}
+
 export function askEdward(
   input: AskEdwardInput,
   signal?: AbortSignal,
-  options: { executionMode?: EdwardExecutionMode } = {},
+  options: EdwardLabRequestOptions = {},
 ) {
   return request<AskEdwardResponse>(
     "/v1/student/assistant/messages",
@@ -1938,9 +1754,7 @@ export function askEdward(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(options.executionMode
-          ? { [EDWARD_EXECUTION_MODE_HEADER]: options.executionMode }
-          : {}),
+        ...labHeaders(options),
       },
       body: JSON.stringify(input),
       signal,
@@ -1951,6 +1765,43 @@ export function askEdward(
       // before the assistant response can render.
       notifyStudentRecordChanged: false,
     },
+  );
+}
+
+export function confirmStudentEdwardAction(
+  intentId: string,
+  input: ConfirmEdwardActionInput,
+) {
+  return request<EdwardActionReceipt>(
+    `/v1/student/assistant/action-intents/${encodeURIComponent(intentId)}/confirm`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function getStudentEdwardAction(intentId: string) {
+  return request<EdwardActionIntent>(
+    `/v1/student/assistant/action-intents/${encodeURIComponent(intentId)}`,
+    { method: "GET" },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function cancelStudentEdwardAction(
+  intentId: string,
+  input: CancelEdwardActionInput,
+) {
+  return request<{ id: string; status: "cancelled"; version: number }>(
+    `/v1/student/assistant/action-intents/${encodeURIComponent(intentId)}/cancel`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
   );
 }
 
@@ -1974,7 +1825,6 @@ export function createStaffAssistantConversation() {
     "/v1/staff/assistant/conversations",
     {
       method: "POST",
-      headers: staffHeaders,
     },
     {
       // Opening a conversation reads nothing from any record.
@@ -1983,14 +1833,26 @@ export function createStaffAssistantConversation() {
   );
 }
 
-export function askStaffEdward(input: AskStaffEdwardInput, signal?: AbortSignal) {
+/** The persisted transcript of one staff conversation, so a remount mirrors the server. */
+export function getStaffAssistantConversationMessages(conversationId: string, signal?: AbortSignal) {
+  return request<StaffAssistantConversationMessagesResponse>(
+    `/v1/staff/assistant/conversations/${encodeURIComponent(conversationId)}/messages`,
+    { method: "GET", signal },
+  );
+}
+
+export function askStaffEdward(
+  input: AskStaffEdwardInput,
+  signal?: AbortSignal,
+  options: EdwardLabRequestOptions = {},
+) {
   return request<AskStaffEdwardResponse>(
     "/v1/staff/assistant/messages",
     {
       method: "POST",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
+        ...labHeaders(options),
       },
       body: JSON.stringify(input),
       signal,
@@ -1998,6 +1860,60 @@ export function askStaffEdward(input: AskStaffEdwardInput, signal?: AbortSignal)
     {
       // Staff Edward is read-only; nothing on the student record changes.
       notifyStudentRecordChanged: false,
+    },
+  );
+}
+
+export function confirmStaffEdwardAction(
+  intentId: string,
+  input: ConfirmEdwardActionInput,
+) {
+  return request<EdwardActionReceipt>(
+    `/v1/staff/assistant/action-intents/${encodeURIComponent(intentId)}/confirm`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function getStaffEdwardAction(intentId: string) {
+  return request<EdwardActionIntent>(
+    `/v1/staff/assistant/action-intents/${encodeURIComponent(intentId)}`,
+    { method: "GET" },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function cancelStaffEdwardAction(
+  intentId: string,
+  input: CancelEdwardActionInput,
+) {
+  return request<{ id: string; status: "cancelled"; version: number }>(
+    `/v1/staff/assistant/action-intents/${encodeURIComponent(intentId)}/cancel`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+    { notifyStudentRecordChanged: false },
+  );
+}
+
+export function confirmStaffEmailSendIntent(
+  intentId: string,
+  input: ConfirmStaffEmailSendIntentInput,
+) {
+  return request<StaffEmailSendIntent>(
+    `/v1/staff/mail/send-intents/${encodeURIComponent(intentId)}/confirm`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": crypto.randomUUID(),
+      },
+      body: JSON.stringify(input),
     },
   );
 }
@@ -2011,7 +1927,6 @@ export function submitStaffEdwardFeedback(
     {
       method: "PATCH",
       headers: {
-        ...staffHeaders,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(input),
@@ -2259,4 +2174,66 @@ export async function sendActivityEvents(
     body: JSON.stringify({ events }),
     keepalive: options.keepalive,
   });
+}
+
+export function getUniversityRecord(domain: import("@vv/contracts").UniversityDomain, studentId?: string, signal?: AbortSignal) {
+  const path = studentId ? `/v1/staff/students/${encodeURIComponent(studentId)}/university` : "/v1/student/university";
+  return request<import("@vv/contracts").UniversityRecord>(`${path}?domain=${domain}`, { method: "GET", signal });
+}
+
+export function getUniversityOperations(signal?: AbortSignal) {
+  return request<import("@vv/contracts").UniversityOperations>("/v1/staff/university", { method: "GET", signal });
+}
+
+
+export function getFinancialPlan(signal?: AbortSignal) {
+  return request<import("@vv/contracts").FinancialPlan>("/v1/student/financial-plan", {method: "GET", signal});
+}
+export function saveFinancialPlanInputs(input: {termId: string; expectedVersion: number; inputs: Record<string, number>}, key: string) {
+  return request<{version: number; receiptId: string}>("/v1/student/financial-plan/inputs", {method: "PUT", headers: {"Content-Type": "application/json", "Idempotency-Key": key}, body: JSON.stringify(input)});
+}
+
+export function getWorkBoard(offset = 0, project?: string, filters: import("@vv/contracts").StaffWorkBoardQuery = {}) {
+  const params = actionCenterQueryToParams(filters);
+  params.set("offset", String(offset));
+  if (project) params.set("project", project);
+  if (filters.quick) params.set("quick", filters.quick);
+  return request<StaffActionCenter & {cards: Record<string, unknown>[]; basis: string}>(`/v1/staff/work-board?${params}`, {method: "GET"});
+}
+
+export function simulateFinancialPlan(input: Record<string, unknown>) {
+  return request<Record<string, unknown>>("/v1/student/financial-plan/simulate", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(input)});
+}
+export function getStaffDocumentContent(path: string) {
+  return requestBlob(path, { method: "GET" });
+}
+
+export function getStaffDocumentReviewOptions(signal?: AbortSignal) {
+  return request<import("@vv/contracts").StaffDocumentReviewOptions>("/v1/staff/document-review/options", {method: "GET", signal});
+}
+
+/** Staff financial summary is the same projection used by My Financials and Edward. */
+export function getStaffFinancialPlan(studentId: string, signal?: AbortSignal) {
+  return request<import("@vv/contracts").FinancialPlan>(`/v1/staff/students/${encodeURIComponent(studentId)}/university?domain=financial_plan`, {method:"GET",signal});
+}
+
+export function getDemoTaskBoard() {
+  return request<import("@vv/contracts").StaffDemoTaskBoard>("/v1/staff/demo-task-board", {method: "GET"});
+}
+
+
+export function writeDemoTaskActivity(workItemId: string, input: import("@vv/contracts").DemoTaskWriteInput, idempotencyKey: string) {
+  return request<{workItemId: string; version: number; inquiryId: string | null}>(
+    `/v1/staff/demo-task-board/${encodeURIComponent(workItemId)}/activity`, {
+      method: "POST", headers: {"Content-Type": "application/json", "Idempotency-Key": idempotencyKey},
+      body: JSON.stringify(input),
+    }, {notifyStudentRecordChanged: false});
+}
+
+export function reviewDemoDocument(documentId: string, input: ReviewStaffDocumentInput & {originalReviewed: true}, idempotencyKey: string) {
+  return request<StaffDocumentDecisionResult>(
+    `/v1/staff/demo-task-board/documents/${encodeURIComponent(documentId)}/decision`, {
+      method: "POST", headers: {"Content-Type": "application/json", "Idempotency-Key": idempotencyKey},
+      body: JSON.stringify(input),
+    }, {notifyStudentRecordChanged: false});
 }

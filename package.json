@@ -22,16 +22,14 @@
     "node": ">=22.13.0 <23"
   },
   "overrides": {
-    "next@16.3.1": {
-      "postcss": "8.5.25",
-      "sharp": "0.35.3"
-    },
     "nanoid": "3.3.18",
-    "postcss": "8.5.25"
+    "postcss": "8.5.25",
+    "next": "16.3.5",
+    "sharp": "$sharp"
   },
   "dependencies": {
     "postcss": "8.5.25",
-    "sharp": "0.35.3"
+    "sharp": "0.35.4"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1"

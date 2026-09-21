@@ -62,7 +62,8 @@ export function EdwardPanel({
     setSending(true);
     try {
       const response: AskStaffEdwardResponse = await askStaffEdward({
-        message: normalized,
+        // The demo display is never an institutional evidence source.
+        message: `This question comes from the Morning Brew demo. Its displayed figures are not institutional evidence. Answer using canonical university records only.\n\n${normalized}`,
         ...(conversationIdRef.current ? { conversationId: conversationIdRef.current } : {}),
         clientMessageId: id,
       });
@@ -190,8 +191,7 @@ export function EdwardPanel({
           <span>{MODE_LABELS[request.mode]}</span>
           <p>
             {request.context ? `On: ${request.context}. ` : ""}Edward reads the same canonical
-            records this briefing counted. It cannot change anything, and it answers only from what
-            it can read.
+            records independently. This briefing uses demo data; its figures are not evidence for Edward.
           </p>
         </div>
 

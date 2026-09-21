@@ -84,27 +84,6 @@ function workItem(overrides = {}) {
   };
 }
 
-test("task board sorts by priority, due date, created time, and key", async () => {
-  const { compareStaffWorkItems } = await importTypeScriptModule(
-    "../app/staff/task-board-utils.ts",
-  );
-  const items = [
-    workItem({ key: "LOW-1", priority: "low" }),
-    workItem({ key: "HIGH-2", priority: "high", dueAt: "2026-08-11T12:00:00.000Z" }),
-    workItem({ key: "URG-1", priority: "urgent" }),
-    workItem({ key: "HIGH-1", priority: "high", dueAt: "2026-08-10T12:00:00.000Z" }),
-    workItem({ key: "MED-1", priority: "medium" }),
-  ];
-
-  assert.deepEqual(items.sort(compareStaffWorkItems).map((item) => item.key), [
-    "URG-1",
-    "HIGH-1",
-    "HIGH-2",
-    "MED-1",
-    "LOW-1",
-  ]);
-});
-
 test("toolbar filters map onto the bounded Action Center query", async () => {
   const { emptyTaskBoardFilters, buildActionCenterQuery } = await importTypeScriptModule(
     "../app/staff/task-board-utils.ts",
@@ -128,7 +107,7 @@ test("toolbar filters map onto the bounded Action Center query", async () => {
     {
       ...emptyTaskBoardFilters,
       query: "  transcript ",
-      ownership: "mine",
+      scope: "mine",
       workType: "document_review",
       priority: "high",
       status: "blocked",
@@ -151,16 +130,106 @@ test("toolbar filters map onto the bounded Action Center query", async () => {
   assert.equal(narrowed.limit, 25);
   assert.equal(narrowed.offset, 200);
 
-  // The ownership scope wins over a stale assignee choice; a specific person is passed by id.
+  // The Mine scope wins over a stale assignee choice; otherwise a person is passed by id.
   assert.equal(
-    buildActionCenterQuery({ ...emptyTaskBoardFilters, ownership: "unassigned", assigneeId: "staff-9" })
+    buildActionCenterQuery({ ...emptyTaskBoardFilters, scope: "mine", assigneeId: "staff-9" })
       .assignee,
+    "me",
+  );
+  assert.equal(
+    buildActionCenterQuery({ ...emptyTaskBoardFilters, assigneeId: "unassigned" }).assignee,
     "unassigned",
   );
   assert.equal(
     buildActionCenterQuery({ ...emptyTaskBoardFilters, assigneeId: "staff-9" }).assignee,
     "staff-9",
   );
+  // The team scope is the member's own component, locked.
+  assert.equal(
+    buildActionCenterQuery({ ...emptyTaskBoardFilters, scope: "team", component: "Financial Aid" })
+      .component,
+    "Financial Aid",
+  );
+});
+
+test("the board scope is mine / my team / everyone, defaulting to the member's own work", async () => {
+  const {
+    defaultTaskBoardScope,
+    withTaskBoardScope,
+    scopeCountsFor,
+    emptyTaskBoardFilters,
+    hasActiveTaskBoardFilters,
+    clearedTaskBoardFilters,
+    filtersFromActionCenterQuery,
+    viewerRelationshipLabel,
+    assignmentRoleLabel,
+  } = await importTypeScriptModule("../app/staff/task-board-utils.ts");
+  const counts = (open, extra = {}) => ({
+    todo: open,
+    inProgress: 0,
+    followUpRequired: 0,
+    blocked: 0,
+    done: 0,
+    cancelled: 0,
+    open,
+    overdue: 0,
+    dueToday: 0,
+    urgent: 0,
+    escalated: 0,
+    stale: 0,
+    unassigned: 0,
+    students: open,
+    ...extra,
+  });
+  const scopes = {
+    component: "Financial Aid",
+    mine: counts(58),
+    myComponent: counts(475),
+    all: counts(2530),
+  };
+  assert.equal(defaultTaskBoardScope(scopes), "mine");
+  assert.equal(defaultTaskBoardScope({ ...scopes, mine: counts(0) }), "team");
+  assert.equal(
+    defaultTaskBoardScope({ ...scopes, mine: counts(0), myComponent: counts(0) }),
+    "all",
+  );
+  assert.equal(defaultTaskBoardScope(null), "all");
+
+  const team = withTaskBoardScope(emptyTaskBoardFilters, "team", "Financial Aid");
+  assert.equal(team.scope, "team");
+  assert.equal(team.component, "Financial Aid");
+  // Leaving the team scope releases the locked component; other filters survive.
+  const everyone = withTaskBoardScope({ ...team, priority: "high" }, "all", "Financial Aid");
+  assert.equal(everyone.component, "all");
+  assert.equal(everyone.priority, "high");
+  assert.equal(scopeCountsFor(scopes, "team").open, 475);
+  assert.equal(scopeCountsFor(scopes, "mine").open, 58);
+  assert.equal(scopeCountsFor(scopes, "all").open, 2530);
+  assert.equal(scopeCountsFor(null, "all"), null);
+
+  // The scope itself (and its locked component) is not an "active filter".
+  assert.equal(hasActiveTaskBoardFilters(team), false);
+  assert.equal(hasActiveTaskBoardFilters({ ...team, dueWindow: "overdue" }), true);
+  assert.deepEqual(clearedTaskBoardFilters({ ...team, dueWindow: "overdue" }), team);
+
+  // Deep links: assignee=me → mine; the member's own component → team; another → everyone.
+  assert.equal(filtersFromActionCenterQuery({ assignee: "me" }, "Financial Aid").scope, "mine");
+  assert.equal(
+    filtersFromActionCenterQuery({ component: "Financial Aid" }, "Financial Aid").scope,
+    "team",
+  );
+  const other = filtersFromActionCenterQuery({ component: "Registrar" }, "Financial Aid");
+  assert.equal(other.scope, "all");
+  assert.equal(other.component, "Registrar");
+
+  assert.equal(viewerRelationshipLabel(["financial_aid_counselor"]), "Your advisee (financial aid)");
+  assert.equal(viewerRelationshipLabel(["primary_advisor"]), "Your advisee");
+  assert.equal(
+    viewerRelationshipLabel(["primary_advisor", "housing_coordinator"]),
+    "Your advisee (housing)",
+  );
+  assert.equal(viewerRelationshipLabel([]), null);
+  assert.equal(assignmentRoleLabel("primary_advisor"), "primary adviser");
 });
 
 test("query serialization omits undefined and writes booleans literally", async () => {
@@ -198,8 +267,8 @@ test("a deep-linked query round-trips into toolbar state", async () => {
     limit: 50,
   };
   const filters = filtersFromActionCenterQuery(query);
-  assert.equal(filters.ownership, "unassigned");
-  assert.equal(filters.assigneeId, "all");
+  assert.equal(filters.scope, "all");
+  assert.equal(filters.assigneeId, "unassigned");
   assert.equal(filters.status, "all");
   assert.equal(filters.dueWindow, "overdue");
   assert.equal(filters.ownerRisk, true);
@@ -293,7 +362,12 @@ test("the task board pages the server instead of filtering the workspace payload
   assert.doesNotMatch(board, /filterAndSortStaffWorkItems/);
   assert.doesNotMatch(board, /workspace\.actionCenter\.items/);
   assert.match(board, /TASK_BOARD_PAGE_SIZE/);
-  assert.match(board, /Showing \$\{items\.length\} of \$\{total\} tasks/);
+  assert.match(board, /Showing \$\{items\.length\} of \$\{total\.toLocaleString\(\)\} tasks/);
+  // Scope switch and column totals come from the server's scope counts.
+  assert.match(board, /staff-scope-switch/);
+  assert.match(board, /scopeCountsFor\(scopes, filters\.scope\)/);
+  assert.match(board, /defaultTaskBoardScope\(workspace\.actionCenter\.scopes\)/);
+  assert.doesNotMatch(board, /workspace\.actionCenter\.counts\.todo \+/);
   assert.match(board, /Load more/);
   assert.match(board, /window\.setTimeout\(\(\) => setDebouncedQuery\(filters\.query\), 300\)/);
   // Stale / owner-unavailable are one select in the existing filter grid, not a new strip.

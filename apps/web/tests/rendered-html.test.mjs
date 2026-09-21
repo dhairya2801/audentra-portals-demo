@@ -763,8 +763,6 @@ test("typed client wires every resource route and mutation contract", async () =
     });
     await client.getStaffActionCenter();
     await client.getStaffOperationsWorkspace();
-    await client.triggerStaffMorningBrewExternalContext();
-    await client.getStaffMorningBrewExternalContext();
     await client.createStaffKnowledgeCard({
       title: "Orientation guide",
       summary: "Arrival guidance.",
@@ -875,7 +873,6 @@ test("typed client wires every resource route and mutation contract", async () =
         notifyStudent: false,
       },
     );
-    await client.getStaffDocumentReviewOptions();
     await client.reviewStaffDocument(
       "00000000-0000-7000-8000-000000000601",
       {
@@ -885,7 +882,6 @@ test("typed client wires every resource route and mutation contract", async () =
         note: "Reviewed.",
         notifyStudent: true,
       },
-      "staff-document-decision-12345678",
     );
     await client.signOutStaff();
     testWindow.location.pathname = "/parent/documents";
@@ -954,7 +950,6 @@ test("typed client wires every resource route and mutation contract", async () =
     "/v1/auth/staff/sign-up",
     "/v1/staff/action-center",
     "/v1/staff/workspace",
-    "/v1/staff/morning-brew/external-context",
     "/v1/staff/knowledge-base",
     "/v1/staff/knowledge-base/00000000-0000-7000-8000-000000000931",
     "/v1/staff/core-plays",
@@ -969,7 +964,6 @@ test("typed client wires every resource route and mutation contract", async () =
     "/v1/staff/work-items/00000000-0000-7000-8000-000000000911",
     "/v1/staff/students/00000000-0000-7000-8000-000000000101",
     "/v1/staff/students/00000000-0000-7000-8000-000000000101/preferences",
-    "/v1/staff/documents/review-options",
     "/v1/staff/documents/00000000-0000-7000-8000-000000000601/decision",
     "/v1/auth/staff/sign-out",
   ];
@@ -1103,12 +1097,6 @@ test("typed client wires every resource route and mutation contract", async () =
     ],
     "intent-12345678",
   );
-  assert.equal(
-    requestByPath.get(
-      "/v1/staff/documents/00000000-0000-7000-8000-000000000601/decision",
-    ).init.headers["Idempotency-Key"],
-    "staff-document-decision-12345678",
-  );
   assert.deepEqual(
     JSON.parse(requestByPath.get("/v1/activity-events/batch").init.body),
     {
@@ -1124,21 +1112,6 @@ test("typed client wires every resource route and mutation contract", async () =
     ],
     },
   );
-  const externalContextRequests = requests.filter(
-    (entry) =>
-      new URL(entry.url).pathname === "/v1/staff/morning-brew/external-context",
-  );
-  const triggerExternalContext = externalContextRequests.find(
-    (entry) => entry.init.method === "POST",
-  );
-  const readExternalContext = externalContextRequests.find(
-    (entry) => entry.init.method === "GET",
-  );
-  assert.ok(triggerExternalContext, "missing external-context trigger request");
-  assert.ok(readExternalContext, "missing external-context canonical read request");
-  assert.equal(triggerExternalContext.init.credentials, "include");
-  assert.equal(readExternalContext.init.credentials, "include");
-  assert.equal(triggerExternalContext.init.body, undefined);
 });
 
 test("onboarding preserves the eight-step order and authoritative boundary actions", async () => {
@@ -1259,7 +1232,7 @@ test("staff authentication never exposes or prefills credentials", async () => {
 });
 
 test("staff authentication forms survive ambient focus refreshes", async () => {
-  const [resourceHook, staffPortal, legacyCenter] = await Promise.all([
+  const [resourceHook, staffPortal, actionCenter] = await Promise.all([
     readFile(new URL("../app/hooks/use-api-resource.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/staff/staff-portal.tsx", import.meta.url), "utf8"),
     readFile(
@@ -1277,10 +1250,10 @@ test("staff authentication forms survive ambient focus refreshes", async () => {
     staffPortal,
     /useApiResource\(loadWorkspace, \{\s*refreshOnAmbient: false/,
   );
-  assert.match(
-    legacyCenter,
-    /useApiResource\(loadCenter, \{\s*refreshOnAmbient: false/,
-  );
+  // The unreachable legacy action center (and its second sign-in path) is gone;
+  // the shared sign-in form is the only way in.
+  assert.doesNotMatch(actionCenter, /LegacyStaffActionCenter|function StaffWorkspace\(/);
+  assert.match(actionCenter, /export function StaffSignIn\(/);
 });
 
 test("Morning Brew renders the demo corpus, and says that it is one", async () => {
@@ -1854,7 +1827,7 @@ test("DSM feedback surfaces remain connected to portal data and safe fallbacks",
     ]);
 
   // Accepted aid is the platform's own figure; work-study is named as wages, never as a credit.
-  assert.match(financials, /aidAccepted: data\.acceptedAidCents/);
+  assert.match(financials, /aidAccepted: data\.postedAidCents \?\? data\.acceptedAidCents/);
   assert.match(financials, /work_study: "Work-study · earned by working"/);
   assert.match(financials, /Accepted financial aid/);
   assert.match(financials, /Not counted below until it is awarded/);
@@ -2837,25 +2810,38 @@ test("Edward talks over LiveKit when the platform offers voice and falls back to
   assert.match(globalStyles, /\.edward-message__mode/);
 });
 
-test("staff CRM distinguishes canonical students from preview cohort records", async () => {
-  const source = await readFile(
-    new URL("../app/staff/staff-portal.tsx", import.meta.url),
-    "utf8",
-  );
+test("staff CRM searches the whole tenant server-side and shows counted signals, never a fake risk score", async () => {
+  const [source, api, contracts] = await Promise.all([
+    readFile(new URL("../app/staff/staff-portal.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
+    readFile(new URL("../../../packages/contracts/src/index.ts", import.meta.url), "utf8"),
+  ]);
 
-  assert.match(source, /operation\.syntheticSeed \? "preview" : "success"/);
-  assert.match(source, /Canonical student record/);
-});
+  // The Students view reads one bounded page of the server search, and a
+  // student's open work is its own server query — never a slice of the first
+  // board page or a 1,000-row browser copy.
+  assert.match(source, /searchStaffStudents\(\{ query: debouncedQuery, limit: 50 \}/);
+  assert.match(source, /getStaffActionCenter\(\{ studentId: operationId, status: "open"/);
+  assert.match(api, /`\/v1\/staff\/students\$\{suffix\}`/);
+  assert.match(contracts, /export interface StaffStudentSearch \{/);
+  assert.match(contracts, /export interface StaffStudentAttention \{/);
+  assert.doesNotMatch(contracts, /meltLikelihoodPercent|modelVersion: string/);
 
-test("staff CRM keeps implementation provenance out of the Student 360 header", async () => {
-  const source = await readFile(
-    new URL("../app/staff/student-360.tsx", import.meta.url),
-    "utf8",
-  );
-
-  assert.match(source, /Student 360 · Class of/);
-  assert.doesNotMatch(source, /operation\.syntheticSeed \? "preview" : "success"/);
-  assert.doesNotMatch(source, /Canonical student record/);
+  // Nothing browser-invented remains on the roster surface.
+  for (const stale of [
+    "Search 400 test students",
+    "Fall 2027 students",
+    "Export view",
+    "deterministic test cohort",
+    "Melt score",
+    "melt risk",
+    "Canonical student record",
+  ]) {
+    assert.doesNotMatch(source, new RegExp(stale));
+  }
+  assert.doesNotMatch(source, /\.risk\.(band|score|category)/);
+  assert.match(source, /function AttentionPills\(/);
+  assert.match(source, /There is no risk model/);
 });
 
 test("the Action Center keeps evidence durable while AI and scheduled rules run asynchronously", async () => {
@@ -2904,40 +2890,6 @@ test("the Action Center keeps evidence durable while AI and scheduled rules run 
   ]) {
     assert.match(api, new RegExp(route.replaceAll("/", "\\/")));
   }
-});
-
-test("enrollment document decisions stay atomic, explainable, and visible to the student", async () => {
-  const [detail, legacyInspector, documents, requirement, api, contracts] = await Promise.all([
-    readFile(new URL("../app/staff/action-center-detail.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/staff/staff-action-center.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/components/documents-panel.tsx", import.meta.url), "utf8"),
-    readFile(
-      new URL("../app/enrollment/requirements/[slug]/page.tsx", import.meta.url),
-      "utf8",
-    ),
-    readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
-    readFile(new URL("../../../packages/contracts/src/index.ts", import.meta.url), "utf8"),
-  ]);
-
-  assert.match(detail, /Document check-in/);
-  assert.match(detail, /Reason for requested changes/);
-  assert.match(detail, /A note for the student/);
-  assert.doesNotMatch(detail, /Internal staff note/);
-  assert.match(detail, /crypto\.randomUUID\(\)/);
-  assert.match(legacyInspector, /reviewIntentRef = useRef/);
-  assert.match(legacyInspector, /signature: JSON\.stringify|const signature = JSON\.stringify/);
-  assert.match(legacyInspector, /reviewIntentRef\.current\.key/);
-  assert.match(api, /\/v1\/staff\/documents\/review-options/);
-  assert.match(api, /"Idempotency-Key": idempotencyKey/);
-  assert.match(contracts, /reasonCode\?: string/);
-  assert.match(contracts, /reviewHistory\?: StudentDocumentReviewDecision\[\]/);
-  assert.match(contracts, /history\?: StudentRequirementHistoryEvent\[\]/);
-  assert.match(documents, /Why it came back/);
-  assert.match(documents, /document-decision-history/);
-  assert.match(documents, /review\.reviewerName/);
-  assert.match(requirement, /This step&apos;s history/);
-  assert.match(requirement, /Private staff notes are never included/);
-  assert.match(requirement, /Open document record/);
 });
 
 test("student requirement pages create durable, requirement-linked help requests", async () => {

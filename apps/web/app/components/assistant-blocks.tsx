@@ -1,6 +1,7 @@
 import type { AssistantResponseBlock } from "@vv/contracts";
 import { safePortalDestination } from "../lib/safe-destination";
 import { TenantLink as Link } from "./tenant-link";
+import { EdwardResponse } from "./edward-response";
 
 /**
  * Assistant hrefs may only be internal portal routes — the contract says
@@ -55,6 +56,16 @@ function AssistantBlockView({
   idPrefix: string;
 }) {
   switch (block.type) {
+    case "answer":
+    case "next_action":
+    case "explanation":
+    case "facts":
+    case "checklist":
+    case "contacts":
+    case "timeline":
+    case "sources":
+    case "record_context":
+      return <EdwardResponse block={block} />;
     case "text":
       return <p className="assistant-block assistant-block--text">{block.text}</p>;
 

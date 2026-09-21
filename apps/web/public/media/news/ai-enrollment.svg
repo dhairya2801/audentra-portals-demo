@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 260" role="img" aria-label="A lecture hall of students facing a screen showing enrollment data">
+  <defs>
+    <linearGradient id="ae-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#101f3e"/>
+      <stop offset="1" stop-color="#1d3566"/>
+    </linearGradient>
+    <linearGradient id="ae-screen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6a38ff"/>
+      <stop offset="1" stop-color="#1e5bff"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="260" fill="url(#ae-bg)"/>
+
+  <!-- projection cone -->
+  <path d="M118 62 L282 62 L336 190 L64 190 Z" fill="#6a38ff" opacity="0.1"/>
+
+  <!-- screen -->
+  <rect x="112" y="30" width="176" height="104" rx="6" fill="#0a1733"/>
+  <rect x="118" y="36" width="164" height="92" rx="4" fill="url(#ae-screen)" opacity="0.9"/>
+  <g opacity="0.95">
+    <path d="M132 108 L156 96 L178 100 L200 82 L224 70 L250 58" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="250" cy="58" r="5" fill="#00c49a"/>
+    <rect x="132" y="46" width="46" height="6" rx="3" fill="#ffffff" opacity="0.85"/>
+    <rect x="132" y="58" width="28" height="10" rx="3" fill="#ffffff" opacity="0.55"/>
+    <g fill="#ffffff" opacity="0.28">
+      <rect x="132" y="116" width="150" height="3" rx="1.5"/>
+    </g>
+  </g>
+  <rect x="192" y="134" width="16" height="10" fill="#0a1733"/>
+  <rect x="170" y="144" width="60" height="5" rx="2.5" fill="#0a1733"/>
+
+  <!-- tiered desks and students -->
+  <g>
+    <!-- back row -->
+    <g>
+      <circle cx="96" cy="168" r="13" fill="#7d8db0"/>
+      <path d="M78 194 a18 16 0 0 1 36 0 z" fill="#5f719a"/>
+      <circle cx="160" cy="164" r="13" fill="#9aa7c4"/>
+      <path d="M142 190 a18 16 0 0 1 36 0 z" fill="#7486ad"/>
+      <circle cx="228" cy="164" r="13" fill="#7d8db0"/>
+      <path d="M210 190 a18 16 0 0 1 36 0 z" fill="#5f719a"/>
+      <circle cx="296" cy="168" r="13" fill="#9aa7c4"/>
+      <path d="M278 194 a18 16 0 0 1 36 0 z" fill="#7486ad"/>
+    </g>
+    <rect x="44" y="188" width="312" height="14" rx="4" fill="#28406f"/>
+
+    <!-- front row -->
+    <g>
+      <circle cx="126" cy="212" r="15" fill="#b7c1d8"/>
+      <path d="M105 242 a21 19 0 0 1 42 0 z" fill="#8b9ac0"/>
+      <circle cx="200" cy="208" r="15" fill="#cdd5e7"/>
+      <path d="M179 238 a21 19 0 0 1 42 0 z" fill="#a3b0cd"/>
+      <circle cx="274" cy="212" r="15" fill="#b7c1d8"/>
+      <path d="M253 242 a21 19 0 0 1 42 0 z" fill="#8b9ac0"/>
+    </g>
+    <rect x="24" y="238" width="352" height="16" rx="4" fill="#1c3157"/>
+  </g>
+
+  <!-- floating data nodes -->
+  <g opacity="0.8">
+    <circle cx="60" cy="60" r="4" fill="#00c49a"/>
+    <circle cx="86" cy="96" r="3" fill="#6a38ff"/>
+    <circle cx="340" cy="72" r="4" fill="#00c49a"/>
+    <circle cx="316" cy="108" r="3" fill="#6a38ff"/>
+    <path d="M60 60 L86 96" stroke="#00c49a" stroke-width="1.5" opacity="0.5"/>
+    <path d="M340 72 L316 108" stroke="#00c49a" stroke-width="1.5" opacity="0.5"/>
+  </g>
+</svg>

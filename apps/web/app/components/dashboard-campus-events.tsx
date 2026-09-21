@@ -4,21 +4,24 @@ import type { CampusEvent } from "@vv/contracts";
 import { useMemo, useRef } from "react";
 import { safePortalDestination } from "../lib/safe-destination";
 import { TenantLink as Link } from "./tenant-link";
-import { useTenant } from "./tenant-provider";
 import styles from "./dashboard-widgets.module.css";
 
-/* Drawn in the campus's own clock, the same one Campus Life uses, so the
-   dashboard and the events page never disagree about when something starts. */
-function eventDate(value: string, timeZone: string) {
+function eventDate(value: string) {
   const date = new Date(value);
   return {
-    month: new Intl.DateTimeFormat("en-US", { month: "short", timeZone }).format(date),
-    day: new Intl.DateTimeFormat("en-US", { day: "numeric", timeZone }).format(date),
+    month: new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      timeZone: "UTC",
+    }).format(date),
+    day: new Intl.DateTimeFormat("en-US", {
+      day: "numeric",
+      timeZone: "UTC",
+    }).format(date),
     detail: new Intl.DateTimeFormat("en-US", {
       weekday: "short",
       hour: "numeric",
       minute: "2-digit",
-      timeZone,
+      timeZone: "UTC",
     }).format(date),
   };
 }
@@ -33,7 +36,6 @@ export function DashboardCampusEvents({
   canOpenCampusLife?: boolean;
 }) {
   const rail = useRef<HTMLUListElement>(null);
-  const { tenant } = useTenant();
   const upcoming = useMemo(
     () =>
       [...events]
@@ -91,7 +93,7 @@ export function DashboardCampusEvents({
           aria-roledescription="carousel"
         >
           {upcoming.map((event) => {
-            const date = eventDate(event.startsAt, tenant.localization.timeZone);
+            const date = eventDate(event.startsAt);
             const registration = safePortalDestination(
               event.registrationUrl,
               "/campus-life",

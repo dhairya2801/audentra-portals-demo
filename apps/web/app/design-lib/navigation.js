@@ -49,7 +49,7 @@ export const GROUPS = {
 export const GROUP_HEROES = {
   financials: {
     kicker: 'My Financials · 2026–27 academic year',
-    title: 'Know what’s covered. Plan what’s next.',
+    title: 'What the year costs, and what covers it.',
     lede: 'What the year costs, what’s covering it, and what still needs you, with the person who can change it.',
     motif: 'wallet',
   },
@@ -185,11 +185,13 @@ export const DESTINATIONS = [
     next: 'profile',
     built: true,
   },
-  { id: 'financials-expenses', label: 'Expenses', route: '/financials/expenses', icon: 'receipt', group: 'financials', lede: 'Tuition, housing, meals and coverage in one place.', built: true },
+  {
+    id: 'financials-expenses', label: 'Expenses', route: '/financials/expenses', icon: 'receipt', group: 'financials', lede: 'Housing, meals, coverage and your living estimates.', built: true,
+  },
   {
     id: 'financials-payments',
     label: 'Payments',
-    route: '/financials/payments',
+    route: '/payments',
     icon: 'card',
     group: 'financials',
     lede: 'What Aster bills you, when each payment is due, and what it has recorded.',

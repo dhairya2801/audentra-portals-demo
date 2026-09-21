@@ -1,5 +1,7 @@
 "use client";
 
+import { UniversityRecordPanel } from "./components/university-record";
+
 import {
   studentRequirementSlug,
   type CampusLifeFeed,
@@ -42,6 +44,9 @@ type ScopeAwareDashboard = Omit<StudentDashboard, "offer" | "journey"> & {
 type DashboardFinancialProjection = Pick<
   StudentFinancials,
   | "academicYear"
+  | "accountBasis"
+  | "postedAidCents"
+  | "termLabel"
   | "acceptedAidCents"
   | "paymentsCents"
   | "remainingBalanceCents"
@@ -53,7 +58,7 @@ type DashboardFinancialProjection = Pick<
 
 type DashboardAcademicsProjection = Pick<
   StudentAcademics,
-  "selectedProgram" | "exemptionRecommendations" | "generatedAt"
+  "selectedProgram" | "exemptionRecommendations" | "generatedAt" | "attempts"
 >;
 
 type DashboardCampusProjection = Pick<CampusLifeFeed, "events" | "generatedAt">;
@@ -293,13 +298,13 @@ export function StudentDashboardPage() {
   const classroomsContent = (
     <>
       <span>My Classrooms</span>
-      <h2>{suggestedExemptions.length} credit matches</h2>
+      <h2>{academics.attempts ? `${academics.attempts.filter(item => item.status === "enrolled").length} current courses` : `${suggestedExemptions.length} credit matches`}</h2>
       <p>
-        Stored equivalency rules found potential exemptions for your program.
+        {academics.attempts ? "Your registered courses, earned credit and academic history." : "Stored equivalency rules found potential exemptions for your program."}
       </p>
       <div>
         <small>{academics.selectedProgram.degree}</small>
-        <strong>{canRead("classrooms") ? "Review matches" : "Shared summary"}</strong>
+        <strong>{canRead("classrooms") ? (academics.attempts ? "Review academics" : "Review matches") : "Shared summary"}</strong>
       </div>
     </>
   );
@@ -311,6 +316,7 @@ export function StudentDashboardPage() {
       title={`Welcome back, ${dashboard.student.preferredName} 👋`}
       description="Here’s what is moving forward—and what deserves your attention next."
     >
+      <UniversityRecordPanel />
       <section className="aster-info-strip" aria-label="Student program summary">
         {offer?.programName ? (
           <div>
@@ -332,7 +338,7 @@ export function StudentDashboardPage() {
         ) : null}
         <div>
           <span>Class of</span>
-          <strong>{dashboard.student.classYear}</strong>
+          <strong>{dashboard.student.classYear ?? "Not assigned"}</strong>
         </div>
         <AdviserStrip />
       </section>

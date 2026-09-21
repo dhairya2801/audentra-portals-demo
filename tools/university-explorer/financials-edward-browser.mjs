@@ -1,0 +1,25 @@
+// Real demo browser -> iframe -> Edward -> scoped API -> provider smoke.
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {chromium, expect} from '@playwright/test';
+const browser=await chromium.launch();
+const page=await browser.newPage({viewport:{width:1600,height:1100}});
+await page.goto('http://localhost:3009/sign-in');
+await page.getByRole('button',{name:/Continue as Ada/}).click();
+await page.waitForURL(url=>url.pathname!='/sign-in');
+await page.goto('http://localhost:3009/financials/payments');
+const frame=page.frameLocator('iframe[title*="Financials"]');
+await expect(frame.locator('#sum-figure')).toContainText('$4,401.55');
+await frame.locator('[data-ask]').filter({hasText:'Ask Edward'}).nth(1).click();
+const composer=page.getByPlaceholder('Ask a question, or tell me what’s stuck…');
+await expect(composer).toHaveValue('Explain my proposed payment-plan installment amounts, dates and fee. Am I enrolled in this payment plan?');
+const result=page.waitForResponse(r=>r.url().includes('/v1/student/assistant/messages')&&r.request().method()==='POST',{timeout:120000});
+await page.getByRole('button',{name:'Send question',exact:true}).click();
+const response=await result, data=await response.json();
+assert.equal(response.status(),200);assert.equal(data.provider,'openai');
+assert.match(data.message,/4,401\.55/);assert.match(data.message,/proposed/i);assert.match(data.message,/Student Accounts/i);
+assert.match(data.message,/not (?:yet |currently )?enrolled|not.*enrolled payment|not signed|not been signed|proposed.*unsigned/i);
+await expect(page.locator('.edward-body')).toContainText('$4,401.55',{timeout:15000});
+await page.screenshot({path:'artifacts/financials/edward-browser.png'});
+await fs.writeFile('artifacts/financials/edward-browser-result.json',JSON.stringify({status:'passed',provider:data.provider,answer:data.message},null,2));
+await browser.close();console.log('Financial page to live Edward verified.');

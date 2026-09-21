@@ -1,8 +1,11 @@
 import type {
   StaffActionCenterDueWindow,
   StaffActionCenterQuery,
+  StaffActionCenterScopeCounts,
+  StaffActionCenterScopes,
   StaffActionCenterSort,
   StaffActionCenterStatusScope,
+  StaffAssignmentRole,
   StaffMemberSummary,
   StaffWorkItem,
   StaffWorkItemPriority,
@@ -10,7 +13,12 @@ import type {
   StaffWorkItemType,
 } from "@vv/contracts";
 
-export type TaskOwnershipScope = "all" | "mine" | "unassigned";
+/**
+ * Who the board is read for. `mine` is `assignee=me`; `team` locks the
+ * component filter to the signed-in member's component; `all` is the whole
+ * institution. The three are the server's `scopes`, never a browser count.
+ */
+export type TaskBoardScope = "mine" | "team" | "all";
 export type TaskDueWindow = StaffActionCenterDueWindow;
 export type TaskStatusFilter = StaffActionCenterStatusScope | StaffWorkItemStatus;
 
@@ -20,11 +28,13 @@ export type TaskStatusFilter = StaffActionCenterStatusScope | StaffWorkItemStatu
  */
 export interface TaskBoardFilters {
   query: string;
-  ownership: TaskOwnershipScope;
+  scope: TaskBoardScope;
+  /** `all`, `unassigned`, or a staff member id. Ignored in the `mine` scope. */
   assigneeId: string;
   workType: "all" | StaffWorkItemType;
   priority: "all" | StaffWorkItemPriority;
   status: TaskStatusFilter;
+  /** In the `team` scope this is the member's own component and cannot change. */
   component: string;
   dueWindow: TaskDueWindow;
   stale: boolean;
@@ -34,7 +44,7 @@ export interface TaskBoardFilters {
 
 export const emptyTaskBoardFilters: TaskBoardFilters = {
   query: "",
-  ownership: "all",
+  scope: "all",
   assigneeId: "all",
   workType: "all",
   priority: "all",
@@ -45,6 +55,63 @@ export const emptyTaskBoardFilters: TaskBoardFilters = {
   ownerRisk: false,
   sort: "priority",
 };
+
+/** The board opens on the member's own work when they own any; otherwise on their team's, else everyone's. */
+export function defaultTaskBoardScope(
+  scopes: Pick<StaffActionCenterScopes, "mine" | "myComponent"> | null | undefined,
+): TaskBoardScope {
+  if (!scopes) return "all";
+  if (scopes.mine.open > 0) return "mine";
+  if (scopes.myComponent.open > 0) return "team";
+  return "all";
+}
+
+/** Move to a scope, keeping the other filters; `team` needs the member's component. */
+export function withTaskBoardScope(
+  filters: TaskBoardFilters,
+  scope: TaskBoardScope,
+  myComponent: string,
+): TaskBoardFilters {
+  if (scope === "team") {
+    return { ...filters, scope, component: myComponent };
+  }
+  const component = filters.scope === "team" ? "all" : filters.component;
+  return { ...filters, scope, component };
+}
+
+/** The server counts for the active scope: the column headers and the switch read these. */
+export function scopeCountsFor(
+  scopes: StaffActionCenterScopes | null | undefined,
+  scope: TaskBoardScope,
+): StaffActionCenterScopeCounts | null {
+  if (!scopes) return null;
+  return scope === "mine" ? scopes.mine : scope === "team" ? scopes.myComponent : scopes.all;
+}
+
+const assignmentRoleWords: Record<StaffAssignmentRole, string> = {
+  primary_advisor: "primary adviser",
+  admissions_counselor: "admissions",
+  financial_aid_counselor: "financial aid",
+  international_adviser: "international",
+  housing_coordinator: "housing",
+};
+
+/** "your advisee (financial aid)" — the member's own relationship to an item's student, if any. */
+export function viewerRelationshipLabel(
+  roles: readonly StaffAssignmentRole[] | null | undefined,
+): string | null {
+  if (!roles || roles.length === 0) return null;
+  if (roles.includes("primary_advisor") && roles.length === 1) return "Your advisee";
+  const facets = roles
+    .filter((role) => role !== "primary_advisor")
+    .map((role) => assignmentRoleWords[role] ?? role.replaceAll("_", " "));
+  return `Your advisee (${facets.join(", ")})`;
+}
+
+/** "financial aid counselor" — one role, humanized. */
+export function assignmentRoleLabel(role: StaffAssignmentRole | string): string {
+  return role === "primary_advisor" ? "primary adviser" : role.replaceAll("_", " ");
+}
 
 /** Items fetched per request; the board appends pages rather than loading the whole queue. */
 export const TASK_BOARD_PAGE_SIZE = 100;
@@ -73,29 +140,6 @@ const priorities = new Set<string>(Object.keys(priorityRank));
 const dueWindows = new Set<string>(["all", "overdue", "today", "seven_days", "no_due"]);
 const sorts = new Set<string>(["priority", "due", "updated", "created", "stale"]);
 
-function timestamp(value: string | null, fallback: number) {
-  if (!value) return fallback;
-  const result = Date.parse(value);
-  return Number.isNaN(result) ? fallback : result;
-}
-
-/** Priority order, matching the API's default sort; used by legacy list views. */
-export function compareStaffWorkItems(left: StaffWorkItem, right: StaffWorkItem) {
-  const byPriority = priorityRank[left.priority] - priorityRank[right.priority];
-  if (byPriority !== 0) return byPriority;
-
-  const byDueDate =
-    timestamp(left.dueAt, Number.POSITIVE_INFINITY) -
-    timestamp(right.dueAt, Number.POSITIVE_INFINITY);
-  if (byDueDate !== 0) return byDueDate;
-
-  const byCreated =
-    timestamp(left.createdAt, Number.POSITIVE_INFINITY) -
-    timestamp(right.createdAt, Number.POSITIVE_INFINITY);
-  if (byCreated !== 0) return byCreated;
-  return left.key.localeCompare(right.key, undefined, { numeric: true });
-}
-
 /** Turn toolbar state into the server query for one page. */
 export function buildActionCenterQuery(
   filters: TaskBoardFilters,
@@ -103,13 +147,11 @@ export function buildActionCenterQuery(
 ): StaffActionCenterQuery {
   const search = filters.query.trim();
   const assignee =
-    filters.ownership === "mine"
+    filters.scope === "mine"
       ? "me"
-      : filters.ownership === "unassigned"
-        ? "unassigned"
-        : filters.assigneeId !== "all"
-          ? filters.assigneeId
-          : undefined;
+      : filters.assigneeId !== "all"
+        ? filters.assigneeId
+        : undefined;
   return {
     status: filters.status,
     priority: filters.priority === "all" ? undefined : filters.priority,
@@ -126,20 +168,27 @@ export function buildActionCenterQuery(
   };
 }
 
-/** The inverse of `buildActionCenterQuery`, for deep links from other views. */
+/**
+ * The inverse of `buildActionCenterQuery`, for deep links from other views.
+ * `assignee=me` lands in the `mine` scope; a component equal to the member's
+ * own lands in `team`; anything else is read against everyone.
+ */
 export function filtersFromActionCenterQuery(
   query: StaffActionCenterQuery | null | undefined,
+  myComponent?: string | null,
 ): TaskBoardFilters {
   if (!query) return { ...emptyTaskBoardFilters };
   const status = query.status;
+  const scope: TaskBoardScope =
+    query.assignee === "me"
+      ? "mine"
+      : query.component && myComponent && query.component === myComponent
+        ? "team"
+        : "all";
   return {
     query: query.search ?? "",
-    ownership:
-      query.assignee === "me" ? "mine" : query.assignee === "unassigned" ? "unassigned" : "all",
-    assigneeId:
-      query.assignee && query.assignee !== "me" && query.assignee !== "unassigned"
-        ? query.assignee
-        : "all",
+    scope,
+    assigneeId: query.assignee && query.assignee !== "me" ? query.assignee : "all",
     priority: query.priority && priorities.has(query.priority) ? query.priority : "all",
     workType: query.workType && workTypes.has(query.workType) ? query.workType : "all",
     status:
@@ -194,10 +243,25 @@ export function groupWorkItemsByStatus(items: StaffWorkItem[]) {
   return groups;
 }
 
+/** Whether anything beyond the scope itself narrows the board (the Clear button keeps the scope). */
 export function hasActiveTaskBoardFilters(filters: TaskBoardFilters) {
-  return Object.entries(emptyTaskBoardFilters).some(
+  const baseline: TaskBoardFilters = {
+    ...emptyTaskBoardFilters,
+    scope: filters.scope,
+    component: filters.scope === "team" ? filters.component : "all",
+  };
+  return Object.entries(baseline).some(
     ([key, value]) => filters[key as keyof TaskBoardFilters] !== value,
   );
+}
+
+/** Reset every filter but keep reading the same scope. */
+export function clearedTaskBoardFilters(filters: TaskBoardFilters): TaskBoardFilters {
+  return {
+    ...emptyTaskBoardFilters,
+    scope: filters.scope,
+    component: filters.scope === "team" ? filters.component : "all",
+  };
 }
 
 /** "Priya Shah · on leave until 2026-09-01" — for select options and cards. */

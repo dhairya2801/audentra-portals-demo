@@ -1,0 +1,491 @@
+.surface {
+  --edward-accent: var(--purple-dark, #6041b7);
+  background: #fff !important;
+  color: #20283e;
+  border: 1px solid #e5e2ec !important;
+  box-shadow:
+    0 24px 90px #1c164024,
+    0 2px 8px #1c16400a !important;
+  border-radius: 22px !important;
+  overflow: hidden;
+  display: flex !important;
+  flex-direction: column;
+  isolation: isolate;
+  font-family: inherit;
+}
+.floating {
+  position: fixed !important;
+  width: min(640px, calc(100vw - 48px)) !important;
+  height: min(860px, calc(100dvh - 48px)) !important;
+  max-height: calc(100dvh - 48px) !important;
+  right: 24px !important;
+  bottom: 24px !important;
+  z-index: 240 !important;
+  animation: arrive 180ms ease-out !important;
+}
+.embedded {
+  position: relative !important;
+  width: 100% !important;
+  min-height: 620px;
+  height: calc(100dvh - 230px) !important;
+  max-height: 900px !important;
+  box-shadow: 0 8px 32px #1c16400a !important;
+}
+.surface :global(.edward-head),
+.surface :global(.edward-panel__header) {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-height: 76px;
+  padding: 18px 24px;
+  border-bottom: 1px solid #eeeaf3;
+  background: #fff !important;
+  color: #20283e !important;
+  flex-shrink: 0;
+}
+.surface :global(.edward-title) {
+  flex: 1;
+}
+.surface :global(.edward-title) strong,
+.surface :global(.edward-panel__header) strong {
+  font-size: 16px;
+  font-weight: 650;
+  color: #20283e;
+}
+.surface :global(.edward-title) > span,
+.surface :global(.edward-panel__header) > div > span {
+  font-size: 11px;
+  color: #6e657b;
+  display: block;
+  margin-top: 3px;
+}
+.surface :global(.edward-head) button,
+.surface :global(.edward-panel__header) button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: #79748e;
+  background: transparent;
+  cursor: pointer;
+}
+.surface :global(.edward-head) button:hover,
+.surface :global(.edward-panel__header) button:hover {
+  background: #f4f1fa;
+  border-color: #e5dfef;
+}
+.surface :global(.edward-mark),
+.surface :global(.edward-avatar) {
+  display: grid;
+  place-items: center;
+  background: #eee8fc;
+  color: #6a46bd;
+  font-family: Georgia, serif;
+  font-weight: 600;
+  border-radius: 12px;
+  box-shadow: none;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+}
+.surface :global(.edward-body),
+.surface :global(.edward-main) {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+.surface :global(.edward-main) {
+  flex-direction: column;
+}
+.surface :global(.edward-thread),
+.surface :global(.edward-transcript) {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 26px;
+  background: #fff;
+  scroll-padding: 24px;
+}
+.surface :global(.edward-greeting) {
+  margin: 18px 0 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.surface :global(.edward-greeting) > :global(.edward-mark) {
+  width: 48px;
+  height: 48px;
+  font-size: 26px;
+  margin-bottom: 22px;
+}
+.surface :global(.edward-greeting) h3 {
+  font-size: 27px;
+  font-weight: 550;
+  color: #23233b;
+  letter-spacing: -0.04em;
+  line-height: 1.2;
+  margin: 0 0 12px;
+}
+.surface :global(.edward-greeting) > p {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #6d637b;
+  max-width: 430px;
+}
+.surface :global(.edward-boundary) {
+  font-size: 11px !important;
+  color: #6d637b !important;
+  margin-top: 16px;
+  background: none;
+  padding: 0;
+}
+.surface :global(.edward-suggestions) {
+  display: block;
+  padding: 0;
+  margin-top: 20px;
+}
+.surface :global(.edward-suggestions) section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.surface :global(.panel-label) {
+  grid-column: 1 / -1;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #6d637b;
+  margin-bottom: 4px;
+}
+.surface :global(.edward-suggestion) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  gap: 12px;
+  padding: 16px;
+  min-height: 76px;
+  background: #fcfbfe;
+  border: 1px solid #eae5f2;
+  border-radius: 12px;
+  color: #595169;
+  font-size: 12px;
+  line-height: 1.6;
+  transition:
+    border-color 140ms,
+    background 140ms;
+}
+.surface :global(.edward-suggestion):hover {
+  background: #f6f2ff;
+  border-color: #cdbfe9;
+}
+.surface :global(.edward-turn) {
+  margin: 0 0 25px;
+}
+.surface :global(.edward-turn.student),
+.surface :global(.edward-message--user) {
+  margin: 0 0 28px auto;
+  max-width: 86%;
+}
+.surface :global(.edward-bubble),
+.surface :global(.edward-message--user) > p {
+  background: #f2eef9;
+  border: none;
+  border-radius: 16px 16px 4px 16px;
+  padding: 13px 17px;
+  color: #49405d;
+  font-size: 14px;
+  line-height: 1.65;
+  margin: 0;
+  box-shadow: none;
+}
+.surface :global(.edward-answer),
+.surface :global(.edward-message--assistant) {
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  padding: 0;
+  color: #2d3448;
+}
+.surface :global(.edward-message--assistant) {
+  margin: 0 0 28px;
+}
+.surface :global(.edward-answer) > p,
+.surface :global(.edward-message--assistant) > p {
+  font-size: 14px;
+  line-height: 1.7;
+}
+.surface :global(.edward-asked-from) {
+  font-size: 10px;
+  color: #6d637b;
+  margin-top: 6px;
+}
+.surface :global(.edward-answer-actions) {
+  gap: 8px;
+  margin-top: 12px;
+}
+.surface :global(.edward-route) {
+  font-size: 11px;
+  background: #f5f2fc;
+  color: #6b49b0;
+  border-radius: 8px;
+  padding: 8px 11px;
+  border: 1px solid #e9e1f6;
+}
+.surface :global(.edward-composer) {
+  flex-shrink: 0;
+  border-top: 1px solid #ede9f3;
+  background: #fff;
+  padding: 16px 24px 14px;
+}
+.surface :global(.edward-field),
+.surface :global(.edward-composer) > div:not(:global(.edward-context)) {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  border: 1px solid #dcd5e9;
+  border-radius: 14px;
+  padding: 8px 10px;
+  background: #fff;
+}
+.surface :global(.edward-field):focus-within,
+.surface :global(.edward-composer) > div:focus-within {
+  border-color: #9575d8;
+  box-shadow: 0 0 0 3px #764cc00a;
+}
+.surface :global(.edward-composer) textarea,
+.surface :global(.edward-composer) input {
+  min-height: 38px;
+  max-height: 130px;
+  padding: 8px 3px;
+  flex: 1;
+  width: 100%;
+  resize: none;
+  font: inherit;
+  font-size: 14px;
+  color: #302b40;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+  line-height: 1.5;
+}
+.surface :global(.edward-composer) textarea::placeholder,
+.surface :global(.edward-composer) input::placeholder {
+  color: #6e657b;
+}
+.surface :global(.edward-send),
+.surface :global(.edward-send-button) {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  background: #7350bf;
+  color: white;
+  border-radius: 10px;
+  box-shadow: none;
+  border: 0;
+}
+.surface :global(.edward-send):disabled,
+.surface :global(.edward-send-button):disabled {
+  background: #e9e3f2;
+  color: #b4a8c9;
+}
+.surface :global(.edward-caution),
+.surface :global(.edward-composer) > small {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: #6e657b;
+  margin: 10px 0 0;
+}
+.surface :global(.edward-context) {
+  margin-bottom: 9px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.surface :global(.edward-context-chip) {
+  font-size: 10px;
+  color: #6e657b;
+  background: #f8f5fc;
+  border-radius: 6px;
+}
+.surface :global(.edward-thinking),
+.surface :global(.edward-typing) {
+  font-size: 12px;
+  color: #6e657b;
+  padding: 12px 0;
+}
+.surface :global(.edward-error),
+.surface :global(.edward-answer.error) {
+  font-size: 13px;
+  color: #914732;
+  background: #fff7f2;
+  padding: 14px;
+  border-radius: 10px;
+}
+.surface :global(.edward-prompts) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 24px;
+  border-top: 1px solid #f0ecf5;
+}
+.surface :global(.edward-prompts) button {
+  font-size: 11px;
+  padding: 10px 13px;
+  border: 1px solid #e6e0f0;
+  background: #fbf9ff;
+  color: #726183;
+  border-radius: 9px;
+}
+.surface button:focus-visible,
+.surface a:focus-visible,
+.surface summary:focus-visible {
+  outline: 2px solid #7650c0;
+  outline-offset: 3px;
+}
+.staffHeaderText {
+  flex: 1;
+}
+.stop {
+  border: 0;
+  background: transparent;
+  color: #78628e;
+  font: inherit;
+  font-size: 11px;
+  padding: 8px;
+  cursor: pointer;
+}
+.newConversation {
+  font-size: 18px;
+}
+@keyframes arrive {
+  from {
+    transform: translateY(10px);
+    opacity: 0.7;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@media (max-width: 620px) {
+  .floating {
+    inset: 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+    border: 0 !important;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .surface :global(.edward-thread),
+  .surface :global(.edward-transcript) {
+    padding: 22px 18px;
+  }
+  .surface :global(.edward-head),
+  .surface :global(.edward-panel__header) {
+    padding: 16px 18px;
+    min-height: 68px;
+  }
+  .surface :global(.edward-composer) {
+    padding: 12px 16px;
+  }
+  .surface :global(.edward-composer) textarea,
+  .surface :global(.edward-composer) input {
+    font-size: 16px;
+  }
+  .surface :global(.edward-greeting) h3 {
+    font-size: 25px;
+  }
+  .embedded {
+    min-height: 600px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .floating {
+    animation: none !important;
+  }
+  .surface * {
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.surface :global(.assistant-blocks) {
+  display: block !important;
+}
+.surface :global(.edward-thread),
+.surface :global(.edward-transcript) {
+  display: block !important;
+  position: relative;
+}
+
+.surface :global(.edward-composer) textarea:focus-visible {
+  outline: none !important;
+}
+@media (max-width: 620px) {
+  .surface :global(.edward-head) button,
+  .surface :global(.edward-panel__header) button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+.draftPanel {
+  padding: 20px;
+  border: 1px solid #e6e0f0;
+  border-radius: 14px;
+  background: #fcfbfe;
+}
+.draftPanelHead {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.draftChannel {
+  font-size: 11px;
+  color: #655275;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.draftSubject {
+  font-size: 13px;
+  font-weight: 600;
+}
+.draftBody {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.7;
+}
+.draftDisclaimer {
+  color: #6d657a;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.copyDraft {
+  min-height: 40px;
+  padding: 8px 13px;
+  border: 1px solid #ded4ee;
+  border-radius: 8px;
+  background: white;
+  color: #6842ac;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.surface :global(.assistant-block--text) {
+  font-size: 15px;
+  line-height: 1.7;
+}

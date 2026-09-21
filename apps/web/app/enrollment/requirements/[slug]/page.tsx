@@ -44,7 +44,6 @@ import { openEdward } from "../../../design-lib/door.js";
 import { FerpaAccessCenter } from "../../../components/ferpa-access-center";
 import { PointsInfoModal } from "../../../components/points-popover";
 import { PortalShell } from "../../../components/portal-shell";
-import { TenantLink as Link } from "../../../components/tenant-link";
 import { RequirementExtractReview } from "../../../components/requirement-extract-review";
 import {
   RequirementHelpRequest,
@@ -906,9 +905,16 @@ function DocumentAction({
   // object so an observed processing response advances that projection. The
   // local mutation response remains the fallback before the parent update is
   // committed (and for non-transcript document actions).
-  const selectedDocument = requirementDocumentOverrideProjection
+  let selectedDocument = requirementDocumentOverrideProjection
     ? serverDocument
     : currentDocumentProjection(serverDocument, recentRequirementDocument);
+  // An official review is newer than the upload response retained in this visit.
+  if (latestStoredDocument?.id === selectedDocument?.id &&
+      latestStoredDocument?.processingMode === "manual_review" &&
+      ["accepted", "rejected"].includes(latestStoredDocument.status)) {
+    selectedDocument = latestStoredDocument;
+  }
+  const staffReview = selectedDocument?.review;
   const extraction = selectedDocument?.extraction;
   useEffect(() => {
     onDocumentSelected?.(selectedDocument);
@@ -1001,6 +1007,17 @@ function DocumentAction({
             ))}
           </ul>
         </section>
+      ) : null}
+
+      {staffReview?.note ? (
+        <Notice
+          tone={selectedDocument?.status === "rejected" ? "urgent" : "done"}
+          icon={selectedDocument?.status === "rejected" ? "alert" : "check"}
+          title={selectedDocument?.status === "rejected" ? "Changes requested" : "Document reviewed"}
+        >
+          {"reviewerName" in staffReview ? <strong>{staffReview.reviewerName}: </strong> : null}
+          {staffReview.note}
+        </Notice>
       ) : null}
 
       {documents.status === "loading" ? (
@@ -1741,7 +1758,7 @@ export default function RequirementDetailPage() {
     (requested: boolean) => setHelpState({ slug, requested }),
     [slug],
   );
-  const [tab, setTab] = useState<"action" | "how" | "history">("action");
+  const [tab, setTab] = useState<"action" | "how">("action");
   const [pointsModal, setPointsModal] = useState(false);
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [transcriptDocumentProjection, setTranscriptDocumentProjection] =
@@ -2108,15 +2125,6 @@ export default function RequirementDetailPage() {
             >
               How it works
             </button>
-            <button
-              type="button"
-              className={tab === "history" ? "active" : ""}
-              onClick={() => setTab("history")}
-              role="tab"
-              aria-selected={tab === "history"}
-            >
-              History{item.history?.length ? ` (${item.history.length})` : ""}
-            </button>
           </div>
 
           {tab === "how" ? (
@@ -2141,52 +2149,6 @@ export default function RequirementDetailPage() {
               <button className="primary-button full" type="button" onClick={() => setTab("action")}>
                 Continue to the step <Icon name="arrow" size={17} />
               </button>
-            </div>
-          ) : tab === "history" ? (
-            <div className="requirement-history-panel" role="tabpanel">
-              <div className="requirement-history-panel__heading">
-                <h3>This step&apos;s history</h3>
-                <p>
-                  Uploads, decisions, status changes, and help activity stay together here.
-                  Private staff notes are never included.
-                </p>
-              </div>
-              {(item.history?.length ?? 0) === 0 ? (
-                <StateCard variant="empty" icon="clock" title="No activity recorded yet">
-                  The first action on this enrollment step will appear here.
-                </StateCard>
-              ) : (
-                <ol className="requirement-history-list">
-                  {item.history?.map((event) => (
-                    <li key={event.id}>
-                      <span className="requirement-history-list__mark" aria-hidden="true">
-                        <Icon name={event.kind === "document_reviewed" ? "file" : "clock"} size={16} />
-                      </span>
-                      <div>
-                        <div className="requirement-history-list__title">
-                          <strong>{event.title}</strong>
-                          {event.status ? <span>{humanize(event.status)}</span> : null}
-                        </div>
-                        {event.detail ? <p>{event.detail}</p> : null}
-                        <time dateTime={event.occurredAt}>
-                          {formatTenantDate(event.occurredAt, tenant, {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}
-                        </time>
-                        {event.documentId ? (
-                          <Link href={`/profile?section=documents&document=${encodeURIComponent(event.documentId)}`}>
-                            Open document record
-                          </Link>
-                        ) : null}
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              )}
             </div>
           ) : (
             <div className="action-panel" role="tabpanel">

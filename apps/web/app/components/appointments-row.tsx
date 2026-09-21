@@ -11,6 +11,7 @@ import {
   dateTile,
   stateOf,
   whoLabel,
+  whoShort,
 } from "./appointments-logic";
 
 /**
@@ -34,7 +35,7 @@ export function AppointmentsRow({
   onBookAgain: (appointment: StudentAppointment, node: HTMLElement | null) => void;
 }) {
   const state = stateOf(appointment, now);
-  const past = state.tone === "done" || state.tone === "cancelled";
+  const past = state.tone !== "confirmed";
   const tile = dateTile(appointment.startsAt, tenant);
 
   return (
@@ -52,12 +53,12 @@ export function AppointmentsRow({
           <span className="campus-row-when">
             {clockTime(appointment.startsAt, tenant)}
             <i aria-hidden="true">·</i>
-            {whoLabel(appointment, type)}
+            {whoLabel(appointment)}
           </span>
 
           <h3 className="campus-row-title">
             <button type="button" className="row-link" onClick={(event) => onOpen(appointment, event.currentTarget)}>
-              {type.label} · {appointment.staff?.name ?? type.team}
+              {type.label} · {whoShort(appointment)}
             </button>
           </h3>
 

@@ -51,7 +51,8 @@ test.describe("staff portal journeys", () => {
       page.getByRole("heading", { name: "Action center", exact: true }),
     ).toBeVisible();
 
-    await page.locator('[title="Sign out"]').click();
+    await page.getByRole("button", { name: /Account menu/i }).click();
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
     await expect(
       page.getByRole("heading", { name: "Staff sign in" }),
     ).toBeVisible();

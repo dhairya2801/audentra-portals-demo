@@ -783,3 +783,5 @@
   font-size: var(--fs-h2);
   font-weight: var(--fw-regular);
 }
+
+.document-decision-history{display:grid;gap:12px;margin:12px 0;padding-left:20px}.document-decision-history li>span{display:block;color:var(--muted);font-size:12px}.document-decision-history li>p{margin:6px 0}

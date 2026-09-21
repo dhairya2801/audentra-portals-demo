@@ -1,4 +1,8 @@
 "use client";
+import {Student360Summary} from "./student360-summary";
+import { ResetDemo } from "./reset-demo";
+
+import { UniversityOperationsPanel, UniversityRecordPanel } from "../components/university-record";
 
 import type {
   CampusEvent,
@@ -15,7 +19,9 @@ import type {
   StaffManagedConfigurationKind,
   StaffMemberSummary,
   StaffOperationsWorkspace,
+  StaffStudentOperation,
   StaffWorkItem,
+  StaffTaskBoardContext,
   StaffWorkItemPriority,
   StaffWorkItemStatus,
   StaffWorkItemType,
@@ -30,8 +36,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { DateTimePicker } from "../components/date-time-picker";
-import { ApprovedTaskBoard, ApprovedBoardNavigation } from "./approved-task-board";
 import { TenantLink as Link } from "../components/tenant-link";
 import { StaffEdwardAssistant } from "../components/staff-edward-assistant";
 import { PortalMark } from "../components/portal-ui";
@@ -43,50 +47,53 @@ import {
   createStaffKnowledgeCard,
   createStaffWorkItem,
   draftStaffConfigurationWithEdward,
+  getStaffActionCenter,
   getStaffInquiryThread,
+  getStaffMe,
   getStaffOperationsWorkspace,
+  searchStaffStudents,
   signOutStaff,
+  simulateStaffOutreach,
   updateStaffClub,
   updateStaffCorePlay,
   updateStaffInquiry,
   updateStaffKnowledgeCard,
   updateStaffManagedConfiguration,
+  updateStaffWorkItem,
   uploadStaffPortalMedia,
 } from "../lib/api-client";
 import {
   StaffSignIn,
   StudentInspector,
   WorkItemCard,
+  WorkItemSignals,
 } from "./staff-action-center";
-import { AudentraLogo } from "../components/audentra-logo";
 import { ActionCenterDetail } from "./action-center-detail";
-import {
-  DEMO_INQUIRIES,
-  DEMO_OUTREACH_RUNS,
-  DEMO_PORTAL_INVENTORY,
-  DEMO_PUBLISHED_KNOWLEDGE,
-  demoActionCenter,
-  demoMoveWorkItem,
-  demoPersonalActionCenter,
-} from "./demo-workspace";
 import { ActionRulesEditor } from "./action-rules-editor";
 import { JourneyFlowBuilder } from "./journey-flow-builder";
-import { InstitutionProfileView } from "./institution-profile/institution-profile";
+import { ApprovedTaskBoard, ApprovedBoardNavigation, useApprovedBoardOpenCount } from "./approved-task-board";
 import { MorningBrewView } from "./morning-brew/morning-brew";
 import { NotificationCenter } from "./notification-center";
+import { StaffProfileView } from "./staff-profile";
 import { connectStaffRealtime, type StaffRealtimeEvent } from "./staff-realtime";
-import { Student360Workspace } from "./student-360";
 import {
+  assignmentRoleLabel,
   buildActionCenterQuery,
+  clearedTaskBoardFilters,
+  defaultTaskBoardScope,
   emptyTaskBoardFilters,
   filtersFromActionCenterQuery,
   groupWorkItemsByStatus,
   hasActiveTaskBoardFilters,
+  scopeCountsFor,
   staffAvailabilityNote,
   TASK_BOARD_MAX_LIMIT,
   TASK_BOARD_PAGE_SIZE,
+  viewerRelationshipLabel,
   visibleWorkStatuses,
+  withTaskBoardScope,
   type TaskBoardFilters,
+  type TaskBoardScope,
   type TaskDueWindow,
   type TaskStatusFilter,
 } from "./task-board-utils";
@@ -95,7 +102,6 @@ type StaffView =
   | "morning_brew"
   | "overview"
   | "tasks"
-  | "student_360"
   | "students"
   | "journeys"
   | "outreach"
@@ -104,8 +110,8 @@ type StaffView =
   | "messages"
   | "campus_life"
   | "academics"
-  | "institution_profile"
-  | "edward";
+  | "edward"
+  | "profile";
 
 interface StaffRealtimeNotice {
   eventId: number;
@@ -203,7 +209,6 @@ const viewOrder: StaffView[] = [
   "morning_brew",
   "overview",
   "tasks",
-  "student_360",
   "students",
   "journeys",
   "outreach",
@@ -212,45 +217,41 @@ const viewOrder: StaffView[] = [
   "messages",
   "campus_life",
   "academics",
-  "institution_profile",
   "edward",
+  "profile",
 ];
 
-interface StaffNavItem {
-  id: StaffView;
+const navigation: Array<{
   label: string;
-  icon: string;
-  badge?: "inquiries" | "tasks";
-}
-
-/**
- * The four views the workspace is actually worked from, always in sight.
- *
- * Everything else the portal can open still exists and still routes; it sits
- * under one fold below, closed until asked for, so the sidebar reads as the
- * day's four places rather than fourteen of equal weight. Student 360 sits
- * last of the four because it is where the other three send you: the brief
- * names a student, the queue and the board carry their work, and this is the
- * record you open to answer for any of it.
- */
-const primaryNavigation: StaffNavItem[] = [
-  { id: "morning_brew", label: "Morning Brew", icon: "\u2726" },
-  { id: "outreach", label: "Action center", icon: "\u2197" },
-  { id: "tasks", label: "Task board", icon: "\u2713", badge: "tasks" },
-  { id: "student_360", label: "Student 360", icon: "\u25CE" },
-];
-
-const developingNavigation: StaffNavItem[] = [
-  { id: "overview", label: "Today", icon: "\u2302" },
-  { id: "students", label: "Students", icon: "S" },
-  { id: "messages", label: "Messages", icon: "M", badge: "inquiries" },
-  { id: "journeys", label: "Journeys", icon: "J" },
-  { id: "campus_life", label: "Campus life", icon: "C" },
-  { id: "academics", label: "Academics", icon: "A" },
-  { id: "institution_profile", label: "Institution profile", icon: "I" },
-  { id: "knowledge", label: "Knowledge base", icon: "K" },
-  { id: "core_plays", label: "Core plays", icon: "P" },
-  { id: "edward", label: "Edward", icon: "E" },
+  items: Array<{
+    id: StaffView;
+    label: string;
+    icon: string;
+    badge?: "inquiries" | "tasks";
+  }>;
+}> = [
+  {
+    label: "Workspace",
+    items: [
+      { id: "morning_brew", label: "Morning Brew", icon: "✦" },
+      { id: "tasks", label: "Task Board", icon: "✓", badge: "tasks" },
+      { id: "students", label: "Student 360", icon: "◎" },
+    ],
+  },
+  {
+    label: "Developing",
+    items: [
+      { id: "outreach", label: "Action Center", icon: "↗" },
+      { id: "overview", label: "Today", icon: "⌂" },
+      { id: "messages", label: "Messages", icon: "M", badge: "inquiries" },
+      { id: "journeys", label: "Journeys", icon: "J" },
+      { id: "campus_life", label: "Campus life", icon: "C" },
+      { id: "academics", label: "Academics", icon: "A" },
+      { id: "knowledge", label: "Knowledge base", icon: "K" },
+      { id: "core_plays", label: "Core plays", icon: "P" },
+      { id: "edward", label: "Edward", icon: "E" },
+    ],
+  },
 ];
 
 const workColumns: Array<{
@@ -278,7 +279,15 @@ const createTaskActionTypes: Array<{
   value: StaffActionType;
   label: string;
 }> = [
-  { value: "enrollment_follow_up", label: "Reach-out task" },
+  { value: "enrollment_follow_up", label: "Enrollment follow-up" },
+  { value: "onboarding_assistance", label: "Onboarding assistance" },
+  { value: "document_review", label: "Document review" },
+  { value: "missing_information", label: "Missing information" },
+  { value: "external_verification", label: "External verification" },
+  { value: "deadline_risk", label: "Deadline risk" },
+  { value: "staff_decision", label: "Staff decision" },
+  { value: "communication_response", label: "Communication response" },
+  { value: "blocked_dependency", label: "Blocked dependency" },
 ];
 
 const viewCopy: Record<
@@ -303,17 +312,11 @@ const viewCopy: Record<
     description:
       "Coordinate student work Jira-style, assign owners, and keep every colleague on the same shared record.",
   },
-  student_360: {
-    eyebrow: "One student, whole",
-    title: "Student 360",
-    description:
-      "Every side of one student in one record — application, enrollment, aid, academics, campus life, documents, and the staff work and conversations attached to them.",
-  },
   students: {
     eyebrow: "Student operations",
-    title: "Student records",
+    title: "Student 360",
     description:
-      "Review each student’s onboarding, checklist, documents, preferences, and active staff work.",
+      "One student. The full picture. Understand their progress, connect the right people, and make the next step clear.",
   },
   journeys: {
     eyebrow: "Journey configuration",
@@ -357,17 +360,16 @@ const viewCopy: Record<
     description:
       "Manage the student classroom catalog and Edward-assisted academic planning content.",
   },
-  institution_profile: {
-    eyebrow: "Institutional reference",
-    title: "Institution profile",
-    description:
-      "Who the institution is, before any of its work: size, schools, offices, price, and where the incoming class stands.",
-  },
   edward: {
     eyebrow: "Staff copilot",
     title: "Edward for staff",
     description:
       "Ask for data, drafts, and operational plans across the staff workspace with confirmations before any write.",
+  },  profile: {
+    eyebrow: "Your record",
+    title: "Profile",
+    description:
+      "Who you are in the organisation, your numbers, your calendar, and the students that are yours.",
   },
 };
 
@@ -506,17 +508,15 @@ function OverviewView({
   workspace: StaffOperationsWorkspace;
   navigate: (view: StaffView) => void;
 }) {
-  // Today, the Action Center and the Task board read the demo corpus rather
-  // than the tenant — see `demo-workspace.ts` for why. Every other view on this
-  // page still reads the real workspace.
-  const personal = demoPersonalActionCenter(workspace.currentStaff);
-  const inquiries = DEMO_INQUIRIES;
-  const openItems = personal.tasks.filter((item) => item.status !== "done");
-  const urgent = personal.students.filter(
-    (student) =>
-      student.risk.band === "critical" || student.risk.band === "high",
+  const personal = workspace.personalActionCenter;
+  // The first page of the member's own queue, already in attention order.
+  const openItems = personal.tasks;
+  const newInquiries = workspace.inquiries.filter(
+    (item) => item.status === "new",
   );
-  const newInquiries = inquiries.filter((item) => item.status === "new");
+  const publishedKnowledge = workspace.knowledgeBase.filter(
+    (item) => item.status === "published",
+  );
 
   return (
     <>
@@ -528,21 +528,21 @@ function OverviewView({
             type="button"
             onClick={() => navigate("outreach")}
           >
-            Open my Action Center
+            Open my Task Board
           </button>
         }
       />
 
       <section className="staff-metric-grid" aria-label="Today at a glance">
         <MetricCard
-          label="Open work"
-          value={openItems.length}
-          detail={`${personal.counts.inProgress} in progress`}
+          label="Open work · mine"
+          value={personal.counts.open}
+          detail={`${personal.counts.inProgress} in progress · ${personal.counts.students} students`}
         />
         <MetricCard
-          label="Needs attention"
-          value={urgent.length}
-          detail="Urgent or escalated"
+          label="Overdue · mine"
+          value={personal.counts.overdue}
+          detail={`${personal.counts.escalated} escalated · ${personal.counts.dueToday} due today`}
           tone="coral"
         />
         <MetricCard
@@ -553,7 +553,7 @@ function OverviewView({
         />
         <MetricCard
           label="Trusted guidance"
-          value={DEMO_PUBLISHED_KNOWLEDGE}
+          value={publishedKnowledge.length}
           detail="Published knowledge cards"
           tone="green"
         />
@@ -563,14 +563,15 @@ function OverviewView({
         <section className="staff-panel staff-panel--priority">
           <header className="staff-panel__heading">
             <div>
-              <p className="eyebrow">Priority queue</p>
-              <h2>Students who need attention</h2>
+              <p className="eyebrow">Your queue · start here</p>
+              <h2>{personal.queue.total > 0 ? `${personal.queue.total.toLocaleString()} open items assigned to you` : "Nothing assigned to you"}</h2>
             </div>
             <button type="button" onClick={() => navigate("outreach")}>
-              Open Action Center
+              Open Task Board
             </button>
           </header>
           <div className="staff-priority-list">
+            {openItems.length === 0 && <p className="staff-quiet-empty">Your assigned work is clear. Open the Action Center to review your team’s queue.</p>}
             {openItems.slice(0, 4).map((item) => (
               <button type="button" onClick={() => navigate("outreach")} key={item.id}>
                 <span
@@ -582,8 +583,8 @@ function OverviewView({
                   <small>{item.title}</small>
                 </span>
                 <span className="staff-priority-list__owner">
-                  {item.assignee?.name ?? "Unassigned"}
-                  <small>{formatDate(item.dueAt)}</small>
+                  {item.component}
+                  <small>{dueSummary(item)}</small>
                 </span>
               </button>
             ))}
@@ -601,7 +602,8 @@ function OverviewView({
             </button>
           </header>
           <div className="staff-inquiry-preview">
-            {inquiries.slice(0, 3).map((inquiry) => (
+            {workspace.inquiries.length === 0 && <p className="staff-quiet-empty">No active inquiries. Student questions will appear here when they arrive.</p>}
+            {workspace.inquiries.slice(0, 3).map((inquiry) => (
               <button type="button" onClick={() => navigate("messages")} key={inquiry.id}>
                 <span>{inquiry.student.preferredName.slice(0, 1)}</span>
                 <span>
@@ -630,7 +632,7 @@ function OverviewView({
           </button>
         </header>
         <div className="staff-experience-strip">
-          {DEMO_PORTAL_INVENTORY.slice(0, 5).map((item) => (
+          {workspace.portalInventory.slice(0, 5).map((item) => (
             <article key={item.id}>
               <span>{item.label.slice(0, 1)}</span>
               <div>
@@ -671,42 +673,43 @@ function OverviewView({
   );
 }
 
-function TaskBoardView({
+// Retained inspection component for internal tooling; product navigation uses ApprovedTaskBoard.
+export function TaskBoardView({
   workspace,
+  refresh,
   initialWorkItemId = null,
   initialQuery = null,
   onDetailClosed,
 }: {
   workspace: StaffOperationsWorkspace;
+  refresh: () => void;
   initialWorkItemId?: string | null;
   initialQuery?: StaffActionCenterQuery | null;
   onDetailClosed?: () => void;
 }) {
   const [openDetailId, setOpenDetailId] = useState<string | null>(initialWorkItemId);
   const [createOpen, setCreateOpen] = useState(false);
+  const myComponent = workspace.currentStaff.component;
+  // A deep link decides the scope; otherwise the board opens on the reader's
+  // own work when they own any, on their team's when they don't.
   const [filters, setFilters] = useState<TaskBoardFilters>(() =>
-    filtersFromActionCenterQuery(initialQuery),
+    initialQuery
+      ? filtersFromActionCenterQuery(initialQuery, myComponent)
+      : withTaskBoardScope(
+          emptyTaskBoardFilters,
+          defaultTaskBoardScope(workspace.actionCenter.scopes),
+          myComponent,
+        ),
   );
   const [debouncedQuery, setDebouncedQuery] = useState(filters.query);
   const draggedId = useRef<string | null>(null);
-  // The signed-in person, held in a ref so the workspace poll handing back an
-  // equal-but-new object does not give `reloadLoaded` a new identity.
-  const staffRef = useRef(workspace.currentStaff);
-  useEffect(() => {
-    staffRef.current = workspace.currentStaff;
-  }, [workspace.currentStaff]);
   const [dropTarget, setDropTarget] =
     useState<StaffWorkItemStatus | null>(null);
   const [boardMessage, setBoardMessage] = useState<string | null>(null);
 
   // The board is server-paged. `board` is the last page envelope (counts,
   // facets, page) and `items` is everything loaded so far, in server order.
-  // The board is the demo corpus, not the tenant's queue — see
-  // `demo-workspace.ts`. Filtering, paging and dragging all run against it in
-  // memory, so the columns behave exactly as they do against the platform.
-  const [board, setBoard] = useState<StaffActionCenter>(() =>
-    demoActionCenter(buildActionCenterQuery(emptyTaskBoardFilters), workspace.currentStaff),
-  );
+  const [board, setBoard] = useState<StaffActionCenter>(workspace.actionCenter);
   const [items, setItems] = useState<StaffWorkItem[]>([]);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -724,21 +727,7 @@ function TaskBoardView({
     () => ({ ...filters, query: debouncedQuery }),
     [filters, debouncedQuery],
   );
-  /**
-   * What the board actually asks for. The default status filter is "open",
-   * which is the four working columns; the board also shows Done, because that
-   * is the column a card is dragged into and the reader wants to see it land.
-   * So an "open" board asks for everything and renders the columns it wants —
-   * Cancelled stays behind an explicit choice in the status filter.
-   */
-  const boardFilters = useMemo(
-    () =>
-      activeFilters.status === "open"
-        ? { ...activeFilters, status: "all" as TaskStatusFilter }
-        : activeFilters,
-    [activeFilters],
-  );
-  const activeQueryKey = JSON.stringify(buildActionCenterQuery(boardFilters, { offset: 0 }));
+  const activeQueryKey = JSON.stringify(buildActionCenterQuery(activeFilters, { offset: 0 }));
 
   /**
    * Re-fetch everything the reader has loaded so far (at least one page), in
@@ -757,9 +746,9 @@ function TaskBoardView({
         let envelope: StaffActionCenter | null = null;
         for (let offset = 0; offset < target; offset += TASK_BOARD_MAX_LIMIT) {
           const limit = Math.min(TASK_BOARD_MAX_LIMIT, target - offset);
-          envelope = demoActionCenter(
-            buildActionCenterQuery(boardFilters, { limit, offset }),
-            staffRef.current,
+          envelope = await getStaffActionCenter(
+            buildActionCenterQuery(activeFilters, { limit, offset }),
+            controller.signal,
           );
           collected.push(...envelope.items);
           if (!envelope.page.hasMore) break;
@@ -778,7 +767,7 @@ function TaskBoardView({
         setLoadState("error");
       }
     },
-    [boardFilters],
+    [activeFilters],
   );
 
   // A new query starts again from the first page.
@@ -797,6 +786,23 @@ function TaskBoardView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeQueryKey]);
 
+  // The workspace poll and realtime events refresh the workspace every ~10s;
+  // piggyback on that to keep the loaded pages current without a second timer.
+  const workspaceStamp = workspace.actionCenter.generatedAt;
+  const lastStamp = useRef(workspaceStamp);
+  useEffect(() => {
+    if (lastStamp.current === workspaceStamp) return;
+    lastStamp.current = workspaceStamp;
+    if (loadState !== "ready" || loadingMore) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void reloadLoaded({ silent: true });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceStamp, loadState, loadingMore, reloadLoaded]);
+
   const loadMore = async () => {
     if (loadingMore || !board.page.hasMore) return;
     const sequence = ++requestSequence.current;
@@ -805,12 +811,12 @@ function TaskBoardView({
     activeController.current = controller;
     setLoadingMore(true);
     try {
-      const envelope = demoActionCenter(
-        buildActionCenterQuery(boardFilters, {
+      const envelope = await getStaffActionCenter(
+        buildActionCenterQuery(activeFilters, {
           limit: TASK_BOARD_PAGE_SIZE,
           offset: items.length,
         }),
-        staffRef.current,
+        controller.signal,
       );
       if (sequence !== requestSequence.current) return;
       setBoard(envelope);
@@ -831,13 +837,14 @@ function TaskBoardView({
   };
 
   const counts = board.counts;
-  const facets = board.facets;
-  const staffDirectory = board.staff;
+  const scopes = board.scopes ?? workspace.actionCenter.scopes;
+  const scopeCounts = scopeCountsFor(scopes, filters.scope);
+  const facets = board.facets ?? workspace.actionCenter.facets;
+  const staffDirectory = board.staff.length ? board.staff : workspace.actionCenter.staff;
   const grouped = useMemo(() => groupWorkItemsByStatus(items), [items]);
   const itemsById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const visibleColumns = useMemo(() => {
     const statuses = new Set(visibleWorkStatuses(filters.status));
-    if (filters.status === "open") statuses.add("done");
     return workColumns.filter((column) => statuses.has(column.status));
   }, [filters.status]);
 
@@ -889,10 +896,14 @@ function TaskBoardView({
   ) => setFilters((current) => ({ ...current, [key]: value }));
 
   const afterMutation = () => {
+    refresh();
     void reloadLoaded({ silent: true });
   };
 
-  const moveItem = (itemId: string, status: StaffWorkItemStatus) => {
+  const moveItem = async (
+    itemId: string,
+    status: StaffWorkItemStatus,
+  ) => {
     const item = itemsById.get(itemId);
     if (!item || item.status === status) return;
     if (!["todo", "in_progress"].includes(status)) {
@@ -902,26 +913,59 @@ function TaskBoardView({
       );
       return;
     }
-    demoMoveWorkItem(item.id, status);
-    setBoardMessage(`${item.key} moved to ${status.replaceAll("_", " ")}.`);
-    draggedId.current = null;
-    setDropTarget(null);
-    afterMutation();
+    setBoardMessage(`Moving ${item.key}...`);
+    try {
+      await updateStaffWorkItem(item.id, {
+        expectedVersion: item.version,
+        status,
+        note: `Moved to ${status.replaceAll("_", " ")} on the task board.`,
+      });
+      setBoardMessage(
+        `${item.key} moved to ${status.replaceAll("_", " ")}.`,
+      );
+    } catch (error) {
+      setBoardMessage(
+        error instanceof Error
+          ? error.message
+          : "The task could not be moved.",
+      );
+    } finally {
+      draggedId.current = null;
+      setDropTarget(null);
+      afterMutation();
+    }
   };
 
   const total = board.page?.total ?? items.length;
+  // Column totals describe the active scope (yours / your team's / everyone's),
+  // from the server's scope counts; the legacy board-wide counts are the fallback.
+  const columnSource = scopeCounts ?? counts;
   const columnCount = (status: StaffWorkItemStatus) =>
     status === "todo"
-      ? counts.todo
+      ? columnSource.todo
       : status === "in_progress"
-        ? counts.inProgress
+        ? columnSource.inProgress
         : status === "follow_up_required"
-          ? counts.followUpRequired
+          ? columnSource.followUpRequired
           : status === "blocked"
-            ? counts.blocked
+            ? columnSource.blocked
             : status === "done"
-              ? counts.done
-              : counts.cancelled;
+              ? columnSource.done
+              : columnSource.cancelled;
+  const scopeLabel =
+    filters.scope === "mine" ? "Mine" : filters.scope === "team" ? `My team · ${myComponent}` : "Everyone";
+  const scopeOptions: Array<{ scope: TaskBoardScope; label: string; detail: string; open: number | null }> = [
+    { scope: "mine", label: "Mine", detail: "Assigned to you", open: scopes?.mine.open ?? null },
+    {
+      scope: "team",
+      label: "My team",
+      detail: scopes?.component ?? myComponent,
+      open: scopes?.myComponent.open ?? null,
+    },
+    { scope: "all", label: "Everyone", detail: "Whole institution", open: scopes?.all.open ?? null },
+  ];
+  const changeScope = (scope: TaskBoardScope) =>
+    setFilters((current) => withTaskBoardScope(current, scope, myComponent));
 
   return (
     <>
@@ -953,39 +997,62 @@ function TaskBoardView({
               onChange={(event) => updateFilter("query", event.target.value)}
             />
           </label>
-          <div className="staff-segmented-control" aria-label="Quick ownership filters">
-            {(["all", "mine", "unassigned"] as const).map((value) => (
-              <button
-                className={filters.ownership === value ? "is-active" : undefined}
-                type="button"
-                aria-pressed={filters.ownership === value}
-                onClick={() => {
-                  updateFilter("ownership", value);
-                  updateFilter("assigneeId", "all");
-                }}
-                key={value}
-              >
-                {value === "all" ? "All" : value === "mine" ? "@me" : "Unassigned"}
-              </button>
-            ))}
-          </div>
           <strong aria-live="polite">
             {loadState === "loading"
               ? "Loading tasks…"
-              : `Showing ${items.length} of ${total} tasks`}
+              : `Showing ${items.length} of ${total.toLocaleString()} tasks`}
           </strong>
         </div>
+        <div className="staff-board-scope" role="group" aria-label="Board scope">
+          <div className="staff-scope-switch">
+            {scopeOptions.map((option) => (
+              <button
+                className={filters.scope === option.scope ? "is-active" : undefined}
+                type="button"
+                aria-pressed={filters.scope === option.scope}
+                onClick={() => changeScope(option.scope)}
+                data-board-scope={option.scope}
+                key={option.scope}
+              >
+                <strong>{option.label}</strong>
+                <span>
+                  {option.open !== null ? `${option.open.toLocaleString()} open` : "—"}
+                  {" · "}
+                  {option.detail}
+                </span>
+              </button>
+            ))}
+          </div>
+          <p className="staff-board-scope__note" aria-live="polite">
+            {scopeCounts ? (
+              <>
+                <strong>{scopeLabel}:</strong> {scopeCounts.open.toLocaleString()} open across{" "}
+                {scopeCounts.students.toLocaleString()} student{scopeCounts.students === 1 ? "" : "s"}
+                {scopeCounts.overdue > 0 ? ` · ${scopeCounts.overdue.toLocaleString()} overdue` : ""}
+                {scopeCounts.urgent > 0 ? ` · ${scopeCounts.urgent.toLocaleString()} urgent` : ""}
+                {scopeCounts.escalated > 0 ? ` · ${scopeCounts.escalated.toLocaleString()} escalated` : ""}
+                {scopeCounts.unassigned > 0 ? ` · ${scopeCounts.unassigned.toLocaleString()} unassigned` : ""}
+                {filters.scope === "mine" && scopeCounts.open === 0
+                  ? " — nothing is assigned to you; switch to your team or everyone."
+                  : ""}
+              </>
+            ) : (
+              "Counts are computed by the server for each scope."
+            )}
+          </p>
+        </div>
         <div className="staff-task-filter-grid">
-          <label>
+          <label hidden={filters.scope === "mine"}>
             <span>Assignee</span>
             <select
-              value={filters.assigneeId}
-              onChange={(event) => {
-                updateFilter("ownership", "all");
-                updateFilter("assigneeId", event.target.value);
-              }}
+              value={filters.scope === "mine" ? "all" : filters.assigneeId}
+              disabled={filters.scope === "mine"}
+              onChange={(event) => updateFilter("assigneeId", event.target.value)}
             >
               <option value="all">Anyone</option>
+              <option value="unassigned">
+                Unassigned{scopeCounts ? ` (${scopeCounts.unassigned} open)` : ""}
+              </option>
               {assignees.map(({ staff, open }) => {
                 const note = staffAvailabilityNote(staff);
                 return (
@@ -1057,6 +1124,12 @@ function TaskBoardView({
             <span>Team / component</span>
             <select
               value={filters.component}
+              disabled={filters.scope === "team"}
+              title={
+                filters.scope === "team"
+                  ? "The My team scope reads your own component; switch to Everyone to pick another."
+                  : undefined
+              }
               onChange={(event) => updateFilter("component", event.target.value)}
             >
               <option value="all">All teams</option>
@@ -1121,7 +1194,7 @@ function TaskBoardView({
             className="staff-clear-task-filters"
             type="button"
             disabled={!hasActiveTaskBoardFilters(filters)}
-            onClick={() => setFilters({ ...emptyTaskBoardFilters })}
+            onClick={() => setFilters((current) => clearedTaskBoardFilters(current))}
           >
             Clear filters
           </button>
@@ -1182,14 +1255,15 @@ function TaskBoardView({
                         : ""}
                     </p>
                   </div>
-                  <span title={`${columnCount(column.status)} on the whole board`}>
-                    {columnCount(column.status)}
+                  <span title={`${columnCount(column.status).toLocaleString()} in this scope (${scopeLabel})`}>
+                    {columnCount(column.status).toLocaleString()}
                   </span>
                 </header>
                 <div>
                   {columnItems.map((item) => (
                     <WorkItemCard
                       item={item}
+                      currentStaffId={workspace.currentStaff.id}
                       selected={openDetailId === item.id}
                       onSelect={() => setOpenDetailId(item.id)}
                       draggable
@@ -1214,7 +1288,11 @@ function TaskBoardView({
                   ))}
                   {columnItems.length === 0 ? (
                     <p className="staff-column-empty">
-                      {loadState === "loading" ? "Loading…" : "No matching work here."}
+                      {loadState === "loading"
+                        ? "Loading…"
+                        : filters.scope === "mine"
+                          ? "Nothing of yours here."
+                          : "No matching work here."}
                     </p>
                   ) : null}
                 </div>
@@ -1257,7 +1335,6 @@ function TaskBoardView({
         <TaskDetailDialog
           workItemId={openDetailId}
           workspace={workspace}
-          center={board}
           onClose={() => {
             setOpenDetailId(null);
             onDetailClosed?.();
@@ -1392,15 +1469,15 @@ function CreateTaskDialog({
           totalTasks: 0,
           lastActivityAt: new Date(0).toISOString(),
         },
-        risk: workspace.cohort[0]?.risk ?? {
-          score: 0,
-          band: "low",
-          category: "administrative",
-          meltLikelihoodPercent: 0,
-          recoveryLikelihoodPercent: 100,
-          reason: "No current risk assessment.",
+        externalRef: workspace.cohort[0]?.externalRef ?? null,
+        termName: workspace.cohort[0]?.termName ?? null,
+        campusName: workspace.cohort[0]?.campusName ?? null,
+        primaryAdviser: workspace.cohort[0]?.primaryAdviser ?? null,
+        openWorkItems: workspace.cohort[0]?.openWorkItems ?? 0,
+        overdueWorkItems: workspace.cohort[0]?.overdueWorkItems ?? 0,
+        attention: workspace.cohort[0]?.attention ?? {
+          level: "none",
           signals: [],
-          modelVersion: "not_assessed",
           evaluatedAt: new Date(0).toISOString(),
         },
         recommendedAction: workspace.cohort[0]?.recommendedAction ?? {
@@ -1561,17 +1638,15 @@ function CreateTaskDialog({
           </select>
         </label>
         <label>
-          <span>Task type</span>
-          <select name="actionType" defaultValue="enrollment_follow_up">
+          <span>Task category</span>
+          <select name="actionType" defaultValue="">
+            <option value="">Use the flow default</option>
             {createTaskActionTypes.map((option) => (
               <option value={option.value} key={option.value}>
                 {option.label}
               </option>
             ))}
           </select>
-          <small className="staff-create-task-form__hint">
-            Document approval or rejection tasks are created automatically when a student submits a file.
-          </small>
         </label>
         <label>
           <span>Team / component</span>
@@ -1634,7 +1709,7 @@ function CreateTaskDialog({
         </label>
         <label className="staff-create-task-form__wide">
           <span>Due date and time</span>
-          <DateTimePicker name="dueAt" />
+          <input name="dueAt" type="datetime-local" />
         </label>
         {error ? (
           <p className="field-error staff-create-task-form__wide" role="alert">
@@ -1657,13 +1732,11 @@ function CreateTaskDialog({
 function TaskDetailDialog({
   workItemId,
   workspace,
-  center,
   onClose,
   onChanged,
 }: {
   workItemId: string;
   workspace: StaffOperationsWorkspace;
-  center: StaffActionCenter;
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -1676,7 +1749,7 @@ function TaskDetailDialog({
       <ActionCenterDetail
         key={workItemId}
         workItemId={workItemId}
-        center={center}
+        center={workspace.actionCenter}
         currentStaffId={workspace.currentStaff.id}
         presentation="dialog"
         onBack={onClose}
@@ -1690,48 +1763,130 @@ function columnTitle(status: StaffWorkItemStatus) {
   return workColumns.find((column) => column.status === status)?.title ?? status;
 }
 
+/** The rule-based attention signals for one student, as pills — counts, never a score. */
+function AttentionPills({
+  attention,
+  compact = false,
+}: {
+  attention: StaffStudentOperation["attention"];
+  compact?: boolean;
+}) {
+  const levelLabel: Record<StaffStudentOperation["attention"]["level"], string> = {
+    none: "No signals",
+    watch: "Watch",
+    attention: "Needs attention",
+    urgent: "Urgent",
+  };
+  return (
+    <ul className="staff-attention" aria-label="Attention signals">
+      <li className={`level-${attention.level}`}>{levelLabel[attention.level]}</li>
+      {compact
+        ? null
+        : attention.signals.map((signal) => <li key={signal.code}>{signal.label}</li>)}
+    </ul>
+  );
+}
+
 function StudentsView({
-  workspace,
   refresh,
   openTaskBoard,
-  initialQuery = "",
+  initialStudentId,
+  initialQuery,
 }: {
-  workspace: StaffOperationsWorkspace;
   refresh: () => void;
   openTaskBoard: (query: StaffActionCenterQuery) => void;
-  /** Seeded by the topbar search; the view is keyed on it so it applies once. */
-  initialQuery?: string;
+  /** A student opened from elsewhere in the workspace (the profile caseload, a search). */
+  initialStudentId: string | null;
+  initialQuery: string;
 }) {
   const [query, setQuery] = useState(initialQuery);
-  const [selectedId, setSelectedId] = useState(
-    workspace.cohort[0]?.id ?? workspace.student.student.id,
+  const [debouncedQuery, setDebouncedQuery] = useState(initialQuery.trim());
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  // The whole tenant is searched on the server; this is one bounded page of it.
+  const search = useApiResource(
+    useCallback(
+      (signal: AbortSignal) => searchStaffStudents({ query: debouncedQuery, limit: 50 }, signal),
+      [debouncedQuery],
+    ),
+    { refreshOnAmbient: false },
   );
-  const filteredStudents = workspace.cohort.filter((student) => {
-    const search = query.trim().toLowerCase();
-    return (
-      !search ||
-      `${student.name} ${student.programName} ${student.risk.category}`
-        .toLowerCase()
-        .includes(search)
-    );
-  });
-  const operation =
-    workspace.cohort.find((student) => student.id === selectedId) ??
-    filteredStudents[0] ??
-    workspace.cohort[0];
-  // `workspace.actionCenter` is only the first page of open work, so what is
-  // connected here is a sample, never a per-student count.
-  const work = workspace.actionCenter.items.filter(
-    (item) => item.student.id === operation?.id,
+  const results = useMemo(() => search.data?.items ?? [], [search.data]);
+  const [selectedId, setSelectedId] = useState<string | null>(initialStudentId ?? "ac2fa509-b4e3-402d-900b-ffb8440fc430");
+  const selectedInResults = results.find((student) => student.id === selectedId) ?? null;
+
+  // A student opened from elsewhere may not be on this page: read that one row on its own.
+  const needsPinned = selectedId !== null && selectedInResults === null;
+  const pinned = useApiResource(
+    useCallback(
+      (signal: AbortSignal) =>
+        needsPinned && selectedId
+          ? searchStaffStudents({ studentId: selectedId, limit: 1 }, signal)
+          : Promise.resolve(null),
+      [needsPinned, selectedId],
+    ),
+    { refreshOnAmbient: false },
   );
+  const operation: StaffStudentOperation | null =
+    selectedInResults ??
+    (needsPinned ? (pinned.data?.items[0] ?? null) : null) ??
+    results[0] ??
+    null;
+  const operationId = operation?.id ?? null;
+
+  // The student's open work is its own bounded server query, never a slice of
+  // whichever board page the workspace happened to load.
+  const openWork = useApiResource(
+    useCallback(
+      (signal: AbortSignal) =>
+        operationId
+          ? getStaffActionCenter({ studentId: operationId, status: "open", limit: 10 }, signal)
+          : Promise.resolve(null),
+      [operationId],
+    ),
+    { refreshOnAmbient: false },
+  );
+  const work = openWork.data?.items ?? [];
   const inspectorItem = work[0] ?? null;
-  if (!operation) {
+  const onBoardChanged = () => {
+    refresh();
+    openWork.refresh();
+    search.refresh();
+  };
+
+  const cohortTotal = search.data?.cohortTotal ?? null;
+  const searchField = (
+    <div className="staff-heading-actions">
+      <label className="staff-search-field staff-search-field--compact">
+        <span aria-hidden="true">⌕</span>
+        <span className="sr-only">Search students</span>
+        <input
+          type="search"
+          placeholder={
+            cohortTotal !== null
+              ? `Search ${cohortTotal.toLocaleString()} students by name, ID or program`
+              : "Search students by name, ID or program"
+          }
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      </label>
+    </div>
+  );
+
+  if (search.status === "error" && !search.data) {
     return (
       <>
-        <PageHeading view="students" />
-        <section className="staff-panel staff-empty-panel">
-          <h2>No students match this view</h2>
-          <p>Clear the search to return to the deterministic test cohort.</p>
+        <PageHeading view="students" action={searchField} />
+        <section className="staff-panel staff-empty-panel" role="alert">
+          <h2>Students could not be loaded</h2>
+          <p>{search.error}</p>
+          <button className="button button--secondary" type="button" onClick={search.reload}>
+            Try again
+          </button>
         </section>
       </>
     );
@@ -1739,176 +1894,211 @@ function StudentsView({
 
   return (
     <>
-      <PageHeading
-        view="students"
-        action={
-          <div className="staff-heading-actions">
-            <label className="staff-search-field staff-search-field--compact">
-              <span aria-hidden="true">⌕</span>
-              <span className="sr-only">Search students</span>
-              <input
-                type="search"
-                placeholder="Search 400 test students"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </label>
-            <button className="button button--secondary" type="button">
-              Export view
-            </button>
-          </div>
-        }
-      />
+      <PageHeading view="students" action={searchField} />
 
-      <div className="staff-student-layout">
+      <div className="staff-student-layout student360-layout">
         <section className="staff-panel staff-student-directory">
           <header className="staff-panel__heading">
             <div>
-              <p className="eyebrow">Active cohort</p>
-              <h2>Incoming students</h2>
+              <p className="eyebrow">{debouncedQuery ? "Search results" : "Every student"}</p>
+              <h2>
+                {search.data
+                  ? debouncedQuery
+                    ? `${search.data.total.toLocaleString()} match${search.data.total === 1 ? "" : "es"}`
+                    : `${search.data.cohortTotal.toLocaleString()} students`
+                  : "Students"}
+              </h2>
             </div>
-            <span>{filteredStudents.length} students</span>
+            <span>
+              {search.data && search.data.total > search.data.items.length
+                ? `Showing ${search.data.items.length} of ${search.data.total.toLocaleString()} · narrow the search`
+                : search.status === "loading"
+                  ? "Searching…"
+                  : ""}
+            </span>
           </header>
           <div className="staff-student-directory__list">
-            {filteredStudents.map((student) => {
-              return (
-                <button
-                  className={student.id === operation?.id ? "is-selected" : undefined}
-                  type="button"
-                  onClick={() => setSelectedId(student.id)}
-                  key={student.id}
-                >
-                  <span className="staff-avatar">
-                    {student.preferredName.slice(0, 1)}
-                  </span>
-                  <span>
-                    <strong>{student.name}</strong>
-                    <small>{student.programName}</small>
-                  </span>
-                  <span>
-                    <StatusPill
-                      tone={
-                        student.risk.band === "critical" ||
-                        student.risk.band === "high"
-                          ? "danger"
-                          : student.risk.band === "medium"
-                            ? "warning"
-                            : "success"
-                      }
-                    >
-                      {student.risk.score} risk
-                    </StatusPill>
-                    <small>
-                      {student.journey.completedTasks}/{student.journey.totalTasks} checklist
-                    </small>
-                  </span>
-                </button>
-              );
-            })}
+            {search.status === "ready" && results.length === 0 ? (
+              <div className="staff-empty-panel">
+                <h3>No students match</h3>
+                <p>Try part of a name, a student ID, or a program.</p>
+              </div>
+            ) : null}
+            {(needsPinned && pinned.data?.items[0] && !debouncedQuery ? [pinned.data.items[0], ...results] : results).map((student) => (
+              <button
+                className={student.id === operationId ? "is-selected" : undefined}
+                type="button"
+                onClick={() => setSelectedId(student.id)}
+                key={student.id}
+              >
+                <span className="staff-avatar">{student.preferredName.slice(0, 1)}</span>
+                <span>
+                  <strong>{student.name}</strong>
+                  <small>
+                    {student.programName}
+                    {student.externalRef ? ` · ${student.externalRef}` : ""}
+                  </small>
+                </span>
+                <span>
+                  <AttentionPills attention={student.attention} compact />
+                  <small>
+                    {student.openWorkItems} open · {student.journey.completedTasks}/{student.journey.totalTasks} checklist
+                  </small>
+                </span>
+              </button>
+            ))}
           </div>
         </section>
 
-        <section className="staff-student-record">
-          <header className="staff-student-record__hero">
-            <div className="staff-avatar staff-avatar--large">
-              {operation.preferredName.slice(0, 1)}
-            </div>
-            <div>
-              <p className="eyebrow">Student record</p>
-              <h2>{operation.name}</h2>
-              <p>
-                {operation.programName} · Class of{" "}
-                {operation.classYear}
-              </p>
-            </div>
-            <StatusPill tone={operation.syntheticSeed ? "preview" : "success"}>
-              {operation.syntheticSeed ? "Synthetic test student" : "Canonical student record"}
-            </StatusPill>
-          </header>
-          <div className="staff-student-facts">
-            <article>
-              <span>Journey stage</span>
-              <strong>{operation.journey.stage}</strong>
-              <small>
-                Last activity {formatTime(operation.journey.lastActivityAt)}
-              </small>
-            </article>
-            <article>
-              <span>Enrollment checklist</span>
-              <strong>
-                {operation.journey.completedTasks}/{operation.journey.totalTasks}
-              </strong>
-              <small>Configured tasks complete</small>
-            </article>
-            <article>
-              <span>Melt diagnosis</span>
-              <strong>{operation.risk.score}</strong>
-              <small>{operation.risk.category} risk</small>
-            </article>
-            <article>
-              <span>Recommended channel</span>
-              <strong>{operation.recommendedAction.channel}</strong>
-              <small>{operation.recommendedAction.title}</small>
-            </article>
-          </div>
-          <div className="staff-record-sections">
-            <article>
-              <p className="eyebrow">Journey snapshot</p>
-              <h3>Enrollment readiness</h3>
-              <div className="staff-progress-track">
-                <span
-                  style={{
-                    width: `${
-                      operation.journey.totalTasks === 0
-                        ? 8
-                        : Math.round(
-                            (operation.journey.completedTasks /
-                              operation.journey.totalTasks) *
-                              100,
-                          )
-                    }%`,
-                  }}
-                />
+        {operation ? (
+          <section className="staff-student-record">
+            <header className="staff-student-record__hero">
+              <div className="staff-avatar staff-avatar--large">{operation.preferredName.slice(0, 1)}</div>
+              <div>
+                <p className="eyebrow">Student record{operation.externalRef ? ` · ${operation.externalRef}` : ""}</p>
+                <h2>{operation.name}</h2>
+                <p>
+                  {[
+                    operation.programName,
+                    `Class of ${operation.classYear}`,
+                    operation.termName,
+                    operation.campusName,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
               </div>
-              <p>
-                {operation.risk.reason}
-              </p>
-            </article>
-            <article>
-              <p className="eyebrow">Open work</p>
-              <h3>
-                {work.length > 0
-                  ? `${work.length} connected staff task${work.length === 1 ? "" : "s"} in the current queue page`
-                  : "No connected staff tasks on the current queue page"}
-              </h3>
-              <p>
-                <button
-                  className="staff-inline-link"
-                  type="button"
-                  onClick={() => openTaskBoard({ search: operation.name, status: "all" })}
+              <AttentionPills attention={operation.attention} compact />
+            </header>
+            <div className="staff-student-facts staff-student-facts--five">
+              <article>
+                <span>Journey stage</span>
+                <strong>{operation.journey.stage}</strong>
+                <small>Last activity {formatTime(operation.journey.lastActivityAt)}</small>
+              </article>
+              <article>
+                <span>Enrollment checklist</span>
+                <strong>
+                  {operation.journey.completedTasks}/{operation.journey.totalTasks}
+                </strong>
+                <small>Configured tasks complete</small>
+              </article>
+              <article>
+                <span>Open work</span>
+                <strong>{operation.openWorkItems}</strong>
+                <small>
+                  {operation.overdueWorkItems > 0
+                    ? `${operation.overdueWorkItems} overdue`
+                    : "None overdue"}
+                </small>
+              </article>
+              <article>
+                <span>Primary adviser</span>
+                <strong>{operation.primaryAdviser?.name ?? "Not assigned"}</strong>
+                <small>{operation.primaryAdviser ? "Active assignment" : "No active primary-adviser assignment"}</small>
+              </article>
+              <article>
+                <span>Your role</span>
+                <strong>
+                  {operation.viewerAssignmentRoles.length > 0
+                    ? operation.viewerAssignmentRoles.map(assignmentRoleLabel).join(", ")
+                    : "Not on your caseload"}
+                </strong>
+                <small
+                  title={operation.openWorkOwners.map((owner) => `${owner.name} (${owner.component})`).join(", ")}
                 >
-                  Open every task for {operation.preferredName} on the board →
-                </button>
-              </p>
-              <ul>
-                {work.slice(0, 3).map((item) => (
-                  <li key={item.id}>
-                    <span>{item.key}</span>
-                    <strong>{item.title}</strong>
-                    <small>{item.status.replaceAll("_", " ")}</small>
-                  </li>
-                ))}
-              </ul>
-            </article>
-          </div>
-        </section>
-        {inspectorItem ? (
-          <StudentInspector
+                  {operation.openWorkOwners.length === 0
+                    ? "No open work owners"
+                    : operation.openWorkOwners.length === 1
+                      ? `Open work owned by ${operation.openWorkOwners[0].name}`
+                      : `Open work owned by ${operation.openWorkOwners.length} people: ${operation.openWorkOwners
+                          .slice(0, 2)
+                          .map((owner) => owner.name)
+                          .join(", ")}${operation.openWorkOwners.length > 2 ? ` +${operation.openWorkOwners.length - 2}` : ""}`}
+                </small>
+              </article>
+            </div>
+            <details className="staff-record-sections student360-work-disclosure"><summary>Enrollment progress & active work</summary>
+              <article>
+                <p className="eyebrow">Journey snapshot</p>
+                <h3>Enrollment readiness</h3>
+                <div className="staff-progress-track">
+                  <span
+                    style={{
+                      width: `${
+                        operation.journey.totalTasks === 0
+                          ? 0
+                          : Math.round(
+                              (operation.journey.completedTasks / operation.journey.totalTasks) * 100,
+                            )
+                      }%`,
+                    }}
+                  />
+                </div>
+                <p className="eyebrow">Attention signals</p>
+                {operation.attention.signals.length === 0 ? (
+                  <p>No rule-based signals: nothing overdue, blocked, or escalated on this record.</p>
+                ) : (
+                  <AttentionPills attention={operation.attention} />
+                )}
+                <p>
+                  <small>
+                    Counted from requirements, staff work and adviser assignments at{" "}
+                    {formatTime(operation.attention.evaluatedAt)}. There is no risk model behind these.
+                  </small>
+                </p>
+              </article>
+              <article>
+                <p className="eyebrow">Open work</p>
+                <h3>
+                  {openWork.status === "loading" && !openWork.data
+                    ? "Loading open work…"
+                    : work.length > 0
+                      ? `${openWork.data?.page.total ?? work.length} open staff ${(openWork.data?.page.total ?? work.length) === 1 ? "task" : "tasks"}`
+                      : "No open staff tasks"}
+                </h3>
+                <p>
+                  <button
+                    className="staff-inline-link"
+                    type="button"
+                    onClick={() => openTaskBoard({ studentId: operation.id, status: "all" })}
+                  >
+                    Open every task for {operation.preferredName} on the board →
+                  </button>
+                </p>
+                <ul>
+                  {work.slice(0, 3).map((item) => (
+                    <li key={item.id}>
+                      <span>{item.key}</span>
+                      <strong>{item.title}</strong>
+                      <small>
+                        {item.status.replaceAll("_", " ")} · {item.assignee?.name ?? "Unassigned"}
+                        {item.assignee ? ` (${item.assignee.component})` : ""}
+                      </small>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            </details>
+            <Student360Summary key={operation.id} studentId={operation.id} name={operation.name} /><div className="staff-student-university"><UniversityRecordPanel key={operation.id} studentId={operation.id} /></div>
+          </section>
+        ) : search.status === "loading" ? (
+          <section className="staff-panel staff-empty-panel" aria-live="polite">
+            <h2>Loading students…</h2>
+          </section>
+        ) : (
+          <section className="staff-panel staff-empty-panel">
+            <h2>No student selected</h2>
+            <p>Pick a student from the list, or search the whole roster.</p>
+          </section>
+        )}
+        {inspectorItem && openWork.data ? (
+          <details className="student360-inspector"><summary>Student workspace · documents, requirements & communications</summary><StudentInspector
             item={inspectorItem}
-            center={workspace.actionCenter}
-            onBoardChanged={refresh}
+            center={openWork.data}
+            onBoardChanged={onBoardChanged}
             key={inspectorItem.id}
-          />
+          /></details>
         ) : null}
       </div>
     </>
@@ -2216,16 +2406,18 @@ function EventEditor({
         <div className="staff-form-grid">
           <label>
             Starts (UTC)
-            <DateTimePicker
+            <input
               name="startsAt"
+              type="datetime-local"
               defaultValue={campusEvent ? utcInputValue(campusEvent.startsAt) : ""}
               required
             />
           </label>
           <label>
             Ends (UTC)
-            <DateTimePicker
+            <input
               name="endsAt"
+              type="datetime-local"
               defaultValue={campusEvent ? utcInputValue(campusEvent.endsAt) : ""}
               required
             />
@@ -2333,8 +2525,9 @@ function EventEditor({
           <div className="staff-form-grid">
             <label>
               Advertise from (UTC)
-              <DateTimePicker
+              <input
                 name="advertisementStartsAt"
+                type="datetime-local"
                 defaultValue={
                   campusEvent?.advertisementStartsAt
                     ? utcInputValue(campusEvent.advertisementStartsAt)
@@ -2344,8 +2537,9 @@ function EventEditor({
             </label>
             <label>
               Advertise until (UTC)
-              <DateTimePicker
+              <input
                 name="advertisementEndsAt"
+                type="datetime-local"
                 defaultValue={
                   campusEvent?.advertisementEndsAt
                     ? utcInputValue(campusEvent.advertisementEndsAt)
@@ -2945,6 +3139,14 @@ function KnowledgeView({
           ))}
         </div>
       </section>
+      {filtered.length === 0 && (
+        <section className="staff-panel staff-empty-panel staff-empty-library">
+          <span className="staff-empty-library__icon" aria-hidden="true">K</span>
+          <h2>{query || audience !== "all" ? "No guidance matches these filters" : "A home for your team’s guidance"}</h2>
+          <p>{query || audience !== "all" ? "Try a different search or view all guidance." : "Create a knowledge card with a clear answer, an owner, and an audience so your team can find trusted guidance."}</p>
+          <button className="button button--secondary" type="button" onClick={() => { if (query || audience !== "all") { setQuery(""); setAudience("all"); } else setSelected(null); }}>{query || audience !== "all" ? "Clear filters" : "Create a knowledge card"}</button>
+        </section>
+      )}
       <div className="staff-content-grid">
         {filtered.map((card) => (
           <article className="staff-content-card" key={card.id}>
@@ -3134,6 +3336,14 @@ function CorePlaysView({
           </button>
         }
       />
+      {workspace.corePlays.length === 0 && (
+        <section className="staff-panel staff-empty-panel staff-empty-library">
+          <span className="staff-empty-library__icon" aria-hidden="true">P</span>
+          <h2>Make good practice repeatable</h2>
+          <p>Give your team a shared playbook: when to act, who to help, and the steps to follow.</p>
+          <button className="button button--secondary" type="button" onClick={() => setSelected(null)}>Create your first core play</button>
+        </section>
+      )}
       <div className="staff-core-play-grid">
         {workspace.corePlays.map((play) => (
           <article className="staff-core-play" key={play.id}>
@@ -3352,11 +3562,17 @@ function MessagesView({
   const [scope, setScope] = useState<"all" | "new" | "open" | "resolved">(
     "all",
   );
+  const [search, setSearch] = useState("");
+  const needle = search.trim().toLowerCase();
   const inquiries = workspace.inquiries.filter(
     (inquiry) =>
-      scope === "all" ||
-      inquiry.status === scope ||
-      (scope === "open" && inquiry.status === "waiting_on_student"),
+      (scope === "all" ||
+        inquiry.status === scope ||
+        (scope === "open" && inquiry.status === "waiting_on_student")) &&
+      (!needle ||
+        `${inquiry.student.name} ${inquiry.subject} ${inquiry.message}`
+          .toLowerCase()
+          .includes(needle)),
   );
   const selected =
     workspace.inquiries.find((item) => item.id === selectedId) ??
@@ -3374,7 +3590,12 @@ function MessagesView({
             <label className="staff-search-field">
               <span aria-hidden="true">⌕</span>
               <span className="sr-only">Search messages</span>
-              <input type="search" placeholder="Search messages" />
+              <input
+                type="search"
+                placeholder="Search by student, subject, or message"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
             </label>
             <div className="staff-message-scopes">
               {(["all", "new", "open", "resolved"] as const).map((value) => (
@@ -3856,98 +4077,183 @@ function AcademicsView({
   );
 }
 
+/** "Overdue by 3 days" / "Due today" / "Not yet due" — from the server signals, never recomputed. */
+function dueSummary(item: StaffWorkItem) {
+  if (item.signals?.overdue) {
+    return item.signals.overdueDays !== null && item.signals.overdueDays > 0
+      ? `Overdue by ${item.signals.overdueDays} day${item.signals.overdueDays === 1 ? "" : "s"}`
+      : "Overdue";
+  }
+  if (!item.dueAt) return "No due date";
+  return `Due ${formatDate(item.dueAt)}`;
+}
+
 function OutreachView({
   workspace,
   refresh,
+  openTaskBoard,
 }: {
   workspace: StaffOperationsWorkspace;
   refresh: () => void;
+  openTaskBoard: (query: StaffActionCenterQuery) => void;
 }) {
-  // The demo corpus, not the tenant — see `demo-workspace.ts`.
-  const [personalStamp, setPersonalStamp] = useState(0);
-  const personal = useMemo(
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    () => demoPersonalActionCenter(workspace.currentStaff),
-    [workspace.currentStaff, personalStamp],
+  const personal = workspace.personalActionCenter;
+  const scopes = workspace.actionCenter.scopes;
+  const me = workspace.currentStaff;
+  const outreachCapability = workspace.capabilities.externalOutreach;
+  // Appointment outcomes live on /v1/staff/me (the profile's fuller record);
+  // the queue counts are the board's own SQL scope counts for `assignee=me`.
+  const staffMe = useApiResource(
+    useCallback((signal: AbortSignal) => getStaffMe(signal), []),
+    { refreshOnAmbient: false },
   );
-  const [selectedStudentId, setSelectedStudentId] = useState(
-    personal.students[0]?.id ?? null,
-  );
-  const [taskMessage, setTaskMessage] = useState<string | null>(null);
-  const [runs, setRuns] = useState(DEMO_OUTREACH_RUNS);
-  const [result, setResult] = useState<string | null>(null);
-  const selectedStudent =
-    personal.students.find(
-      (student) => student.id === selectedStudentId,
-    ) ??
-    personal.students[0] ??
-    null;
-  const selectedTask = selectedStudent?.recommendedAction.taskId
-    ? personal.tasks.find(
-        (task) => task.id === selectedStudent.recommendedAction.taskId,
-      ) ?? null
-    : null;
+  const awaitingOutcome = staffMe.data?.work.appointmentsAwaitingOutcome ?? null;
 
-  // The move is written to the demo board in memory, so the task board shows
-  // it too and the counts above follow it — without a request leaving the page.
-  const moveRecommendedTask = (status: StaffWorkItemStatus) => {
-    if (!selectedTask) return;
-    demoMoveWorkItem(selectedTask.id, status);
-    setPersonalStamp((current) => current + 1);
-    setTaskMessage(
-      status === "done"
-        ? `${selectedTask.key} completed.`
-        : `${selectedTask.key} is now in progress.`,
-    );
+  // The workspace ships the first page of the member's open work in attention
+  // order; further pages come from the same board query and are appended.
+  const [morePages, setMorePages] = useState<StaffWorkItem[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [queueMessage, setQueueMessage] = useState<string | null>(null);
+  const queueItems = useMemo(() => {
+    const seen = new Set<string>();
+    const merged: StaffWorkItem[] = [];
+    for (const item of [...personal.tasks, ...morePages]) {
+      if (seen.has(item.id) || item.status === "done" || item.status === "cancelled") continue;
+      seen.add(item.id);
+      merged.push(item);
+    }
+    return merged;
+  }, [personal.tasks, morePages]);
+  const queueTotal = personal.queue.total;
+  const hasMore = queueItems.length < queueTotal;
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const envelope = await getStaffActionCenter({
+        assignee: "me",
+        status: "open",
+        sort: "attention",
+        limit: TASK_BOARD_PAGE_SIZE,
+        offset: queueItems.length,
+      });
+      setMorePages((current) => current.concat(envelope.items));
+      setQueueMessage(null);
+    } catch (error) {
+      setQueueMessage(
+        error instanceof Error ? error.message : "More of your queue could not be loaded.",
+      );
+    } finally {
+      setLoadingMore(false);
+    }
   };
-  // The simulation is saved to the demo's own run history; nothing is sent and
-  // nothing is written to the platform.
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedIndex = Math.max(
+    0,
+    queueItems.findIndex((item) => item.id === selectedId),
+  );
+  const selected = queueItems[selectedIndex] ?? null;
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [taskMessage, setTaskMessage] = useState<string | null>(null);
+  const studentContext = selected
+    ? (personal.students.find((student) => student.id === selected.student.id) ?? null)
+    : null;
+  const afterMutation = () => {
+    setMorePages([]);
+    refresh();
+  };
+  const moveTask = async (item: StaffWorkItem, status: StaffWorkItemStatus) => {
+    setTaskMessage(`Updating ${item.key}...`);
+    try {
+      await updateStaffWorkItem(item.id, {
+        expectedVersion: item.version,
+        status,
+        note:
+          status === "done"
+            ? "Completed from the personal Action Center."
+            : "Started from the personal Action Center.",
+      });
+      setTaskMessage(
+        status === "done" ? `${item.key} completed.` : `${item.key} is now in progress.`,
+      );
+    } catch (error) {
+      setTaskMessage(
+        error instanceof Error ? error.message : "The task could not be updated.",
+      );
+    } finally {
+      afterMutation();
+    }
+  };
+
+  const action = useApiAction(simulateStaffOutreach);
+  const [result, setResult] = useState<string | null>(null);
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const requestedCount = Number(form.get("requestedCount"));
-    setRuns((current) => [
-      {
-        id: `demo-run-${current.length + 1}-${Date.now()}`,
+    try {
+      const run = await action.run({
         title: String(form.get("title")),
         audience: String(form.get("audience")),
         channel: form.get("channel") as "email" | "sms" | "voice",
-        requestedCount,
-        status: "simulation_only",
-        createdBy: personal.staff.name,
-        createdAt: new Date().toISOString(),
-      },
-      ...current,
-    ]);
-    setResult(
-      `Simulation created for ${requestedCount} students. No external contact was sent.`,
-    );
+        requestedCount: Number(form.get("requestedCount")),
+      });
+      setResult(
+        `Simulation recorded for ${run.requestedCount} students. No external contact was sent.`,
+      );
+      refresh();
+    } catch {
+      setResult(null);
+    }
   };
+
+  const teamOpen = scopes?.myComponent.open ?? null;
+  const allOpen = scopes?.all.open ?? null;
+  const teamUnassigned = scopes?.myComponent.unassigned ?? null;
+  const relationship = selected ? viewerRelationshipLabel(selected.viewerAssignmentRoles) : null;
+
   return (
     <>
-      <PageHeading view="outreach" />
+      <PageHeading
+        view="outreach"
+        action={
+          <div className="staff-heading-actions staff-scope-links" aria-label="Read the board as">
+            <span>Board:</span>
+            <button type="button" onClick={() => openTaskBoard({ assignee: "me" })}>
+              Mine{scopes ? ` · ${scopes.mine.open.toLocaleString()}` : ""}
+            </button>
+            <button type="button" onClick={() => openTaskBoard({ component: me.component })}>
+              {me.component}
+              {teamOpen !== null ? ` · ${teamOpen.toLocaleString()}` : ""}
+            </button>
+            <button type="button" onClick={() => openTaskBoard({})}>
+              Everyone{allOpen !== null ? ` · ${allOpen.toLocaleString()}` : ""}
+            </button>
+          </div>
+        }
+      />
       <section className="staff-metric-grid" aria-label="My work today">
         <MetricCard
-          label="Students today"
-          value={personal.counts.studentsToday}
-          detail={`Assigned to ${personal.staff.name}`}
+          label="Open · mine"
+          value={personal.counts.open}
+          detail={`Across ${personal.counts.students} student${personal.counts.students === 1 ? "" : "s"} · ${personal.counts.inProgress} in progress`}
         />
         <MetricCard
-          label="Critical risk"
-          value={personal.counts.critical}
-          detail="Act first"
+          label="Overdue"
+          value={personal.counts.overdue}
+          detail={`${personal.counts.escalated} escalated · ${personal.counts.urgent} urgent`}
           tone="coral"
         />
         <MetricCard
-          label="High risk"
-          value={personal.counts.highRisk}
-          detail="Diagnosis and action ready"
+          label="Due today"
+          value={personal.counts.dueToday}
+          detail={`${personal.counts.blocked} blocked · ${personal.counts.stale} stale in progress`}
           tone="gold"
         />
         <MetricCard
-          label="In progress"
-          value={personal.counts.inProgress}
-          detail={`${personal.counts.completed} completed`}
+          label="Awaiting outcome"
+          value={awaitingOutcome ?? (staffMe.status === "error" ? "—" : "…")}
+          detail="Past appointments to close · full record on your profile"
           tone="green"
         />
       </section>
@@ -3955,159 +4261,254 @@ function OutreachView({
         <section className="staff-panel staff-personal-queue">
           <header className="staff-panel__heading staff-panel__heading--padded">
             <div>
-              <p className="eyebrow">Prioritized by recovery opportunity</p>
-              <h2>My students</h2>
+              <p className="eyebrow">Assigned to you · escalated, then overdue, then priority</p>
+              <h2>My queue</h2>
             </div>
-            <StatusPill tone="neutral">
-              {personal.students.length} decisions
+            <StatusPill tone={queueTotal > 0 ? "warning" : "neutral"}>
+              {queueTotal.toLocaleString()} open
             </StatusPill>
           </header>
-          <div className="staff-personal-queue__list">
-            {personal.students.map((student, index) => (
-              <button
-                className={
-                  selectedStudent?.id === student.id ? "is-selected" : undefined
-                }
-                type="button"
-                onClick={() => {
-                  setSelectedStudentId(student.id);
-                  setTaskMessage(null);
-                }}
-                key={student.id}
-              >
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <span>
-                  <strong>{student.name}</strong>
-                  <small>
-                    {student.journey.stage} · {student.programName}
-                  </small>
-                </span>
-                <span>
-                  <strong>{student.risk.score}</strong>
-                  <small>{student.risk.band} melt risk</small>
-                </span>
-              </button>
-            ))}
-          </div>
+          {queueItems.length === 0 ? (
+            <div className="staff-empty-panel staff-empty-panel--queue">
+              <h3>Nothing is assigned to you</h3>
+              <p>
+                No open work item names {me.name} as its owner.
+                {teamOpen !== null
+                  ? ` ${me.component} has ${teamOpen.toLocaleString()} open item${teamOpen === 1 ? "" : "s"}${
+                      teamUnassigned ? ` (${teamUnassigned.toLocaleString()} unassigned)` : ""
+                    }`
+                  : ""}
+                {allOpen !== null ? `; the institution has ${allOpen.toLocaleString()}.` : "."}
+              </p>
+              <div className="staff-empty-panel__actions">
+                <button
+                  className="button button--primary"
+                  type="button"
+                  onClick={() => openTaskBoard({ component: me.component })}
+                >
+                  Open {me.component}&apos;s queue
+                </button>
+                {teamUnassigned ? (
+                  <button
+                    className="button button--secondary"
+                    type="button"
+                    onClick={() => openTaskBoard({ component: me.component, assignee: "unassigned" })}
+                  >
+                    Unassigned in {me.component}
+                  </button>
+                ) : null}
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  onClick={() => openTaskBoard({})}
+                >
+                  Everyone
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="staff-personal-queue__list" data-personal-queue>
+              {queueItems.map((item, index) => (
+                <button
+                  className={[
+                    selected?.id === item.id ? "is-selected" : "",
+                    index === 0 ? "is-start" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ") || undefined}
+                  type="button"
+                  onClick={() => {
+                    setSelectedId(item.id);
+                    setTaskMessage(null);
+                  }}
+                  key={item.id}
+                >
+                  <span>{index === 0 ? "★" : String(index + 1).padStart(2, "0")}</span>
+                  <span>
+                    <strong>{item.title}</strong>
+                    <small>
+                      {item.student.name} · {item.component} · {item.key}
+                      {viewerRelationshipLabel(item.viewerAssignmentRoles)
+                        ? ` · ${viewerRelationshipLabel(item.viewerAssignmentRoles)}`
+                        : ""}
+                    </small>
+                  </span>
+                  <span>
+                    <span className={`staff-priority staff-priority--${item.priority}`}>
+                      {index === 0 ? "Start here" : item.priority}
+                    </span>
+                    <small>
+                      {dueSummary(item)}
+                      {item.escalated ? " · escalated" : ""}
+                    </small>
+                  </span>
+                </button>
+              ))}
+              {hasMore ? (
+                <div className="staff-board-pager">
+                  <button
+                    className="button button--secondary"
+                    type="button"
+                    disabled={loadingMore}
+                    onClick={() => void loadMore()}
+                  >
+                    {loadingMore
+                      ? "Loading more…"
+                      : `Load more (${Math.min(TASK_BOARD_PAGE_SIZE, queueTotal - queueItems.length)} of ${
+                          queueTotal - queueItems.length
+                        } remaining)`}
+                  </button>
+                </div>
+              ) : null}
+              {queueMessage ? (
+                <p className="staff-board-announcement" role="alert">
+                  {queueMessage}
+                </p>
+              ) : null}
+            </div>
+          )}
         </section>
-        {selectedStudent ? (
-          <section className="staff-panel staff-student-decision">
+        {selected ? (
+          <section className="staff-panel staff-student-decision" data-selected-task={selected.key}>
             <header>
               <div>
-                <p className="eyebrow">Decision brief</p>
-                <h2>{selectedStudent.name}</h2>
+                <p className="eyebrow">
+                  {selectedIndex === 0 ? "Start here" : `#${selectedIndex + 1} in your queue`} · {selected.key}
+                </p>
+                <h2>{selected.title}</h2>
                 <span>
-                  {selectedStudent.programName} · Class of{" "}
-                  {selectedStudent.classYear}
+                  {selected.student.name} · {selected.student.programName} · Class of{" "}
+                  {selected.student.classYear}
                 </span>
               </div>
-              <div
-                className={`staff-risk-score staff-risk-score--${selectedStudent.risk.band}`}
-              >
-                <strong>{selectedStudent.risk.score}</strong>
-                <span>Melt score</span>
-              </div>
+              <span className={`staff-priority staff-priority--${selected.priority}`}>
+                {selected.priority}
+              </span>
             </header>
             <div className="staff-decision-grid">
               <article>
-                <p className="eyebrow">Why flagged</p>
-                <h3>{selectedStudent.risk.category} risk</h3>
-                <p>{selectedStudent.risk.reason}</p>
+                <p className="eyebrow">Why now</p>
+                <h3>
+                  {selected.escalated ? "Escalated · " : ""}
+                  {dueSummary(selected)}
+                </h3>
+                <p>{selected.description}</p>
+                <WorkItemSignals item={selected} />
                 <ul>
-                  {selectedStudent.risk.signals.map((signal) => (
-                    <li key={signal}>{signal}</li>
-                  ))}
+                  <li>
+                    Owner: <strong>{selected.assignee?.id === me.id ? "you" : (selected.assignee?.name ?? "Unassigned")}</strong>
+                    {" · "}team: {selected.component}
+                  </li>
+                  <li>
+                    Your relationship:{" "}
+                    <strong>{relationship ?? "Not on your caseload"}</strong>
+                    {studentContext?.primaryAdviser
+                      ? ` · primary adviser ${studentContext.primaryAdviser.id === me.id ? "you" : studentContext.primaryAdviser.name}`
+                      : studentContext
+                        ? " · no primary adviser"
+                        : ""}
+                  </li>
+                  <li>
+                    Status: <strong>{selected.status.replaceAll("_", " ")}</strong>
+                    {selected.followUpAt ? ` · follow up ${formatDate(selected.followUpAt)}` : ""}
+                    {selected.blocker ? ` · blocked: ${selected.blocker.detail}` : ""}
+                  </li>
+                  {studentContext ? (
+                    <li>
+                      Student record: {studentContext.openWorkItems} open
+                      {studentContext.overdueWorkItems > 0
+                        ? ` · ${studentContext.overdueWorkItems} overdue`
+                        : ""}
+                      {" · "}
+                      {studentContext.journey.stage} · {studentContext.journey.completedTasks}/
+                      {studentContext.journey.totalTasks} checklist
+                    </li>
+                  ) : null}
                 </ul>
-                <small>
-                  {selectedStudent.risk.modelVersion} · Observable enrollment
-                  behavior only
-                </small>
+                {studentContext ? <AttentionPills attention={studentContext.attention} /> : null}
               </article>
               <article className="staff-next-best-action">
-                <p className="eyebrow">Next best action</p>
-                <h3>{selectedStudent.recommendedAction.title}</h3>
-                <p>{selectedStudent.recommendedAction.rationale}</p>
+                <p className="eyebrow">Act</p>
+                <h3>{selected.nextStep ?? "Work this item"}</h3>
+                <p>
+                  {selected.status === "todo"
+                    ? "Start it to claim the interaction, or open the full record to reassign, escalate, or log a communication."
+                    : selected.status === "in_progress"
+                      ? "Record the outcome when the interaction is done; blockers and follow-ups need the full record."
+                      : "This item needs details before it moves; open the full record."}
+                </p>
                 <dl>
                   <div>
                     <dt>Channel</dt>
-                    <dd>{selectedStudent.recommendedAction.channel}</dd>
+                    <dd>{selected.selectedChannel ?? "portal"}</dd>
                   </div>
                   <div>
-                    <dt>Expected impact</dt>
-                    <dd>{selectedStudent.recommendedAction.expectedImpact}</dd>
+                    <dt>Attempts</dt>
+                    <dd>{selected.attemptCount}</dd>
                   </div>
                   <div>
-                    <dt>Recovery likelihood</dt>
-                    <dd>
-                      {selectedStudent.risk.recoveryLikelihoodPercent}%
-                    </dd>
+                    <dt>Type</dt>
+                    <dd>{selected.actionType.replaceAll("_", " ")}</dd>
                   </div>
                 </dl>
                 <div>
-                  {selectedTask?.status !== "in_progress" &&
-                  selectedTask?.status !== "done" ? (
+                  {selected.status === "todo" ? (
                     <button
                       className="button button--secondary"
                       type="button"
-                      onClick={() => moveRecommendedTask("in_progress")}
+                      onClick={() => void moveTask(selected, "in_progress")}
                     >
                       Start action
                     </button>
                   ) : null}
-                  {selectedTask?.status !== "done" ? (
+                  {selected.status === "todo" || selected.status === "in_progress" ? (
                     <button
                       className="button button--primary"
                       type="button"
-                      onClick={() => moveRecommendedTask("done")}
+                      onClick={() => void moveTask(selected, "done")}
                     >
                       Mark complete
                     </button>
-                  ) : (
-                    <StatusPill tone="success">Completed</StatusPill>
-                  )}
+                  ) : null}
+                  <button
+                    className="button button--secondary"
+                    type="button"
+                    onClick={() => setDetailId(selected.id)}
+                  >
+                    Open full record
+                  </button>
                 </div>
-                {taskMessage ? (
-                  <small aria-live="polite">{taskMessage}</small>
-                ) : null}
+                {taskMessage ? <small aria-live="polite">{taskMessage}</small> : null}
               </article>
             </div>
-            <section className="staff-communication-timeline">
-              <header>
-                <div>
-                  <p className="eyebrow">Communication history</p>
-                  <h3>What has happened before</h3>
-                </div>
-                <span>
-                  {selectedStudent.journey.completedTasks}/
-                  {selectedStudent.journey.totalTasks} journey tasks complete
-                </span>
-              </header>
-              <ol>
-                {selectedStudent.communicationHistory.map((entry) => (
-                  <li key={entry.id}>
-                    <span>{entry.channel.slice(0, 1).toUpperCase()}</span>
-                    <div>
-                      <strong>{entry.summary}</strong>
-                      <small>
-                        {entry.direction} · {entry.outcome.replaceAll("_", " ")}{" "}
-                        · {formatTime(entry.occurredAt)}
-                      </small>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </section>
           </section>
-        ) : null}
+        ) : (
+          <section className="staff-panel staff-empty-panel">
+            <h2>Pick up your team&apos;s work</h2>
+            <p>
+              With nothing assigned to you, the Task Board&apos;s <strong>My team</strong> scope shows
+              what {me.component} is carrying; claim an item there and it appears here.
+            </p>
+          </section>
+        )}
       </div>
+      {detailId ? (
+        <TaskDetailDialog
+          workItemId={detailId}
+          workspace={workspace}
+          onClose={() => setDetailId(null)}
+          onChanged={afterMutation}
+        />
+      ) : null}
       <header className="staff-section-heading">
         <div>
           <p className="eyebrow">Agentic delegation</p>
           <h2>Prepare a cohort action</h2>
         </div>
         <p>
-          Build an auditable batch plan from your assigned queue. External
-          communication remains disabled until channel tools are connected.
+          {outreachCapability === "simulation_only"
+            ? "This deployment records outreach runs as simulations: the plan is saved and audited, and no student is contacted."
+            : `External outreach capability: ${String(outreachCapability).replaceAll("_", " ")}.`}
         </p>
       </header>
       <div className="staff-outreach-layout">
@@ -4117,29 +4518,30 @@ function OutreachView({
               <p className="eyebrow">Delegated action</p>
               <h2>Plan a student outreach run</h2>
             </div>
-            <StatusPill tone="preview">No sends</StatusPill>
+            <StatusPill tone="preview">
+              {outreachCapability === "simulation_only" ? "Simulation only" : String(outreachCapability)}
+            </StatusPill>
           </header>
           <form onSubmit={submit}>
             <label>
               Run name
-              <input
-                name="title"
-                defaultValue="Deposit deadline reminder"
-                required
-              />
+              <input name="title" placeholder="What this run is for" required />
             </label>
             <label>
               Audience definition
               <textarea
                 name="audience"
-                defaultValue="Admitted Fall 2026 students with a deposit due within 72 hours"
+                placeholder="Describe who should be reached and why"
                 required
               />
             </label>
             <div className="staff-form-grid">
               <label>
                 Channel
-                <select name="channel" defaultValue="voice">
+                <select name="channel" defaultValue="" required>
+                  <option value="" disabled>
+                    Choose a channel
+                  </option>
                   <option value="email">Email</option>
                   <option value="sms">SMS</option>
                   <option value="voice">Voice call</option>
@@ -4152,22 +4554,39 @@ function OutreachView({
                   type="number"
                   min="1"
                   max="10000"
-                  defaultValue="100"
+                  placeholder="How many"
                   required
                 />
               </label>
             </div>
             <div className="staff-simulation-warning">
-              <strong>Preview-only capability</strong>
+              <strong>
+                {outreachCapability === "simulation_only"
+                  ? "Simulation only in this deployment"
+                  : "Outreach capability"}
+              </strong>
               <p>
-                Edward does not have email, SMS, or voice tools in this
-                environment. This saves a simulated run for product design and
-                audit-flow testing only.
+                {outreachCapability === "simulation_only"
+                  ? "The platform reports external outreach as simulation-only: this saves an auditable run and sends nothing by email, SMS, or voice."
+                  : `The platform reports external outreach as “${String(outreachCapability).replaceAll("_", " ")}”.`}
               </p>
             </div>
+            {action.message ? (
+              <p className="field-error" role="alert">
+                {action.message}
+              </p>
+            ) : null}
             {result ? <p className="staff-action-success">{result}</p> : null}
-            <button className="button button--primary" type="submit">
-              Create simulation
+            <button
+              className="button button--primary"
+              type="submit"
+              disabled={action.status === "loading"}
+            >
+              {action.status === "loading"
+                ? "Saving run…"
+                : outreachCapability === "simulation_only"
+                  ? "Save simulated run"
+                  : "Save run"}
             </button>
           </form>
         </section>
@@ -4175,17 +4594,17 @@ function OutreachView({
           <header className="staff-panel__heading">
             <div>
               <p className="eyebrow">Run history</p>
-              <h2>Recent simulations</h2>
+              <h2>Recent runs</h2>
             </div>
           </header>
           <div className="staff-run-history">
-            {runs.length === 0 ? (
+            {workspace.outreachRuns.length === 0 ? (
               <div className="staff-empty-panel">
-                <h3>No simulated runs yet</h3>
-                <p>Create the first preview to test the future workflow.</p>
+                <h3>No runs recorded yet</h3>
+                <p>Runs saved here are kept for audit; none has been created for this tenant.</p>
               </div>
             ) : (
-              runs.map((run) => (
+              workspace.outreachRuns.map((run) => (
                 <article key={run.id}>
                   <span>{run.channel.slice(0, 1).toUpperCase()}</span>
                   <div>
@@ -4194,7 +4613,7 @@ function OutreachView({
                       {run.requestedCount} students · {run.channel}
                     </small>
                   </div>
-                  <StatusPill tone="preview">simulation</StatusPill>
+                  <StatusPill tone="preview">{run.status.replaceAll("_", " ")}</StatusPill>
                 </article>
               ))
             )}
@@ -4210,7 +4629,7 @@ function EdwardView({ staffName }: { staffName: string }) {
     <>
       <PageHeading
         view="edward"
-        action={<StatusPill tone="success">Read-only assistant</StatusPill>}
+        action={<StatusPill tone="warning">Writes need your confirmation</StatusPill>}
       />
       <div className="edward-page-layout">
         <StaffEdwardAssistant staffName={staffName} variant="embedded" />
@@ -4220,15 +4639,18 @@ function EdwardView({ staffName }: { staffName: string }) {
           <ul>
             <li>Student and cohort records</li>
             <li>Enrollment tasks and documents</li>
-            <li>Your Action Center queue</li>
+            <li>Your Task Board queue</li>
             <li>Staff guidance and action rules</li>
             <li>Student inquiries and draft replies</li>
           </ul>
           <div>
             <strong>Safety model</strong>
             <p>
-              Edward is read-only. It can inspect canonical records and draft
-              language, but it cannot change data or contact a student.
+              Edward can propose bounded changes — a follow-up, a work-item
+              update, an email to send. Every proposal is previewed by the
+              server, checked against policy, and applied only after you
+              confirm it; the receipt is recorded on the conversation. It never
+              changes a record or contacts a student on its own.
             </p>
           </div>
         </aside>
@@ -4246,67 +4668,62 @@ function StaffSidebar({
   workspace: StaffOperationsWorkspace;
   navigate: (view: StaffView) => void;
 }) {
-  // Counts the demo board the Task board shows, so the badge and the columns
-  // cannot disagree in front of the room.
-  const demoBoard = demoActionCenter(
-    { status: "open", limit: 1 },
-    workspace.currentStaff,
-  );
-  const openTasks = demoBoard.counts.todo + demoBoard.counts.inProgress;
+  // The badge is the member's own open work; the institution's total is the
+  // hover text. Both are the server's scope counts, never a page count.
+  const scopes = workspace.actionCenter.scopes;
+  const boardOpenCount = useApprovedBoardOpenCount();
+  const demoBoard = view === "tasks" && workspace.currentStaff.id === "01973261-954a-5019-8e9e-24a699abea7b";
+  const openTasks = demoBoard ? boardOpenCount ?? 0 : scopes?.mine.open ?? 0;
+  const institutionOpen = demoBoard ? null : scopes?.all.open ?? null;
   const inquiries = workspace.inquiries.filter(
     (item) => item.status === "new",
   ).length;
-  const [developingOpen, setDevelopingOpen] = useState(
-    // A view opened by hash or deep link should not sit behind a closed fold.
-    () => developingNavigation.some((item) => item.id === view),
-  );
-  const badgeFor = (item: StaffNavItem) =>
-    item.badge === "tasks" ? openTasks : item.badge === "inquiries" ? inquiries : 0;
-
-  const navButton = (item: StaffNavItem) => {
-    const badge = badgeFor(item);
-    return (
-      <button
-        className={view === item.id ? "staff-sidebar__active" : undefined}
-        type="button"
-        aria-current={view === item.id ? "page" : undefined}
-        onClick={() => navigate(item.id)}
-        key={item.id}
-      >
-        <span aria-hidden="true">{item.icon}</span>
-        <strong>{item.label}</strong>
-        {badge > 0 ? <i>{badge}</i> : null}
-      </button>
-    );
-  };
-
   return (
     <aside className="staff-sidebar staff-sidebar--workspace">
       <nav aria-label="Staff workspace">
-        <section>
-          <p>Workspace</p>
-          {primaryNavigation.map(item => <div key={item.id}>
-            {navButton(item)}
-            {item.id === "tasks" && view === "tasks" ? <ApprovedBoardNavigation onSelect={() => navigate("tasks")} /> : null}
-          </div>)}
-        </section>
-
-        <section className="staff-sidebar__developing">
-          <button
-            className="staff-sidebar__fold"
-            type="button"
-            aria-expanded={developingOpen}
-            aria-controls="staff-nav-developing"
-            onClick={() => setDevelopingOpen((current) => !current)}
-          >
-            <span aria-hidden="true">{developingOpen ? "\u2212" : "+"}</span>
-            <strong>Developing</strong>
-            <i>{developingNavigation.length}</i>
-          </button>
-          <div id="staff-nav-developing" hidden={!developingOpen}>
-            {developingNavigation.map(navButton)}
-          </div>
-        </section>
+        {navigation.map((group) => {
+          const Group = group.label === "Developing" ? "details" : "section";
+          return <Group key={group.label} className={group.label === "Developing" ? "staff-developing" : undefined}>
+            {group.label === "Developing" ? <summary><span aria-hidden="true">＋</span><strong>Developing</strong><small>{group.items.length}</small></summary> : <p>{group.label}</p>}
+            {group.items.map((item) => {
+              const badge =
+                item.badge === "tasks"
+                  ? openTasks
+                  : item.badge === "inquiries"
+                    ? inquiries
+                    : 0;
+              return (
+                <div key={item.id}>
+                <button
+                  className={view === item.id ? "staff-sidebar__active" : undefined}
+                  type="button"
+                  aria-current={view === item.id ? "page" : undefined}
+                  title={
+                    item.badge === "tasks"
+                      ? `${openTasks.toLocaleString()} open task${openTasks === 1 ? "" : "s"} assigned to you${
+                          institutionOpen !== null
+                            ? ` · ${institutionOpen.toLocaleString()} open across the institution`
+                            : ""
+                        }`
+                      : undefined
+                  }
+                  onClick={() => navigate(item.id)}
+                  key={item.id}
+                >
+                  <span aria-hidden="true">{item.icon}</span>
+                  <strong>{item.label}</strong>
+                  {badge > 0 ? (
+                    <i aria-label={item.badge === "tasks" ? `${badge} assigned to you` : undefined}>
+                      {badge}
+                    </i>
+                  ) : null}
+                </button>
+                {item.id === "tasks" && view === "tasks" ? <ApprovedBoardNavigation onSelect={() => navigate("tasks")} /> : null}
+                </div>
+              );
+            })}
+          </Group>;
+        })}
       </nav>
       <div className="staff-sidebar__note">
         <strong>Institutional intelligence</strong>
@@ -4325,28 +4742,21 @@ function StaffWorkspaceShell({
   workspace: StaffOperationsWorkspace;
   refresh: () => void;
 }) {
-  // Morning Brew is where the day starts, so it is where a sign-in lands; the
-  // hash below still opens any view directly.
   const [view, setView] = useState<StaffView>("morning_brew");
-  // The topbar search: what is typed there opens the Students view filtered
-  // to it (Enter), and ⌘K / Ctrl+K focuses the box from anywhere.
-  const [globalSearch, setGlobalSearch] = useState("");
-  const globalSearchInput = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        globalSearchInput.current?.focus();
-        globalSearchInput.current?.select();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  const [taskBoardContext, setTaskBoardContext] = useState<StaffTaskBoardContext | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const [globalQuery, setGlobalQuery] = useState("");
   const [requestedWorkItemId, setRequestedWorkItemId] = useState<string | null>(null);
   const [taskBoardRequest, setTaskBoardRequest] = useState<{
     query: StaffActionCenterQuery;
+    key: number;
+  } | null>(null);
+  const [studentsRequest, setStudentsRequest] = useState<{
+    studentId: string | null;
+    query: string;
     key: number;
   } | null>(null);
   const [realtimeNotice, setRealtimeNotice] =
@@ -4389,14 +4799,61 @@ function StaffWorkspaceShell({
     };
   }, [readHash]);
 
-  /** Open the task board pre-filtered — the deep link Morning Brew and the student record use. */
+  // The account menu closes on an outside click or Escape, like any menu.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
+
+  // ⌘K / Ctrl+K focuses the student search, as the hint on it promises.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchInput.current?.focus();
+        searchInput.current?.select();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const showView = (next: StaffView) => {
+    setView(next);
+    setMobileNavOpen(false);
+    setMenuOpen(false);
+    window.history.replaceState(null, "", `#${next}`);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  /** Open the task board pre-filtered — the deep link Morning Brew, the profile and the student record use. */
   const openTaskBoard = (query: StaffActionCenterQuery) => {
     setRequestedWorkItemId(null);
     setTaskBoardRequest((current) => ({ query, key: (current?.key ?? 0) + 1 }));
-    setView("tasks");
-    setMobileNavOpen(false);
-    window.history.replaceState(null, "", "#tasks");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    showView("tasks");
+  };
+
+  /** Open the Students view on one student — from the profile caseload or a search. */
+  const openStudent = (studentId: string) => {
+    setStudentsRequest((current) => ({ studentId, query: "", key: (current?.key ?? 0) + 1 }));
+    showView("students");
+  };
+
+  /** Hand the top-bar search to the server-side student search. */
+  const searchStudents = (query: string) => {
+    setStudentsRequest((current) => ({ studentId: null, query, key: (current?.key ?? 0) + 1 }));
+    showView("students");
   };
 
   /** Change view; a `boardQuery` opens the task board pre-filtered instead. */
@@ -4407,13 +4864,8 @@ function StaffWorkspaceShell({
     }
     setRequestedWorkItemId(null);
     if (next !== "tasks") setTaskBoardRequest(null);
-    setView(next);
-    setMobileNavOpen(false);
-    const destination = new URL(window.location.href);
-    destination.searchParams.delete("actionTask");
-    destination.hash = next;
-    window.history.replaceState(null, "", destination);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (next !== "students") setStudentsRequest(null);
+    showView(next);
   };
 
   const signOut = async () => {
@@ -4423,11 +4875,14 @@ function StaffWorkspaceShell({
 
   const openWorkItem = (workItemId: string) => {
     setRequestedWorkItemId(workItemId);
-    setView("tasks");
-    setMobileNavOpen(false);
-    window.history.replaceState(null, "", "#tasks");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    showView("tasks");
   };
+
+  const initials = workspace.currentStaff.name
+    .split(" ")
+    .map((part) => part.slice(0, 1))
+    .join("")
+    .slice(0, 2);
 
   return (
     <div className="staff-shell staff-shell--workspace">
@@ -4444,29 +4899,36 @@ function StaffWorkspaceShell({
           <span />
         </button>
         <div className="staff-brand">
-          <AudentraLogo height={30} />
+          <PortalMark />
+          <div>
+            <strong>Audentra</strong>
+            <span>Higher Education Intelligence</span>
+          </div>
         </div>
-        <label className="staff-global-search">
+        <form
+          className="staff-global-search"
+          role="search"
+          onSubmit={(event) => {
+            event.preventDefault();
+            searchStudents(globalQuery);
+          }}
+        >
           <span aria-hidden="true">⌕</span>
-          <span className="sr-only">Search staff workspace</span>
+          <label className="sr-only" htmlFor="staff-global-search">
+            Search students
+          </label>
           <input
-            ref={globalSearchInput}
-            placeholder="Search students, tasks, and content"
-            value={globalSearch}
-            onChange={(event) => setGlobalSearch(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                setView("students");
-              } else if (event.key === "Escape") {
-                setGlobalSearch("");
-                event.currentTarget.blur();
-              }
-            }}
+            id="staff-global-search"
+            ref={searchInput}
+            type="search"
+            value={globalQuery}
+            onChange={(event) => setGlobalQuery(event.target.value)}
+            placeholder="Search students by name, ID or program"
           />
           <kbd>⌘ K</kbd>
-        </label>
+        </form>
         <div className="staff-topbar__actions">
+          <ResetDemo />
           <NotificationCenter
             onOpenWorkItem={openWorkItem}
             subscribeToRealtimeInvalidation={subscribeToRealtimeInvalidation}
@@ -4475,24 +4937,47 @@ function StaffWorkspaceShell({
           <button type="button" onClick={refresh}>
             Refresh
           </button>
-          <button
-            className="staff-user-menu"
-            type="button"
-            onClick={() => void signOut()}
-            title="Sign out"
-          >
-            <span>
-              {workspace.currentStaff.name
-                .split(" ")
-                .map((part) => part.slice(0, 1))
-                .join("")
-                .slice(0, 2)}
-            </span>
-            <span>
-              <strong>{workspace.currentStaff.name}</strong>
-              <small>{workspace.currentStaff.component}</small>
-            </span>
-          </button>
+          <div className="staff-user-menu-wrap" ref={menuRef}>
+            <button
+              className="staff-user-menu"
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              aria-controls="staff-user-menu-popover"
+              aria-label={`Account menu for ${workspace.currentStaff.name}`}
+              title="Account menu"
+              onClick={() => setMenuOpen((current) => !current)}
+            >
+              <span>{initials}</span>
+              <span>
+                <strong>{workspace.currentStaff.name}</strong>
+                <small>{workspace.currentStaff.component}</small>
+              </span>
+            </button>
+            {menuOpen ? (
+              <div
+                id="staff-user-menu-popover"
+                className="staff-user-menu__popover"
+                role="menu"
+                aria-label="Account"
+              >
+                <button type="button" role="menuitem" onClick={() => navigate("profile")}>
+                  Profile
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="is-danger"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    void signOut();
+                  }}
+                >
+                  Sign out
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
       </header>
       {realtimeNotice ? (
@@ -4551,33 +5036,29 @@ function StaffWorkspaceShell({
         {view === "morning_brew" ? (
           <MorningBrewView workspace={workspace} navigate={navigate} />
         ) : view === "overview" ? (
-          <OverviewView workspace={workspace} navigate={navigate} />
-        ) : view === "tasks" && !requestedWorkItemId ? (
-          <ApprovedTaskBoard />
+          <><OverviewView workspace={workspace} navigate={navigate} /><UniversityOperationsPanel /></>
         ) : view === "tasks" ? (
-          <TaskBoardView
+          <ApprovedTaskBoard
             key={requestedWorkItemId ?? `task-board-${taskBoardRequest?.key ?? 0}`}
-            workspace={workspace}
-            initialWorkItemId={requestedWorkItemId}
-            initialQuery={taskBoardRequest?.query ?? null}
-            onDetailClosed={() => setRequestedWorkItemId(null)}
-          />
-        ) : view === "student_360" ? (
-          <>
-            <PageHeading view="student_360" />
-            <Student360Workspace
-              workspace={workspace}
-              refresh={refresh}
-              onOpenWorkItem={openWorkItem}
-            />
-          </>
+            initialTask={requestedWorkItemId}
+            initialQuery={taskBoardRequest?.query}
+            onContextChange={setTaskBoardContext}
+            demo={workspace.currentStaff.id === "01973261-954a-5019-8e9e-24a699abea7b"}
+            onOpenWorkspace={id => { if (id) openStudent(id); else showView("outreach"); }} />
         ) : view === "students" ? (
           <StudentsView
-            key={`students:${globalSearch}`}
-            workspace={workspace}
+            key={`students-${studentsRequest?.key ?? 0}`}
             refresh={refresh}
             openTaskBoard={openTaskBoard}
-            initialQuery={globalSearch}
+            initialStudentId={studentsRequest?.studentId ?? null}
+            initialQuery={studentsRequest?.query ?? ""}
+          />
+        ) : view === "profile" ? (
+          <StaffProfileView
+            heading={<PageHeading view="profile" />}
+            openTaskBoard={openTaskBoard}
+            openStudent={openStudent}
+            onSignOut={() => void signOut()}
           />
         ) : view === "journeys" ? (
           <JourneysView workspace={workspace} refresh={refresh} />
@@ -4596,15 +5077,14 @@ function StaffWorkspaceShell({
         ) : view === "academics" ? (
           <AcademicsView workspace={workspace} refresh={refresh} />
         ) : view === "outreach" ? (
-          <OutreachView workspace={workspace} refresh={refresh} />
-        ) : view === "institution_profile" ? (
-          <InstitutionProfileView navigate={navigate} />
+          <OutreachView workspace={workspace} refresh={refresh} openTaskBoard={openTaskBoard} />
         ) : (
           <EdwardView staffName={workspace.currentStaff.name} />
         )}
       </main>
-      {view !== "edward" && view !== "tasks" ? (
-        <StaffEdwardAssistant staffName={workspace.currentStaff.name} />
+      {view !== "edward" ? (
+        <StaffEdwardAssistant staffName={workspace.currentStaff.name}
+          pageContext={view === "tasks" ? taskBoardContext ?? {surface:"task_board"} : undefined} />
       ) : null}
     </div>
   );

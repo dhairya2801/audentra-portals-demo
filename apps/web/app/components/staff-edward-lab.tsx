@@ -1,17 +1,17 @@
 "use client";
 
 /**
- * Staff Edward Lab — developer trace dashboard for the read-only staff
- * assistant.
+ * Staff Edward Lab — developer trace dashboard for the staff assistant.
  *
  * Left: a plain developer chat against POST /v1/staff/assistant/messages
  * (durable conversation, created lazily on the first send and pinned in
  * sessionStorage for this tab). Right: the same AssistantTurnTrace inspector
  * the student lab uses; staff turns carry assistantKind: "staff" plus
- * per-tool arguments/validation and the referent round. Traces come through
- * the same same-origin /api/edward-lab proxy — the browser never sees a
- * worker token. No persona switcher: the lab works against whichever staff
- * state the configured backend serves.
+ * identity, entity resolution, per-tool arguments/validation and the
+ * entity/referent rounds. Traces come through the same same-origin
+ * /api/edward-lab proxy — the browser never sees a worker token. No persona
+ * switcher: the lab works against whichever staff state the configured
+ * backend serves.
  */
 
 import type {
@@ -20,24 +20,31 @@ import type {
   StaffAssistantDraftBlock,
   StaffAssistantResponseBlock,
 } from "@vv/contracts";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ApiClientError,
   askStaffEdward,
   createStaffAssistantConversation,
 } from "../lib/api-client";
 import {
+  type EdwardReadPlanner,
   type EdwardTurnTrace,
   fetchTraceWithRetry,
   formatMs,
+  pathLabel,
+  READ_PLANNERS,
   summarizeTrace,
   type TraceListEntry,
 } from "../lib/edward-lab";
 import { AssistantBlocks } from "./assistant-blocks";
+import { architectureChoices, EdwardArchitecture } from "./edward-architecture";
 import { EdwardFeedbackLab } from "./edward-feedback-lab";
+import { Info, LabInfoProvider } from "./edward-lab-info";
 import { EdwardResponseFeedback } from "./edward-response-feedback";
 import { EdwardTraceInspector } from "./edward-trace-inspector";
 import styles from "./edward-lab.module.css";
+
+type LabView = "chat" | "architecture" | "feedback";
 
 interface LabTurn {
   index: number;
@@ -93,6 +100,24 @@ function writeStoredConversationId(key: string, conversationId: string | null) {
   }
 }
 
+function turnRowMeta(turn: LabTurn, trace: EdwardTurnTrace | null): string {
+  if (turn.status === "error") return "✗ error";
+  if (trace) {
+    const summary = summarizeTrace(trace);
+    const route = trace.path && trace.path !== "pipeline" ? pathLabel(trace.path) : null;
+    return [
+      formatMs(summary.durationMs),
+      route ?? `${summary.toolCount} tools`,
+      trace.readPlanner ?? null,
+      summary.statusLabel,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  if (turn.status === "no_trace") return "trace unavailable";
+  return `${formatMs(turn.latencyMs)} · trace…`;
+}
+
 function DraftBlockPanel({ block }: { block: StaffAssistantDraftBlock }) {
   return (
     <section className={styles.draftPanel} aria-label={`${block.channel} draft`}>
@@ -137,7 +162,7 @@ function StaffBlocks({
 }
 
 export function StaffEdwardLab() {
-  const [view, setView] = useState<"chat" | "feedback">("chat");
+  const [view, setView] = useState<LabView>("chat");
   const [messages, setMessages] = useState<StaffChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -147,6 +172,7 @@ export function StaffEdwardLab() {
   const [traces, setTraces] = useState<Record<string, EdwardTurnTrace>>({});
   const [selectedTraceId, setSelectedTraceId] = useState<string | null>(null);
   const [recent, setRecent] = useState<TraceListEntry[]>([]);
+  const [readPlanner, setReadPlanner] = useState<EdwardReadPlanner | "">("");
   const turnCounter = useRef(0);
   const conversationRef = useRef<string | null>(null);
   const transcript = useRef<HTMLDivElement>(null);
@@ -266,6 +292,7 @@ export function StaffEdwardLab() {
     const normalized = message.trim();
     if (!normalized || sending) return;
     const clientMessageId = crypto.randomUUID();
+    const options = readPlanner ? { readPlanner } : {};
     setMessages((current) => [
       ...current,
       { id: crypto.randomUUID(), role: "user", content: normalized },
@@ -281,13 +308,17 @@ export function StaffEdwardLab() {
       let serverConversationId = await ensureConversation();
       let response: AskStaffEdwardResponse;
       try {
-        response = await askStaffEdward({
-          message: normalized,
-          ...(serverConversationId
-            ? { conversationId: serverConversationId }
-            : {}),
-          clientMessageId,
-        });
+        response = await askStaffEdward(
+          {
+            message: normalized,
+            ...(serverConversationId
+              ? { conversationId: serverConversationId }
+              : {}),
+            clientMessageId,
+          },
+          undefined,
+          options,
+        );
       } catch (caught) {
         // A stored conversation may be gone on the server (restart, TTL).
         // Drop it and retry once on a fresh conversation.
@@ -300,13 +331,17 @@ export function StaffEdwardLab() {
         }
         dropConversation();
         serverConversationId = await ensureConversation();
-        response = await askStaffEdward({
-          message: normalized,
-          ...(serverConversationId
-            ? { conversationId: serverConversationId }
-            : {}),
-          clientMessageId,
-        });
+        response = await askStaffEdward(
+          {
+            message: normalized,
+            ...(serverConversationId
+              ? { conversationId: serverConversationId }
+              : {}),
+            clientMessageId,
+          },
+          undefined,
+          options,
+        );
       }
       if (response.conversationId) {
         conversationRef.current = response.conversationId;
@@ -340,14 +375,15 @@ export function StaffEdwardLab() {
   };
 
   const selectedTrace = selectedTraceId ? (traces[selectedTraceId] ?? null) : null;
+  const choices = useMemo(() => architectureChoices(turns, recent), [turns, recent]);
 
   return (
-    <>
+    <LabInfoProvider assistantKind="staff">
       <header className={styles.topBar}>
         <h1>Staff Edward Lab</h1>
         <span className={styles.devBadge}>Developer tool</span>
         <div className={styles.viewTabs} role="tablist" aria-label="Lab view">
-          {(["chat", "feedback"] as const).map((candidate) => (
+          {(["chat", "architecture", "feedback"] as const).map((candidate) => (
             <button
               key={candidate}
               type="button"
@@ -356,13 +392,34 @@ export function StaffEdwardLab() {
               className={view === candidate ? styles.viewTabActive : styles.viewTab}
               onClick={() => setView(candidate)}
             >
-              {candidate === "chat" ? "Chat + trace" : "User Feedback"}
+              {candidate === "chat"
+                ? "Chat + trace"
+                : candidate === "architecture"
+                  ? "Architecture"
+                  : "User Feedback"}
             </button>
           ))}
         </div>
         <div className={styles.personaControls}>
+          <label className={styles.labControl}>
+            <span>
+              Read planner <Info concept="read_planner" />
+            </span>
+            <select
+              value={readPlanner}
+              onChange={(event) => setReadPlanner(event.target.value as EdwardReadPlanner | "")}
+              aria-label="Read planner for the turns this Lab sends"
+            >
+              <option value="">deployment default</option>
+              {READ_PLANNERS.map((planner) => (
+                <option key={planner.value} value={planner.value}>
+                  {planner.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <span className={styles.personaMeta}>
-            Read-only staff assistant · dev staff actor ·{" "}
+            dev staff actor ·{" "}
             {conversationId ? (
               <>
                 conversation <span className={styles.mono}>{conversationId.slice(0, 8)}…</span>
@@ -375,209 +432,213 @@ export function StaffEdwardLab() {
       </header>
       {view === "feedback" ? (
         <EdwardFeedbackLab assistantKind="staff" />
+      ) : view === "architecture" ? (
+        <EdwardArchitecture
+          assistantKind="staff"
+          trace={selectedTrace}
+          choices={choices}
+          selectedTraceId={selectedTraceId}
+          onSelectTrace={(traceId) => void selectTrace(traceId)}
+        />
       ) : (
-      <div className={styles.shell}>
-        <div className={styles.chatColumn}>
-          <section className={`card ${styles.chatCard}`}>
-            <div className={styles.staffChat}>
-              <div className={styles.staffChatHead}>
-                <span className="eyebrow">Staff Edward</span>
+        <div className={styles.shell}>
+          <div className={styles.chatColumn}>
+            <section className={`card ${styles.chatCard}`}>
+              <div className={styles.staffChat}>
+                <div className={styles.staffChatHead}>
+                  <span className="eyebrow">Staff Edward</span>
+                  <button
+                    type="button"
+                    className={styles.copyButton}
+                    disabled={sending}
+                    onClick={resetConversation}
+                  >
+                    New conversation
+                  </button>
+                </div>
+                <div ref={transcript} className={styles.staffTranscript} aria-live="polite">
+                  {messages.length === 0 ? (
+                    <p className={styles.emptyState}>
+                      Ask Staff Edward about a student, the work queue, or for a draft
+                      message. Turns share one durable conversation per tab.
+                    </p>
+                  ) : (
+                    messages.map((message) => (
+                      <article
+                        key={message.id}
+                        className={`${styles.staffMessage} ${
+                          message.role === "user"
+                            ? styles.staffMessageUser
+                            : styles.staffMessageAssistant
+                        }`}
+                      >
+                        {message.role === "assistant" && message.resolvedStudent ? (
+                          <span className={styles.resolvedStudentBadge}>
+                            Student: {message.resolvedStudent.name}
+                            <span className={styles.mono}>
+                              {message.resolvedStudent.id.slice(0, 8)}…
+                            </span>
+                          </span>
+                        ) : null}
+                        {message.role === "assistant" && message.blocks?.length ? (
+                          <StaffBlocks blocks={message.blocks} idPrefix={message.id} />
+                        ) : (
+                          <p>{message.content}</p>
+                        )}
+                        {message.role === "assistant" && message.provider ? (
+                          <span className={styles.staffMessageMeta}>
+                            {message.provider}
+                            {message.model ? ` · ${message.model}` : ""}
+                          </span>
+                        ) : null}
+                        {message.role === "assistant" && message.traceId ? (
+                          <EdwardResponseFeedback
+                            target={{
+                              assistantKind: "staff",
+                              assistantMessageId: message.id,
+                              traceId: message.traceId,
+                            }}
+                          />
+                        ) : null}
+                      </article>
+                    ))
+                  )}
+                  {sending ? (
+                    <p className={styles.emptyState} role="status">
+                      Staff Edward is reading the record…
+                    </p>
+                  ) : null}
+                  {chatError ? (
+                    <p
+                      className={`${styles.failureBanner} ${styles.failureBannerError}`}
+                      role="alert"
+                    >
+                      {chatError}
+                    </p>
+                  ) : null}
+                </div>
+                <form
+                  className={styles.staffComposer}
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void send(draft);
+                  }}
+                >
+                  <textarea
+                    value={draft}
+                    rows={2}
+                    maxLength={2_000}
+                    placeholder="Message Staff Edward"
+                    aria-label="Message Staff Edward"
+                    onChange={(event) => setDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === "Enter" &&
+                        !event.shiftKey &&
+                        !event.nativeEvent.isComposing
+                      ) {
+                        event.preventDefault();
+                        void send(draft);
+                      }
+                    }}
+                  />
+                  <button type="submit" disabled={sending || draft.trim().length === 0}>
+                    Send
+                  </button>
+                </form>
+                <p className={styles.staffChatNote}>
+                  Reads are live; writes go through the Action Gateway as previewed intents
+                  that need confirmation.
+                </p>
+              </div>
+            </section>
+            <section className="card">
+              <div className={styles.timelineTitle}>
+                <span className="eyebrow">Conversation timeline</span>
+                <span className={styles.turnMeta}>{turns.length} turns</span>
+              </div>
+              <div className={styles.timeline}>
+                {turns.length === 0 ? (
+                  <p className={styles.emptyState}>Turns you send appear here.</p>
+                ) : (
+                  [...turns].reverse().map((turn) => {
+                    const trace = turn.requestId ? (traces[turn.requestId] ?? null) : null;
+                    return (
+                      <button
+                        key={turn.index}
+                        type="button"
+                        className={`${styles.turnRow} ${
+                          turn.requestId && turn.requestId === selectedTraceId
+                            ? styles.turnRowActive
+                            : ""
+                        }`}
+                        onClick={() => {
+                          if (turn.requestId) void selectTrace(turn.requestId);
+                        }}
+                      >
+                        <span className={styles.turnIndex}>#{turn.index}</span>
+                        <span className={styles.turnQuestion}>{turn.question}</span>
+                        <span className={styles.turnMeta}>{turnRowMeta(turn, trace)}</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </section>
+          </div>
+          <div className={styles.inspector}>
+            <EdwardTraceInspector trace={selectedTrace} />
+            <section className={`card ${styles.section}`}>
+              <div className={styles.sectionHead}>
+                <span className="eyebrow">Recent staff traces</span>
                 <button
                   type="button"
                   className={styles.copyButton}
-                  disabled={sending}
-                  onClick={resetConversation}
+                  onClick={() => refreshRecent()}
                 >
-                  New conversation
+                  Refresh
                 </button>
               </div>
-              <div ref={transcript} className={styles.staffTranscript} aria-live="polite">
-                {messages.length === 0 ? (
+              <div className={styles.recentList}>
+                {recent.length === 0 ? (
                   <p className={styles.emptyState}>
-                    Ask Staff Edward about a student, the work queue, or for a draft
-                    message. Turns share one durable conversation per tab.
+                    No staff traces recorded on this backend yet.
                   </p>
                 ) : (
-                  messages.map((message) => (
-                    <article
-                      key={message.id}
-                      className={`${styles.staffMessage} ${
-                        message.role === "user"
-                          ? styles.staffMessageUser
-                          : styles.staffMessageAssistant
-                      }`}
-                    >
-                      {message.role === "assistant" && message.resolvedStudent ? (
-                        <span className={styles.resolvedStudentBadge}>
-                          Student: {message.resolvedStudent.name}
-                          <span className={styles.mono}>
-                            {message.resolvedStudent.id.slice(0, 8)}…
-                          </span>
-                        </span>
-                      ) : null}
-                      {message.role === "assistant" && message.blocks?.length ? (
-                        <StaffBlocks blocks={message.blocks} idPrefix={message.id} />
-                      ) : (
-                        <p>{message.content}</p>
-                      )}
-                      {message.role === "assistant" && message.provider ? (
-                        <span className={styles.staffMessageMeta}>
-                          {message.provider}
-                          {message.model ? ` · ${message.model}` : ""}
-                        </span>
-                      ) : null}
-                      {message.role === "assistant" && message.traceId ? (
-                        <EdwardResponseFeedback
-                          target={{
-                            assistantKind: "staff",
-                            assistantMessageId: message.id,
-                            traceId: message.traceId,
-                          }}
-                        />
-                      ) : null}
-                    </article>
-                  ))
-                )}
-                {sending ? (
-                  <p className={styles.emptyState} role="status">
-                    Staff Edward is reading the record…
-                  </p>
-                ) : null}
-                {chatError ? (
-                  <p
-                    className={`${styles.failureBanner} ${styles.failureBannerError}`}
-                    role="alert"
-                  >
-                    {chatError}
-                  </p>
-                ) : null}
-              </div>
-              <form
-                className={styles.staffComposer}
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void send(draft);
-                }}
-              >
-                <textarea
-                  value={draft}
-                  rows={2}
-                  maxLength={2_000}
-                  placeholder="Message Staff Edward"
-                  aria-label="Message Staff Edward"
-                  onChange={(event) => setDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (
-                      event.key === "Enter" &&
-                      !event.shiftKey &&
-                      !event.nativeEvent.isComposing
-                    ) {
-                      event.preventDefault();
-                      void send(draft);
-                    }
-                  }}
-                />
-                <button type="submit" disabled={sending || draft.trim().length === 0}>
-                  Send
-                </button>
-              </form>
-              <p className={styles.staffChatNote}>
-                Read-only: Staff Edward reads records and writes drafts; it never sends
-                messages or changes data.
-              </p>
-            </div>
-          </section>
-          <section className="card">
-            <div className={styles.timelineTitle}>
-              <span className="eyebrow">Conversation timeline</span>
-              <span className={styles.turnMeta}>{turns.length} turns</span>
-            </div>
-            <div className={styles.timeline}>
-              {turns.length === 0 ? (
-                <p className={styles.emptyState}>Turns you send appear here.</p>
-              ) : (
-                [...turns].reverse().map((turn) => {
-                  const trace = turn.requestId ? traces[turn.requestId] : null;
-                  const summary = trace ? summarizeTrace(trace) : null;
-                  return (
+                  recent.map((entry) => (
                     <button
-                      key={turn.index}
+                      key={entry.traceId}
                       type="button"
-                      className={`${styles.turnRow} ${
-                        turn.requestId && turn.requestId === selectedTraceId
-                          ? styles.turnRowActive
-                          : ""
+                      className={`${styles.recentRow} ${
+                        entry.traceId === selectedTraceId ? styles.recentRowActive : ""
                       }`}
-                      onClick={() => {
-                        if (turn.requestId) void selectTrace(turn.requestId);
-                      }}
+                      onClick={() => void selectTrace(entry.traceId)}
                     >
-                      <span className={styles.turnIndex}>#{turn.index}</span>
-                      <span className={styles.turnQuestion}>{turn.question}</span>
+                      <span className={styles.recentQuestion}>
+                        {entry.userMessage || "(no message)"}
+                      </span>
                       <span className={styles.turnMeta}>
-                        {turn.status === "error"
-                          ? "✗ error"
-                          : summary
-                            ? `${formatMs(summary.durationMs)} · ${summary.toolCount} tools · ${summary.statusLabel}`
-                            : turn.status === "no_trace"
-                              ? "trace unavailable"
-                              : `${formatMs(turn.latencyMs)} · trace…`}
+                        {entry.failureCodes?.length ? "⚠" : "✓"}
+                      </span>
+                      <span className={styles.recentMeta}>
+                        <span>{entry.startedAt?.slice(11, 19) ?? ""}</span>
+                        <span className={styles.mono}>
+                          {entry.path && entry.path !== "pipeline"
+                            ? pathLabel(entry.path)
+                            : (entry.requestType ?? "—")}
+                        </span>
+                        <span className={styles.mono}>{entry.responseSource ?? ""}</span>
+                        <span>{formatMs(entry.durationMs)}</span>
+                        <span>{entry.executedTools?.length ?? 0} tools</span>
                       </span>
                     </button>
-                  );
-                })
-              )}
-            </div>
-          </section>
+                  ))
+                )}
+              </div>
+            </section>
+          </div>
         </div>
-        <div className={styles.inspector}>
-          <EdwardTraceInspector trace={selectedTrace} />
-          <section className={`card ${styles.section}`}>
-            <div className={styles.sectionHead}>
-              <span className="eyebrow">Recent staff traces</span>
-              <button
-                type="button"
-                className={styles.copyButton}
-                onClick={() => refreshRecent()}
-              >
-                Refresh
-              </button>
-            </div>
-            <div className={styles.recentList}>
-              {recent.length === 0 ? (
-                <p className={styles.emptyState}>
-                  No staff traces recorded on this backend yet.
-                </p>
-              ) : (
-                recent.map((entry) => (
-                  <button
-                    key={entry.traceId}
-                    type="button"
-                    className={`${styles.recentRow} ${
-                      entry.traceId === selectedTraceId ? styles.recentRowActive : ""
-                    }`}
-                    onClick={() => void selectTrace(entry.traceId)}
-                  >
-                    <span className={styles.recentQuestion}>
-                      {entry.userMessage || "(no message)"}
-                    </span>
-                    <span className={styles.turnMeta}>
-                      {entry.failureCodes?.length ? "⚠" : "✓"}
-                    </span>
-                    <span className={styles.recentMeta}>
-                      <span>{entry.startedAt?.slice(11, 19) ?? ""}</span>
-                      <span className={styles.mono}>{entry.requestType ?? entry.path}</span>
-                      <span>{formatMs(entry.durationMs)}</span>
-                      <span>{entry.executedTools?.length ?? 0} tools</span>
-                    </span>
-                  </button>
-                ))
-              )}
-            </div>
-          </section>
-        </div>
-      </div>
       )}
-    </>
+    </LabInfoProvider>
   );
 }

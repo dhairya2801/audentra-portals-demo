@@ -70,33 +70,33 @@ export function runningName(name: string) {
   return name.replace(/ Office$/, "");
 }
 
-export type AppointmentTone = "confirmed" | "done" | "cancelled";
+export type AppointmentTone = "confirmed" | "pending" | "done" | "cancelled";
 
 /**
- * What the row's badge says. A scheduled conversation whose time has passed is not still
- * "Confirmed" — it happened (or, when the person on the other side recorded it, it did not).
- * A rescheduled one lives on as its replacement. Derived, never stored.
+ * What the row's badge says — the canonical status, never a guess from the
+ * clock. A scheduled conversation whose time has passed stays scheduled until
+ * the staff member records what happened; until then it is "awaiting outcome",
+ * not "completed". A rescheduled one lives on as its replacement.
  */
 export function stateOf(appointment: StudentAppointment, now: number): { tone: AppointmentTone; label: string } {
   if (appointment.status === "cancelled") return { tone: "cancelled", label: "Cancelled" };
   if (appointment.status === "rescheduled") return { tone: "cancelled", label: "Rescheduled" };
   if (appointment.status === "no_show") return { tone: "done", label: "Missed" };
-  if (appointment.status === "completed" || new Date(appointment.startsAt).getTime() < now) {
-    return { tone: "done", label: "Completed" };
-  }
+  if (appointment.status === "completed") return { tone: "done", label: "Completed" };
+  if (new Date(appointment.startsAt).getTime() < now) return { tone: "pending", label: "Awaiting outcome" };
   return { tone: "confirmed", label: "Confirmed" };
 }
 
-/** Who the student meets: the named person when the record has one, otherwise the team. */
-export function whoLabel(appointment: StudentAppointment, type: ConversationType) {
+/** Who the student meets: the named person on the record, or an honest blank. */
+export function whoLabel(appointment: StudentAppointment) {
   const staff = appointment.staff;
-  if (!staff) return type.team;
+  if (!staff) return "Staff member not yet assigned";
   return staff.title ? `${staff.name} · ${staff.title}` : staff.name;
 }
 
-/** The short name of the person, for running text; the team when nobody is named. */
-export function whoShort(appointment: StudentAppointment, type: ConversationType) {
-  return appointment.staff?.name ?? type.team;
+/** The short name of the person, for running text; a neutral phrase when nobody is named. */
+export function whoShort(appointment: StudentAppointment) {
+  return appointment.staff?.name ?? "the assigned staff member";
 }
 
 /** The slot picker groups a person's open times by local day. */
@@ -197,7 +197,7 @@ export function calendarHref(appointment: StudentAppointment, type: Conversation
     "VERSION:2.0",
     "BEGIN:VEVENT",
     `DTSTART:${stamp}`,
-    `SUMMARY:${type.label} · ${whoShort(appointment, type)}`,
+    `SUMMARY:${type.label} · ${whoShort(appointment)}`,
     ...(appointment.endsAt ? [`DTEND:${new Date(appointment.endsAt).toISOString().replaceAll(/[-:]/g, "").replace(".000", "")}`] : []),
     ...(appointment.location ? [`LOCATION:${appointment.location}`] : []),
     ...(appointment.notes ? [`DESCRIPTION:${appointment.notes.replaceAll(/\r?\n/g, " ")}`] : []),

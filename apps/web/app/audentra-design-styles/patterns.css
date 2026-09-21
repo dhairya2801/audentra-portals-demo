@@ -702,6 +702,12 @@
   display: grid;
 }
 
+/* A rail component can legitimately render nothing (for example, no next
+   payment). Give its column back to the page instead of leaving a blank lane. */
+.page-body:has(> .page-rail:empty) { grid-template-columns: minmax(0, 1fr); }
+.page-body > .page-rail:empty { display: none; }
+.page-body > .page-main { min-width: 0; }
+
 /* One heading for a card, wherever the card is. Three classes were doing this
    job at three sizes — `.section-heading` at 21px on My Enrollment and Help,
    `.status-heading` at 17px on My Enrollment, My Classrooms and My Profile,

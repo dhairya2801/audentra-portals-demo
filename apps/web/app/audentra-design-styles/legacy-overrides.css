@@ -24,4 +24,4 @@
 :where(.app-shell) .why-card p { margin: revert; color: revert; font-size: revert; line-height: revert; }
 :where(.app-shell) .field-error { margin: revert; padding: revert; border-left: revert; background: revert; color: revert; font-size: revert; line-height: revert; }
 :where(.app-shell) .section-heading, :where(.app-shell) .section-heading > p, :where(.app-shell) .section-heading h2 { all: revert; }
-:where(.app-shell) .edward-launcher > span:last-child:not(.edward-mark) { display: revert; flex-direction: revert; align-items: revert; }
+:where(.app-shell) .edward-launcher > span:last-child { display: revert; flex-direction: revert; align-items: revert; }

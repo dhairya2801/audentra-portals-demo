@@ -1,0 +1,14 @@
+import {request,expect} from '@playwright/test';
+import fs from 'node:fs/promises';
+const api='http://127.0.0.1:45619',atlas='http://127.0.0.1:4321',student='ac2fa509-b4e3-402d-900b-ffb8440fc430';
+const c=await request.newContext({baseURL:api,extraHTTPHeaders:{'x-demo-tenant-id':'00000000-0000-7000-8000-000000000003'}});
+const get=async url=>{const r=await c.get(url);expect(r.ok()).toBeTruthy();return r.json();};
+await c.post('/v1/auth/demo/sign-in-as',{data:{studentRef:'SYN-000000'}});
+const plan=await get('/v1/student/financial-plan'),atlasPlan=await get(atlas+'/api/financial-plan?student_id='+student);expect(plan).toEqual(atlasPlan);
+const snapshot=await get('/v1/student/financials');expect(snapshot.paymentsCents).toBe(250000);expect(snapshot.remainingBalanceCents).toBe(plan.account.postedBalanceCents);expect(snapshot.postedAidCents).toBe(plan.account.postedAidCents);
+await c.post('/v1/auth/demo/staff/sign-in-as',{data:{staffRef:'AU-55ff7e408818'}});
+const board=await get('/v1/staff/work-board'),atlasBoard=await get(atlas+'/api/work-board');expect(atlasBoard.cards).toEqual(board.cards);expect(atlasBoard.projectSummaries).toEqual(board.projectSummaries);
+const curated=await get('/v1/staff/work-board?search=DEMO-');expect(curated.cards).toHaveLength(35);
+const counts=Object.fromEntries(curated.projects.map(p=>[p.id,curated.cards.filter(c=>c.board===p.id).length]));expect(Object.values(counts)).toEqual([5,5,5,5,5,5,5]);
+expect((await c.post(atlas+'/api/sandboxes')).status()).toBe(403);
+await fs.writeFile('artifacts/demo-excellence/final/parity.json',JSON.stringify({passed:true,postedCharges:plan.account.postedChargesCents,postedBalance:plan.account.postedBalanceCents,netPostedPayments:snapshot.paymentsCents,postedAid:plan.account.postedAidCents,curatedCounts:counts,institutionalProjectCounts:board.projectCounts,atlasMatches:true},null,2));console.log('Live financial plan, dashboard net payments and WorkBoard agree with Atlas; 35 curated cards.');await c.dispose();

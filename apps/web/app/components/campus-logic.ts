@@ -46,6 +46,9 @@ function clock(value: string, tenant: TenantConfig) {
 
 /** `7:30 PM–9:30 PM` — what the reference publishes as `event.time`. */
 export function timeRange(startsAt: string, endsAt: string, tenant: TenantConfig) {
+  if (tenantDayIndex(startsAt, tenant) !== tenantDayIndex(endsAt, tenant)) {
+    return `${shortDate(startsAt, tenant)}, ${clock(startsAt, tenant)}–${shortDate(endsAt, tenant)}, ${clock(endsAt, tenant)}`;
+  }
   return `${clock(startsAt, tenant)}–${clock(endsAt, tenant)}`;
 }
 

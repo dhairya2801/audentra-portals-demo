@@ -11,11 +11,6 @@ import { demoApiBaseUrl } from "../support/demo-session";
  * i.e. after `npm run audentra:tenant -- demo && npm run audentra:deploy` in
  * Audentra-university-explorer. Otherwise every test skips with a reason.
  *
- * It drives the *open* demo panels — a search box and a student-ID field — so
- * the API must run with its persona allowlist empty. The local stack now names
- * four personas by default, so start it with
- * `DEMO_STUDENT_ALLOWLIST= DEMO_STAFF_ALLOWLIST= docker compose up`.
- *
  *   E2E_BASE_URL=http://localhost:3000 E2E_API_BASE_URL=http://localhost:4000 \
  *     npx playwright test tools/browser-e2e/specs/staff-advising.spec.ts
  */
@@ -41,13 +36,11 @@ async function openStaffAs(page: Page, query: string, name: string) {
   await expect(page.getByRole("button", { name: new RegExp(name) }).first()).toBeVisible();
 }
 
-async function openMyDesk(page: Page) {
-  await page
-    .locator("aside.staff-sidebar--workspace:visible")
-    .getByRole("navigation", { name: "Staff workspace" })
-    .getByRole("button", { name: /My desk/i })
-    .click();
-  await expect(page.getByRole("heading", { name: "My desk", exact: true })).toBeVisible();
+/** The profile lives behind the avatar chip: open the account menu, choose Profile. */
+async function openProfile(page: Page) {
+  await page.getByRole("button", { name: /Account menu/i }).click();
+  await page.getByRole("menuitem", { name: "Profile" }).click();
+  await expect(page.getByRole("region", { name: "Who you are" })).toBeVisible();
 }
 
 async function signOutStaff(page: Page) {
@@ -75,52 +68,53 @@ test.describe("staff advising and demo staff login", () => {
 
   test("the overloaded adviser sees her own caseload, calendar and gaps", async ({ page }) => {
     await openStaffAs(page, "Larkspur", "Elena Larkspur");
-    await openMyDesk(page);
+    await openProfile(page);
     const identity = page.getByRole("region", { name: "Who you are" });
     await expect(identity).toContainText("Elena Larkspur");
-    await expect(identity).toContainText("Academic Adviser · Academic Advising");
-    await expect(identity).toContainText(/over its cap: 126 advisees against 110/);
+    await expect(identity).toContainText("Academic Adviser");
+    await expect(identity).toContainText("Academic Advising");
+    await expect(identity).toContainText(/over its cap: 126 primary advisees against 110/);
     await expect(identity).toContainText(/no open appointment slot in the next two weeks/);
     const metrics = page.getByRole("region", { name: "Your numbers" });
     await expect(metrics).toContainText("126");
     await expect(metrics).toContainText("/ 110");
     await expect(page.getByRole("heading", { name: "My caseload" })).toBeVisible();
     await expect(page.locator(".staff-desk-table tbody tr")).toHaveCount(126);
-    await shot(page, "01-elena-larkspur-my-desk");
+    await shot(page, "01-elena-larkspur-profile");
     await signOutStaff(page);
   });
 
   test("the underutilized adviser has spare slots; the ordinary adviser is unremarkable", async ({ page }) => {
     await openStaffAs(page, "Calderwood", "Ximena Calderwood");
-    await openMyDesk(page);
+    await openProfile(page);
     const metrics = page.getByRole("region", { name: "Your numbers" });
-    await expect(metrics.getByText("Open slots · 14 days")).toBeVisible();
-    await expect(metrics).toContainText("51");
+    await expect(page.getByRole("region", { name: "Availability & calendar" }).getByText("Open slots · 14 days")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Availability & calendar" })).toContainText("51");
     await expect(page.getByRole("region", { name: "Who you are" })).not.toContainText("over its cap");
-    await shot(page, "02-ximena-calderwood-my-desk");
+    await shot(page, "02-ximena-calderwood-profile");
     await signOutStaff(page);
 
     await openStaffAs(page, "Dunmire", "Hana Dunmire");
-    await openMyDesk(page);
+    await openProfile(page);
     await expect(page.getByRole("region", { name: "Who you are" })).toContainText("Hana Dunmire");
     await expect(page.getByRole("region", { name: "Your numbers" })).toContainText("90");
-    await shot(page, "03-hana-dunmire-my-desk");
+    await shot(page, "03-hana-dunmire-profile");
     await signOutStaff(page);
   });
 
   test("the adviser who is falling behind sees stale work and unclosed appointments", async ({ page }) => {
     await openStaffAs(page, "Jessamy", "Vera Jessamy");
-    await openMyDesk(page);
+    await openProfile(page);
     const identity = page.getByRole("region", { name: "Who you are" });
     await expect(identity).toContainText(/past appointments have not been closed out/);
     await expect(page.getByRole("heading", { name: "Needs an outcome" })).toBeVisible();
-    await shot(page, "04-vera-jessamy-my-desk");
+    await shot(page, "04-vera-jessamy-profile");
     await signOutStaff(page);
   });
 
   test("the director sees the team, the departed adviser's orphaned caseload and the leave gap", async ({ page }) => {
     await openStaffAs(page, "Hartigan", "Leandro Hartigan");
-    await openMyDesk(page);
+    await openProfile(page);
     await expect(page.getByRole("heading", { name: "My team" })).toBeVisible();
     const team = page.getByRole("region", { name: "My team" });
     await expect(team).toContainText(/students are still assigned to an adviser who has left/);
@@ -137,7 +131,7 @@ test.describe("staff advising and demo staff login", () => {
 
   test("a person on leave can sign in and is told what it means; a departed person cannot", async ({ page }) => {
     await openStaffAs(page, "Pemberwell", "Junia Pemberwell");
-    await openMyDesk(page);
+    await openProfile(page);
     await expect(page.getByRole("region", { name: "Who you are" })).toContainText(/You are on leave until/);
     await shot(page, "06-junia-pemberwell-on-leave");
     await signOutStaff(page);

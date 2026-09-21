@@ -82,7 +82,7 @@ export function CostCard({
         </span>
         <div>
           <h2 id="cost-title">Cost and coverage</h2>
-          <p>{data.academicYear} academic year</p>
+          <p>{data.accountBasis ? `${data.termLabel} account` : `${data.academicYear} academic year`}</p>
         </div>
       </div>
 
@@ -95,9 +95,9 @@ export function CostCard({
         <tbody>
           <tr className="ledger-group">
             <th scope="row">
-              Cost of attendance
-              <TermTip term="coa" label="cost of attendance" />
-              <small>{copy("{institution}’s full estimate for the year, including what you spend off campus")}</small>
+              {data.accountBasis ? "Posted term charges" : "Cost of attendance"}
+              {!data.accountBasis && <TermTip term="coa" label="cost of attendance" />}
+              <small>{data.accountBasis ? "Charges posted to your university account; off-campus estimates are excluded" : copy("{institution}’s full estimate for the year, including what you spend off campus")}</small>
             </th>
             <td />
             <td className="ledger-amount">{money.format(ledger.cost)}</td>
@@ -105,7 +105,7 @@ export function CostCard({
 
           <tr className="ledger-group">
             <th scope="row">
-              Accepted financial aid
+              {data.accountBasis ? "Aid posted to this term" : "Accepted financial aid"}
               <TermTip term="aid" label="financial aid" />
             </th>
             <td>
@@ -157,13 +157,14 @@ export function CostCard({
             <td className="ledger-amount soft">up to {money.format(ledger.additionalTotal)}</td>
           </tr>
 
+          {data.accountBasis && Boolean(data.accountAdjustmentsCents) && <tr className="ledger-group"><th scope="row">Charge credits, reversals and refunds</th><td /><td className="ledger-amount">{money.format(data.accountAdjustmentsCents!)}</td></tr>}
           <tr className="ledger-total">
             <th scope="row">
-              Estimated remaining balance
-              <TermTip term="balance" label="estimated remaining balance" />
+              {data.accountBasis ? (ledger.balance < 0 ? "Credit owed" : "Posted account balance") : "Estimated remaining balance"}
+              {!data.accountBasis && <TermTip term="balance" label="estimated remaining balance" />}
             </th>
             <td>
-              <span className="estimate-chip">Estimate</span>
+              <span className="estimate-chip">{data.accountBasis ? "Posted ledger" : "Estimate"}</span>
             </td>
             <td className="ledger-amount">{money.format(ledger.balance)}</td>
           </tr>

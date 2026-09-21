@@ -1,0 +1,9 @@
+.dialog { margin: auto; inset: 0; max-height: calc(100% - 2rem); overflow: auto; max-width: 32rem; width: calc(100% - 2rem); padding: 1.5rem; border: 1px solid #ddd; border-radius: 1rem; color: #252525; background: white; }
+.dialog::backdrop { background: rgb(0 0 0 / 35%); }
+.dialog h2 { margin: 0 0 1rem; font-size: 1.25rem; }
+.dialog p { margin: 0 0 1rem; line-height: 1.5; }
+.actions { display: flex; justify-content: flex-end; gap: .75rem; }
+
+.dialog .actions .confirm { background: #6355cc; color: #fff; border-color: #6355cc; }
+
+.control .trigger[type="button"], .dialog .actions button[type="button"] { display: inline-flex; }

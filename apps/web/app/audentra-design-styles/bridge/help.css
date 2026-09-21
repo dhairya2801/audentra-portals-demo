@@ -1,3 +1,5 @@
 /* Production-only bridge rules for the help pages. Restate a design decision here only
    when a legacy or production-only element has no design-system shape; never restyle
    a reference class. */
+
+.app-shell .help-guides-empty { margin: 0; padding: 8px 0; color: var(--muted); font-size: 13px; line-height: 1.7; }

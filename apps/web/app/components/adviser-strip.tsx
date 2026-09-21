@@ -3,7 +3,6 @@
 import { useCallback } from "react";
 import { useApiResource } from "../hooks/use-api-resource";
 import { getStudentAdvising } from "../lib/api-client";
-import { StaffPortrait } from "./staff-portrait";
 import { TenantLink as Link } from "./tenant-link";
 
 /**
@@ -24,7 +23,9 @@ export function AdviserStrip() {
       <span>Academic adviser</span>
       {primary ? (
         <strong className="adviser-strip">
-          <StaffPortrait person={primary.staff} className="adviser-strip__avatar" />
+          <span className="adviser-strip__avatar" aria-hidden="true">
+            {primary.staff.name.split(" ").map((part) => part.slice(0, 1)).join("").slice(0, 2)}
+          </span>
           <span>
             <Link href="/appointments">{primary.staff.name}</Link>
             <small>{gap ? gap.message : primary.staff.title ?? "Academic adviser"}</small>

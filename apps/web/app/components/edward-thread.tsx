@@ -6,11 +6,14 @@ import type {
   EdwardActionWidget,
   EdwardChatMessage,
   EdwardContextReceipt,
+  EdwardActionIntent,
+  EdwardActionReceipt,
 } from "@vv/contracts";
 import type { RefObject } from "react";
 import Icon from "../design-system/Icon.jsx";
 import { AssistantBlocks } from "./assistant-blocks";
 import { ActionWidget } from "./edward-action-widget";
+import { EdwardActionCard } from "./edward-action-card";
 import { EdwardAnswerFeedback } from "./edward-answer-feedback";
 import { TenantLink as Link } from "./tenant-link";
 
@@ -21,6 +24,8 @@ export type EdwardDisplayMessage = EdwardChatMessage & {
   provider?: AskEdwardResponse["provider"];
   contextReceipts?: AskEdwardResponse["contextReceipts"];
   widgets?: EdwardActionWidget[];
+  actionIntents?: EdwardActionIntent[];
+  actionReceipts?: EdwardActionReceipt[];
   blocks?: AssistantResponseBlock[];
   traceId?: string;
   /** The composer's context chip at the moment the question was sent. */
@@ -30,11 +35,13 @@ export type EdwardDisplayMessage = EdwardChatMessage & {
 export const EDWARD = { name: "Edward", mark: "E" } as const;
 
 export const STANDING_CAUTION =
-  "Edward can be wrong. Check anything about your record, aid or payments against your official record before you act on it.";
+  "AI guidance, grounded in your record. You review changes before they happen.";
 
 const BOUNDARY_NOTE = "Edward can only see your record.";
 
 export const contextSourceLabels: Record<EdwardContextReceipt["source"], string> = {
+  university: "University records",
+  institution_knowledge: "Institutional policies",
   dashboard: "Enrollment summary",
   profile: "Profile",
   documents: "Documents",
@@ -150,8 +157,7 @@ export function EdwardMessage({
   }
 
   const receipts = message.contextReceipts ?? [];
-  const isModel =
-    message.provider === "openrouter" || message.provider === "openai";
+  const semantic = message.blocks?.some(block => block.type === "answer");
 
   return (
     <article className="edward-turn edward">
@@ -162,7 +168,7 @@ export function EdwardMessage({
           <Body content={message.content} />
         )}
 
-        {receipts.length > 0 ? (
+        {receipts.length > 0 && !semantic ? (
           <p
             className="edward-source"
             aria-label="Student record context used for this response"
@@ -173,15 +179,6 @@ export function EdwardMessage({
           </p>
         ) : null}
 
-        {message.provider ? (
-          <p className="edward-source">
-            <Icon name={isModel ? "spark" : "book"} size={13} />
-            {isModel
-              ? "AI-generated guidance · verify important decisions"
-              : "Built-in portal guidance"}
-            {message.inputMode === "voice" ? " · spoken" : ""}
-          </p>
-        ) : null}
 
         {message.widgets?.map((widget) => (
           <ActionWidget
@@ -189,6 +186,10 @@ export function EdwardMessage({
             onCompleted={onWidgetCompleted}
             key={`${message.id}-${widget.id}`}
           />
+        ))}
+
+        {message.actionIntents?.map((intent) => (
+          <EdwardActionCard intent={intent} actor="student" key={intent.id} />
         ))}
 
         {message.actions?.length || message.traceId || onPlay ? (
@@ -248,7 +249,6 @@ export function EdwardMessage({
 
 export function EdwardThread({
   studentName,
-  greeting,
   messages,
   suggestions,
   thinking,
@@ -291,20 +291,11 @@ export function EdwardThread({
           <span className="edward-mark" aria-hidden="true">
             {EDWARD.mark}
           </span>
-          <h3>Hi {studentName}. Ask me about your enrollment.</h3>
-          {greeting ? <p>{greeting.content}</p> : null}
+          <h3>Let’s find your next step, {studentName}.</h3>
+          <p>Understand what’s happening, what matters now, and who can help. Start wherever you are.</p>
           <p className="edward-boundary">
             <Icon name="shield" size={13} /> {BOUNDARY_NOTE}
           </p>
-          {greeting?.actions?.length ? (
-            <div className="edward-answer-actions">
-              {greeting.actions.map((action) => (
-                <Link className="edward-route" href={action.href} key={action.href}>
-                  {action.label} <Icon name="arrow" size={15} />
-                </Link>
-              ))}
-            </div>
-          ) : null}
         </div>
       ) : null}
 

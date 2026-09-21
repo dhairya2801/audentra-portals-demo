@@ -14,7 +14,6 @@ import {
   demoStaffLoginEnabled,
   groupDemoStaff,
 } from "../lib/demo-staff-login";
-import { browserBrewPreferenceStore } from "./morning-brew/preferences";
 
 /**
  * "Log in as synthetic staff" — the developer affordance under the staff
@@ -87,10 +86,6 @@ function DemoStaffLoginPanel({ onSignedIn }: { onSignedIn: () => void }) {
     setOpening(entry.id);
     try {
       await signIn.run(entry);
-      // A demo sign-in opens the demo from the top: the portal lands on Morning
-      // Brew, and Morning Brew opens on setup rather than on whatever the last
-      // person at this machine answered.
-      browserBrewPreferenceStore.clearAll();
       onSignedIn();
     } catch {
       setOpening(null);

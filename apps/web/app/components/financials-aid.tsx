@@ -2,7 +2,7 @@
 
 import type { FinancialAward, StudentFinancials } from "@vv/contracts";
 import Icon from "../design-system/Icon.jsx";
-import Card from "../design-system/primitives/Card.jsx";
+import Card, { CardHead } from "../design-system/primitives/Card.jsx";
 import StateCard from "../design-system/patterns/StateCard.jsx";
 import { useTenant } from "./tenant-provider";
 import { TermTip } from "./financials-frame";
@@ -13,7 +13,7 @@ import { AWARD_KIND, AWARD_SOURCE, AWARD_STATUS, moneyFor, share, type Ledger } 
  * it is repaid. A pending award keeps a row of its own with no amount and the
  * reason it is held; it is never rendered as a zero.
  */
-export function AidSources({ awards, ledger }: { awards: FinancialAward[]; ledger: Ledger }) {
+export function AidSources({ awards, ledger, postedAccount = false }: { awards: FinancialAward[]; ledger: Ledger; postedAccount?: boolean }) {
   const { tenant, copy } = useTenant();
   const money = moneyFor(tenant);
 
@@ -74,7 +74,7 @@ export function AidSources({ awards, ledger }: { awards: FinancialAward[]; ledge
       )}
 
       <div className="aid-total">
-        <span>Accepted so far</span>
+        <span>{postedAccount ? "Aid posted to your account" : "Accepted so far"}</span>
         <strong>{money.format(ledger.aidAccepted)}</strong>
       </div>
     </Card>
@@ -140,10 +140,10 @@ function metricsOf(sap: StudentFinancials["sap"]): Metric[] {
       label: "Grade point average",
       term: "gpa",
       minimumLabel: `minimum ${sap.minimumGpa.toFixed(1)}`,
-      value: sap.cumulativeGpa,
-      display: sap.cumulativeGpa.toFixed(2),
+      value: sap.cumulativeGpa ?? 0,
+      display: sap.cumulativeGpa === null ? "Not evaluated" : sap.cumulativeGpa.toFixed(2),
       max: 4,
-      above: sap.cumulativeGpa >= sap.minimumGpa,
+      above: sap.cumulativeGpa !== null && sap.cumulativeGpa >= sap.minimumGpa,
     },
     {
       id: "pace",
@@ -151,10 +151,10 @@ function metricsOf(sap: StudentFinancials["sap"]): Metric[] {
       gloss: "the share of credits you finish out of the ones you start",
       term: "pace",
       minimumLabel: `minimum ${sap.minimumCompletionRatePercent}%`,
-      value: sap.completionRatePercent,
+      value: sap.completionRatePercent ?? 0,
       display: `${sap.completionRatePercent}%`,
       max: 100,
-      above: sap.completionRatePercent >= sap.minimumCompletionRatePercent,
+      above: sap.completionRatePercent !== null && sap.completionRatePercent >= sap.minimumCompletionRatePercent,
     },
     {
       id: "credits",
@@ -185,6 +185,10 @@ function chipFor(metric: Metric) {
 export function ProgressPreview({ sap, onExplain }: { sap: StudentFinancials["sap"]; onExplain: () => void }) {
   const { copy } = useTenant();
   const metrics = metricsOf(sap);
+  if (sap.status === "not_evaluated") return <Card>
+    <CardHead icon="chart" title="Academic progress" note="Evaluated after completed coursework" />
+    <p className="preview-intro">{copy("No completed {institution} course attempts have been evaluated yet. A missing GPA is not a failing GPA.")}</p>
+  </Card>;
 
   return (
     <Card variant="progress-preview" aria-labelledby="progress-title">

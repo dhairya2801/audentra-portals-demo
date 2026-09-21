@@ -31,6 +31,7 @@ import {
 import { useActivityTracking } from "../hooks/use-activity-tracking";
 import { useEdwardVoice } from "../hooks/use-edward-voice";
 import {
+  type EdwardLabRequestOptions,
   ApiClientError,
   askEdward,
   createAssistantConversation,
@@ -41,6 +42,7 @@ import {
   type EdwardCanonicalVoiceResponse,
 } from "../lib/edward-voice";
 import { AssistantBlocks } from "./assistant-blocks";
+import { EdwardActionCard } from "./edward-action-card";
 import { ActionWidget } from "./edward-action-widget";
 import { EdwardComposer } from "./edward-composer";
 import { EdwardHistory } from "./edward-history";
@@ -50,27 +52,13 @@ import {
   EdwardThread,
   contextSourceLabels,
   type EdwardDisplayMessage,
-  type EdwardSuggestionGroup,
 } from "./edward-thread";
 import { useTenant } from "./tenant-provider";
 import styles from "./edward-assistant.module.css";
-
-const quickPrompts = [
-  "What should I do next?",
-  "Which classes can I be exempted from?",
-  "I want to pay my deposit",
-  "What financial-aid item needs attention?",
-];
+import experience from "./edward-experience.module.css";
+import { useEdwardSuggestions } from "../hooks/use-edward-suggestions";
 
 type DisplayMessage = EdwardDisplayMessage;
-
-const suggestionGroups: EdwardSuggestionGroup[] = [
-  {
-    id: "start",
-    label: "To get started",
-    items: quickPrompts.map((text, index) => ({ id: `start-${index}`, text })),
-  },
-];
 
 /**
  * `My Financials · Payments` — the composer's chip names the page the student
@@ -162,6 +150,12 @@ function persistedMessageToDisplay(
       ? { contextReceipts: message.contextReceipts }
       : {}),
     ...(message.widgets.length ? { widgets: message.widgets } : {}),
+    ...(message.actionIntents?.length
+      ? { actionIntents: message.actionIntents }
+      : {}),
+    ...(message.actionReceipts?.length
+      ? { actionReceipts: message.actionReceipts }
+      : {}),
     ...(message.blocks?.length ? { blocks: message.blocks } : {}),
     ...(message.requestId ? { traceId: message.requestId } : {}),
   };
@@ -244,6 +238,7 @@ export function EdwardAssistant({
   variant = "floating",
   allowLiveVoice = true,
   onTurn,
+  labOptions,
 }: {
   studentName: string;
   variant?: "floating" | "embedded";
@@ -255,11 +250,20 @@ export function EdwardAssistant({
    * surfaces; adds no behavior when absent.
    */
   onTurn?: (turn: EdwardTurnEvent) => void;
+  /**
+   * Development-only request controls (Edward Lab): per-turn read planner
+   * and execution mode headers. Absent on every student surface, in which
+   * case the request is sent exactly as before.
+   */
+  labOptions?: EdwardLabRequestOptions;
 }) {
   const { tenant } = useTenant();
   const [open, setOpen] = useState(variant === "embedded");
+  const suggestionGroups = useEdwardSuggestions(open);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const pendingRequest = useRef<AbortController | null>(null);
+  const retryRequest = useRef<{ message: string; id: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const voiceSupported = useSyncExternalStore(
     subscribeToVoiceCapability,
@@ -406,6 +410,8 @@ export function EdwardAssistant({
                 provider: response.provider,
                 contextReceipts,
                 widgets: response.widgets ?? [],
+                actionIntents: response.actionIntents ?? [],
+                actionReceipts: response.actionReceipts ?? [],
                 ...(response.blocks?.length ? { blocks: response.blocks } : {}),
                 ...(response.requestId ? { traceId: response.requestId } : {}),
               },
@@ -527,15 +533,17 @@ export function EdwardAssistant({
   }, [voice.state]);
 
   useEffect(() => {
-    transcript.current?.scrollTo({
-      top: transcript.current.scrollHeight,
-      behavior: "smooth",
-    });
+    const embedded = transcript.current;
+    const embeddedAnswer = embedded?.querySelector<HTMLElement>(".edward-message--assistant:last-of-type");
+    if (embedded) embedded.scrollTo({ top: !sending && embeddedAnswer
+      ? Math.max(0, embeddedAnswer.offsetTop - embedded.offsetTop - 20) : embedded.scrollHeight });
     // An empty conversation is read from the top: the greeting and the
     // suggestions are the content. Only a conversation follows its own tail.
     const thread = bottom.current?.parentElement;
     if (thread && messages.length > 1) {
-      thread.scrollTo({ top: thread.scrollHeight });
+      const latest = thread.querySelector<HTMLElement>(".edward-turn.edward:last-of-type");
+      thread.scrollTo({ top: !sending && latest
+        ? Math.max(0, latest.offsetTop - thread.offsetTop - 20) : thread.scrollHeight });
     }
   }, [activeConversationId, messages, sending, voice.caption, voice.state, open, view]);
 
@@ -615,7 +623,11 @@ export function EdwardAssistant({
   const send = async (message: string, speakResponse = voiceReplies) => {
     const normalized = message.trim();
     if (!normalized || sending) return;
-    const clientMessageId = crypto.randomUUID();
+    const retrying = retryRequest.current?.message === normalized;
+    const clientMessageId = retrying ? retryRequest.current!.id : crypto.randomUUID();
+    retryRequest.current = { message: normalized, id: clientMessageId };
+    const controller = new AbortController();
+    pendingRequest.current = controller;
     const userMessage: DisplayMessage = {
       id: crypto.randomUUID(),
       role: "user",
@@ -632,7 +644,7 @@ export function EdwardAssistant({
         conversation.messages.length === 1
           ? conversationTitle(normalized)
           : conversation.title,
-      messages: [...conversation.messages, userMessage],
+      messages: retrying ? conversation.messages : [...conversation.messages, userMessage],
     }));
     setDraft("");
     setError(null);
@@ -642,18 +654,23 @@ export function EdwardAssistant({
     try {
       const serverConversationId =
         await ensureServerConversation(conversationId);
-      const response = await askEdward({
-        ...(serverConversationId
-          ? { conversationId: serverConversationId, clientMessageId }
-          : {}),
-        message: normalized,
-        inputMode: "text",
-        pageContext: window.location.pathname,
-        history,
-      });
+      const response = await askEdward(
+        {
+          ...(serverConversationId
+            ? { conversationId: serverConversationId, clientMessageId }
+            : {}),
+          message: normalized,
+          inputMode: "text",
+          pageContext: window.location.pathname,
+          history,
+        },
+        controller.signal,
+        labOptions ?? {},
+      );
       if (serverConversationId && response.conversationId) {
         writeStoredConversationId(storageKey, response.conversationId);
       }
+      retryRequest.current = null;
       const contextReceipts = response.contextReceipts ?? [];
       if (contextReceipts.length > 0) {
         track("ui.edward_context_receipts_received.v1", {
@@ -686,6 +703,8 @@ export function EdwardAssistant({
             provider: response.provider,
             contextReceipts,
             widgets: response.widgets ?? [],
+            actionIntents: response.actionIntents ?? [],
+            actionReceipts: response.actionReceipts ?? [],
             ...(response.blocks?.length ? { blocks: response.blocks } : {}),
             ...(response.requestId ? { traceId: response.requestId } : {}),
           },
@@ -699,8 +718,9 @@ export function EdwardAssistant({
         window.speechSynthesis.speak(utterance);
       }
     } catch (caught) {
-      const message =
-        caught instanceof Error
+      const message = controller.signal.aborted
+        ? "Stopped waiting. Your request may still finish; retry checks the same request."
+        : caught instanceof Error
           ? caught.message
           : "Edward could not answer just now. Please try again.";
       setError(message);
@@ -714,6 +734,7 @@ export function EdwardAssistant({
         latencyMs: performance.now() - sendStartedAt,
       });
     } finally {
+      pendingRequest.current = null;
       setSending(false);
     }
   };
@@ -849,6 +870,7 @@ export function EdwardAssistant({
 
   /** A fresh thread — or the current one, when nothing has been said in it yet. */
   const beginConversation = () => {
+    retryRequest.current = null;
     if (voiceSessionOpen) void voice.endVoice();
     setDraft("");
     setError(null);
@@ -883,6 +905,7 @@ export function EdwardAssistant({
       return;
     }
     if (voiceSessionOpen) void voice.endVoice();
+    retryRequest.current = null;
     setActiveConversationId(conversationId);
     setDraft("");
     setError(null);
@@ -1019,7 +1042,7 @@ export function EdwardAssistant({
       className={
         variant === "floating"
           ? "edward-panel"
-          : `edward-panel edward-panel--embedded ${styles.embeddedPanel}`
+          : `edward-panel edward-panel--embedded ${styles.embeddedPanel} ${experience.surface} ${experience.embedded}`
       }
       role={variant === "floating" ? "dialog" : "region"}
       aria-label="Edward AI student guide"
@@ -1122,6 +1145,14 @@ export function EdwardAssistant({
                 key={`${message.id}-${widget.id}`}
               />
             ))}
+            {/* The confirmation card IS the write experience: without it a
+                proposed change can neither be reviewed nor confirmed. This
+                inline renderer predates the action plane and silently dropped
+                `actionIntents` — found by the browser E2E suite, invisible to
+                the component tests, which exercise EdwardThread instead. */}
+            {message.actionIntents?.map((intent) => (
+              <EdwardActionCard intent={intent} actor="student" key={intent.id} />
+            ))}
             {message.actions?.length ? (
               <div className="edward-actions">
                 {message.actions.map((action) => (
@@ -1186,7 +1217,7 @@ export function EdwardAssistant({
           }`}
           aria-label="Suggested questions"
         >
-          {quickPrompts.map((prompt) => (
+          {suggestionGroups.flatMap((group) => group.items.map((item) => item.text)).map((prompt) => (
             <button type="button" onClick={() => void send(prompt)} key={prompt}>
               {prompt}
             </button>
@@ -1253,10 +1284,11 @@ export function EdwardAssistant({
           <button
             className="edward-send-button"
             type="submit"
-            disabled={sending || draft.trim().length === 0}
-            aria-label="Send message"
+            disabled={!sending && draft.trim().length === 0}
+            onClick={sending ? (event) => { event.preventDefault(); pendingRequest.current?.abort(); } : undefined}
+            aria-label={sending ? "Stop waiting" : "Send message"}
           >
-            ↑
+            {sending ? "■" : "↑"}
           </button>
         </div>
         {listening ? (
@@ -1510,6 +1542,7 @@ export function EdwardAssistant({
               micDisabled={micDisabled}
               onMic={handleVoiceButton}
               disabled={sending}
+              onStop={() => pendingRequest.current?.abort()}
               note={composerNote}
               inputRef={floatingInput}
             >
@@ -1556,7 +1589,7 @@ function EdwardWindow({
       ) : null}
       <aside
         id="edward-panel"
-        className={`edward-panel${wide ? " wide" : ""}${historyOnly ? " history-only" : ""}`}
+        className={`edward-panel ${experience.surface} ${experience.floating}${wide ? " wide" : ""}${historyOnly ? " history-only" : ""}`}
         ref={panel}
         role="dialog"
         aria-modal={isSheet ? "true" : undefined}

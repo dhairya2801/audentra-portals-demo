@@ -35,7 +35,7 @@ import { isParentPortalPath, parentPortalHref } from "../lib/parent-portal-route
 import Icon from "../design-system/Icon.jsx";
 import Avatar from "../design-system/primitives/Avatar.jsx";
 import { IconButton } from "../design-system/primitives/Button.jsx";
-import { AudentraLogo } from "./audentra-logo";
+import AudentraMark from "../design-system/marks/AudentraMark.jsx";
 import Popover from "../design-system/patterns/Popover.jsx";
 import {
   NAV,
@@ -103,6 +103,21 @@ function readOpenGroups(): Record<string, boolean> {
   } catch {
     return {};
   }
+}
+
+/**
+ * What the chip under the student's name says. Read from the onboarding
+ * record the platform holds — the portal has no enrollment-standing fact of
+ * its own, so it never claims one.
+ */
+function studentStanding(
+  onboarding: { status: string; required?: boolean } | undefined,
+) {
+  if (!onboarding || onboarding.status === "restricted" || onboarding.status === "completed") {
+    return "Student";
+  }
+  if (onboarding.status === "in_progress") return "Onboarding in progress";
+  return onboarding.required ? "Onboarding not started" : "Student";
 }
 
 function initials(fullName: string) {
@@ -361,7 +376,6 @@ export function PortalShell({
   tabs?: ReactNode;
   rail?: ReactNode;
   actions?: ReactNode;
-  /** Use custom page content inside the standard navigation and assistant. */
   bareContent?: boolean;
   children: ReactNode;
 }) {
@@ -386,6 +400,13 @@ export function PortalShell({
   }
   const [menuOpen, setMenuOpen] = useState(false);
   const [pointsModal, setPointsModal] = useState(false);
+  useEffect(() => {
+    const reset = (event: StorageEvent) => {
+      if (event.key === "audentra:demo-reset") window.location.reload();
+    };
+    window.addEventListener("storage", reset);
+    return () => window.removeEventListener("storage", reset);
+  }, []);
   const menuButton = useRef<HTMLButtonElement>(null);
   const navigationPanel = useRef<HTMLElement>(null);
   // Groups closed by default, the one holding the page you are on opened for
@@ -797,7 +818,9 @@ export function PortalShell({
 
   const student = identity.data.student;
   const person = { name: student.fullName, initials: initials(student.fullName) };
-  const standing = delegateActor ? relationshipLabel(delegateActor.relationship) : "Incoming student";
+  const standing = delegateActor
+    ? relationshipLabel(delegateActor.relationship)
+    : studentStanding(identity.data.onboarding);
   const help = destinationById(UTILITY_ID)!;
   const profile = destinationById(PROFILE_ID)!;
   const rewards = !delegateActor ? identity.data.rewards : undefined;
@@ -828,27 +851,20 @@ export function PortalShell({
         aria-label="Primary navigation"
       >
         <div className="brand-row">
-          <Link
-            className="brand-home"
-            href="/dashboard"
-            aria-label={`${tenant.name} — student home`}
-            onClick={() => setMenuOpen(false)}
-          >
-            <span className="brand-mark" aria-hidden="true">
-              {/* eslint-disable-next-line @next/next/no-img-element -- the tenant's mark is a plain asset URL */}
-              <img
-                className="brand-mark-image"
-                src={tenant.branding.logoUrl}
-                width="40"
-                height="40"
-                alt=""
-              />
-            </span>
-            <span className="brand-name">
-              <strong>{tenant.name}</strong>
-              <span>New Student Portal</span>
-            </span>
-          </Link>
+          <span className="brand-mark" aria-hidden="true">
+            {/* eslint-disable-next-line @next/next/no-img-element -- the tenant's mark is a plain asset URL */}
+            <img
+              className="brand-mark-image"
+              src={tenant.branding.logoUrl}
+              width="40"
+              height="40"
+              alt=""
+            />
+          </span>
+          <div className="brand-name">
+            <strong>{tenant.name}</strong>
+            <span>New Student Portal</span>
+          </div>
           <IconButton
             className="nav-close"
             name="close"
@@ -961,7 +977,7 @@ export function PortalShell({
             </div>
           )}
           <p className="powered-by">
-            Powered by <AudentraLogo height={16} />
+            Powered by <AudentraMark height={13} /> <strong>Audentra</strong>
           </p>
         </div>
       </aside>

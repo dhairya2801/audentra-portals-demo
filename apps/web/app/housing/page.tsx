@@ -1,5 +1,7 @@
 "use client";
 
+import { UniversityHousingPanel } from "../components/university-record";
+
 import type {
   HousingPreference,
   StudentHousingPlan,
@@ -17,7 +19,6 @@ import PageSkeleton from "../design-system/patterns/PageSkeleton.jsx";
 import SummaryFigure from "../design-system/patterns/SummaryFigure.jsx";
 import ToastStack from "../design-system/patterns/Toast.jsx";
 import { type ToastInput, useToasts } from "../design-lib/toast.js";
-import { officeAdvisor } from "../components/office-contact";
 import { HousingCatalogue } from "../components/housing-catalogue";
 import {
   SHORTLIST_MAX,
@@ -56,13 +57,11 @@ type ShortlistToast = { title: string; body?: string; action?: { label: string; 
 export default function HousingPage() {
   const router = useRouter();
   const { tenant, href } = useTenant();
-  // The person who covers enrollment for this student — the office contact the
-  // institution published, seated as a person (`components/office-contact.ts`).
-  const ADVISOR = officeAdvisor(
-    "admissions",
-    tenant.contacts.admissions ?? tenant.contacts.support ?? null,
-    "Your admissions contact",
-  );
+  // The institution's real admissions contact — no named advisor exists in the platform.
+  const advisorContact = tenant.contacts.admissions ?? tenant.contacts.support ?? null;
+  const ADVISOR = advisorContact
+    ? { name: advisorContact.label, label: "Your admissions contact", office: null as string | null }
+    : null;
   const { toasts, push, dismiss } = useToasts();
 
   const loadPlan = useCallback((signal: AbortSignal) => getStudentHousingPlan(signal), []);
@@ -259,6 +258,7 @@ export default function HousingPage() {
       }
       rail={ready ? <HousingRail office={office} deadline={deadline} onHow={() => setHow(true)} /> : undefined}
     >
+      {ready && <UniversityHousingPanel />}
       {loading ? (
         <PageSkeleton label="your housing plan" />
       ) : housing.status === "error" || !record ? (

@@ -1,6 +1,5 @@
 "use client";
 
-import { StaffPortrait } from "../components/staff-portrait";
 import type { StudentAdvising, StudentAppointment, StudentAppointmentType } from "@vv/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PortalShell } from "../components/portal-shell";
@@ -355,7 +354,9 @@ function AdviserCard({ advising, onBook }: { advising: StudentAdvising; onBook: 
       <div className="adviser-card__body">
         {primary ? (
           <div className="adviser-card__person">
-            <StaffPortrait person={primary.staff} className="adviser-card__avatar" />
+            <span className="adviser-card__avatar" aria-hidden="true">
+              {primary.staff.name.split(" ").map((part) => part.slice(0, 1)).join("").slice(0, 2)}
+            </span>
             <div>
               <strong>{primary.staff.name}</strong>
               <p>

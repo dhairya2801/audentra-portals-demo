@@ -1,5 +1,7 @@
 "use client";
 
+import { UniversityRecordPanel } from "../components/university-record";
+
 import type { CatalogCourse } from "@vv/contracts";
 import {
   type CSSProperties,
@@ -287,6 +289,7 @@ export default function ClassroomsPage() {
           ) : null
         }
       >
+        <UniversityRecordPanel initialDomain="academics" />
         {academics.status === "loading" ? (
           <PageSkeleton label="your degree" />
         ) : academics.status === "error" ? (

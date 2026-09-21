@@ -10,7 +10,6 @@ import { ApiClientError, cancelStudentAppointment } from "../lib/api-client";
 import type { TenantConfig } from "../lib/tenant";
 import {
   type ConversationType,
-  articled,
   calendarHref,
   clockTime,
   longDate,
@@ -47,7 +46,7 @@ export function AppointmentsDrawer({
   onCancelled: (appointment: StudentAppointment) => void;
 }) {
   const state = stateOf(appointment, now);
-  const who = whoShort(appointment, type);
+  const who = whoShort(appointment);
   const [confirming, setConfirming] = useState(false);
   const cancel = useApiAction(
     async () => cancelStudentAppointment(appointment.id, { reason: "Cancelled by the student" }),
@@ -66,7 +65,13 @@ export function AppointmentsDrawer({
       tone: "ok",
       icon: "check",
       title: `Confirmed · ${relativeDay(appointment.startsAt, tenant, now)}`,
-      body: `This is on your calendar and on ${appointment.staff ? `${appointment.staff.name}’s` : `${articled(type.team)}’s`}. They have what you wrote it is about.`,
+      body: `This is on your calendar${appointment.staff ? ` and on ${appointment.staff.name}’s` : ""}. They have what you wrote it is about.`,
+    },
+    pending: {
+      tone: "quiet",
+      icon: "clock",
+      title: `Awaiting outcome · ${relativeDay(appointment.startsAt, tenant, now)}`,
+      body: `The time has passed, but ${who} has not recorded what happened yet. It stays scheduled on the record until they do.`,
     },
     cancelled: {
       tone: "quiet",
@@ -142,7 +147,7 @@ export function AppointmentsDrawer({
             <Icon name="users" size={15} /> Who
           </dt>
           <dd>
-            {whoLabel(appointment, type)}
+            {whoLabel(appointment)}
             {appointment.staff?.component && appointment.staff.component !== type.team ? ` (${appointment.staff.component})` : ""}
           </dd>
         </div>

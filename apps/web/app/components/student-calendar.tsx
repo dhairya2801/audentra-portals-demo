@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useCallback, useId, useMemo, useState } from "react";
 import {
   buildStudentCalendarMonth,
   defaultStudentCalendarMonth,
@@ -10,6 +10,8 @@ import {
 } from "../lib/student-calendar";
 import { safePortalDestination } from "../lib/safe-destination";
 import { TenantLink as Link } from "./tenant-link";
+import { getUniversityRecord, ApiClientError } from "../lib/api-client";
+import { useApiResource } from "../hooks/use-api-resource";
 import styles from "./student-calendar.module.css";
 
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -71,7 +73,7 @@ function CalendarAction({ entry }: { entry: StudentCalendarEntry }) {
 }
 
 export function StudentCalendar({
-  entries,
+  entries: suppliedEntries,
   initialMonth,
   title = "Your student calendar",
   canOpenEntry = () => true,
@@ -81,6 +83,17 @@ export function StudentCalendar({
   title?: string;
   canOpenEntry?: (entry: StudentCalendarEntry) => boolean;
 }) {
+  const load = useCallback(async (signal: AbortSignal) => {
+    try { return await getUniversityRecord("overview", undefined, signal); }
+    catch (error) { if (error instanceof ApiClientError && error.status === 404) return null; throw error; }
+  }, []);
+  const university = useApiResource(load);
+  const entries = useMemo(() => [...suppliedEntries, ...(university.data?.deadlines ?? []).map(item => ({
+    id: `university:${item.id}`, kind: "enrollment" as const, title: item.title,
+    startsAt: new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(item.starts_at)),
+    description: `${new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", dateStyle: "full", timeStyle: "short" }).format(new Date(item.starts_at))} · New York time`,
+    href: "/dashboard", actionLabel: "Review university record",
+  }))], [suppliedEntries, university.data]);
   const [displayedMonth, setDisplayedMonth] = useState(() =>
     initialMonth ?? defaultStudentCalendarMonth(entries),
   );
@@ -151,7 +164,7 @@ export function StudentCalendar({
       ) : null}
 
       <div className={styles.layout}>
-        <div className={styles.month}>
+        <div className={styles.month} role="region" aria-label="Monthly calendar" tabIndex={0}>
           <div className={styles.monthLabel} aria-live="polite">
             <strong>{month.label}</strong>
             <span>
@@ -159,6 +172,7 @@ export function StudentCalendar({
               {month.entries.length === 1 ? "" : "s"}
             </span>
           </div>
+          <p className={styles.scrollHint}>Scroll sideways to see the whole week. Select an event for details below.</p>
           <div className={styles.grid} role="group" aria-label={month.label}>
             {weekdays.map((weekday) => (
               <div className={styles.weekday} aria-hidden="true" key={weekday}>

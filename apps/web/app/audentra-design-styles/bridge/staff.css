@@ -1,0 +1,107 @@
+/* Production staff surfaces: contain the legacy layout and keep the shared
+   student stylesheet from repositioning the staff workspace's components. */
+.staff-shell--workspace .staff-main { min-width: 0; }
+.staff-shell--workspace .staff-main .eyebrow { color: var(--purple-ink); }
+.staff-shell--workspace .staff-automation-banner .eyebrow { color: var(--on-ink-muted); }
+.staff-shell--workspace :is(h1, h2, h3, p) { overflow-wrap: anywhere; }
+.staff-shell--workspace :is(button, input, textarea, select) { font-family: inherit; }
+.staff-shell--workspace .staff-sidebar { overflow-y: auto; overscroll-behavior: contain; }
+.staff-shell--workspace :is(.staff-page-heading, .staff-heading-actions, .staff-content-toolbar) { flex-wrap: wrap; }
+.staff-shell--workspace .staff-page-heading > div { min-width: 0; }
+.staff-shell--workspace .staff-student-layout { grid-template-columns: minmax(280px, .8fr) minmax(0, 2fr); }
+.staff-shell--workspace .staff-student-layout > .staff-inspector { grid-column: 1 / -1; }
+.staff-shell--workspace .staff-student-layout > * { min-width: 0; }
+.staff-shell--workspace .staff-student-directory .staff-panel__heading { flex-wrap: wrap; gap: 8px; }
+.staff-shell--workspace .staff-student-directory__list > button { grid-template-columns: 34px minmax(0, 1fr); gap: 6px 10px; }
+.staff-shell--workspace .staff-student-directory__list > button > span:last-child { grid-column: 2; justify-items: start; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.staff-shell--workspace .staff-student-directory__list strong { font-size: 13px; line-height: 1.5; }
+.staff-shell--workspace .staff-student-directory__list small { font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.staff-student-university { padding: 0 16px 16px; }
+.staff-student-university .university-record { margin: 0; }
+.staff-shell--workspace .staff-student-facts--five { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+.staff-shell--workspace .staff-task-workspace { --staff-task-workbench-height: clamp(360px, calc(100dvh - 350px), 720px); }
+.staff-shell--workspace .staff-empty-library { padding: 48px 24px; }
+.staff-empty-library__icon { display: grid; place-items: center; width: 48px; height: 48px; margin: 0 auto 18px; border-radius: 14px; background: var(--purple-soft); color: var(--purple-ink); font-weight: 600; }
+.staff-shell--workspace .staff-empty-library h2 { font-size: 20px; margin: 0 0 10px; }
+.staff-shell--workspace .staff-empty-library p { max-width: 460px; margin: 0 auto 22px; font-size: 13px; line-height: 1.7; }
+.staff-shell--workspace .staff-action-rules { margin-block: 20px; padding: 24px; }
+.staff-shell--workspace .staff-action-rules__heading { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--staff-line); }
+.staff-action-rules__heading > div { flex: 1 1 300px; }
+.staff-shell--workspace .staff-action-rules__heading h2 { margin: 6px 0 10px; font-size: 20px; line-height: 1.4; }
+.staff-shell--workspace .staff-action-rules__heading p:not(.eyebrow) { max-width: 680px; margin: 0; font-size: 13px; color: var(--staff-muted); }
+.staff-shell--workspace .staff-action-rules > p { padding-top: 18px; font-size: 13px; color: var(--staff-muted); }
+.staff-shell--workspace .edward-page-layout { grid-template-columns: minmax(0, 1fr) minmax(250px, .48fr); }
+.staff-shell--workspace .edward-panel--embedded { position: static; inset: auto; width: 100%; height: min(760px, calc(100dvh - 180px)); min-height: 520px; max-height: none; z-index: auto; animation: none; }
+.staff-shell--workspace .edward-panel--embedded .edward-transcript { min-height: 0; max-height: none; }
+.staff-shell--workspace .edward-prompts { min-width: 0; max-width: 100%; overflow-x: auto; }
+.staff-shell--workspace .edward-prompts button { flex-shrink: 0; }
+.staff-shell--workspace .staff-journey-tab > span:first-child,
+.staff-shell--workspace .staff-journey-commandbar__mark { color: var(--surface); }
+@media (max-width: 1100px) {
+  .staff-shell--workspace .staff-personal-action-layout:has(.staff-personal-queue),
+  .staff-shell--workspace .edward-page-layout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 900px) {
+  .staff-shell--workspace .staff-student-layout { grid-template-columns: minmax(0, 1fr); }
+  .staff-shell--workspace .staff-student-directory__list { max-height: 350px; }
+}
+@media (max-width: 620px) {
+  .staff-shell--workspace .staff-student-facts--five { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .staff-shell--workspace .staff-student-record__hero { flex-wrap: wrap; }
+  .staff-shell--workspace .staff-action-rules { padding: 18px; }
+  .staff-shell--workspace .staff-action-rules__heading > .button { width: 100%; }
+  .staff-shell--workspace .staff-heading-actions { width: 100%; }
+  .staff-shell--workspace .edward-panel--embedded { height: 620px; min-height: 0; }
+}
+.staff-shell--workspace .staff-main > .university-record { margin-top: 24px; }
+.staff-shell--workspace .staff-action-rules__heading { flex-direction: row; }
+.staff-shell--workspace .edward-panel--embedded { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; align-content: stretch; }
+.staff-shell--workspace .staff-journey-tabs button.is-active > span:first-child { color: var(--surface); }
+@media (max-width: 620px) {
+  .staff-shell--workspace .staff-record-sections,
+  .staff-shell--workspace .staff-decision-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+.staff-shell--workspace .staff-quiet-empty { margin: 0; padding: 20px; font-size: 13px; line-height: 1.7; color: var(--staff-muted); }
+
+/* Section labels need different contrast on the profile's dark hero. */
+.staff-shell--workspace .staff-main .page-hero .eyebrow { color: var(--on-ink-muted); }
+.auth-panel .eyebrow, .staff-entry .eyebrow { color: var(--purple-ink); }
+.auth-demo-student__form { align-items: start; }
+.auth-demo-student__form > button { margin-top: 24px; }
+@media (max-width: 620px) {
+  .auth-demo-student__form { grid-template-columns: minmax(0, 1fr); }
+  .auth-demo-student__form > button { margin-top: 0; width: 100%; }
+}
+
+/* Three primary staff products; everything else stays discoverable. */
+.staff-developing { margin-top: 14px; }
+.staff-developing > summary { display:flex; align-items:center; gap:12px; padding:13px 14px; border-radius:10px; color:#bdc9de; cursor:pointer; list-style:none; font-size:13px; }
+.staff-developing > summary::-webkit-details-marker { display:none; }
+.staff-developing > summary small { margin-left:auto; background:#ffffff12; padding:2px 6px; border-radius:5px; }
+.staff-developing[open] > summary span { transform:rotate(45deg); }
+.staff-developing > div { margin-left:15px; border-left:1px solid #ffffff20; padding-left:5px; }
+.student360-layout { grid-template-columns:280px minmax(0,1fr)!important; align-items:start; gap:22px!important; }
+.student360-layout .staff-student-directory { position:sticky; top:90px; max-height:calc(100dvh - 120px); overflow:auto; }
+.student360-layout .staff-student-directory__list > button { grid-template-columns:32px minmax(0,1fr); padding:16px 12px; }
+.student360-layout .staff-student-directory__list > button > span:last-child { grid-column:2; text-align:left; }
+.student360-layout .staff-student-record__hero { background:linear-gradient(120deg,#19233d,#483984); color:white; border:0; border-radius:20px; padding:28px; }
+.student360-layout .staff-student-record__hero p { color:#ddd9f5; }
+.student360-layout .staff-student-facts { grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:18px; }
+.student360-layout .staff-student-facts article { border-radius:14px; background:#fff; padding:18px; border:1px solid #e7e4f2; }
+.student360-layout .staff-record-sections { margin-top:18px; }
+.student360-inspector { grid-column:2; border:1px solid #e4e1ef; border-radius:16px; background:#fff; overflow:hidden; }
+.student360-inspector > summary { padding:20px; cursor:pointer; color:#5845b6; font-weight:600; }
+.student360-inspector .staff-student-inspector { width:100%; position:static; max-height:none; }
+@media(max-width:1000px){.student360-layout{grid-template-columns:1fr!important}.student360-layout .staff-student-directory{position:static;max-height:260px}.student360-inspector{grid-column:1}.student360-layout .staff-student-facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.student360-layout .staff-student-facts{grid-template-columns:1fr}.student360-layout .staff-student-record__hero{padding:20px;flex-wrap:wrap}}
+.staff-shell--workspace .student360-layout .staff-student-record__hero h2{color:#fff;font-size:28px;letter-spacing:-.03em}
+.staff-shell--workspace .student360-layout .staff-student-record__hero .eyebrow{color:#d5cef0}
+.staff-shell--workspace .student360-layout .staff-record-sections{display:block;background:white;padding:16px;border:1px solid #e5e2ef;border-radius:12px}.student360-work-disclosure>summary{cursor:pointer;color:#6854b4;font-size:13px;font-weight:600}.student360-work-disclosure[open]>article{margin-top:18px}
+.staff-shell--workspace .student360-layout .staff-student-facts{grid-template-columns:repeat(3,minmax(0,1fr));padding:16px;border-bottom:0}
+.staff-shell--workspace .student360-layout .staff-student-record{background:transparent;border:0}
+.staff-shell--workspace .student360-layout .staff-student-facts article{background:white}
+.staff-shell--workspace .student360-layout .staff-student-university{padding:0}
+.staff-shell--workspace .student360-layout .staff-student-directory__list>.is-selected{background:#f2eeff}
+.staff-shell--workspace .student360-layout .staff-page-heading h1{font-size:34px}
+@media(max-width:620px){.staff-shell--workspace .student360-layout .staff-student-facts{grid-template-columns:1fr}}

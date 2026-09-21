@@ -302,7 +302,7 @@ function OnboardingFlow({
       : null;
 
   const [onboarding, setOnboarding] = useState(initial);
-  const [offer, setOffer] = useState<AdmissionOfferSummary>(dashboard.offer);
+  const [offer, setOffer] = useState<AdmissionOfferSummary>(dashboard.offer!);
   const [draft, setDraft] = useState<OnboardingDraft>(() =>
     typeof window === "undefined" ? emptyDraft() : readDraft(initial.studentId),
   );
@@ -1607,6 +1607,10 @@ function OnboardingResource() {
         </div>
       </main>
     );
+  }
+
+  if (!onboarding.data.dashboard.offer) {
+    return <p>Your application has no admission offer to accept. Review its status on your dashboard.</p>;
   }
 
   return (

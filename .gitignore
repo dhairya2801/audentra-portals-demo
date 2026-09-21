@@ -16,3 +16,21 @@ test-results/
 .portal-dev.pid
 .vercel
 .env*
+
+# Reproducible local model-university browser artifacts.
+/artifacts/university-explorer/
+
+/artifacts/portal-ui/
+
+/artifacts/integration/
+
+/artifacts/demo-excellence/
+
+/artifacts/demo-task-board-parity/
+
+/apps/web/public/document-viewer/
+
+# Financial browser captures and provider responses.
+/artifacts/financials/
+
+/artifacts/demo-reset/

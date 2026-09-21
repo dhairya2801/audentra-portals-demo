@@ -146,14 +146,14 @@ export function buildLedger(data: StudentFinancials, payments: StudentPayment[] 
   const openInstallments = installments.filter((row) => row.status !== "received");
 
   const coverage: CoverageSegment[] = [
-    { key: "aid", label: "Aid accepted", amount: data.acceptedAidCents },
+    { key: "aid", label: data.accountBasis ? "Aid posted" : "Aid accepted", amount: data.postedAidCents ?? data.acceptedAidCents },
     { key: "paid", label: "You’ve paid", amount: data.paymentsCents },
-    { key: "open", label: "Estimated remaining balance", amount: data.remainingBalanceCents },
+    { key: "open", label: data.accountBasis ? "Posted balance" : "Estimated remaining balance", amount: data.remainingBalanceCents },
   ].filter((segment) => segment.amount > 0) as CoverageSegment[];
 
   return {
     cost: data.costOfAttendanceCents,
-    aidAccepted: data.acceptedAidCents,
+    aidAccepted: data.postedAidCents ?? data.acceptedAidCents,
     paid: data.paymentsCents,
     balance: data.remainingBalanceCents,
     additionalTotal: data.pendingAidCents,

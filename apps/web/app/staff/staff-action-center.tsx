@@ -1,9 +1,10 @@
 "use client";
 
+import { UniversityRecordPanel } from "../components/university-record";
+
 import type {
   HousingPreference,
   StaffActionCenter,
-  StaffIdentityProvider,
   StaffWorkItem,
   StaffWorkItemStatus,
 } from "@vv/contracts";
@@ -11,27 +12,20 @@ import {
   type DragEventHandler,
   type FormEvent,
   useCallback,
-  useEffect,
-  useMemo,
-  useRef,
   useState,
 } from "react";
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
 import {
   ApiClientError,
-  getStaffAuthOptions,
-  getStaffActionCenter,
-  getStaffDocumentReviewOptions,
   getStaffStudentRecord,
   reviewStaffDocument,
+  getStaffDocumentReviewOptions,
   signInStaff,
-  signOutStaff,
   signUpStaff,
-  staffSsoStartUrl,
   updateStaffStudentPreferences,
   updateStaffWorkItem,
 } from "../lib/api-client";
-import { ownerRiskLabel } from "./task-board-utils";
+import { ownerRiskLabel, viewerRelationshipLabel } from "./task-board-utils";
 import { TenantLink as Link } from "../components/tenant-link";
 import { PortalMark } from "../components/portal-ui";
 import { useTenant } from "../components/tenant-provider";
@@ -81,40 +75,6 @@ const staffAuthErrorMessage = (error: unknown) =>
     ? error.message
     : "We couldn't access your staff account. Check your connection and try again.";
 
-function InstitutionalProviderIcon({ provider }: { provider: StaffIdentityProvider }) {
-  if (provider === "google") {
-    return (
-      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-        <path
-          fill="#4285F4"
-          d="M21.35 12.23c0-.79-.07-1.55-.2-2.28H12v4.31h5.23a4.47 4.47 0 0 1-1.94 2.93v2.79h3.6c2.11-1.94 3.34-4.8 3.34-8.17Z"
-        />
-        <path
-          fill="#34A853"
-          d="M12 21.7c2.7 0 4.96-.9 6.61-2.43l-3.6-2.79c-1 .67-2.28 1.07-3.01 1.07-2.31 0-4.27-1.56-4.97-3.65H3.31v2.88A9.98 9.98 0 0 0 12 21.7Z"
-        />
-        <path
-          fill="#FBBC05"
-          d="M7.03 13.9A6 6 0 0 1 6.75 12c0-.66.11-1.3.28-1.9V7.22H3.31A9.98 9.98 0 0 0 2.3 12c0 1.61.39 3.14 1.01 4.78l3.72-2.88Z"
-        />
-        <path
-          fill="#EA4335"
-          d="M12 6.45c1.47 0 2.79.51 3.83 1.51l2.87-2.87C16.96 3.47 14.7 2.3 12 2.3a9.98 9.98 0 0 0-8.69 4.92l3.72 2.88c.7-2.09 2.66-3.65 4.97-3.65Z"
-        />
-      </svg>
-    );
-  }
-
-  return (
-    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-      <path fill="#f35325" d="M2.5 2.5h8.55v8.55H2.5z" />
-      <path fill="#81bc06" d="M12.95 2.5h8.55v8.55h-8.55z" />
-      <path fill="#05a6f0" d="M2.5 12.95h8.55v8.55H2.5z" />
-      <path fill="#ffba08" d="M12.95 12.95h8.55v8.55h-8.55z" />
-    </svg>
-  );
-}
-
 function formatDate(value: string | null) {
   if (!value) return "No due date";
   return new Intl.DateTimeFormat("en-US", {
@@ -127,6 +87,7 @@ function formatDate(value: string | null) {
 
 export function WorkItemCard({
   item,
+  currentStaffId = null,
   selected,
   onSelect,
   draggable = false,
@@ -134,12 +95,16 @@ export function WorkItemCard({
   onDragEnd,
 }: {
   item: StaffWorkItem;
+  /** Marks the owner as "you" and shows the reader's own role for the student. */
+  currentStaffId?: string | null;
   selected: boolean;
   onSelect: () => void;
   draggable?: boolean;
   onDragStart?: DragEventHandler<HTMLButtonElement>;
   onDragEnd?: DragEventHandler<HTMLButtonElement>;
 }) {
+  const relationship = viewerRelationshipLabel(item.viewerAssignmentRoles);
+  const ownedByViewer = currentStaffId !== null && item.assignee?.id === currentStaffId;
   return (
     <button
       className={`staff-work-card${selected ? " staff-work-card--selected" : ""}`}
@@ -161,13 +126,20 @@ export function WorkItemCard({
       <span className="staff-work-card__student">
         {item.student.name} · {item.student.programName}
       </span>
+      {relationship ? (
+        <span className="staff-work-card__relationship">{relationship}</span>
+      ) : null}
       <span className="staff-work-card__meta">
         <span>{item.component}</span>
-        <span>Due {formatDate(item.dueAt)}</span>
+        <span>{item.dueAt ? `Due ${formatDate(item.dueAt)}` : "No due date"}</span>
       </span>
       <WorkItemSignals item={item} />
       <span className="staff-work-card__footer">
-        <span>{item.assignee?.name ?? "Unassigned"}</span>
+        <span className={ownedByViewer ? "staff-work-card__owner staff-work-card__owner--you" : "staff-work-card__owner"}>
+          {ownedByViewer
+            ? `You · ${item.assignee?.name ?? ""}`
+            : (item.assignee?.name ?? "Unassigned")}
+        </span>
         {item.escalated ? <strong>Escalated</strong> : null}
       </span>
     </button>
@@ -205,20 +177,11 @@ export function WorkItemSignals({ item }: { item: StaffWorkItem }) {
 export function StaffSignIn({ onSignedIn }: { onSignedIn: () => void }) {
   const tenantRuntime = useTenant();
   const [mode, setMode] = useState<StaffAuthMode>("sign_in");
-  const [ssoProviders, setSsoProviders] = useState<StaffIdentityProvider[]>([]);
   const [fieldErrors, setFieldErrors] = useState<StaffAuthFieldErrors>({});
   const signIn = useApiAction(signInStaff, staffAuthErrorMessage);
   const signUp = useApiAction(signUpStaff, staffAuthErrorMessage);
   const activeAction = mode === "sign_in" ? signIn : signUp;
   const isBusy = signIn.status === "loading" || signUp.status === "loading";
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void getStaffAuthOptions(tenantRuntime.tenant.slug, controller.signal)
-      .then((options) => setSsoProviders(options.providers))
-      .catch(() => setSsoProviders([]));
-    return () => controller.abort();
-  }, [tenantRuntime.tenant.slug]);
 
   const chooseMode = (nextMode: StaffAuthMode) => {
     setMode(nextMode);
@@ -318,30 +281,6 @@ export function StaffSignIn({ onSignedIn }: { onSignedIn: () => void }) {
             Create account
           </button>
         </div>
-        {mode === "sign_in" && ssoProviders.length > 0 ? (
-          <div className="staff-sso-options" role="group" aria-label="Institutional single sign-on">
-            {ssoProviders.map((provider) => (
-              <a
-                className="button staff-sso-button"
-                href={staffSsoStartUrl(
-                  provider,
-                  tenantRuntime.tenant.slug,
-                  "/staff",
-                )}
-                key={provider}
-              >
-                <span className="staff-sso-button__icon">
-                  <InstitutionalProviderIcon provider={provider} />
-                </span>
-                <span className="staff-sso-button__label">
-                  Continue with {provider === "google" ? "Google" : "Microsoft"}
-                </span>
-                <span className="staff-sso-button__endcap" aria-hidden="true" />
-              </a>
-            ))}
-            <span className="staff-sso-divider">or use your staff password</span>
-          </div>
-        ) : null}
         <form key={mode} className="staff-auth-form" noValidate onSubmit={enter}>
           <label>
             Staff email
@@ -562,19 +501,15 @@ export function StudentInspector({
     [item.student.id],
   );
   const student = useApiResource(loadStudent);
-  const loadReviewOptions = useCallback(
-    (signal: AbortSignal) => getStaffDocumentReviewOptions(signal),
-    [],
-  );
-  const reviewOptions = useApiResource(loadReviewOptions, { refreshOnAmbient: false });
   const updateItem = useApiAction(updateStaffWorkItem);
   const updatePreferences = useApiAction(updateStaffStudentPreferences);
   const decideDocument = useApiAction(reviewStaffDocument);
   const [note, setNote] = useState("");
   const [reviewNote, setReviewNote] = useState("");
+  const loadReviewOptions = useCallback((signal: AbortSignal) => getStaffDocumentReviewOptions(signal), []);
+  const reviewOptions = useApiResource(loadReviewOptions, { refreshOnAmbient: false });
   const [reviewReasonCode, setReviewReasonCode] = useState("");
   const [notifyStudent, setNotifyStudent] = useState(true);
-  const reviewIntentRef = useRef<{ signature: string; key: string } | null>(null);
 
   const mutateWorkItem = async (input: {
     status?: StaffWorkItemStatus;
@@ -632,24 +567,17 @@ export function StudentInspector({
     documentWorkItem: StaffWorkItem,
     decision: "accepted" | "rejected",
   ) => {
-    if (!reviewNote.trim() || (decision === "rejected" && !reviewReasonCode)) return;
-    const input = {
-      workItemId: documentWorkItem.id,
-      expectedWorkItemVersion: documentWorkItem.version,
-      decision,
-      note: reviewNote.trim(),
-      notifyStudent,
-      ...(decision === "rejected" ? { reasonCode: reviewReasonCode } : {}),
-    };
-    const signature = JSON.stringify({ documentId, input });
-    if (reviewIntentRef.current?.signature !== signature) {
-      reviewIntentRef.current = { signature, key: crypto.randomUUID() };
-    }
+    if (!reviewNote.trim()) return;
     try {
-      await decideDocument.run(documentId, input, reviewIntentRef.current.key);
-      reviewIntentRef.current = null;
+      await decideDocument.run(documentId, {
+        workItemId: documentWorkItem.id,
+        expectedWorkItemVersion: documentWorkItem.version,
+        decision,
+        note: reviewNote.trim(),
+        ...(decision === "rejected" ? { reasonCode: reviewReasonCode } : {}),
+        notifyStudent,
+      });
       setReviewNote("");
-      setReviewReasonCode("");
       student.refresh();
       onBoardChanged();
     } catch {
@@ -671,6 +599,7 @@ export function StudentInspector({
       </header>
       <p>{item.description}</p>
 
+      <UniversityRecordPanel studentId={item.student.id} />
       <section className="staff-inspector__section">
         <h3>Work item</h3>
         <label>
@@ -895,6 +824,14 @@ export function StudentInspector({
               </p>
             ) : (
               <>
+                <label className="staff-field">
+                  <span>Correction reason</span>
+                  <select value={reviewReasonCode} onChange={event => setReviewReasonCode(event.target.value)} disabled={reviewOptions.status !== "ready"}>
+                    <option value="">Choose when requesting changes</option>
+                    {reviewOptions.status === "ready" ? reviewOptions.data.rejectionReasons.map(reason => <option key={reason.code} value={reason.code}>{reason.label}</option>) : null}
+                  </select>
+                  {reviewOptions.status === "error" ? <button type="button" onClick={reviewOptions.reload}>Retry loading reasons</button> : null}
+                </label>
                 <label>
                   Decision note
                   <textarea
@@ -904,29 +841,6 @@ export function StudentInspector({
                     onChange={(event) => setReviewNote(event.target.value)}
                   />
                 </label>
-                <label>
-                  Requested-change reason
-                  <select
-                    value={reviewReasonCode}
-                    disabled={reviewOptions.status !== "ready"}
-                    onChange={(event) => setReviewReasonCode(event.target.value)}
-                  >
-                    <option value="">
-                      {reviewOptions.status === "loading" ? "Loading reasons..." : "Choose when requesting changes"}
-                    </option>
-                    {reviewOptions.status === "ready"
-                      ? reviewOptions.data.rejectionReasons.map((reason) => (
-                          <option key={reason.code} value={reason.code}>{reason.label}</option>
-                        ))
-                      : null}
-                  </select>
-                </label>
-                {reviewOptions.status === "error" ? (
-                  <p className="field-error" role="alert">
-                    {reviewOptions.error}{" "}
-                    <button type="button" onClick={reviewOptions.reload}>Try again</button>
-                  </p>
-                ) : null}
                 <div className="staff-document-list">
                   {student.data.documents.items.map((document) => {
                     const documentWorkItem = center.items.find(
@@ -967,8 +881,7 @@ export function StudentInspector({
                             <button
                               type="button"
                               disabled={
-                                !reviewNote.trim() ||
-                                !reviewReasonCode ||
+                                !reviewNote.trim() || !reviewReasonCode ||
                                 decideDocument.status === "loading"
                               }
                               onClick={() =>
@@ -1024,274 +937,4 @@ export function StudentInspector({
       </section>
     </aside>
   );
-}
-
-function StaffWorkspace({
-  center,
-  refresh,
-}: {
-  center: StaffActionCenter;
-  refresh: () => void;
-}) {
-  const tenantRuntime = useTenant();
-  const [selectedId, setSelectedId] = useState(
-    () => center.items[0]?.id ?? null,
-  );
-  const [query, setQuery] = useState("");
-  const [component, setComponent] = useState("all");
-  const selected =
-    center.items.find((item) => item.id === selectedId) ??
-    center.items[0] ??
-    null;
-  const components = useMemo(
-    () => Array.from(new Set(center.items.map((item) => item.component))).sort(),
-    [center.items],
-  );
-  const filtered = center.items.filter((item) => {
-    const search = query.trim().toLowerCase();
-    return (
-      (component === "all" || item.component === component) &&
-      (!search ||
-        `${item.key} ${item.title} ${item.student.name} ${item.component}`
-          .toLowerCase()
-          .includes(search))
-    );
-  });
-
-  const signOut = async () => {
-    await signOutStaff();
-    window.location.reload();
-  };
-
-  return (
-    <div className="staff-shell">
-      <header className="staff-topbar">
-        <div className="staff-brand">
-          <PortalMark />
-          <div>
-            <strong>{tenantRuntime.tenant.shortName} University</strong>
-            <span>Enrollment operations</span>
-          </div>
-        </div>
-        <div className="staff-topbar__actions">
-          <span>
-            Synced{" "}
-            {new Intl.DateTimeFormat("en-US", {
-              hour: "numeric",
-              minute: "2-digit",
-              second: "2-digit",
-            }).format(new Date(center.generatedAt))}
-          </span>
-          <button type="button" onClick={refresh}>
-            Refresh
-          </button>
-          <button type="button" onClick={() => void signOut()}>
-            Sign out
-          </button>
-        </div>
-      </header>
-      <aside className="staff-sidebar">
-        <p>Staff workspace</p>
-        <nav aria-label="Staff workspace">
-          <a className="staff-sidebar__active" href="#action-center">
-            <span aria-hidden="true">◆</span>
-            Action center
-          </a>
-          <a href="#student-record">
-            <span aria-hidden="true">○</span>
-            Student record
-          </a>
-          <a href="#documents">
-            <span aria-hidden="true">□</span>
-            Documents
-          </a>
-          <a href="#activity">
-            <span aria-hidden="true">↻</span>
-            Activity
-          </a>
-        </nav>
-        <div className="staff-sidebar__note">
-          <strong>Shared state V1</strong>
-          <p>
-            The board refreshes every five seconds. Writes use record versions
-            to prevent lost updates.
-          </p>
-        </div>
-      </aside>
-      <main className="staff-main" id="action-center">
-        <header className="staff-page-heading">
-          <div>
-            <p className="eyebrow">Enrollment action center</p>
-            <h1>Who needs attention today?</h1>
-            <p>
-              Coordinate student work, make official review decisions, and
-              keep every staff view on the same server-owned record.
-            </p>
-          </div>
-          <Link className="button button--secondary" href="/dashboard">
-            Open student portal
-          </Link>
-        </header>
-
-        <section className="staff-kpis" aria-label="Action center totals">
-          <article>
-            <span>Open work</span>
-            <strong>{center.counts.todo + center.counts.inProgress}</strong>
-            <small>{center.counts.inProgress} actively in progress</small>
-          </article>
-          <article>
-            <span>Urgent</span>
-            <strong>{center.counts.urgent}</strong>
-            <small>Highest-priority queue</small>
-          </article>
-          <article>
-            <span>Escalated</span>
-            <strong>{center.counts.escalated}</strong>
-            <small>Status flag, not a separate task type</small>
-          </article>
-          <article>
-            <span>Resolved</span>
-            <strong>{center.counts.done}</strong>
-            <small>Available in work history</small>
-          </article>
-        </section>
-
-        <section className="staff-filters" aria-label="Action center filters">
-          <label>
-            <span className="sr-only">Search work items</span>
-            <input
-              type="search"
-              value={query}
-              placeholder="Search student, task, or key"
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
-          <label>
-            <span className="sr-only">Filter by component</span>
-            <select
-              value={component}
-              onChange={(event) => setComponent(event.target.value)}
-            >
-              <option value="all">All components</option>
-              {components.map((value) => (
-                <option value={value} key={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
-          <span aria-live="polite">{filtered.length} matching work items</span>
-        </section>
-
-        <div className="staff-workspace">
-          <div className="staff-board" aria-label="Enrollment work board">
-            {columns.map((column) => {
-              const items = filtered.filter(
-                (item) => item.status === column.status,
-              );
-              return (
-                <section className="staff-board-column" key={column.status}>
-                  <header>
-                    <div>
-                      <h2>{column.title}</h2>
-                      <p>{column.description}</p>
-                    </div>
-                    <span>{items.length}</span>
-                  </header>
-                  <div>
-                    {items.map((item) => (
-                      <WorkItemCard
-                        item={item}
-                        selected={selected?.id === item.id}
-                        onSelect={() => setSelectedId(item.id)}
-                        key={item.id}
-                      />
-                    ))}
-                    {items.length === 0 ? (
-                      <p className="staff-column-empty">No work here.</p>
-                    ) : null}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
-          {selected ? (
-            <StudentInspector
-              item={selected}
-              center={center}
-              onBoardChanged={refresh}
-              key={selected.id}
-            />
-          ) : (
-            <aside className="staff-inspector staff-inspector--empty">
-              <h2>No work items</h2>
-              <p>New enrollment and document-review work will appear here.</p>
-            </aside>
-          )}
-        </div>
-      </main>
-    </div>
-  );
-}
-
-export default function LegacyStaffActionCenter() {
-  const loadCenter = useCallback(
-    (signal: AbortSignal) =>
-      getStaffActionCenter({ status: "all", limit: 200 }, signal),
-    [],
-  );
-  const center = useApiResource(loadCenter, {
-    refreshOnAmbient: false,
-  });
-  const refresh = center.refresh;
-
-  useEffect(() => {
-    if (center.status !== "ready") return;
-    const interval = window.setInterval(refresh, 5_000);
-    const onFocus = () => refresh();
-    window.addEventListener("focus", onFocus);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [center.status, refresh]);
-
-  if (
-    center.status === "error" &&
-    (center.errorStatus === 401 || center.errorStatus === 403)
-  ) {
-    return <StaffSignIn onSignedIn={center.reload} />;
-  }
-  if (center.status === "loading") {
-    return (
-      <main className="staff-entry">
-        <section className="staff-entry__card" aria-live="polite">
-          <PortalMark />
-          <p className="eyebrow">Staff workspace</p>
-          <h1>Opening the action center</h1>
-          <p>Loading the latest shared enrollment work…</p>
-          <span className="loader" aria-hidden="true" />
-        </section>
-      </main>
-    );
-  }
-  if (center.status === "error") {
-    return (
-      <main className="staff-entry">
-        <section className="staff-entry__card" role="alert">
-          <PortalMark />
-          <h1>The staff workspace could not load</h1>
-          <p>{center.error}</p>
-          <button
-            className="button button--primary"
-            type="button"
-            onClick={center.reload}
-          >
-            Try again
-          </button>
-        </section>
-      </main>
-    );
-  }
-  return <StaffWorkspace center={center.data} refresh={center.refresh} />;
 }

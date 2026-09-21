@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { PortalShell, type PortalSection } from "../portal-shell";
 import { openEdward } from "../../design-lib/door.js";
+import { getFinancialPlan, saveFinancialPlanInputs, simulateFinancialPlan } from "../../lib/api-client";
 import { useTenant } from "../tenant-provider";
 import {
   conceptRoutes,
@@ -50,6 +51,16 @@ export function ConceptFinancialPlan() {
         event.source !== frame.current?.contentWindow
       )
         return;
+      if (event.data?.type === "financial-plan:request" && typeof event.data.id === "string") {
+        const send = (result: unknown, error?: string) => frame.current?.contentWindow?.postMessage(
+          {type: "financial-plan:response", id: event.data.id, result, error}, window.location.origin);
+        const operation = event.data.operation === "read" ? getFinancialPlan()
+          : event.data.operation === "simulate" ? simulateFinancialPlan(event.data.payload)
+          : event.data.operation === "save-inputs" ? saveFinancialPlanInputs(event.data.payload, event.data.idempotencyKey)
+          : Promise.reject(new Error("This planning operation is unavailable"));
+        void operation.then(result => send(result)).catch(() => send(null, "Unable to load or save your plan. Refresh to check your session or a newer version; your draft is retained."));
+        return;
+      }
       if (
         event.data?.type === "financial-plan:ask-edward" &&
         typeof event.data.question === "string"

@@ -22,10 +22,9 @@ export function EdwardComposer({
   micDisabled,
   onMic,
   disabled,
+  onStop,
   note,
   inputRef,
-  placeholder = "Ask about your enrollment",
-  caution = STANDING_CAUTION,
   children,
 }: {
   draft: string;
@@ -38,13 +37,10 @@ export function EdwardComposer({
   micDisabled: boolean;
   onMic: () => void;
   disabled: boolean;
+  onStop?: () => void;
   /** A status line under the field: listening, voice replies, a mic problem. */
   note?: ReactNode;
   inputRef: RefObject<HTMLTextAreaElement | null>;
-  /** What the empty field invites. Staff Edward asks about the workspace. */
-  placeholder?: string;
-  /** The standing caution pinned under the field, in the reader's own terms. */
-  caution?: ReactNode;
   /** Production-only controls (the live voice session) rendered above the field. */
   children?: ReactNode;
 }) {
@@ -55,7 +51,7 @@ export function EdwardComposer({
       !event.nativeEvent.isComposing
     ) {
       event.preventDefault();
-      if (draft.trim()) onSend(draft);
+      if (draft.trim() && !disabled) onSend(draft);
     }
   }
 
@@ -92,8 +88,7 @@ export function EdwardComposer({
           maxLength={2_000}
           autoComplete="off"
           value={draft}
-          placeholder={listening ? "Listening…" : placeholder}
-          disabled={disabled}
+          placeholder={listening ? "Listening…" : "Ask a question, or tell me what’s stuck…"}
           onChange={(event) => onDraft(event.target.value)}
           onKeyDown={onKeyDown}
         />
@@ -120,15 +115,15 @@ export function EdwardComposer({
           </button>
         </Tooltip>
 
-        <Tooltip tip="Send" placement="top">
+        <Tooltip tip={disabled && onStop ? "Stop waiting" : "Send"} placement="top">
           <button
             type="button"
             className="edward-send"
-            aria-label="Send question"
-            disabled={disabled || !draft.trim()}
-            onClick={() => onSend(draft)}
+            aria-label={disabled && onStop ? "Stop waiting" : "Send question"}
+            disabled={disabled ? !onStop : !draft.trim()}
+            onClick={() => disabled ? onStop?.() : onSend(draft)}
           >
-            <Icon name="send" size={16} />
+            {disabled ? <span aria-hidden="true">■</span> : <Icon name="send" size={16} />}
           </button>
         </Tooltip>
       </div>
@@ -137,7 +132,7 @@ export function EdwardComposer({
 
       <p className="edward-caution">
         <Icon name="shield" size={13} />
-        {caution}
+        {STANDING_CAUTION}
       </p>
     </div>
   );

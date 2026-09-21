@@ -1,14 +1,11 @@
 "use client";
 
 import type {
-  ReviewStaffDocumentInput,
   StaffActionCenter,
   StaffAiProcessingState,
   StaffCallRecording,
   StaffCommunicationChannel,
   StaffInteraction,
-  StaffEmailSendIntent,
-  StaffMailbox,
   StaffWorkItemDetail,
   StaffWorkItemStatus,
 } from "@vv/contracts";
@@ -16,105 +13,23 @@ import {
   type FormEvent,
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
 import {
   ApiClientError,
-  completeStaffInteraction as platformCompleteInteraction,
-  confirmStaffEmailSendIntent,
-  createStaffEmailSendIntent,
-  createStaffWorkComment as platformCreateComment,
+  completeStaffInteraction,
+  createStaffWorkComment,
   getStaffCallRecordingContent,
   getStaffDocumentContentUrl,
-  getStaffDocumentReviewOptions,
-  getStaffMailboxes,
-  getStaffWorkItemDetail as platformWorkItemDetail,
-  recordStaffCommunication as platformRecordCommunication,
-  requestStaffAiRefresh as platformAiRefresh,
-  reviewStaffDocument,
+  getStaffWorkItemDetail,
+  recordStaffCommunication,
+  requestStaffAiRefresh,
   retryStaffCallTranscription,
-  startStaffInteraction as platformStartInteraction,
-  updateStaffWorkItem as platformUpdateWorkItem,
+  startStaffInteraction,
+  updateStaffWorkItem,
   uploadStaffCallRecording,
 } from "../lib/api-client";
-import { DateTimePicker } from "../components/date-time-picker";
-import { useApiResource } from "../hooks/use-api-resource";
-import {
-  demoAddComment,
-  demoCompleteInteraction,
-  demoRecordCommunication,
-  demoRefreshedDetail,
-  demoStartInteraction,
-  demoUpdateWorkItem,
-  demoWorkItemDetail,
-  isDemoRecord,
-} from "./demo-workspace";
-
-/**
- * This panel opens over two boards: the demo task board, whose records live in
- * `demo-workspace.ts` and never leave the browser, and the Students view, whose
- * records are the tenant's own. The id says which, so one panel serves both and
- * a demo card is never sent to the platform to be looked up.
- */
-const getStaffWorkItemDetail = async (workItemId: string, signal?: AbortSignal) => {
-  if (!isDemoRecord(workItemId)) return platformWorkItemDetail(workItemId, signal);
-  const detail = demoWorkItemDetail(workItemId);
-  if (!detail) throw new Error("That task is not part of the demo board.");
-  return detail;
-};
-
-const updateStaffWorkItem = async (
-  workItemId: string,
-  input: Parameters<typeof platformUpdateWorkItem>[1],
-) =>
-  isDemoRecord(workItemId)
-    ? demoUpdateWorkItem(workItemId, input)
-    : platformUpdateWorkItem(workItemId, input);
-
-const createStaffWorkComment = async (
-  workItemId: string,
-  input: Parameters<typeof platformCreateComment>[1],
-  idempotencyKey: string,
-) =>
-  isDemoRecord(workItemId)
-    ? demoAddComment(workItemId, input)
-    : platformCreateComment(workItemId, input, idempotencyKey);
-
-const startStaffInteraction = async (
-  workItemId: string,
-  input: Parameters<typeof platformStartInteraction>[1],
-  idempotencyKey: string,
-) =>
-  isDemoRecord(workItemId)
-    ? demoStartInteraction(workItemId, input)
-    : platformStartInteraction(workItemId, input, idempotencyKey);
-
-const recordStaffCommunication = async (
-  interactionId: string,
-  input: Parameters<typeof platformRecordCommunication>[1],
-  idempotencyKey: string,
-) =>
-  isDemoRecord(interactionId)
-    ? demoRecordCommunication(interactionId, input)
-    : platformRecordCommunication(interactionId, input, idempotencyKey);
-
-const completeStaffInteraction = async (
-  interactionId: string,
-  input: Parameters<typeof platformCompleteInteraction>[1],
-) =>
-  isDemoRecord(interactionId)
-    ? demoCompleteInteraction(interactionId, input)
-    : platformCompleteInteraction(interactionId, input);
-
-const requestStaffAiRefresh = async (
-  workItemId: string,
-  input: Parameters<typeof platformAiRefresh>[1],
-) =>
-  isDemoRecord(workItemId)
-    ? demoRefreshedDetail(workItemId)
-    : platformAiRefresh(workItemId, input);
 
 type DetailTab = "overview" | "next_step" | "outcomes" | "comments" | "history";
 
@@ -169,15 +84,6 @@ function ActionChannelIcon({
     <svg viewBox="0 0 24 24" role="img" aria-label="Enrollment action">
       <rect x="5" y="3.5" width="14" height="17" rx="2" />
       <path d="M9 3.5h6V7H9zM8.5 11h7M8.5 15h5" />
-    </svg>
-  );
-}
-
-function RefreshIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M20 7v5h-5M4 17v-5h5" />
-      <path d="M18.2 9A7 7 0 0 0 6.1 6.1L4 9M5.8 15A7 7 0 0 0 17.9 17.9L20 15" />
     </svg>
   );
 }
@@ -580,7 +486,10 @@ export function ActionCenterDetail({
               void retryAi(activeInteraction ? "both" : "student_summary")
             }
           >
-            <RefreshIcon />
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 7v5h-5M4 17v-5h5" />
+              <path d="M18.2 9A7 7 0 0 0 6.1 6.1L4 9M5.8 15A7 7 0 0 0 17.9 17.9L20 15" />
+            </svg>
           </button>
         </div>
       </header>
@@ -632,20 +541,8 @@ export function ActionCenterDetail({
               detail={detail}
               channel={channel}
               busy={busy}
-              interactionId={activeInteraction?.id ?? null}
               onChannel={setChannel}
               onStart={() => void start()}
-              onReviewDocument={(documentId, input, idempotencyKey) =>
-                runMutation(
-                  "document-review",
-                  async () => {
-                    await reviewStaffDocument(documentId, input, idempotencyKey);
-                  },
-                  input.decision === "accepted"
-                    ? "Document accepted. The enrollment step and student record were updated."
-                    : "Changes requested. The reason and enrollment history are now visible to the student.",
-                )
-              }
               onRecord={async (event) => {
                 event.preventDefault();
                 const formElement = event.currentTarget;
@@ -867,24 +764,23 @@ function OverviewTab({
               <p className="eyebrow">Suggested approach (AI)</p>
               <h2>{aiLabel(insight.state)}</h2>
             </div>
-            <div className="action-card-heading__actions">
-              <span className={`action-ai-state action-ai-state--${insight.state}`}>
-                {aiLabel(insight.state)}
-              </span>
-              <button
-                className="action-icon-button action-ai-refresh"
-                type="button"
-                disabled={Boolean(busy) || isAiBusy(insight.state)}
-                aria-label="Refresh task insight"
-                title="Refresh task insight"
-                onClick={() => onRetry("task_insight")}
-              >
-                <RefreshIcon />
-              </button>
-            </div>
+            <span className={`action-ai-state action-ai-state--${insight.state}`}>
+              {aiLabel(insight.state)}
+            </span>
           </div>
           <p>{insight.suggestedApproach ?? "The suggested approach is waiting for the task insight run."}</p>
           {insight.suggestedChannel ? <p><strong>Recommended channel:</strong> {readable(insight.suggestedChannel)}</p> : null}
+          <button
+            type="button"
+            disabled={Boolean(busy) || isAiBusy(insight.state)}
+            onClick={() => onRetry("task_insight")}
+          >
+            {isAiBusy(insight.state)
+              ? "Task insight refresh queued"
+              : insight.state === "failed_retryable" || insight.state === "dead_letter"
+                ? "Retry task insight"
+                : "Refresh task insight"}
+          </button>
         </section>
       </div>
 
@@ -894,21 +790,9 @@ function OverviewTab({
               <p className="eyebrow">Student summary (AI)</p>
               <h2>{aiLabel(summary.state)}</h2>
             </div>
-            <div className="action-card-heading__actions">
-              <span className={`action-ai-state action-ai-state--${summary.state}`}>
-                {aiLabel(summary.state)}
-              </span>
-              <button
-                className="action-icon-button action-ai-refresh"
-                type="button"
-                disabled={Boolean(busy) || isAiBusy(summary.state)}
-                aria-label="Refresh student summary"
-                title="Refresh student summary"
-                onClick={() => onRetry("student_summary")}
-              >
-                <RefreshIcon />
-              </button>
-            </div>
+            <span className={`action-ai-state action-ai-state--${summary.state}`}>
+              {aiLabel(summary.state)}
+            </span>
           </div>
           <p>
             {summary.summary ??
@@ -917,6 +801,17 @@ function OverviewTab({
           {summary.keyFacts.length > 0 ? (
             <ul>{summary.keyFacts.map((fact) => <li key={fact}>{fact}</li>)}</ul>
           ) : null}
+          <button
+            type="button"
+            disabled={Boolean(busy) || isAiBusy(summary.state)}
+            onClick={() => onRetry("student_summary")}
+          >
+            {isAiBusy(summary.state)
+              ? "Student summary refresh queued"
+              : summary.state === "failed_retryable" || summary.state === "dead_letter"
+                ? "Retry student summary"
+                : "Refresh student summary"}
+          </button>
       </section>
 
       {!terminalStatuses.has(item.status) ? (
@@ -954,7 +849,7 @@ function OverviewTab({
             <label className="action-form-span">Blocker or cancellation detail
               <textarea name="blockerDetail" defaultValue={item.blocker?.detail ?? ""} />
             </label>
-            <label>Review blocker at<DateTimePicker name="blockerReviewAt" /></label>
+            <label>Review blocker at<input name="blockerReviewAt" type="datetime-local" /></label>
             <label>Cancellation reason<input name="terminalReason" defaultValue={item.terminalReason ?? ""} /></label>
             <label className="action-form-span">Audit note<textarea name="note" /></label>
           </div>
@@ -965,357 +860,24 @@ function OverviewTab({
   );
 }
 
-const reviewableDocumentStatuses = new Set(["needs_review", "under_review"]);
-
-function DocumentReviewPanel({
-  detail,
-  busy,
-  onReviewDocument,
-}: {
-  detail: StaffWorkItemDetail;
-  busy: string | null;
-  onReviewDocument: (
-    documentId: string,
-    input: ReviewStaffDocumentInput,
-    idempotencyKey: string,
-  ) => Promise<boolean>;
-}) {
-  const documents = detail.relatedDocuments;
-  const reviewableDocuments = useMemo(
-    () => documents.filter((document) => reviewableDocumentStatuses.has(document.status)),
-    [documents],
-  );
-  const loadOptions = useCallback(
-    (signal: AbortSignal) => getStaffDocumentReviewOptions(signal),
-    [],
-  );
-  const options = useApiResource(loadOptions, { refreshOnAmbient: false });
-  const [selectedDocumentId, setSelectedDocumentId] = useState(
-    () => reviewableDocuments[0]?.id ?? documents[0]?.id ?? "",
-  );
-  const [decision, setDecision] = useState<"accepted" | "rejected">("accepted");
-  const [reasonCode, setReasonCode] = useState("");
-  const [note, setNote] = useState("");
-  const [notifyStudent, setNotifyStudent] = useState(true);
-  const intentRef = useRef<{ signature: string; key: string } | null>(null);
-
-  if (documents.length === 0) return null;
-
-  const selectedDocument =
-    documents.find((document) => document.id === selectedDocumentId) ??
-    reviewableDocuments[0] ??
-    documents[0];
-  const selectedIsReviewable = reviewableDocumentStatuses.has(selectedDocument.status);
-  const rejectionReasons = options.status === "ready" ? options.data.rejectionReasons : [];
-  const selectedReason = rejectionReasons.find((reason) => reason.code === reasonCode) ?? null;
-  const canSubmit =
-    selectedIsReviewable &&
-    note.trim().length >= 3 &&
-    (decision === "accepted" || (options.status === "ready" && Boolean(reasonCode))) &&
-    !busy;
-
-  const submitDecision = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!canSubmit) return;
-    const input: ReviewStaffDocumentInput = {
-      workItemId: detail.workItem.id,
-      expectedWorkItemVersion: detail.workItem.version,
-      decision,
-      note: note.trim(),
-      notifyStudent,
-      ...(decision === "rejected" ? { reasonCode } : {}),
-    };
-    const signature = JSON.stringify({ documentId: selectedDocument.id, input });
-    if (intentRef.current?.signature !== signature) {
-      intentRef.current = { signature, key: crypto.randomUUID() };
-    }
-    const succeeded = await onReviewDocument(
-      selectedDocument.id,
-      input,
-      intentRef.current.key,
-    );
-    if (!succeeded) return;
-    intentRef.current = null;
-    setDecision("accepted");
-    setReasonCode("");
-    setNote("");
-  };
-
-  return (
-    <section className="action-card action-document-review" aria-labelledby="document-review-title">
-      <div className="action-card-heading">
-        <div>
-          <p className="eyebrow">Document check-in</p>
-          <h2 id="document-review-title">Review it and choose the next step</h2>
-        </div>
-        <span>{reviewableDocuments.length} awaiting decision</span>
-      </div>
-      <p className="action-document-review__lede">
-        A thoughtful decision keeps the student&apos;s enrollment moving. They will only see the
-        note you choose to share.
-      </p>
-
-      <form onSubmit={submitDecision}>
-        <div className="action-form-grid">
-          <label className="action-form-span">
-            Document ready for review
-            <select
-              value={selectedDocument.id}
-              onChange={(event) => {
-                setSelectedDocumentId(event.target.value);
-                intentRef.current = null;
-              }}
-            >
-              {documents.map((document) => (
-                <option key={document.id} value={document.id}>
-                  {document.fileName} - {readable(document.status)}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="action-form-span action-document-review__file">
-            <div>
-              <strong>{selectedDocument.fileName}</strong>
-              <span>
-                {readable(selectedDocument.category)} · {readable(selectedDocument.status)}
-              </span>
-            </div>
-            {selectedDocument.contentUrl ? (
-              <a
-                href={getStaffDocumentContentUrl(selectedDocument.contentUrl)}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open original
-              </a>
-            ) : null}
-          </div>
-
-          {selectedDocument.review ? (
-            <p className="action-form-span action-document-review__latest">
-              Latest decision: <strong>{readable(selectedDocument.review.decision)}</strong> by{" "}
-              {selectedDocument.review.reviewerName} on {dateTime(selectedDocument.review.decidedAt)}
-              {selectedDocument.review.note ? ` - ${selectedDocument.review.note}` : ""}
-            </p>
-          ) : null}
-
-          {selectedIsReviewable ? (
-            <>
-              <fieldset className="action-form-span action-document-review__decision">
-                <legend>What happens next?</legend>
-                <label>
-                  <input
-                    type="radio"
-                    name="documentDecision"
-                    value="accepted"
-                    checked={decision === "accepted"}
-                    onChange={() => {
-                      setDecision("accepted");
-                      setReasonCode("");
-                      intentRef.current = null;
-                    }}
-                  />
-                  Approve document
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="documentDecision"
-                    value="rejected"
-                    checked={decision === "rejected"}
-                    onChange={() => {
-                      setDecision("rejected");
-                      intentRef.current = null;
-                    }}
-                  />
-                  Request changes
-                </label>
-              </fieldset>
-
-              {decision === "rejected" ? (
-                <label className="action-form-span">
-                  Reason for requested changes
-                  <select
-                    required
-                    value={reasonCode}
-                    disabled={options.status !== "ready"}
-                    onChange={(event) => {
-                      setReasonCode(event.target.value);
-                      intentRef.current = null;
-                    }}
-                  >
-                    <option value="">
-                      {options.status === "loading" ? "Loading reasons..." : "Choose a reason"}
-                    </option>
-                    {rejectionReasons.map((reason) => (
-                      <option key={reason.code} value={reason.code}>{reason.label}</option>
-                    ))}
-                  </select>
-                  {selectedReason ? <small>{selectedReason.description}</small> : null}
-                  {options.status === "error" ? (
-                    <span className="field-error" role="alert">
-                      {options.error}{" "}
-                      <button type="button" onClick={options.reload}>Try again</button>
-                    </span>
-                  ) : null}
-                </label>
-              ) : null}
-
-              <label className="action-form-span">
-                A note for the student
-                <textarea
-                  required
-                  minLength={3}
-                  maxLength={500}
-                  rows={3}
-                  value={note}
-                  placeholder={
-                    decision === "accepted"
-                      ? "Let them know what is all set."
-                      : "Explain what needs updating and how to send it back."
-                  }
-                  onChange={(event) => {
-                    setNote(event.target.value);
-                    intentRef.current = null;
-                  }}
-                />
-                <small>
-                  Keep it clear and kind - this note appears in the student&apos;s document history.
-                </small>
-              </label>
-
-              <label className="action-form-span action-document-review__notify">
-                <input
-                  type="checkbox"
-                  checked={notifyStudent}
-                  onChange={(event) => {
-                    setNotifyStudent(event.target.checked);
-                    intentRef.current = null;
-                  }}
-                />
-                Let the student know in their inbox
-              </label>
-              <button
-                className={`action-document-review__submit action-document-review__submit--${decision}`}
-                type="submit"
-                disabled={!canSubmit}
-              >
-                {busy === "document-review"
-                  ? "Saving decision..."
-                  : decision === "accepted"
-                    ? "Approve document"
-                    : "Request changes"}
-              </button>
-            </>
-          ) : (
-            <p className="action-form-span action-document-review__settled" role="status">
-              This document is all set and has no decision waiting.
-            </p>
-          )}
-        </div>
-      </form>
-    </section>
-  );
-}
-
 function NextStepTab({
   itemTerminal,
   detail,
   channel,
   busy,
-  interactionId,
   onChannel,
   onStart,
-  onReviewDocument,
   onRecord,
 }: {
   itemTerminal: boolean;
   detail: StaffWorkItemDetail;
   channel: StaffCommunicationChannel;
   busy: string | null;
-  interactionId: string | null;
   onChannel: (channel: StaffCommunicationChannel) => void;
   onStart: () => void;
-  onReviewDocument: (
-    documentId: string,
-    input: ReviewStaffDocumentInput,
-    idempotencyKey: string,
-  ) => Promise<boolean>;
   onRecord: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
   const studentName = detail.workItem.student.preferredName;
-  const [mailboxes, setMailboxes] = useState<StaffMailbox[]>([]);
-  const [emailIntent, setEmailIntent] = useState<StaffEmailSendIntent | null>(null);
-  const [emailBusy, setEmailBusy] = useState(false);
-  const [emailMessage, setEmailMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (channel !== "email") return;
-    const controller = new AbortController();
-    void getStaffMailboxes(controller.signal)
-      .then((result) => setMailboxes(result.items.filter((mailbox) => mailbox.canSend)))
-      .catch((error: unknown) => setEmailMessage(errorMessage(error)));
-    return () => controller.abort();
-  }, [channel]);
-
-  const prepareEmail = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!interactionId) {
-      setEmailMessage("Start a new email interaction before preparing the delivery.");
-      return;
-    }
-    const form = new FormData(event.currentTarget);
-    setEmailBusy(true);
-    try {
-      const intent = await createStaffEmailSendIntent({
-        mailboxId: String(form.get("mailboxId")),
-        studentId: detail.workItem.student.id,
-        interactionId,
-        subject: String(form.get("subject") ?? "").trim(),
-        body: String(form.get("body") ?? "").trim(),
-      });
-      setEmailIntent(intent);
-      setEmailMessage("Review the exact sender, recipient, subject, and body before confirming.");
-    } catch (error) {
-      setEmailMessage(errorMessage(error));
-    } finally {
-      setEmailBusy(false);
-    }
-  };
-
-  const confirmEmail = async () => {
-    if (!emailIntent) return;
-    setEmailBusy(true);
-    try {
-      const queued = await confirmStaffEmailSendIntent(
-        emailIntent.id,
-        {
-          expectedVersion: emailIntent.version,
-          contentSha256: emailIntent.contentSha256,
-        },
-        crypto.randomUUID(),
-      );
-      setEmailIntent(queued);
-      setEmailMessage("Email queued. Delivery status will appear in the interaction timeline.");
-    } catch (error) {
-      setEmailMessage(errorMessage(error));
-    } finally {
-      setEmailBusy(false);
-    }
-  };
-  if (detail.workItem.actionType === "document_review") {
-    return (
-      <div className="action-panel-stack">
-        <DocumentReviewPanel
-          detail={detail}
-          busy={busy}
-          onReviewDocument={onReviewDocument}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="action-panel-stack">
       <section className="action-card">
@@ -1397,76 +959,6 @@ function NextStepTab({
             Send portal message
           </button>
         </form>
-      ) : channel === "email" ? (
-        <section className="action-card action-email-composer">
-          <div className="action-card-heading">
-            <div>
-              <p className="eyebrow">University email</p>
-              <h2>Email {studentName}</h2>
-            </div>
-            <span>Confirmation required</span>
-          </div>
-          {!emailIntent ? (
-            <form onSubmit={prepareEmail}>
-              <label>
-                From mailbox
-                <select name="mailboxId" required defaultValue="">
-                  <option value="" disabled>Select an authorized mailbox</option>
-                  {mailboxes.map((mailbox) => (
-                    <option value={mailbox.id} key={mailbox.id}>{mailbox.address}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Subject
-                <input
-                  name="subject"
-                  required
-                  maxLength={998}
-                  defaultValue={detail.workItem.title}
-                />
-              </label>
-              <label>
-                Message
-                <textarea
-                  name="body"
-                  required
-                  maxLength={100_000}
-                  rows={7}
-                  defaultValue={`Hi ${studentName},\n\n${detail.taskInsight.suggestedApproach ?? "I am reaching out about your enrollment next step."}\n\nBest,\nYour enrollment team`}
-                />
-              </label>
-              <button
-                type="submit"
-                disabled={itemTerminal || Boolean(busy) || emailBusy || !interactionId || mailboxes.length === 0}
-              >
-                Prepare email for review
-              </button>
-              {!interactionId ? <small>Use “Start a new email” above to open an auditable interaction first.</small> : null}
-              {mailboxes.length === 0 ? <small>Connect a send-enabled mailbox from the Mailboxes workspace.</small> : null}
-            </form>
-          ) : (
-            <div className="action-email-review">
-              <dl>
-                <div><dt>From</dt><dd>{emailIntent.sender}</dd></div>
-                <div><dt>To</dt><dd>{emailIntent.recipients.join(", ")}</dd></div>
-                <div><dt>Subject</dt><dd>{emailIntent.subject}</dd></div>
-              </dl>
-              <pre>{emailIntent.body}</pre>
-              {emailIntent.status === "pending_confirmation" ? (
-                <div className="action-email-review__actions">
-                  <button type="button" onClick={() => setEmailIntent(null)} disabled={emailBusy}>Edit</button>
-                  <button type="button" onClick={() => void confirmEmail()} disabled={emailBusy}>
-                    Confirm and send
-                  </button>
-                </div>
-              ) : (
-                <strong>Status: {readable(emailIntent.status)}</strong>
-              )}
-            </div>
-          )}
-          {emailMessage ? <p role="status">{emailMessage}</p> : null}
-        </section>
       ) : (
         <p className="action-channel-handoff">
           Continue in the approved {readable(channel)} channel, then record the confirmed result
@@ -1776,63 +1268,6 @@ function ConversationSignalsCard({ interaction }: { interaction: StaffInteractio
   );
 }
 
-function documentsForTaskOutcome(detail: StaffWorkItemDetail) {
-  const { source } = detail.workItem;
-  if (source?.type !== "document") return [];
-  const sourceDocument = detail.relatedDocuments.find((document) => document.id === source.id);
-  return sourceDocument ? [sourceDocument] : [];
-}
-
-function DocumentOutcomeCard({
-  documents,
-}: {
-  documents: ReturnType<typeof documentsForTaskOutcome>;
-}) {
-  const latestDecision = documents.find((document) => document.review)?.review ?? null;
-  const title =
-    latestDecision?.decision === "accepted"
-      ? "Document accepted"
-      : latestDecision?.decision === "changes_requested"
-        ? "Changes requested"
-        : "Student document activity";
-
-  return (
-    <section className="action-card action-transcript-card">
-      <div className="action-card-heading">
-        <div>
-          <p className="eyebrow">2. Student document outcome</p>
-          <h2>{title}</h2>
-        </div>
-        <span>{documents.length} {documents.length === 1 ? "file" : "files"}</span>
-      </div>
-      <ol className="action-transcript">
-        {documents.map((document) => (
-          <li key={document.id}>
-            <div>
-              <strong>{document.fileName}</strong>
-              <span>Submitted {dateTime(document.createdAt)}</span>
-            </div>
-            <p>{readable(document.category)} - {readable(document.status)}</p>
-            {document.review ? (
-              <small>
-                {readable(document.review.decision)} by {document.review.reviewerName} on {dateTime(document.review.decidedAt)}
-                {document.review.note ? ` - ${document.review.note}` : ""}
-              </small>
-            ) : (
-              <small>Student submission recorded; review is still in progress.</small>
-            )}
-            {document.contentUrl ? (
-              <a href={getStaffDocumentContentUrl(document.contentUrl)} target="_blank" rel="noreferrer">
-                Open original
-              </a>
-            ) : null}
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
-}
-
 function OutcomesTab({
   detail,
   interaction,
@@ -1856,19 +1291,6 @@ function OutcomesTab({
   onRetryTranscription: (recording: StaffCallRecording) => Promise<boolean>;
   onComplete: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
-  const documents = documentsForTaskOutcome(detail);
-  const isDocumentTask = detail.workItem.source?.type === "document";
-  const communicationCount = detail.interactions.reduce(
-    (count, candidate) => count + candidate.communications.length,
-    0,
-  );
-  const latestDocumentDecision = documents.find((document) => document.review)?.review ?? null;
-  const taskOutcome =
-    latestDocumentDecision?.decision ??
-    interaction?.outcome?.outcomeCode ??
-    (terminalStatuses.has(detail.workItem.status) ? detail.workItem.status : "awaiting_student_action");
-  const canRecordContactOutcome = Boolean(interaction) || !isDocumentTask;
-
   return (
     <div className="action-panel-stack">
       {detail.interactions.length > 1 ? (
@@ -1885,88 +1307,69 @@ function OutcomesTab({
 
       <div className="action-outcome-grid">
         <section className="action-card">
-          <p className="eyebrow">1. Task outcome</p>
-          <h2>{readable(taskOutcome)}</h2>
+          <p className="eyebrow">1. Interaction outcome</p>
+          <h2>{interaction?.outcome?.outcomeCode ? readable(interaction.outcome.outcomeCode) : "Awaiting outcome"}</h2>
           <dl className="action-fact-list">
-            <div><dt>Current state</dt><dd>{readable(detail.workItem.status)}</dd></div>
-            <div><dt>Student action</dt><dd>{documents.length ? `${documents.length} document ${documents.length === 1 ? "submitted" : "submissions"}` : "No document activity for this task"}</dd></div>
-            <div><dt>Contact activity</dt><dd>{communicationCount ? `${communicationCount} ${communicationCount === 1 ? "event" : "events"}` : "Not started"}</dd></div>
+            <div><dt>Resolution</dt><dd>{interaction?.outcome?.resolutionCode ? readable(interaction.outcome.resolutionCode) : "Not generated"}</dd></div>
             <div><dt>Next step</dt><dd>{interaction?.outcome?.nextStep ?? detail.workItem.nextStep ?? "Not set"}</dd></div>
+            <div><dt>Follow-up</dt><dd>{interaction?.outcome?.followUpRequired ? "Required" : "Not indicated"}</dd></div>
+            <div><dt>Coverage</dt><dd>{interaction ? `${interaction.coveredSourceVersion} of ${interaction.sourceVersion}` : "No sources"}</dd></div>
           </dl>
         </section>
-
-        {documents.length ? <DocumentOutcomeCard documents={documents} /> : null}
-
-        {interaction ? (
-          <>
-            <section className="action-card">
-              <p className="eyebrow">3. Reach-out outcome</p>
-              <h2>{interaction.outcome?.outcomeCode ? readable(interaction.outcome.outcomeCode) : "Awaiting contact outcome"}</h2>
-              <dl className="action-fact-list">
-                <div><dt>Resolution</dt><dd>{interaction.outcome?.resolutionCode ? readable(interaction.outcome.resolutionCode) : "Not recorded"}</dd></div>
-                <div><dt>Channel</dt><dd>{interaction.selectedChannel ? readable(interaction.selectedChannel) : "Not selected"}</dd></div>
-                <div><dt>Follow-up</dt><dd>{interaction.outcome?.followUpRequired ? "Required" : "Not indicated"}</dd></div>
-                <div><dt>Coverage</dt><dd>{interaction.coveredSourceVersion} of {interaction.sourceVersion}</dd></div>
-              </dl>
-            </section>
-
-            {interaction.selectedChannel === "voice" || interaction.recordings.length > 0 ? (
-              <CallRecordingPanel
-                interaction={interaction}
-                busy={busy}
-                onUpload={onUploadRecording}
-                onRetry={onRetryTranscription}
-              />
-            ) : null}
-
-            <section className="action-card action-transcript-card">
-              <div className="action-card-heading">
-                <div><p className="eyebrow">Reach-out evidence</p><h2>{interaction.communications.length ? "Communication timeline" : "Outreach started"}</h2></div>
-                <span>{interaction.communications.length} events</span>
-              </div>
-              {interaction.communications.length ? (
-                <ol className="action-transcript">
-                  {interaction.communications.map((communication) => (
-                    <li key={communication.id}>
-                      <div>
-                        <strong>{communication.direction === "inbound" ? detail.workItem.student.preferredName : "Staff"}</strong>
-                        <span>{communication.channel} - {dateTime(communication.occurredAt)}</span>
-                      </div>
-                      <p>{communication.body ?? "No text was captured for this event."}</p>
-                      <small>{readable(communication.deliveryStatus)}</small>
-                    </li>
-                  ))}
-                </ol>
-              ) : <p>No staff or student contact has been recorded yet.</p>}
-            </section>
-
-            <section className="action-card action-ai-card">
-              <div className="action-card-heading">
-                <div><p className="eyebrow">AI reach-out summary</p><h2>{aiLabel(interaction.aiState)}</h2></div>
-                <span className={`action-ai-state action-ai-state--${interaction.aiState}`}>
-                  {aiLabel(interaction.aiState)}
-                </span>
-              </div>
-              <p>{interaction.outcome?.summary ?? (interaction.communications.length ? "The source communication is visible while the summary is generated." : "AI outcome analysis begins after staff or the student records a communication.")}</p>
-              {interaction.outcome?.channelResults.length ? (
-                <ul>{interaction.outcome.channelResults.map((result) => <li key={`${result.channel}:${result.result}`}>{result.channel}: {result.result}</li>)}</ul>
-              ) : null}
-              {enrichmentTiming(interaction) ? (
-                <small className="action-enrichment-timing">
-                  {enrichmentTiming(interaction)}
-                </small>
-              ) : null}
-            </section>
-            {interaction.communications.length || interaction.outcome ? <ConversationSignalsCard interaction={interaction} /> : null}
-          </>
+        {interaction &&
+        (interaction.selectedChannel === "voice" || interaction.recordings.length > 0) ? (
+          <CallRecordingPanel
+            interaction={interaction}
+            busy={busy}
+            onUpload={onUploadRecording}
+            onRetry={onRetryTranscription}
+          />
         ) : null}
+        <section className="action-card action-transcript-card">
+          <div className="action-card-heading">
+            <div><p className="eyebrow">Source evidence</p><h2>Communication timeline</h2></div>
+            <span>{interaction?.communications.length ?? 0} events</span>
+          </div>
+          {interaction?.communications.length ? (
+            <ol className="action-transcript">
+              {interaction.communications.map((communication) => (
+                <li key={communication.id}>
+                  <div>
+                    <strong>{communication.direction === "inbound" ? detail.workItem.student.preferredName : "Staff"}</strong>
+                    <span>{communication.channel} - {dateTime(communication.occurredAt)}</span>
+                  </div>
+                  <p>{communication.body ?? "No text was captured for this event."}</p>
+                  <small>{readable(communication.deliveryStatus)}</small>
+                </li>
+              ))}
+            </ol>
+          ) : <p>No communication has been recorded.</p>}
+        </section>
+        <section className="action-card action-ai-card">
+          <div className="action-card-heading">
+            <div><p className="eyebrow">3. AI outcome summary</p><h2>{interaction ? aiLabel(interaction.aiState) : "Not requested"}</h2></div>
+            <span className={`action-ai-state action-ai-state--${interaction?.aiState ?? "not_requested"}`}>
+              {aiLabel(interaction?.aiState ?? "not_requested")}
+            </span>
+          </div>
+          <p>{interaction?.outcome?.summary ?? "The source communication is visible while the summary is generated."}</p>
+          {interaction?.outcome?.channelResults.length ? (
+            <ul>{interaction.outcome.channelResults.map((result) => <li key={`${result.channel}:${result.result}`}>{result.channel}: {result.result}</li>)}</ul>
+          ) : null}
+          {interaction && enrichmentTiming(interaction) ? (
+            <small className="action-enrichment-timing">
+              {enrichmentTiming(interaction)}
+            </small>
+          ) : null}
+        </section>
+        <ConversationSignalsCard interaction={interaction} />
       </div>
 
-      {!terminalStatuses.has(detail.workItem.status) && canRecordContactOutcome ? (
+      {!terminalStatuses.has(detail.workItem.status) ? (
         <form className="action-card action-completion-form" onSubmit={onComplete}>
-          <p className="eyebrow">Record the official contact outcome</p>
+          <p className="eyebrow">Record the official outcome</p>
           <h2>Complete or schedule follow-up</h2>
-          <p>These fields describe staff and student contact. Document decisions remain in the document outcome above.</p>
+          <p>AI text is advisory. These fields are the staff-confirmed CRM outcome.</p>
           <div className="action-form-grid">
             <label>Outcome
               <select name="outcomeCode" required defaultValue={interaction?.outcome?.outcomeCode ?? "student_reached"}>
@@ -1987,9 +1390,9 @@ function OutcomesTab({
               </select>
             </label>
             <label className="action-form-span">Next step<textarea name="nextStep" defaultValue={interaction?.outcome?.nextStep ?? detail.workItem.nextStep ?? ""} /></label>
-            <label>Follow up at<DateTimePicker name="followUpAt" /></label>
+            <label>Follow up at<input name="followUpAt" type="datetime-local" /></label>
           </div>
-          <button type="submit" disabled={Boolean(busy)}>Save contact outcome</button>
+          <button type="submit" disabled={Boolean(busy)}>Save official outcome</button>
         </form>
       ) : null}
 
@@ -1997,7 +1400,7 @@ function OutcomesTab({
         <p className="action-processing-note">AI enrichment is running in the background. You can leave this page safely.</p>
       ) : null}
       {detail.aiState === "dead_letter" ? (
-        <button type="button" onClick={() => onRetry(interaction ? "both" : "student_summary")} disabled={Boolean(busy)}>Retry available AI projections</button>
+        <button type="button" onClick={() => onRetry("both")} disabled={Boolean(busy)}>Retry all AI projections</button>
       ) : null}
     </div>
   );
@@ -2067,14 +1470,12 @@ function RightRail({
   }) => Promise<void>;
 }) {
   const item = detail.workItem;
-  const remaining = useMemo(() => {
-    if (!item.dueAt) return "No SLA due date";
-    const milliseconds =
-      new Date(item.dueAt).getTime() - new Date(detail.generatedAt).getTime();
-    if (milliseconds <= 0) return "Past due";
-    const hours = Math.ceil(milliseconds / 3_600_000);
-    return hours > 48 ? `${Math.ceil(hours / 24)} days remaining` : `${hours} hours remaining`;
-  }, [detail.generatedAt, item.dueAt]);
+  // The SLA standing is the server's signal, never a clock the browser ran.
+  const standing = !item.dueAt
+    ? "No SLA due date"
+    : item.signals.overdue
+      ? `Overdue by ${item.signals.overdueDays ?? 0} ${item.signals.overdueDays === 1 ? "day" : "days"}`
+      : "Not yet due";
   return (
     <aside className="action-detail__rail">
       <section className="action-card action-student-card">
@@ -2142,8 +1543,9 @@ function RightRail({
         <h2>SLA</h2>
         <dl className="action-fact-list">
           <div><dt>Due</dt><dd>{dateTime(item.dueAt)}</dd></div>
-          <div><dt>Time remaining</dt><dd>{remaining}</dd></div>
-          <div><dt>Status</dt><dd>{item.escalated ? "Escalated" : "On track"}</dd></div>
+          <div><dt>Standing</dt><dd>{standing}</dd></div>
+          <div><dt>Status</dt><dd>{readable(item.status)}</dd></div>
+          <div><dt>Escalation</dt><dd>{item.escalated ? "Escalated for leader review" : "Not escalated"}</dd></div>
         </dl>
       </section>
       <section className="action-card">

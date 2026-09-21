@@ -174,11 +174,6 @@ function decisionOf(files: StudentDocument[]) {
   return latest?.review ?? null;
 }
 
-function decisionExplanation(review: StudentDocument["review"]) {
-  if (!review) return null;
-  return [review.reasonLabel, review.note].filter(Boolean).join(": ") || null;
-}
-
 /** The record, cut into rows the reference's `DocumentRow` can draw. */
 export function buildRows(
   requirements: readonly StudentRequirementDetail[],
@@ -233,7 +228,7 @@ export function buildRows(
                     ? `Accepted ${accepted} · ${office}`
                     : `Accepted · ${office}`
                   : `Sent back by ${office}`,
-      consequence: state === "changes-requested" ? decisionExplanation(decision ?? undefined) : null,
+      consequence: state === "changes-requested" ? (decision?.note ?? null) : null,
       requirement,
       document: null,
       files,
@@ -271,7 +266,7 @@ export function buildRows(
                     ? `Accepted ${decided} · ${office}`
                     : `Accepted · ${office}`
                   : `Sent back by ${office}`,
-      consequence: state === "changes-requested" ? decisionExplanation(document.review) : null,
+      consequence: state === "changes-requested" ? (document.review?.note ?? null) : null,
       requirement: null,
       document,
       files: [document],
@@ -613,14 +608,11 @@ function DocumentDrawer({
           <h3 id="reject-title">
             <Icon name="alert" size={17} /> Why it came back
           </h3>
-          {decision?.reasonLabel ? (
-            <strong className="reject-reason-label">{decision.reasonLabel}</strong>
-          ) : null}
           <p className="reject-reason">
             {decision?.note ?? `${row.office} asked for another copy. Send it from the same place.`}
           </p>
           <p className="reject-by">
-            {decision?.reviewerName ?? row.office}
+            {row.office}
             {decision ? ` · ${formatDate(decision.decidedAt, tenant.localization.locale)}` : ""}
           </p>
         </section>
@@ -711,7 +703,7 @@ function DocumentDrawer({
                           {review.reasonLabel ? ` - ${review.reasonLabel}` : ""}
                         </strong>
                         <span>
-                          {formatDate(review.decidedAt, tenant.localization.locale)} · {review.reviewerName}
+                          {review.synthetic ? "Earlier status recorded" : formatDate(review.decidedAt, tenant.localization.locale)} · {review.reviewerName}
                         </span>
                         {review.note ? <p>{review.note}</p> : null}
                       </li>
@@ -750,8 +742,7 @@ function outcomeLine(file: StudentDocument, office: string, locale: string) {
     return file.review ? `Accepted ${formatDate(file.review.decidedAt, locale)}.` : "Accepted.";
   }
   if (state === "changes-requested") {
-    const explanation = decisionExplanation(file.review);
-    return `Changes requested${file.review ? ` ${formatDate(file.review.decidedAt, locale)}` : ""}.${explanation ? ` ${explanation}` : ""}`;
+    return `Changes requested${file.review ? ` ${formatDate(file.review.decidedAt, locale)}` : ""}.${file.review?.note ? ` ${file.review.note}` : ""}`;
   }
   if (state === "needed") return "A placeholder. Nothing has been sent yet.";
   return `With ${office}. No decision yet.`;
@@ -776,15 +767,8 @@ function ExtractionReview({
     () => new Set(defaultAcceptedDocumentExtractionFieldKeys(extraction)),
   );
   const confirmAction = useCallback(
-    (fieldKeys: string[], key: string, applyRequirementId?: string) =>
-      confirmStudentDocumentExtraction(
-        document.id,
-        {
-          acceptedFieldKeys: fieldKeys,
-          ...(applyRequirementId ? { applyRequirementId } : {}),
-        },
-        key,
-      ),
+    (fieldKeys: string[], key: string) =>
+      confirmStudentDocumentExtraction(document.id, { acceptedFieldKeys: fieldKeys }, key),
     [document.id],
   );
   const confirm = useApiAction(confirmAction);
@@ -843,17 +827,6 @@ function ExtractionReview({
     }
   };
 
-  const applyRequirement = async (requirementId: string) => {
-    const key = intentKey.current ?? (intentKey.current = crypto.randomUUID());
-    try {
-      const changed = await confirm.run([...acceptedKeys], key, requirementId);
-      intentKey.current = null;
-      onDocumentChanged(changed);
-    } catch {
-      // Keep the idempotency key for a safe retry of the same confirmation.
-    }
-  };
-
   return (
     <section className="extract-review" aria-labelledby="extract-title">
       <div className="extract-head">
@@ -861,13 +834,7 @@ function ExtractionReview({
         <p className="extract-note">{extraction.summary}</p>
       </div>
 
-      <DocumentContextMatches
-        matches={extraction.contextMatches}
-        pending={confirm.status === "loading"}
-        onApplyRequirement={
-          reviewable ? (requirementId) => void applyRequirement(requirementId) : undefined
-        }
-      />
+      <DocumentContextMatches matches={extraction.contextMatches} />
 
       {extraction.fields.length > 0 ? (
         <ul className="extract-fields">
@@ -950,11 +917,9 @@ function ExtractionReview({
         </>
       ) : (
         <p className="extract-left" role="status">
-          {extraction.autoResolution?.status === "accepted"
-            ? "Audentra AI accepted this document and notified staff."
-            : extraction.autoResolution?.status === "rejected"
-              ? "Audentra AI requested a replacement document and notified staff."
-              : `Reviewed ${extraction.verifiedAt ? formatDate(extraction.verifiedAt) : "by you"}. Nothing was assumed.`}
+          Reviewed{" "}
+          {extraction.verifiedAt ? formatDate(extraction.verifiedAt) : "by you"}. Nothing was
+          assumed.
         </p>
       )}
     </section>

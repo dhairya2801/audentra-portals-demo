@@ -9,24 +9,33 @@
  * onTurn observer and its trace is fetched automatically through the
  * same-origin /api/edward-lab proxy (which holds the internal credential
  * server-side — the browser never sees a worker token).
+ *
+ * Views: "Chat + trace" (this file), "Architecture" (the component map lit
+ * with the selected trace's route), "Normal vs deterministic", and "User
+ * Feedback". The read-planner control in the header applies to every turn
+ * the Lab sends, and the trace confirms which planner actually ran.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  type EdwardReadPlanner,
   type EdwardTurnTrace,
   fetchTraceWithRetry,
   formatMs,
+  pathLabel,
+  READ_PLANNERS,
   summarizeTrace,
   type TraceListEntry,
 } from "../lib/edward-lab";
+import { architectureChoices, EdwardArchitecture } from "./edward-architecture";
 import { EdwardAssistant, type EdwardTurnEvent } from "./edward-assistant";
 import { EdwardFeedbackLab } from "./edward-feedback-lab";
+import { Info, LabInfoProvider } from "./edward-lab-info";
 import { EdwardLabCompare } from "./edward-lab-compare";
 import { EdwardTraceInspector } from "./edward-trace-inspector";
 import styles from "./edward-lab.module.css";
 
-/** "chat" is the original trace dashboard; "compare" runs one question twice. */
-type LabView = "chat" | "compare" | "feedback";
+type LabView = "chat" | "architecture" | "compare" | "feedback";
 
 interface LabPersona {
   name: string;
@@ -46,6 +55,25 @@ async function labFetch(url: string, init?: RequestInit): Promise<Response> {
   return fetch(url, { ...init, headers: { accept: "application/json" } });
 }
 
+/** One row of the conversation timeline: what the trace says, or what the client knows. */
+export function turnRowMeta(turn: LabTurn, trace: EdwardTurnTrace | null): string {
+  if (turn.status === "error") return "✗ error";
+  if (trace) {
+    const summary = summarizeTrace(trace);
+    const route = trace.path && trace.path !== "pipeline" ? pathLabel(trace.path) : null;
+    return [
+      formatMs(summary.durationMs),
+      route ?? `${summary.toolCount} tools`,
+      trace.readPlanner ?? null,
+      summary.statusLabel,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  if (turn.status === "no_trace") return "trace unavailable";
+  return `${formatMs(turn.latencyMs)} · trace…`;
+}
+
 export function EdwardLab() {
   const [personas, setPersonas] = useState<LabPersona[]>([]);
   const [personaSupported, setPersonaSupported] = useState<boolean | null>(null);
@@ -60,14 +88,20 @@ export function EdwardLab() {
   const [recent, setRecent] = useState<TraceListEntry[]>([]);
   const [labError, setLabError] = useState<string | null>(null);
   const [view, setView] = useState<LabView>("chat");
+  const [readPlanner, setReadPlanner] = useState<EdwardReadPlanner | "">("");
   const turnCounter = useRef(0);
 
   const refreshRecent = useCallback(() => {
-    labFetch("/api/edward-lab/traces?limit=20")
+    labFetch("/api/edward-lab/traces?limit=50")
       .then(async (response) => {
         if (response.ok) {
           const body = (await response.json()) as { traces?: TraceListEntry[] };
-          setRecent(body.traces ?? []);
+          // This Lab drives the student assistant; staff turns have their own Lab.
+          setRecent(
+            (body.traces ?? []).filter(
+              (entry) => (entry.assistantKind ?? "student") === "student",
+            ),
+          );
         }
       })
       .catch(() => {
@@ -194,14 +228,55 @@ export function EdwardLab() {
   );
 
   const selectedTrace = selectedTraceId ? (traces[selectedTraceId] ?? null) : null;
+  const labOptions = useMemo(
+    () => (readPlanner ? { readPlanner } : {}),
+    [readPlanner],
+  );
+  const choices = useMemo(() => architectureChoices(turns, recent), [turns, recent]);
+
+  const timeline = (
+    <section className="card">
+      <div className={styles.timelineTitle}>
+        <span className="eyebrow">Conversation timeline</span>
+        <span className={styles.turnMeta}>{turns.length} turns</span>
+      </div>
+      <div className={styles.timeline}>
+        {turns.length === 0 ? (
+          <p className={styles.emptyState}>Turns you send appear here.</p>
+        ) : (
+          [...turns].reverse().map((turn) => {
+            const trace = turn.requestId ? (traces[turn.requestId] ?? null) : null;
+            return (
+              <button
+                key={turn.index}
+                type="button"
+                className={`${styles.turnRow} ${
+                  turn.requestId && turn.requestId === selectedTraceId
+                    ? styles.turnRowActive
+                    : ""
+                }`}
+                onClick={() => {
+                  if (turn.requestId) void selectTrace(turn.requestId);
+                }}
+              >
+                <span className={styles.turnIndex}>#{turn.index}</span>
+                <span className={styles.turnQuestion}>{turn.question}</span>
+                <span className={styles.turnMeta}>{turnRowMeta(turn, trace)}</span>
+              </button>
+            );
+          })
+        )}
+      </div>
+    </section>
+  );
 
   return (
-    <>
+    <LabInfoProvider assistantKind="student">
       <header className={styles.topBar}>
         <h1>Edward Lab</h1>
         <span className={styles.devBadge}>Developer tool</span>
         <div className={styles.viewTabs} role="tablist" aria-label="Lab view">
-          {(["chat", "compare", "feedback"] as const).map((candidate) => (
+          {(["chat", "architecture", "compare", "feedback"] as const).map((candidate) => (
             <button
               key={candidate}
               type="button"
@@ -212,13 +287,32 @@ export function EdwardLab() {
             >
               {candidate === "chat"
                 ? "Chat + trace"
-                : candidate === "compare"
-                  ? "Normal vs deterministic"
-                  : "User Feedback"}
+                : candidate === "architecture"
+                  ? "Architecture"
+                  : candidate === "compare"
+                    ? "Normal vs deterministic"
+                    : "User Feedback"}
             </button>
           ))}
         </div>
         <div className={styles.personaControls}>
+          <label className={styles.labControl}>
+            <span>
+              Read planner <Info concept="read_planner" />
+            </span>
+            <select
+              value={readPlanner}
+              onChange={(event) => setReadPlanner(event.target.value as EdwardReadPlanner | "")}
+              aria-label="Read planner for the turns this Lab sends"
+            >
+              <option value="">deployment default</option>
+              {READ_PLANNERS.map((planner) => (
+                <option key={planner.value} value={planner.value}>
+                  {planner.label}
+                </option>
+              ))}
+            </select>
+          </label>
           {personaSupported ? (
             <>
               <label htmlFor="edward-lab-persona">Student state</label>
@@ -264,107 +358,83 @@ export function EdwardLab() {
       {view === "feedback" ? (
         <EdwardFeedbackLab assistantKind="student" />
       ) : view === "compare" ? (
-        <EdwardLabCompare resetKey={`${activePersona}:${chatEpoch}`} />
+        <EdwardLabCompare
+          resetKey={`${activePersona}:${chatEpoch}`}
+          readPlanner={readPlanner || undefined}
+        />
+      ) : view === "architecture" ? (
+        <EdwardArchitecture
+          assistantKind="student"
+          trace={selectedTrace}
+          choices={choices}
+          selectedTraceId={selectedTraceId}
+          onSelectTrace={(traceId) => void selectTrace(traceId)}
+        />
       ) : (
-      <div className={styles.shell}>
-        <div className={styles.chatColumn}>
-          <section className={`card ${styles.chatCard}`}>
-            <EdwardAssistant
-              key={`${activePersona}:${chatEpoch}`}
-              studentName={studentName}
-              variant="embedded"
-              onTurn={onTurn}
-            />
-          </section>
-          <section className="card">
-            <div className={styles.timelineTitle}>
-              <span className="eyebrow">Conversation timeline</span>
-              <span className={styles.turnMeta}>{turns.length} turns</span>
-            </div>
-            <div className={styles.timeline}>
-              {turns.length === 0 ? (
-                <p className={styles.emptyState}>Turns you send appear here.</p>
-              ) : (
-                [...turns].reverse().map((turn) => {
-                  const trace = turn.requestId ? traces[turn.requestId] : null;
-                  const summary = trace ? summarizeTrace(trace) : null;
-                  return (
+        <div className={styles.shell}>
+          <div className={styles.chatColumn}>
+            <section className={`card ${styles.chatCard}`}>
+              <EdwardAssistant
+                key={`${activePersona}:${chatEpoch}`}
+                studentName={studentName}
+                variant="embedded"
+                onTurn={onTurn}
+                labOptions={labOptions}
+              />
+            </section>
+            {timeline}
+          </div>
+          <div className={styles.inspector}>
+            <EdwardTraceInspector trace={selectedTrace} />
+            <section className={`card ${styles.section}`}>
+              <div className={styles.sectionHead}>
+                <span className="eyebrow">Recent student traces</span>
+                <button
+                  type="button"
+                  className={styles.copyButton}
+                  onClick={() => refreshRecent()}
+                >
+                  Refresh
+                </button>
+              </div>
+              <div className={styles.recentList}>
+                {recent.length === 0 ? (
+                  <p className={styles.emptyState}>No traces recorded on this backend yet.</p>
+                ) : (
+                  recent.map((entry) => (
                     <button
-                      key={turn.index}
+                      key={entry.traceId}
                       type="button"
-                      className={`${styles.turnRow} ${
-                        turn.requestId && turn.requestId === selectedTraceId
-                          ? styles.turnRowActive
-                          : ""
+                      className={`${styles.recentRow} ${
+                        entry.traceId === selectedTraceId ? styles.recentRowActive : ""
                       }`}
-                      onClick={() => {
-                        if (turn.requestId) void selectTrace(turn.requestId);
-                      }}
+                      onClick={() => void selectTrace(entry.traceId)}
                     >
-                      <span className={styles.turnIndex}>#{turn.index}</span>
-                      <span className={styles.turnQuestion}>{turn.question}</span>
+                      <span className={styles.recentQuestion}>
+                        {entry.userMessage || "(no message)"}
+                      </span>
                       <span className={styles.turnMeta}>
-                        {turn.status === "error"
-                          ? "✗ error"
-                          : summary
-                            ? `${formatMs(summary.durationMs)} · ${summary.toolCount} tools · ${summary.statusLabel}`
-                            : turn.status === "no_trace"
-                              ? "trace unavailable"
-                              : `${formatMs(turn.latencyMs)} · trace…`}
+                        {entry.failureCodes?.length ? "⚠" : "✓"}
+                      </span>
+                      <span className={styles.recentMeta}>
+                        <span>{entry.startedAt?.slice(11, 19) ?? ""}</span>
+                        <span className={styles.mono}>
+                          {entry.path && entry.path !== "pipeline"
+                            ? pathLabel(entry.path)
+                            : (entry.requestType ?? "—")}
+                        </span>
+                        <span className={styles.mono}>{entry.responseSource ?? ""}</span>
+                        <span>{formatMs(entry.durationMs)}</span>
+                        <span>{entry.executedTools?.length ?? 0} tools</span>
                       </span>
                     </button>
-                  );
-                })
-              )}
-            </div>
-          </section>
+                  ))
+                )}
+              </div>
+            </section>
+          </div>
         </div>
-        <div className={styles.inspector}>
-          <EdwardTraceInspector trace={selectedTrace} />
-          <section className={`card ${styles.section}`}>
-            <div className={styles.sectionHead}>
-              <span className="eyebrow">Recent traces</span>
-              <button
-                type="button"
-                className={styles.copyButton}
-                onClick={() => refreshRecent()}
-              >
-                Refresh
-              </button>
-            </div>
-            <div className={styles.recentList}>
-              {recent.length === 0 ? (
-                <p className={styles.emptyState}>No traces recorded on this backend yet.</p>
-              ) : (
-                recent.map((entry) => (
-                  <button
-                    key={entry.traceId}
-                    type="button"
-                    className={`${styles.recentRow} ${
-                      entry.traceId === selectedTraceId ? styles.recentRowActive : ""
-                    }`}
-                    onClick={() => void selectTrace(entry.traceId)}
-                  >
-                    <span className={styles.recentQuestion}>
-                      {entry.userMessage || "(no message)"}
-                    </span>
-                    <span className={styles.turnMeta}>
-                      {entry.failureCodes?.length ? "⚠" : "✓"}
-                    </span>
-                    <span className={styles.recentMeta}>
-                      <span>{entry.startedAt?.slice(11, 19) ?? ""}</span>
-                      <span className={styles.mono}>{entry.requestType ?? entry.path}</span>
-                      <span>{formatMs(entry.durationMs)}</span>
-                      <span>{entry.executedTools?.length ?? 0} tools</span>
-                    </span>
-                  </button>
-                ))
-              )}
-            </div>
-          </section>
-        </div>
-      </div>
       )}
-    </>
+    </LabInfoProvider>
   );
 }

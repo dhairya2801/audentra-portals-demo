@@ -35,6 +35,7 @@ export function HelpGuideList({
         </span>
       </div>
 
+      {guides.length === 0 && <p className="help-guides-empty">No guides have been published yet. Use “Ask an office” above to reach the team that can help.</p>}
       <div className="card-rows guide-rows">
         {guides.map((guide) => {
           const expanded = open.includes(guide.id);

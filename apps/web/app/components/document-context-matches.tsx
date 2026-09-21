@@ -5,12 +5,8 @@ import styles from "./document-context-matches.module.css";
 
 export function DocumentContextMatches({
   matches,
-  onApplyRequirement,
-  pending,
 }: {
   matches: readonly StudentDocumentContextMatch[] | null | undefined;
-  onApplyRequirement?: (requirementId: string) => void;
-  pending?: boolean;
 }) {
   if (!matches?.length) return null;
 
@@ -24,11 +20,7 @@ export function DocumentContextMatches({
             against missing items in your authenticated record.
           </p>
         </div>
-        <span>
-          {matches.some((match) => match.studentConfirmationRequired)
-            ? "Your confirmation needed"
-            : "Official staff review required"}
-        </span>
+        <span>Official staff review required</span>
       </div>
       <ul className={styles.list}>
         {matches.map((match) => {
@@ -49,16 +41,7 @@ export function DocumentContextMatches({
                     : `${match.matchedFieldKeys.length} suggested field${match.matchedFieldKeys.length === 1 ? "" : "s"} available for your review.`}
                 </small>
               </div>
-              {match.studentConfirmationRequired && onApplyRequirement ? (
-                <button
-                  className={styles.apply}
-                  type="button"
-                  disabled={pending}
-                  onClick={() => onApplyRequirement(match.targetId)}
-                >
-                  {pending ? "Applying document..." : `Use this for ${match.title}`}
-                </button>
-              ) : destination.external ? (
+              {destination.external ? (
                 <a href={destination.href} target="_blank" rel="noreferrer">
                   Review match
                 </a>

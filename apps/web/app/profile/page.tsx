@@ -1,7 +1,11 @@
 "use client";
 
+import { UniversityRecordPanel } from "../components/university-record";
+
 import type {
+  StudentAdvising,
   StudentBootstrap,
+  StudentDashboard,
   StudentDocument,
   StudentFerpaAuthorization,
   StudentProfile,
@@ -36,6 +40,7 @@ import {
 } from "../lib/document-extraction-ui";
 import { PortalShell } from "../components/portal-shell";
 import ProfileAccess, { type ToastInput } from "../components/profile-access";
+import ProfileAdvisers from "../components/profile-advisers";
 import ProfileFieldRow, { type FieldEdit } from "../components/profile-field-row";
 import {
   type ChannelId,
@@ -56,7 +61,9 @@ import { useTenant } from "../components/tenant-provider";
 import { useApiResource } from "../hooks/use-api-resource";
 import {
   ApiClientError,
+  getStudentAdvising,
   getStudentBootstrap,
+  getStudentDashboard,
   getStudentDocumentProfilePhoto,
   getStudentDocuments,
   getStudentFerpaAuthorization,
@@ -106,6 +113,10 @@ type Loaded = {
     | { status: "ready"; authorization: StudentFerpaAuthorization | null }
     | { status: "unavailable" }
     | { status: "delegate" };
+  /** The offer's program, term and campus; `null` when the dashboard could not be read. */
+  dashboard: StudentDashboard | null;
+  /** Who is assigned to the student; `null` when the record could not be read. */
+  advising: StudentAdvising | null;
 };
 
 function ProfilePageContent() {
@@ -128,7 +139,7 @@ function ProfilePageContent() {
     const delegate = bootstrap.actor?.type === "delegate" ? bootstrap.actor : null;
     const canReadDocuments = !delegate || delegate.scopes.includes("documents");
     const canReadEnrollment = !delegate || delegate.scopes.includes("enrollment");
-    const [profile, documents, requirements, ferpa] = await Promise.all([
+    const [profile, documents, requirements, ferpa, dashboard, advising] = await Promise.all([
       getStudentProfile(signal),
       canReadDocuments
         ? getStudentDocuments(signal).then(
@@ -148,8 +159,20 @@ function ProfilePageContent() {
             (result): Loaded["ferpa"] => ({ status: "ready", authorization: result.authorization }),
             (): Loaded["ferpa"] => ({ status: "unavailable" }),
           ),
+      canReadEnrollment
+        ? getStudentDashboard(signal).then(
+            (result): StudentDashboard | null => result,
+            (): StudentDashboard | null => null,
+          )
+        : Promise.resolve<StudentDashboard | null>(null),
+      canReadEnrollment
+        ? getStudentAdvising(signal).then(
+            (result): StudentAdvising | null => result,
+            (): StudentAdvising | null => null,
+          )
+        : Promise.resolve<StudentAdvising | null>(null),
     ]);
-    return { bootstrap, delegate, profile, documents, requirements, ferpa };
+    return { bootstrap, delegate, profile, documents, requirements, ferpa, dashboard, advising };
   }, []);
   const resource = useApiResource(load);
   const refresh = resource.refresh;
@@ -433,6 +456,14 @@ function ProfilePageContent() {
     photoOnFile: Boolean(photoDocument),
     photoUnavailable: documentsUnavailable || documentsHidden,
     tenantShortName: tenant.shortName,
+    academic: data.dashboard
+      ? {
+          programName: data.dashboard.offer?.programName ?? null,
+          termName: data.dashboard.offer?.termName ?? null,
+          campusName: data.dashboard.offer?.campusName ?? null,
+          classYear: data.dashboard.student.classYear ?? null,
+        }
+      : null,
   });
   const you = groups.find((group) => group.id === "you") as FieldGroup;
   const contact = groups.find((group) => group.id === "contact") as FieldGroup;
@@ -551,7 +582,17 @@ function ProfilePageContent() {
         />
       }
     >
-      {active === "profile" && groupCard(you)}
+      {active === "profile" && (
+        <>
+          {groupCard(you)}
+          <ProfileAdvisers
+            advising={data.advising}
+            unavailable={data.advising === null}
+            locale={tenant.localization.locale}
+            timeZone={tenant.localization.timeZone}
+          />
+        </>
+      )}
 
       {active === "profile-contact" && groupCard(contact)}
 
@@ -608,6 +649,10 @@ function ProfilePageContent() {
           tenantShortName={tenant.shortName}
           locale={tenant.localization.locale}
         />
+      )}
+
+      {!data.delegate && (active === "profile" || active === "profile-documents" || active === "profile-origins") && (
+        <UniversityRecordPanel key={active} initialDomain={active === "profile-documents" ? "documents" : active === "profile-origins" ? "history" : "relationships"} />
       )}
 
       <ToastStack toasts={toasts} onDismiss={dismiss} />

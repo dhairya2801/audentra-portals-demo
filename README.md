@@ -139,40 +139,23 @@ npx vercel --prod
 platform; there is no browser-only demo mode and no way into either portal
 without a real, revocable session.
 
-Because the platform issues host-only session cookies, the browser must see a
-single origin. Hosted split deployments leave the public API variable empty
-and configure the portal's server-side worker instead:
+Because the platform issues host-only `SameSite=lax` session cookies, the
+browser has to see a single origin. Which variable you set depends on whether
+that is already true:
 
 ```text
 # Portal and API share one hostname (Caddy fronts both).
 NEXT_PUBLIC_API_BASE_URL=https://portal.your-domain.example
 
-# Portal is hosted apart from an IAM-private Cloud Run platform.
-NEXT_PUBLIC_API_BASE_URL=
-PLATFORM_API_ORIGIN=https://private-api.run.app
-PLATFORM_API_AUDIENCE=https://private-api.run.app
-PLATFORM_API_AUTH_MODE=google
+# Portal is hosted apart from the API, e.g. on Vercel. next.config.ts then
+# proxies /v1/* and /health*, keeping the session cookie first-party.
+API_PROXY_ORIGIN=https://api.your-domain.example
 ```
 
-`NEXT_PUBLIC_API_BASE_URL` makes `api-client.ts` build browser-visible absolute
-URLs, so it must stay empty for the private-platform topology. The worker
-intercepts only `/v1/*`; `/health` remains the student Health page.
+Set exactly one. They are mutually exclusive: `NEXT_PUBLIC_API_BASE_URL` makes
+`api-client.ts` build absolute cross-origin URLs, which bypasses the rewrites
+and puts the browser back into CORS with a cookie it will refuse to send.
 
 `NEXT_PUBLIC_SITE_URL` can be omitted for previews because Vercel supplies its
 generated hostname. Next App Router owns client/server routing, so no SPA
 rewrite is needed.
-
-## GCP Cloud Run delivery
-
-`.github/workflows/deploy-ref.yml` is a manual-only workflow. Dispatch it from
-trusted `main`, then select a source ref and either `development` or
-`production`. Development accepts a same-repository branch, tag, or SHA;
-production/current accepts only the exact trusted `main` SHA and the
-`DEPLOY_CURRENT` confirmation. No push or merge triggers a portal deployment.
-
-The one-time identities, repository, WIF provider, public portal/private API
-boundary, and OAuth callback-log exclusion are provisioned with the reviewed
-`infra/cloud-run/provision-portals.sh` operator script. It creates no key and
-does not grant public access to the platform API. See
-`docs/architecture/cloud-run-portals-cutover.md` before provisioning or
-deploying.

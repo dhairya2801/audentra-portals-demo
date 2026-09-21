@@ -1,33 +1,56 @@
 import { expect, test } from "@playwright/test";
 import { signInDemoStaff } from "../support/demo-session";
 
-// Authentication handoff against the platform; Morning Brew itself currently
-// renders its existing demo corpus. Requires E2E_STAFF_PASSWORD.
-test("staff portal serves Morning Brew alongside the workspace", async ({ page }) => {
+// Staff portal + Morning Brew journey against the live platform: sign in,
+// complete the first-use setup, and confirm the briefing renders from the
+// canonical `/v1/staff/morning-brew` read. Requires E2E_STAFF_PASSWORD like the
+// other staff journeys.
+test("staff portal serves Morning Brew alongside the workspace", async ({
+  page,
+}) => {
   await page.goto("/aster/staff");
   await signInDemoStaff(page);
-  const navigation = page
-    .locator("aside.staff-sidebar--workspace:visible")
-    .getByRole("navigation", { name: "Staff workspace" });
-  await navigation.getByRole("button", { name: /Morning Brew/i }).click();
+  await expect(
+    page.getByRole("heading", { name: /Today.*enrollment work/ }),
+  ).toBeVisible();
 
-  const setup = page.getByRole("heading", { name: /start your morning with what matters/ });
+  await page
+    .locator("aside.staff-sidebar--workspace:visible")
+    .getByRole("navigation", { name: "Staff workspace" })
+    .getByRole("button", { name: /Morning Brew/i })
+    .click();
+
+  // First use lands on the three-step setup; a returning profile lands on
+  // the briefing itself. Accept either as a healthy render.
+  const setupHeading = page.getByRole("heading", {
+    name: /What do you want to catch up on each morning\?/,
+  });
   const briefing = page.locator(".brew-hero");
-  await expect(setup.or(briefing.first())).toBeVisible();
-  if (await setup.isVisible()) {
-    await page.getByRole("button", { name: "Looks good" }).click();
-    await page.getByRole("button", { name: "Make my Morning Brew" }).click();
+  await expect(setupHeading.or(briefing.first())).toBeVisible();
+
+  // Walk the setup when it is showing and reach the generated briefing.
+  if (await setupHeading.isVisible()) {
+    await page.getByRole("button", { name: /Looks good/ }).click();
+    await page.getByRole("button", { name: /Looks good/ }).click();
+    await page.getByRole("button", { name: /Make my Morning Brew/ }).click();
+    await expect(briefing.first()).toBeVisible();
   }
-  await expect(briefing).toBeVisible();
+
+  // The briefing must render canonical content, not an error state and not the
+  // retired synthetic corpus.
   await expect(page.locator(".staff-shell--workspace")).toBeVisible();
   await expect(page.locator(".brew-unavailable")).toHaveCount(0);
-  await expect(page.getByText("Demo data.", { exact: true })).toBeVisible();
-  await expect(page.locator("section.brew-news")).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Higher Ed News/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "View full dashboard" })).toHaveCount(0);
+  await expect(page.getByText(/count of canonical records/)).toBeVisible();
+  await expect(page.getByText(/Higher Ed News/)).toHaveCount(0);
   await expect(page.getByText(/Confidence:/)).toHaveCount(0);
 
-  await navigation.getByRole("button", { name: /Action center/i }).click();
-  await expect(page.locator(".brew-hero")).toHaveCount(0);
-  await expect(page.locator(".staff-shell--workspace")).toBeVisible();
+  // Other staff views still respond after Morning Brew.
+  await page
+    .locator("aside.staff-sidebar--workspace:visible")
+    .getByRole("navigation", { name: "Staff workspace" })
+    .getByRole("button", { name: /Today/i })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: /Today.*enrollment work/ }),
+  ).toBeVisible();
 });

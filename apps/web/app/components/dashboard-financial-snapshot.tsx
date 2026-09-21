@@ -26,6 +26,9 @@ export function DashboardFinancialSnapshot({
   financials: Pick<
     StudentFinancials,
     | "academicYear"
+    | "accountBasis"
+    | "postedAidCents"
+    | "termLabel"
     | "acceptedAidCents"
     | "paymentsCents"
     | "remainingBalanceCents"
@@ -37,8 +40,8 @@ export function DashboardFinancialSnapshot({
   const segments = [
     {
       key: "aid",
-      label: "Accepted aid",
-      cents: Math.max(0, financials.acceptedAidCents),
+      label: financials.accountBasis ? "Posted aid" : "Accepted aid",
+      cents: Math.max(0, financials.postedAidCents ?? financials.acceptedAidCents),
       color: segmentColors.aid,
     },
     {
@@ -76,7 +79,7 @@ export function DashboardFinancialSnapshot({
             className={styles.donut}
             viewBox="0 0 42 42"
             role="img"
-            aria-label={`${money(financials.remainingBalanceCents)} estimated remaining balance`}
+            aria-label={`${money(financials.remainingBalanceCents)} ${financials.accountBasis ? "posted balance" : "estimated remaining balance"}`}
           >
             <circle cx="21" cy="21" r="15.9155" pathLength="100" />
             {segments.map((segment) => {
@@ -99,14 +102,14 @@ export function DashboardFinancialSnapshot({
             })}
           </svg>
           <div>
-            <span>Estimated balance</span>
+            <span>{financials.accountBasis ? (financials.remainingBalanceCents < 0 ? "Credit owed" : "Posted balance") : "Estimated balance"}</span>
             <strong>{money(financials.remainingBalanceCents)}</strong>
           </div>
         </div>
 
         <div className={styles.financialCardDetails}>
           <h2 id="financial-snapshot-title">Your financial snapshot</h2>
-          <p>Accepted aid, recorded payments, and what remains at a glance.</p>
+          <p>{financials.accountBasis ? "Posted aid, settled payments, and your current account balance." : "Accepted aid, recorded payments, and what remains at a glance."}</p>
           <ul aria-label="Financial balance breakdown">
             {segments.map((segment) => (
               <li key={segment.key}>
@@ -124,7 +127,7 @@ export function DashboardFinancialSnapshot({
         </small>
         <strong>
           {enrolledPlan?.name ??
-            (canOpen ? "Choose a payment plan" : "Shared account summary")}
+            (canOpen ? (financials.accountBasis ? "Review account" : "Choose a payment plan") : "Shared account summary")}
           {canOpen ? " →" : ""}
         </strong>
       </div>

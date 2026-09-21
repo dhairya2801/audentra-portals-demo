@@ -1,3 +1,20 @@
 /* Production-only bridge rules for the appointments pages. Restate a design decision here only
    when a legacy or production-only element has no design-system shape; never restyle
    a reference class. */
+
+/* A scheduled conversation whose time has passed but whose outcome nobody has
+   recorded yet: the record says scheduled, so the badge says so — amber,
+   because someone still has to act, and never "completed" on the clock's say. */
+.app-shell .appt-state.pending {
+  color: var(--amber-ink, var(--amber));
+  background: var(--amber-tint, var(--amber-soft));
+}
+
+.app-shell .appointment-row.pending .date-tile {
+  opacity: 0.75;
+}
+
+.app-shell .drawer-icon.appointment.pending {
+  color: var(--amber-ink, var(--amber));
+  background: var(--amber-soft);
+}

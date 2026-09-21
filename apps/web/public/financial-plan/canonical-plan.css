@@ -1,0 +1,13 @@
+/* Small adapters around the reference portal's financial workspace styles. */
+.table-scroll{overflow-x:auto}.table-scroll td small{display:block;color:var(--muted);margin-top:4px}
+.budget-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0}.budget-grid input,.budget-grid select{width:100%}
+.payment-equation{display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;align-items:center;gap:12px;margin:20px 0}
+.pay-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.pay-option{border:1px solid var(--line);border-radius:16px;padding:20px}.pay-option h3{margin-bottom:16px}.pay-option p{color:var(--muted);margin:14px 0;line-height:1.6}.option-amount{font-size:24px;letter-spacing:-.7px}
+.loan-primer{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:18px 0}.loan-primer>div{padding:18px;background:var(--surface-sunk);border-radius:12px}.loan-primer p{margin:8px 0;color:var(--muted)}
+.timeline-chart svg{width:100%;max-height:240px}.ledger-foot{display:flex;justify-content:space-between;padding:14px}
+#pop .pop-body{overflow-wrap:anywhere}#pop .table-scroll{max-width:100%}.kpi2 .text-button{margin-top:10px;font-size:10px}.cov-mini-row>.text-button{justify-self:end}
+.comparison-ring .src-row .n{min-width:0}.comparison-ring .src-row .a{white-space:nowrap}.comparison-ring .arc:focus-visible{outline:none;stroke:var(--purple);stroke-width:3}
+#budget-status{max-width:65%}.story h3{margin-top:12px}.pay-option .edward-ask{white-space:normal}
+@media(max-width:760px){.payment-equation,.pay-options,.loan-primer,.budget-grid{grid-template-columns:1fr}.payment-equation>b{display:none}.table-scroll{max-width:100%}.kpi2 strong{overflow-wrap:anywhere}#budget-status{max-width:100%}}
+/* Financial sections already live in the parent portal's sidebar, as on test. */
+#tabs{display:none}.kpi2{min-height:134px}.kpi2 strong small{font-size:14px;color:var(--muted);font-weight:500}.advisor-bar .who strong span{font-size:10px;font-weight:400;color:var(--muted)}

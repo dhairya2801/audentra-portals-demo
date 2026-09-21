@@ -113,9 +113,9 @@ export interface StudentDashboard {
     id: string;
     preferredName: string;
     fullName: string;
-    classYear: number;
+    classYear: number | null;
   };
-  offer: AdmissionOfferSummary;
+  offer: AdmissionOfferSummary | null;
   journey: {
     id: string | null;
     status:
@@ -596,8 +596,6 @@ export interface StudentRequirementDetail extends StudentRequirementSummary {
   documentCategory: StudentDocumentCategory | null;
   responsibleOffice: string;
   dependencyCodes: string[];
-  /** Oldest-first, student-safe activity for this enrollment task. */
-  history?: StudentRequirementHistoryEvent[];
   immunizationPolicy?: {
     id: string;
     code: string;
@@ -615,25 +613,6 @@ export interface StudentRequirementDetail extends StudentRequirementSummary {
       validityDays: number | null;
     }>;
   };
-}
-
-export type StudentRequirementHistoryEventKind =
-  | "assigned"
-  | "status_changed"
-  | "response_submitted"
-  | "document_uploaded"
-  | "document_reviewed"
-  | "help_requested"
-  | "help_resolved";
-
-export interface StudentRequirementHistoryEvent {
-  id: string;
-  kind: StudentRequirementHistoryEventKind;
-  title: string;
-  detail: string | null;
-  status?: string;
-  documentId?: string;
-  occurredAt: string;
 }
 
 export type StudentRequirementResponseValue =
@@ -910,13 +889,8 @@ export type StudentDocumentProcessingMode =
 export function documentProcessingModeForCategory(
   category: StudentDocumentCategory,
 ): StudentDocumentProcessingMode {
-  if (
-    category === "identity" ||
-    category === "transcript" ||
-    category === "financial_aid"
-  ) {
-    return "agentic";
-  }
+  if (category === "identity" || category === "transcript") return "agentic";
+  if (category === "financial_aid") return "classification_only";
   return "manual_review";
 }
 
@@ -948,22 +922,6 @@ export interface ExtractedDocumentVisualRegion {
   confidence: number;
 }
 
-export interface StudentDocumentValidity {
-  status: "valid" | "invalid" | "uncertain";
-  confidence: number;
-  rationale: string;
-}
-
-export interface StudentDocumentAutoResolution {
-  status:
-    | "accepted"
-    | "rejected"
-    | "needs_student_confirmation"
-    | "needs_review";
-  confidence: number | null;
-  reason: string;
-}
-
 export type StudentDocumentContextTargetType =
   | "profile"
   | "onboarding"
@@ -984,8 +942,7 @@ export interface StudentDocumentContextMatch {
   confidence: number;
   rationale: string;
   applied: boolean;
-  reviewRequired: boolean;
-  studentConfirmationRequired?: boolean;
+  reviewRequired: true;
   href: string | null;
 }
 
@@ -1058,8 +1015,6 @@ export interface StudentDocumentExtraction {
   institutionName: string | null;
   issueDate: string | null;
   academicTerm: string | null;
-  validity?: StudentDocumentValidity;
-  autoResolution?: StudentDocumentAutoResolution;
   fields: ExtractedDocumentField[];
   courses?: ExtractedTranscriptCourse[];
   visualRegions?: ExtractedDocumentVisualRegion[];
@@ -1088,6 +1043,7 @@ export interface StudentDocumentReviewDecision {
   /** Explicitly student-visible reviewer guidance; never an internal staff note. */
   note: string | null;
   reviewerName: string;
+  source?: "staff_review" | "legacy_backfill" | "ai_auto";
   synthetic?: boolean;
   automated?: boolean;
 }
@@ -1109,11 +1065,20 @@ export interface StudentDocument {
     | "accepted"
     | "rejected"
     | "needs_resubmission"
-    | "waived";
-  /** Present once a reviewer has ruled on this specific submission. */
-  review?: StudentDocumentReviewDecision;
-  /** Oldest-first immutable decisions for this specific submission. */
-  reviewHistory?: StudentDocumentReviewDecision[];
+    | "waived"
+    | "expired";
+  /** Present once a reviewer has ruled on the document. */
+  review?: {
+    decision:
+      | "accepted"
+      | "rejected"
+      | "needs_resubmission"
+      | "waived"
+      | "under_review";
+    decidedAt: string;
+    note: string | null;
+    synthetic?: boolean;
+  } | StudentDocumentReviewDecision;
   sha256?: string;
   contentUrl?: string;
   extraction?: StudentDocumentExtraction;
@@ -1126,6 +1091,8 @@ export interface StudentDocument {
     onboardingVersion: number;
   };
   createdAt: string;
+  /** Immutable, student-safe decisions for this submission. */
+  reviewHistory?: StudentDocumentReviewDecision[];
 }
 
 export interface StudentDocumentList {
@@ -1179,6 +1146,8 @@ export interface StaffMemberSummary {
   /** End of a current absence (vacation, sick, conference, leave) — null when present. */
   awayUntil?: string | null;
   awayKind?: string | null;
+  /** IANA zone the member works in; times shown to them are rendered in it. */
+  timezone?: string;
 }
 
 export type StaffEmploymentStatus = "active" | "on_leave" | "departed";
@@ -1444,12 +1413,15 @@ export interface StaffWorkItemLog {
   action:
     | "created"
     | "status_changed"
+    | "priority_changed"
+    | "due_date_changed"
     | "assigned"
     | "escalated"
     | "commented"
     | "document_decided"
     | "student_preferences_updated"
     | "channel_selected"
+    | "outreach_draft_saved"
     | "interaction_started"
     | "communication_recorded"
     | "outcome_recorded"
@@ -1533,6 +1505,12 @@ export interface StaffWorkItem {
   /** Populated on board pages for the items on the page and on the detail read. */
   history: StaffWorkItemLog[];
   signals: StaffWorkItemSignals;
+  /**
+   * The signed-in member's current caseload roles for this item's student
+   * (e.g. `["financial_aid_counselor"]`); empty when the student is not on
+   * their caseload. Joined server-side from `student_staff_assignment`.
+   */
+  viewerAssignmentRoles: StaffAssignmentRole[];
 }
 
 export interface StaffWorkComment {
@@ -1606,9 +1584,9 @@ export type StaffRelatedDocument = Pick<
   | "processingMode"
   | "status"
   | "contentUrl"
-  | "review"
-  | "reviewHistory"
   | "createdAt"
+  | "extraction"
+  | "reviewHistory"
 >;
 
 export interface StaffInteraction {
@@ -1711,6 +1689,7 @@ export interface StaffTaskAiInsight {
 }
 
 export interface StaffWorkItemDetail {
+  outreachDraft?: StaffOutreachDraft | null;
   workItem: StaffWorkItem;
   taskInsight: StaffTaskAiInsight;
   studentSummary: StaffStudentAiSummary;
@@ -1732,6 +1711,8 @@ export type StaffActionCenterDueWindow =
 export type StaffActionCenterSort =
   | "priority"
   | "due"
+  /** Escalated, then overdue, then priority, then nearest due: the personal queue order. */
+  | "attention"
   | "updated"
   | "created"
   | "stale";
@@ -1786,6 +1767,46 @@ export interface StaffActionCenterFacets {
 }
 
 /**
+ * Counts for one reading scope of the board. Status counts cover the whole
+ * scope; `open` onwards describe open work only. `dueToday` is the calendar
+ * day (UTC), whether or not the hour has passed. Computed in SQL, never from
+ * a page.
+ */
+export interface StaffActionCenterScopeCounts {
+  todo: number;
+  inProgress: number;
+  followUpRequired: number;
+  blocked: number;
+  done: number;
+  cancelled: number;
+  open: number;
+  overdue: number;
+  dueToday: number;
+  urgent: number;
+  escalated: number;
+  stale: number;
+  unassigned: number;
+  /** Distinct students with open work in the scope. */
+  students: number;
+}
+
+export type StaffActionCenterScope = "mine" | "myComponent" | "all";
+
+/**
+ * The three ways a member reads the shared board: their own queue
+ * (`assignee=me`), their component's work (`component=<theirs>`), and the
+ * whole institution. Served with every board page so the scope switch, the
+ * sidebar badge and the column headers never count over pages.
+ */
+export interface StaffActionCenterScopes {
+  /** The signed-in member's component; null if their staff row is missing. */
+  component: string | null;
+  mine: StaffActionCenterScopeCounts;
+  myComponent: StaffActionCenterScopeCounts;
+  all: StaffActionCenterScopeCounts;
+}
+
+/**
  * One bounded page of the board plus board-wide counts and facets. The board
  * is never returned in full: page further with `offset`, or narrow with the
  * query. `counts.todo…escalated` describe the whole board (the legacy shape);
@@ -1810,6 +1831,7 @@ export interface StaffActionCenter {
     unassigned: number;
     ownerRisk: number;
   };
+  scopes: StaffActionCenterScopes;
   page: {
     limit: number;
     offset: number;
@@ -1841,87 +1863,12 @@ export interface StaffActionCenter {
   generatedAt: string;
 }
 
-export interface StaffStudentApplicationSnapshot {
-  id: string;
-  sourceSystem: string;
-  applicationTerm: string;
-  decisionPlan: string;
-  status:
-    | "draft"
-    | "submitted"
-    | "complete"
-    | "under_review"
-    | "admitted"
-    | "denied"
-    | "waitlisted"
-    | "enrolled";
-  submittedAt: string | null;
-  completedAt: string | null;
-  decidedAt: string | null;
-  completenessPercent: number;
-  academicProfile: Record<string, unknown>;
-  programChoices: Record<string, unknown>[];
-  essays: Record<string, unknown>[];
-  recommendations: Record<string, unknown>[];
-  artifacts: Record<string, unknown>[];
-  contactSnapshot: Record<string, unknown>;
-  version: number;
-  updatedAt: string;
-}
-
-export interface StaffStudentTimelineItem {
-  id: string;
-  category:
-    | "application"
-    | "document"
-    | "enrollment"
-    | "website"
-    | "note"
-    | "staff_task";
-  occurredAt: string;
-  title: string;
-  summary: string;
-  actorName: string | null;
-  source: string;
-  metadata: Record<string, unknown>;
-}
-
-export interface StaffStudentNote {
-  id: string;
-  category: "general" | "admissions" | "enrollment" | "financial" | "engagement" | "academic";
-  visibility: "staff" | "admissions" | "financial_aid";
-  body: string;
-  pinned: boolean;
-  version: number;
-  author: StaffMemberSummary;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateStaffStudentNoteInput {
-  category?: StaffStudentNote["category"];
-  visibility?: StaffStudentNote["visibility"];
-  body: string;
-  pinned?: boolean;
-}
-
 export interface StaffStudentRecord {
   student: StaffWorkItem["student"];
   onboarding: StudentOnboarding;
   profile: StudentProfile;
   requirements: StudentRequirementList;
   documents: StudentDocumentList;
-  application: StaffStudentApplicationSnapshot | null;
-  timeline: {
-    items: StaffStudentTimelineItem[];
-    websiteActivityAvailable: boolean;
-    generatedAt: string;
-  };
-  notes: {
-    items: StaffStudentNote[];
-    total: number;
-  };
-  financials: StudentFinancials;
   syntheticTestRecord?: boolean;
   operation?: StaffStudentOperation | null;
 }
@@ -2043,6 +1990,8 @@ export interface StaffSignUpInput extends StaffSignInInput {
 
 export interface UpdateStaffWorkItemInput {
   expectedVersion: number;
+  priority?: StaffWorkItemPriority;
+  dueAt?: string | null;
   status?: StaffWorkItemStatus;
   assigneeId?: string | null;
   escalated?: boolean;
@@ -2088,6 +2037,34 @@ export interface CreateStaffWorkCommentInput {
   mentionIds?: string[];
 }
 
+export interface StaffOutreachDraft {
+  id: string;
+  workItemId: string;
+  studentId: string;
+  channel: "portal";
+  subject: string | null;
+  body: string;
+  status: "draft" | "sent";
+  version: number;
+  createdByStaffId: string;
+  updatedByStaffId: string;
+  communicationId: string | null;
+  updatedAt: string;
+  semantics: string;
+}
+
+export interface SaveStaffOutreachDraftInput {
+  expectedWorkItemVersion: number;
+  expectedDraftVersion: number;
+  subject?: string | null;
+  body: string;
+}
+
+export interface SaveStaffOutreachDraftResult {
+  draft: StaffOutreachDraft;
+  workItemVersion: number;
+}
+
 export interface StartStaffInteractionInput {
   expectedWorkItemVersion: number;
   channel: StaffCommunicationChannel;
@@ -2095,6 +2072,8 @@ export interface StartStaffInteractionInput {
 }
 
 export interface RecordStaffCommunicationInput {
+  draftId?: string;
+  expectedDraftVersion?: number;
   expectedInteractionVersion: number;
   channel: StaffCommunicationChannel;
   direction: "inbound" | "outbound";
@@ -2425,13 +2404,45 @@ export interface StaffCommunicationHistoryItem {
   occurredAt: string;
 }
 
+/**
+ * One deterministic, rule-based reason a student needs a human look. Every
+ * signal is counted from canonical rows at read time; there is no model, no
+ * score and no likelihood behind any of them.
+ */
+export interface StaffStudentAttentionSignal {
+  code:
+    | "overdue_requirements"
+    | "blocking_requirements_open"
+    | "overdue_work"
+    | "escalated_work"
+    | "no_primary_adviser";
+  label: string;
+  count: number;
+}
+
+export interface StaffStudentAttention {
+  /** `urgent` > `attention` > `watch` > `none`, derived from the signals below. */
+  level: "none" | "watch" | "attention" | "urgent";
+  signals: StaffStudentAttentionSignal[];
+  evaluatedAt: string;
+}
+
 export interface StaffStudentOperation {
   id: string;
   name: string;
   preferredName: string;
+  externalRef: string | null;
   programName: string;
+  termName: string | null;
+  campusName: string | null;
   classYear: number;
+  /** Owner of the student's next open work item; the reader when there is none. */
   assignedStaffId: string;
+  primaryAdviser: { id: string; name: string } | null;
+  /** Distinct owners of the student's open work items, from the same aggregate that counts them. */
+  openWorkOwners: { id: string; name: string; component: string }[];
+  /** The signed-in member's current caseload roles for this student; empty when not theirs. */
+  viewerAssignmentRoles: StaffAssignmentRole[];
   syntheticSeed: boolean;
   journey: {
     stage: string;
@@ -2439,26 +2450,10 @@ export interface StaffStudentOperation {
     totalTasks: number;
     lastActivityAt: string;
   };
-  risk: {
-    score: number;
-    band: "low" | "medium" | "high" | "critical";
-    category:
-      | "financial"
-      | "academic"
-      | "belonging"
-      | "administrative"
-      | "family"
-      | "engagement"
-      | "geographic"
-      | "confidence"
-      | "timing";
-    meltLikelihoodPercent: number;
-    recoveryLikelihoodPercent: number;
-    reason: string;
-    signals: string[];
-    modelVersion: string;
-    evaluatedAt: string;
-  };
+  /** Open Action Center items for this student, counted server-side. */
+  openWorkItems: number;
+  overdueWorkItems: number;
+  attention: StaffStudentAttention;
   recommendedAction: {
     title: string;
     rationale: string;
@@ -2470,17 +2465,61 @@ export interface StaffStudentOperation {
   communicationHistory: StaffCommunicationHistoryItem[];
 }
 
+/**
+ * The signed-in member's own queue: every open item assigned to them, read
+ * through the same board query the Task Board uses (`assignee=me`,
+ * `sort=attention`). `tasks` is the first page; page the rest with
+ * `GET /v1/staff/action-center?assignee=me&sort=attention&offset=`.
+ */
 export interface StaffPersonalActionCenter {
   staff: StaffMemberSummary;
+  /** Roster rows for the students in `tasks`, strongest attention first (context, not the queue). */
   students: StaffStudentOperation[];
+  /** The first page of the member's open work, attention order. */
   tasks: StaffWorkItem[];
-  counts: {
-    studentsToday: number;
-    critical: number;
-    highRisk: number;
-    inProgress: number;
-    completed: number;
+  queue: {
+    /** Open items assigned to the member across all pages. */
+    total: number;
+    limit: number;
+    hasMore: boolean;
+    sort: "attention";
   };
+  /** The member's own counts (`scopes.mine` of the board), computed in SQL. */
+  counts: {
+    open: number;
+    overdue: number;
+    dueToday: number;
+    urgent: number;
+    escalated: number;
+    todo: number;
+    inProgress: number;
+    followUpRequired: number;
+    blocked: number;
+    stale: number;
+    /** Distinct students with open work assigned to the member. */
+    students: number;
+  };
+  generatedAt: string;
+}
+
+/** GET /v1/staff/students — the tenant roster, searched server-side. */
+export interface StaffStudentSearchQuery {
+  /** Matches name, preferred name, external reference, email and program. */
+  query?: string;
+  /** Exactly one student, regardless of `query`. */
+  studentId?: string;
+  /** 1–200, default 50. */
+  limit?: number;
+}
+
+export interface StaffStudentSearch {
+  items: StaffStudentOperation[];
+  /** Students matching the query across the whole tenant. */
+  total: number;
+  /** Every student in the tenant, regardless of the query. */
+  cohortTotal: number;
+  query: string;
+  limit: number;
   generatedAt: string;
 }
 
@@ -2985,7 +3024,6 @@ export interface CreateStudentDocumentInput {
 
 export interface ConfirmStudentDocumentExtractionInput {
   acceptedFieldKeys: string[];
-  applyRequirementId?: string;
 }
 
 export interface EdwardChatMessage {
@@ -3024,6 +3062,8 @@ export interface AskEdwardInput {
  */
 export interface EdwardContextReceipt {
   source:
+    | "university"
+    | "institution_knowledge"
     | "dashboard"
     | "profile"
     | "documents"
@@ -3099,7 +3139,31 @@ export interface AssistantBlockTableColumn {
   align?: "left" | "right";
 }
 
+/** Semantic concepts, not a layout DSL. Record values are backend projections;
+ * prose is guarded. No model-authored destinations or executable operations. */
+export type EdwardSemanticBlock = {
+  fallbackText: string;
+  provenance?: { kind: "institution_record"; tool: string; asOf?: string | null };
+} & (
+  | { type: "answer" | "next_action"; text: string }
+  | { type: "explanation"; title: string; text: string }
+  | { type: "facts"; title: string; items: { label: string; value: string }[]; note?: string }
+  | { type: "checklist"; title: string; total: number; items: {
+      title: string; status: string; owner: string; detail: string; href?: string;
+    }[] }
+  | { type: "contacts"; title: string; items: {
+      name: string; role: string; email: string; office: string; status?: string;
+    }[] }
+  | { type: "timeline"; title: string; items: { title: string; at: string; detail: string }[] }
+  | { type: "sources"; items: {
+      title: string; citation: string; version: string; section: string;
+      excerpt: string; applicability: string;
+    }[] }
+  | { type: "record_context"; label: string; asOf: string }
+);
+
 export type AssistantResponseBlock =
+  | EdwardSemanticBlock
   | { type: "text"; fallbackText: string; text: string }
   | {
       type: "bullet_list";
@@ -3133,6 +3197,110 @@ export type AssistantResponseBlock =
       items: AssistantBlockNextStep[];
     };
 
+export interface EdwardActionProvenance {
+  kind:
+    | "canonical_database"
+    | "institution_authored"
+    | "user_authored"
+    | "uploaded_document"
+    | "inbound_communication"
+    | "model_derived";
+  source: string;
+  /** Canonical sources establish facts; derived/user content does not. */
+  factTrusted: boolean;
+  /** No evidence source is ever an instruction or authorization signal. */
+  instructionTrusted: boolean;
+}
+
+export interface EdwardActionPreview {
+  title: string;
+  summary: string;
+  changes?: { field: string; before: unknown; after: unknown }[];
+  student?: { id: string; name: string };
+  recipient?: { id: string; name: string; address?: string };
+  requirement?: {
+    id?: string;
+    title?: string;
+    status?: string;
+    dueAt?: string | null;
+    blocking?: boolean;
+  } | null;
+  topic?: string;
+  message?: string;
+  /** Who an internal request reaches: the responsible office, the adviser, or both. */
+  routesTo?: {
+    office?: string | null;
+    adviser?: { name: string; title?: string | null; component?: string | null } | null;
+  } | null;
+  sender?: string;
+  subject?: string;
+  body?: string;
+  response?: Record<string, unknown>;
+  workItem?: Record<string, unknown>;
+  cohort?: {
+    filter: Record<string, unknown>;
+    description: string[];
+    count: number;
+    sample: { id: string; name: string; program?: string }[];
+  };
+  warnings?: string[];
+}
+
+export interface EdwardActionIntent {
+  id: string;
+  action:
+    | "student.requirement.submit_response"
+    | "student.preferences.update"
+    | "student.support.contact"
+    | "operations.follow_up.create"
+    | "operations.work_item.update"
+    | "operations.cohort.create_follow_ups"
+    | "communications.email.prepare";
+  status:
+    | "pending_confirmation"
+    | "executing"
+    | "succeeded"
+    | "partial"
+    | "failed"
+    | "cancelled"
+    | "expired";
+  version: number;
+  riskClass: 1 | 2 | 3 | 4;
+  confirmationMode: "immediate" | "confirm" | "strong_confirm" | "external_confirm";
+  contentSha256: string;
+  expiresAt: string;
+  preview: EdwardActionPreview;
+  provenance: EdwardActionProvenance[];
+  authorizationCapability?: string | null;
+  receipt?: EdwardActionReceipt;
+}
+
+export interface EdwardActionReceipt {
+  id: string;
+  intentId: string;
+  action: EdwardActionIntent["action"];
+  status: "succeeded" | "partial" | "failed";
+  target: {
+    studentId?: string | null;
+    resourceType?: string | null;
+    resourceId?: string | null;
+  };
+  result: Record<string, unknown>;
+  affectedCount: number;
+  auditEventIds: string[];
+  receiptSha256: string;
+  committedAt: string;
+}
+
+export interface ConfirmEdwardActionInput {
+  expectedVersion: number;
+  contentSha256: string;
+}
+
+export interface CancelEdwardActionInput {
+  expectedVersion: number;
+}
+
 export interface AskEdwardResponse {
   message: string;
   /** Structured rendering of `message`. Absent on legacy gateway replies. */
@@ -3150,6 +3318,9 @@ export interface AskEdwardResponse {
   }[];
   contextReceipts: EdwardContextReceipt[];
   widgets: EdwardActionWidget[];
+  actionIntents?: EdwardActionIntent[];
+  actionReceipts?: EdwardActionReceipt[];
+  actionError?: { code: string; message: string };
   /** Present when the platform persisted this exchange to a conversation. */
   conversationId?: string;
   userMessageId?: string;
@@ -3172,6 +3343,8 @@ export interface AssistantConversationMessage {
   contextReceipts: EdwardContextReceipt[];
   suggestedActions: AskEdwardResponse["suggestedActions"];
   widgets: EdwardActionWidget[];
+  actionIntents?: EdwardActionIntent[];
+  actionReceipts?: EdwardActionReceipt[];
   createdAt: string;
 }
 
@@ -3235,106 +3408,26 @@ export interface EdwardFeedbackListResponse {
  * authenticated session and resolves student referents server-side.
  * ------------------------------------------------------------------------- */
 
-export type StaffWebSearchSafeSearch = "moderate";
-export type StaffWebSearchSourceType = "web" | "news";
-export type StaffWebSearchPurpose = "edward" | "morning_brew";
-export type StaffWebSearchQueryLengthBucket =
-  | "2-25"
-  | "26-50"
-  | "51-100"
-  | "101-200"
-  | "201-300";
-
-/**
- * Purpose is assigned by the server from the trusted call path. Clients must
- * not send purpose, freshness, or domain filters in this initial contract.
- */
-export interface StaffWebSearchInput {
-  /** Public-information query only; student identifiers and record referents are rejected. */
-  query: string;
-  /** Defaults to 5; the platform enforces a range of 1-10. */
-  limit?: number;
-}
-
-export interface StaffWebSearchResult {
-  title: string;
-  url: string;
-  snippet: string;
-  kind: StaffWebSearchSourceType;
-  publishedAt: string | null;
-  source: string | null;
-  /** Provider-supplied, safe HTTPS preview image for visual result rails. */
-  thumbnailUrl: string | null;
-}
-
-/**
- * Canonical asynchronous external-news state for the staff Morning Brew.
- * The platform owns the query, provider scheduling, and stale-result policy;
- * the portal only renders this tenant-scoped read model.
- */
-export type StaffMorningBrewExternalContextStatus =
-  | "idle"
-  | "pending"
-  | "running"
-  | "ready"
-  | "failed"
-  | "unavailable";
-
-export interface StaffMorningBrewExternalContext {
-  status: StaffMorningBrewExternalContextStatus;
-  query: string;
-  provider: "you.com" | null;
-  results: StaffWebSearchResult[];
-  requestedAt: string | null;
-  searchedAt: string | null;
-  retryAfter: string | null;
-  errorCode: string | null;
-  errorMessage: string | null;
-  stale: boolean;
-}
-
-export interface StaffWebSearchResponse {
-  provider: "you.com";
-  query: string;
-  searchedAt: string;
-  safeSearch: StaffWebSearchSafeSearch;
-  results: StaffWebSearchResult[];
-  total: number;
-  requestId: string;
-  metadata: {
-    queryLength: number;
-    queryLengthBucket: StaffWebSearchQueryLengthBucket;
-    requestedLimit: number;
-    returned: number;
-    purpose: StaffWebSearchPurpose;
-    latencyMs: number;
-  };
-}
-
-export interface StaffAssistantWebSourcesBlock {
-  type: "web_sources";
-  fallbackText: string;
-  query: string;
-  searchedAt: string;
-  /** External, read-only source links returned by the server-side provider. */
-  results: StaffWebSearchResult[];
-}
-
 export interface StaffAssistantDraftBlock {
   type: "draft";
   fallbackText: string;
-  channel: "email" | "sms";
+  channel: "email" | "sms" | "portal";
   subject?: string;
   body: string;
   disclaimer: string;
 }
 
-export type StaffAssistantResponseBlock =
-  | AssistantResponseBlock
-  | StaffAssistantDraftBlock
-  | StaffAssistantWebSourcesBlock;
+export type StaffAssistantResponseBlock = AssistantResponseBlock | StaffAssistantDraftBlock;
+
+export interface StaffTaskBoardContext {
+  surface: "task_board";
+  project?: "fa-docs" | "fa-outreach" | "fa-payments" | "en-docs" | "en-outreach" | "en-requests" | "cl-housing";
+  /** Navigation hint only; membership and identity are validated on the server. */
+  workItemKey?: string;
+}
 
 export interface AskStaffEdwardInput {
+  pageContext?: StaffTaskBoardContext;
   message: string;
   /** Omit for a stateless turn or when `clientMessageId` should create the conversation. */
   conversationId?: string;
@@ -3365,6 +3458,9 @@ export interface AskStaffEdwardResponse {
   conversationId?: string;
   userMessageId?: string;
   assistantMessageId?: string;
+  actionIntents?: EdwardActionIntent[];
+  actionReceipts?: EdwardActionReceipt[];
+  actionError?: { code: string; message: string };
 }
 
 export interface StaffAssistantConversationMessage {
@@ -3379,6 +3475,8 @@ export interface StaffAssistantConversationMessage {
   usage: AskEdwardResponse["usage"];
   blocks: StaffAssistantResponseBlock[] | null;
   contextReceipts: StaffAssistantContextReceipt[];
+  actionIntents?: EdwardActionIntent[];
+  actionReceipts?: EdwardActionReceipt[];
   referencedStudentId: string | null;
   createdAt: string;
 }
@@ -3393,6 +3491,7 @@ export interface StaffAssistantConversation {
 export interface StaffAssistantConversationMessagesResponse {
   conversationId: string;
   activeStudentId: string | null;
+  activeCohortFilter?: Record<string, unknown> | null;
   messages: StaffAssistantConversationMessage[];
 }
 
@@ -3525,6 +3624,10 @@ export interface CourseExemptionRecommendation {
 }
 
 export interface StudentAcademics {
+  attempts?: UniversityCourseAttempt[];
+  currentLoads?: { term_id: string; credits: number }[];
+  unresolvedRequirements?: { id: string; credits: number; description: string }[];
+  limitations?: string[];
   selectedProgram: AcademicProgram;
   availablePrograms: AcademicProgram[];
   transcriptCredits: TranscriptCredit[];
@@ -3577,6 +3680,14 @@ export interface FinancialAward {
 }
 
 export interface StudentFinancials {
+  accountBasis?: "posted_ledger";
+  termLabel?: string;
+  postedAidCents?: number;
+  postedChargesCents?: number;
+  accountAdjustmentsCents?: number;
+  ledger?: UniversityLedgerEntry[];
+  disbursements?: UniversityDisbursement[];
+  transactions?: UniversityPayment[];
   academicYear: string;
   costOfAttendanceCents: number;
   acceptedAidCents: number;
@@ -3595,10 +3706,10 @@ export interface StudentFinancials {
   }[];
   paymentSchedule?: FinancialPaymentScheduleItem[];
   sap: {
-    status: "meeting" | "warning" | "probation" | "not_meeting" | "appeal_pending";
-    cumulativeGpa: number;
+    status: "meeting" | "warning" | "probation" | "not_meeting" | "appeal_pending" | "not_evaluated";
+    cumulativeGpa: number | null;
     minimumGpa: number;
-    completionRatePercent: number;
+    completionRatePercent: number | null;
     minimumCompletionRatePercent: number;
     attemptedCredits: number;
     maximumAttemptedCredits: number;
@@ -3842,6 +3953,8 @@ export interface CreateDepositPaymentInput {
 }
 
 export interface StudentProfile {
+  /** University-facing student number (e.g. SYN-001278); absent when the SIS reference is not set. */
+  externalRef?: string;
   studentId: string;
   preferredName: string;
   firstName?: string;
@@ -3927,3 +4040,150 @@ export interface ApiErrorResponse {
     requestId: string;
   };
 }
+
+
+/** Canonical v3 evidence; all amounts are integer USD cents. */
+export type UniversityDomain = "overview" | "academics" | "account" | "relationships" | "documents" | "history";
+export interface UniversityCourseAttempt {
+  id: string; code: string; title: string; credits: number; term_id: string;
+  status: string; grade: string | null; weekday: number; start_minute: number;
+  end_minute: number; room: string; modality: string;
+}
+export interface UniversityLedgerEntry {
+  id: string; term_id: string; kind: string; amount_cents: number;
+  posted_at: string; due_at: string | null; description: string;
+}
+export interface UniversityDisbursement {
+  id: string; name: string; term_id: string; amount_cents: number;
+  status: string; scheduled_at: string; posted_at: string | null; reason: string | null;
+}
+export interface UniversityPayment {
+  id: string; term_id: string; amount_cents: number; status: string;
+  submitted_at: string; settled_at: string | null; method: string;
+}
+export interface UniversityRecord {
+  domain: UniversityDomain;
+  snapshotAt: string;
+  semantics: string;
+  student: { id: string; external_ref: string; name: string; preferred_name: string;
+    program_name: string; status: string; admit_term: string; residency: string };
+  applications?: { id: string; status: string; submitted_at: string; decided_at: string | null; respond_by: string | null }[];
+  holds?: { id: string; kind: string; office_name?: string; office_id: string; reason: string; placed_at: string; released_at: string | null }[];
+  loads?: { term_id: string; credits: number }[];
+  balances?: { term_id: string; balance_cents: number }[];
+  deadlines?: { id: string; title: string; starts_at: string; category: string }[];
+  attempts?: UniversityCourseAttempt[];
+  ledger?: UniversityLedgerEntry[];
+  payments?: { id: string; term_id: string; amount_cents: number; status: string; method: string; submitted_at: string }[];
+  disbursements?: { id: string; term_id: string; name: string; amount_cents: number; status: string; scheduled_at: string; reason: string | null }[];
+  portalAuthorizations?: { id: string; full_name: string; scopes: string[]; active: boolean; authorization_status: string }[];
+  assignments?: { id: string; name: string; role: string; email: string; office_name: string; ends_at: string | null }[];
+  appointments?: { id: string; starts_at: string; ends_at: string; status: string; purpose: string; staff_name?: string }[];
+  coverage?: { id: string; covering_name: string; covering_email: string; starts_at: string; ends_at: string }[];
+  housing?: { id: string; status: string; residence_name: string | null; room: string | null; reason: string }[];
+  events?: { id: string; description: string; effective_at: string; recorded_at: string; to_state: string }[];
+  documents?: { id: string; category: string; status: string; office_name: string }[];
+  revisions?: { id: string; document_id: string; status: string; reason: string; recorded_at: string; effective_at: string }[];
+  workflows?: { id: string; title: string; status: string; owner_name: string; due_at: string }[];
+  steps?: { id: string; workflow_id: string; title: string; status: string; evidence: string | null }[];
+  consents?: { id: string; delegate_name: string; scope: string; expires_at: string; revoked_at: string | null }[];
+  exceptions?: { id: string; kind: string; status: string; starts_at: string; ends_at: string; reason: string }[];
+}
+export interface UniversityOperations {
+  staff: { name: string; title: string; capacity: number; office_id: string };
+  availability: { id: string; weekday: number; start_minute: number; end_minute: number; timezone: string; location: string }[];
+  calendar: { id: string; title: string; starts_at: string; ends_at: string; location: string }[];
+  absences: { id: string; starts_at: string; ends_at: string; covering_name: string; reason: string }[];
+  caseload: { role: string; count: number }[];
+  cases: { id: string; title: string; student_name: string; external_ref: string; status: string; due_at: string }[];
+}
+
+/** Shared projection; every monetary property is integer cents. Annual awards
+ * and term postings are deliberately distinct. Planning inputs are assumptions. */
+export interface FinancialPlan {
+  schemaVersion: 1;
+  domain: "financial_plan";
+  term: Record<string, unknown> | null;
+  advisers: Record<string, unknown>[];
+  snapshotAt: string;
+  student: Record<string, unknown>;
+  termId: string;
+  basis: "posted_ledger";
+  actionGuidance: Record<string, string>;
+  exceptions: Record<string, unknown>[];
+  currency: "USD";
+  account: {
+    postedBalanceCents: number; postedChargesCents: number; postedAidCents: number;
+    postedPaymentCreditsCents: number; adjustmentsCents: number; creditBalanceCents: number;
+    paymentStates: Record<"pending" | "posted" | "failed" | "reversed", number>;
+    refundLedgerEntries: Record<string, unknown>[]; refundSettlementStatus: "not_recorded";
+  };
+  aid: {totalsScope: string; awards: Record<string, unknown>[]; disbursements: Record<string, unknown>[];
+    offeredAnnualCents: number; acceptedAnnualCents: number; anticipatedTermCents: number;
+    loanTerms: Record<string, unknown>[]; termAwards: Record<string, unknown>[];
+    termSummary: {offeredGiftCents: number; acceptedGiftCents: number; offeredLoanCents: number;
+      acceptedLoanCents: number; offeredGrossCents: number; acceptedGrossCents: number;
+      acceptedNetCents: number; pendingDecisionCents: number; pendingDecisionCount: number}};
+  ledger: Record<string, unknown>[]; payments: Record<string, unknown>[];
+  holds: Record<string, unknown>[]; requirements: Record<string, unknown>[];
+  serviceProgress: Record<string, unknown>[]; catalog: Record<string, unknown>[];
+  mealEnrollments: Record<string, unknown>[]; insuranceCoverage: Record<string, unknown>[];
+  paymentAgreements: Record<string, unknown>[]; installments: Record<string, unknown>[];
+  planning: {version: number; inputs: Record<string, number>; updatedAt: string | null;
+    provenance: "student_entered"; scope: "term"; living: Record<string, unknown>[];
+    income: Record<string, unknown>[]; livingTotalCents: number; incomeTotalCents: number;
+    estimatedCushionCents: number; roomAndBoardCents: number; catalogComparisons: Record<string, unknown>[]; totalAttendanceEstimateCents: number; estimatedAccountGapAfterAnticipatedAidCents: number;
+    scenarios: Record<string, unknown>[]};
+  visualization: {charges: Record<string, unknown>[]; postedSources: Record<string, unknown>[]; netPostedSources: Record<string, unknown>[];
+    postedCoverage: Record<string, unknown>[]; postedCoverageUnavailableReason: string | null; livingCoverage: Record<string, unknown>[]};
+  boundaries: string[];
+}
+
+/** Canonical Action Center filters apply before bounded card pagination. */
+export interface StaffWorkBoardQuery extends Pick<StaffActionCenterQuery,
+  "search" | "assignee" | "priority" | "component" | "sort"> {
+  quick?: "all" | "mine" | "exceptions" | "overdue";
+}
+
+/** Backend identities and work links for the progressively connected demo board.
+ * Original documents, conversations and activity are canonical; parser and other workflows remain previews.
+ */
+export interface StaffDemoTaskBoard {
+  scenarioVersion: string;
+  staff: { id: string; name: string; title: string | null; component: string };
+  cards: Array<{
+    id: string; key: string; title: string; templateKey: string; board: string; version: number;
+    createdAt: string;
+    priority: StaffWorkItemPriority; dueAt: string | null; status: StaffWorkItemStatus;
+    description: string; nextStep: string | null; followUpAt: string | null;
+    updatedAt: string; workType: string;
+    documents: Array<{
+      id: string; fileName: string; mimeType: string; sizeBytes: number; category: string;
+      uploadedAt: string; requirementId: string | null; contentPath: string;
+      status: string; decisions: Array<{id: string; decision: string; note: string; reviewerName: string; decidedAt: string}>;
+    }>;
+    activity: Array<{id: string; actor: string; actorType: string; action: string; message: string; createdAt: string}>;
+    requirements: Array<{id: string; title: string; status: string; version: number; code: string}>;
+    conversations: Array<{id: string; version: number; status: string; expiresAt: string; expired: boolean;
+      messages: Array<{id: string; direction: "student" | "staff"; authorName: string; body: string; createdAt: string}>}>;
+    student: {
+      id: string; externalRef: string; name: string; preferredName: string;
+      program: string; classYear: number; admitTerm: string | null; email: string | null;
+    };
+  }>;
+  total: number;
+  studentCount: number;
+}
+
+
+export interface DemoTaskWriteInput {
+  kind: "message" | "note";
+  expectedVersion: number;
+  body: string;
+  startNewConversation?: boolean;
+}
+
+/** Explicit reset of an opt-in, disposable shared demo. */
+export interface DemoResetStatus { enabled: boolean; }
+export interface DemoResetInput { confirmation: "RESET DEMO"; }
+export interface DemoResetResult { reset: true; }

@@ -5,10 +5,13 @@
   "buildCommand": "npm run vercel-build",
   "build": {
     "env": {
+      "API_PROXY_ORIGIN": "https://34-86-255-134.sslip.io",
+      "NEXT_PUBLIC_API_BASE_URL": "",
+      "NEXT_PUBLIC_SITE_URL": "https://test.audentra.ai",
       "NEXT_PUBLIC_DEMO_STUDENT_LOGIN_ENABLED": "true",
       "NEXT_PUBLIC_DEMO_STAFF_LOGIN_ENABLED": "true",
       "NEXT_PUBLIC_EDWARD_DEBUG_ENABLED": "true",
-      "NEXT_PUBLIC_DEFAULT_TENANT_SLUG": "aster"
+      "NEXT_PUBLIC_DEFAULT_TENANT_SLUG": "aster-demo"
     }
   }
 }

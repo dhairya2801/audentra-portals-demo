@@ -261,7 +261,7 @@ export function dashboardStudentCalendarEntries(input: {
       typeof item.kind === "string" && item.kind.toLowerCase() === "deposit",
   );
   const depositDeadline =
-    !hasScheduledDeposit && validDate(dashboard.offer.responseDeadline)
+    !hasScheduledDeposit && dashboard.offer && validDate(dashboard.offer.responseDeadline)
     ? [
         {
           id: `payment:deposit:${dashboard.offer.id}`,

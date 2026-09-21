@@ -18,7 +18,7 @@ import { ferpaPortalScopeOptions } from "./ferpa-access-center";
  * interests, the institution's own email) are omitted rather than invented.
  */
 
-export type OfficeId = "registrar" | "support";
+export type OfficeId = "registrar" | "support" | "admissions";
 
 export interface Office {
   id: OfficeId;
@@ -76,11 +76,25 @@ export const channelOptions: ReadonlyArray<[ChannelId, string, string]> = [
 ];
 
 export function officesFor(
-  tenant: { shortName: string; contacts: { support: TenantContact } },
+  tenant: {
+    shortName: string;
+    contacts: { support: TenantContact; admissions?: TenantContact | null };
+  },
   bootstrapTenant: StudentBootstrap["tenant"] | undefined,
 ): Record<OfficeId, Office> {
   const support = tenant.contacts.support;
+  const admissions = tenant.contacts.admissions ?? null;
   return {
+    admissions: {
+      id: "admissions",
+      name: admissions?.label ?? "Admissions",
+      short: "Admissions",
+      holds: "Your offer: the program, term and campus you were admitted to, and your class year.",
+      where: null,
+      hours: admissions?.hours ?? null,
+      email: admissions?.email ?? bootstrapTenant?.admissionsEmail ?? null,
+      url: admissions?.url ?? null,
+    },
     registrar: {
       id: "registrar",
       name: "Office of the Registrar",
@@ -119,12 +133,29 @@ export function identityFor(profile: StudentProfile, photo: string | null) {
   };
 }
 
+/** What the admission offer says about the student — read from the dashboard, owned by Admissions. */
+export interface AcademicStanding {
+  programName: string | null;
+  termName: string | null;
+  campusName: string | null;
+  classYear: number | null;
+}
+
 export function buildProfile(
   profile: StudentProfile,
-  options: { photoOnFile: boolean; photoUnavailable: boolean; tenantShortName: string },
+  options: {
+    photoOnFile: boolean;
+    photoUnavailable: boolean;
+    tenantShortName: string;
+    /** `null` when the dashboard could not be read; omitted rows are never invented. */
+    academic?: AcademicStanding | null;
+  },
 ): { groups: FieldGroup[]; ownership: { yours: number; total: number }; blanks: number } {
   const legalName = [profile.firstName, profile.lastName].filter(Boolean).join(" ").trim();
   const { tenantShortName } = options;
+  const academic = options.academic;
+  const academicBlank =
+    academic === null ? "Couldn’t be read just now" : "Not on your record yet";
 
   const you: FieldGroup = {
     id: "you",
@@ -174,10 +205,45 @@ export function buildProfile(
         id: "student-id",
         label: "Student ID",
         owner: "registrar",
-        value: profile.studentId,
+        value: profile.externalRef ?? profile.studentId,
         mono: true,
-        note: "It never changes, and it is safe to quote in an email.",
+        note: profile.externalRef
+          ? "Your student number. It never changes, and it is safe to quote in an email."
+          : "It never changes, and it is safe to quote in an email.",
       },
+      ...(academic !== undefined
+        ? ([
+            {
+              id: "program",
+              label: "Program",
+              owner: "admissions",
+              value: academic?.programName?.trim() || null,
+              note: "The program on your admission offer.",
+              blank: academicBlank,
+            },
+            {
+              id: "term",
+              label: "Starting term",
+              owner: "admissions",
+              value: academic?.termName?.trim() || null,
+              blank: academicBlank,
+            },
+            {
+              id: "campus",
+              label: "Campus",
+              owner: "admissions",
+              value: academic?.campusName?.trim() || null,
+              blank: academicBlank,
+            },
+            {
+              id: "class-year",
+              label: "Class year",
+              owner: "admissions",
+              value: academic?.classYear ? `Class of ${academic.classYear}` : null,
+              blank: academicBlank,
+            },
+          ] satisfies ProfileField[])
+        : []),
     ],
   };
 

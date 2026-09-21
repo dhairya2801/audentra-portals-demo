@@ -1,4 +1,4 @@
-/** URL adapter only. Financial behavior stays in the unmodified concept document. */
+/** URL adapter only. Financial facts and planning behavior come from the canonical Financial Plan service. */
 export const conceptRoutes = {
   overview: "/financials",
   payments: "/financials/payments",

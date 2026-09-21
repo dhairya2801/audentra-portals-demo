@@ -23,6 +23,7 @@ import {
   type ComparisonFacts,
   type ComparisonSide,
   type EdwardExecutionMode,
+  type EdwardReadPlanner,
   comparisonDelta,
   comparisonFacts,
   fetchTraceWithRetry,
@@ -56,6 +57,7 @@ async function runOne(
   mode: EdwardExecutionMode,
   question: string,
   history: HistoryTurn[],
+  readPlanner: EdwardReadPlanner | undefined,
 ): Promise<ComparisonSide> {
   const started = performance.now();
   try {
@@ -67,7 +69,7 @@ async function runOne(
         ...(history.length > 0 ? { history } : {}),
       },
       undefined,
-      { executionMode: mode },
+      { executionMode: mode, ...(readPlanner ? { readPlanner } : {}) },
     );
     const latencyMs = performance.now() - started;
     const requestId = response.requestId ?? null;
@@ -120,6 +122,8 @@ function SideColumn({ facts, side }: { facts: ComparisonFacts; side: ComparisonS
         >
           {facts.error
             ? "Error"
+            : facts.unavailableReason ? "Unsupported comparison"
+            : !facts.modeConfirmed ? "Unverified"
             : `${facts.modelCallCount} model call${facts.modelCallCount === 1 ? "" : "s"}`}
         </span>
       </div>
@@ -128,6 +132,9 @@ function SideColumn({ facts, side }: { facts: ComparisonFacts; side: ComparisonS
           Unverified: no trace confirmed this turn ran in {facts.mode} mode. Treat
           its numbers as observations, not proof.
         </p>
+      ) : null}
+      {facts.unavailableReason ? (
+        <p className={styles.compareWarning} role="status">{facts.unavailableReason}</p>
       ) : null}
       {facts.unsupported ? (
         <p className={styles.compareWarning} role="status">
@@ -139,16 +146,16 @@ function SideColumn({ facts, side }: { facts: ComparisonFacts; side: ComparisonS
         <p className={styles.compareError} role="alert">
           {facts.error}
         </p>
-      ) : (
+      ) : facts.unavailableReason ? null : (
         <p className={styles.compareMessage}>{side.message}</p>
       )}
       <dl className={styles.summaryGrid}>
         <Metric label="Route" value={facts.requestType ?? "—"} />
         <Metric label="Selection" value={facts.toolSelectionSource ?? "—"} />
-        <Metric label="Response source" value={facts.responseSource ?? "—"} />
+        <Metric label="Response source" value={facts.unavailableReason ? "Planner unavailable" : facts.responseSource ?? "—"} />
         <Metric label="Provider" value={facts.provider ?? "—"} />
         <Metric label="Model" value={facts.model ?? "—"} />
-        <Metric label="Model calls" value={String(facts.modelCallCount)} />
+        <Metric label="Model calls" value={side.trace ? String(facts.modelCallCount) : "—"} />
         <Metric label="Tokens" value={formatTokens(facts.totalTokens)} />
         <Metric label="Est. cost" value={formatUsd(facts.estimatedCostUsd)} />
         <Metric label="Server duration" value={formatMs(facts.serverDurationMs)} />
@@ -156,7 +163,7 @@ function SideColumn({ facts, side }: { facts: ComparisonFacts; side: ComparisonS
         <Metric
           label="Tools"
           value={`${facts.toolCallCount}${
-            facts.dependencyToolCount > 0 ? ` (+${facts.dependencyToolCount} dep)` : ""
+            facts.dependencyToolCount > 0 ? ` total (${facts.dependencyToolCount} dependency)` : ""
           }`}
         />
         <Metric label="Evidence facts" value={String(facts.evidenceCount)} />
@@ -184,7 +191,7 @@ function SideColumn({ facts, side }: { facts: ComparisonFacts; side: ComparisonS
       ) : null}
       {facts.failureCodes.length > 0 ? (
         <div className={styles.compareChips}>
-          {facts.failureCodes.map((code) => (
+          {facts.failureCodes.filter(code => code !== "university_planner_required").map((code) => (
             <span key={code} className={styles.failureChip}>
               {code}
             </span>
@@ -200,7 +207,14 @@ function SideColumn({ facts, side }: { facts: ComparisonFacts; side: ComparisonS
   );
 }
 
-export function EdwardLabCompare({ resetKey }: { resetKey: string }) {
+export function EdwardLabCompare({
+  resetKey,
+  readPlanner,
+}: {
+  resetKey: string;
+  /** The Lab's pinned read planner, applied to both runs so the mode is the only difference. */
+  readPlanner?: EdwardReadPlanner;
+}) {
   const [question, setQuestion] = useState<string>(COMPARISON_EXPERIMENTS[0].question);
   const [history, setHistory] = useState<HistoryTurn[]>([]);
   const [running, setRunning] = useState(false);
@@ -223,13 +237,13 @@ export function EdwardLabCompare({ resetKey }: { resetKey: string }) {
       // Sequential on purpose: two concurrent turns would share the same
       // process and muddy the latency each one reports.
       for (const mode of MODES) {
-        sides[mode] = await runOne(mode, asked, history);
+        sides[mode] = await runOne(mode, asked, history, readPlanner);
       }
       setRun({ question: asked, history, sides });
     } finally {
       setRunning(false);
     }
-  }, [history, question, running]);
+  }, [history, question, running, readPlanner]);
 
   const normalFacts = run ? comparisonFacts(run.sides.default) : null;
   const deterministicFacts = run ? comparisonFacts(run.sides.deterministic) : null;
@@ -312,7 +326,12 @@ export function EdwardLabCompare({ resetKey }: { resetKey: string }) {
               confirming the requested mode.
             </p>
           ) : null}
-          <dl className={styles.summaryGrid}>
+          {!delta.comparable ? (
+            <p className={styles.compareWarning} role="status">
+              These runs do not form a supported, verified comparison. Timing, token and cost savings are unavailable.
+            </p>
+          ) : null}
+          {delta.comparable ? <dl className={styles.summaryGrid}>
             <Metric label="Same final message" value={delta.sameMessage ? "yes" : "no"} />
             <Metric label="Same route" value={delta.sameRequestType ? "yes" : "no"} />
             <Metric label="Same tool reads" value={delta.sameTools ? "yes" : "no"} />
@@ -329,7 +348,7 @@ export function EdwardLabCompare({ resetKey }: { resetKey: string }) {
             />
             <Metric label="Tokens avoided" value={formatTokens(delta.tokensSaved)} />
             <Metric label="Cost avoided" value={formatUsd(delta.costSavedUsd)} />
-          </dl>
+          </dl> : null}
           {delta.toolsOnlyInNormal.length > 0 || delta.toolsOnlyInDeterministic.length > 0 ? (
             <p className={styles.compareHistoryNote}>
               {delta.toolsOnlyInNormal.length > 0

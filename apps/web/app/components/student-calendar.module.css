@@ -456,3 +456,11 @@
 .detail a {
   background: var(--portal-accent-strong, #45358e);
 }
+
+.scrollHint { display: none; }
+@media (max-width: 680px) {
+  .scrollHint { display: block; margin: 0 6px 12px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+}
+@container (max-width: 540px) {
+  .scrollHint { display: block; margin: 0 6px 12px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+}

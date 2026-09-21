@@ -22,7 +22,6 @@ import PageError from "../design-system/patterns/PageError.jsx";
 import PageSkeleton from "../design-system/patterns/PageSkeleton.jsx";
 import StateCard from "../design-system/patterns/StateCard.jsx";
 import SummaryFigure from "../design-system/patterns/SummaryFigure.jsx";
-import { officeAdvisor } from "../components/office-contact";
 import { PortalShell } from "../components/portal-shell";
 import { PointsInfoModal } from "../components/points-popover";
 import { EnrollmentTaskCard } from "../components/enrollment-task-card";
@@ -208,8 +207,9 @@ export default function EnrollmentPage() {
   });
 
   const contact = tenant.contacts.admissions ?? tenant.contacts.support ?? null;
-  // A person, not the office's own label — `components/office-contact.ts`.
-  const advisor = officeAdvisor("admissions", contact, "Your admissions contact");
+  const advisor = contact
+    ? { name: contact.label, label: "Your admissions contact", office: null as string | null }
+    : null;
   const onContact = (kind: "email" | "message") => {
     if (kind === "message" && messagesAllowed) {
       router.push(href("/messages"));

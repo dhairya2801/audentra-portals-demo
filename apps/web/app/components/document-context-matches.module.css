@@ -68,24 +68,6 @@
   text-decoration: underline;
 }
 
-.apply {
-  align-self: center;
-  border: 0;
-  border-radius: 0.65rem;
-  padding: 0.55rem 0.7rem;
-  background: #143f70;
-  color: #fff;
-  font: inherit;
-  font-size: 0.86rem;
-  font-weight: 750;
-  cursor: pointer;
-}
-
-.apply:disabled {
-  cursor: wait;
-  opacity: 0.7;
-}
-
 @media (max-width: 640px) {
   .heading,
   .item {
