@@ -596,8 +596,9 @@ dialog.pop::backdrop{background:var(--scrim);backdrop-filter:blur(3px)}
 </style>
 
 <link rel="stylesheet" href="canonical-plan.css">
+<link rel="stylesheet" href="../portal-theme/financials.css">
 </head>
-<body>
+<body class="portal-refresh">
 <div class="app-shell">
   <div id="sidebar-slot"></div>
   <section class="workspace">
@@ -608,7 +609,7 @@ dialog.pop::backdrop{background:var(--scrim);backdrop-filter:blur(3px)}
         <div class="hero-copy">
           <p class="eyebrow"><span class="flag">Loading university record</span> My Financials · Fall 2026</p>
           <h1>Know what’s covered. Plan what’s next.</h1>
-          <p class="hero-lede">Understand your cost of attendance: committed university expenses such as tuition, housing and meals, plus the living costs you manage yourself. See what your aid covers, plan your out-of-pocket payments, and explore next semester.</p>
+          <p class="hero-lede">See what your aid covers, understand university and living costs, and plan what you’ll pay this semester and next.</p>
         </div>
         <div class="hero-motif"><span class="orbit-ring"></span><span class="orbit-ring two"></span><span class="orbit-core" id="motif-icon"></span><span class="spark-dot a"></span><span class="spark-dot b"></span><span class="spark-dot c"></span></div>
       </header>
@@ -620,7 +621,7 @@ dialog.pop::backdrop{background:var(--scrim);backdrop-filter:blur(3px)}
             <strong class="big" id="sum-figure">—</strong>
             <p id="sum-copy"></p>
           </div>
-          <div class="advisor-bar"><span class="avatar">FA</span><div class="who"><span class="panel-label">Your financial aid contact</span><strong>Financial Aid office</strong></div><button class="advisor-action" type="button" aria-label="Ask Edward about my financial aid contact" onclick="askEdward('Who is my financial aid adviser?')">E</button></div>
+          <div class="advisor-bar"><span class="avatar" aria-hidden="true">FA</span><div class="who"><span class="panel-label">Your financial aid contact</span><strong>Financial Aid office</strong></div><button class="advisor-action" type="button" aria-label="Ask Edward about my financial aid contact" onclick="askEdward('Who is my financial aid adviser?')">E</button></div>
         </div>
         <div class="summary-alert"><div class="action-band" id="band"></div></div>
       </section>

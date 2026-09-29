@@ -52,6 +52,7 @@ import {
 } from "../lib/api-client";
 import { latestDocumentForCategory } from "../lib/document-extraction-ui";
 import { formatTenantDate, formatTenantMoney } from "../lib/tenant";
+import { loadOnboardingProfile } from "./profile";
 import { getPostAcceptanceRoute } from "./offer-acceptance";
 import {
   CITIZENSHIP,
@@ -205,7 +206,7 @@ type OnboardingPageData = {
   onboarding: StudentOnboarding;
   dashboard: StudentDashboard;
   payments: StudentPaymentList;
-  profile: StudentProfile;
+  profile: StudentProfile | null;
   housingPlan: StudentHousingPlan;
   documents: StudentDocumentList;
   ferpa: StudentFerpaAuthorization | null;
@@ -288,7 +289,7 @@ function OnboardingFlow({
   housingPlan: StudentHousingPlan;
   initialDocuments: StudentDocumentList;
   initialFerpa: StudentFerpaAuthorization | null;
-  profile: StudentProfile;
+  profile: StudentProfile | null;
   reload: () => void;
 }) {
   const tenantRuntime = useTenant();
@@ -308,7 +309,7 @@ function OnboardingFlow({
   );
   const [documents, setDocuments] = useState<StudentDocument[]>(initialDocuments.items);
   const [ferpa, setFerpa] = useState(initialFerpa);
-  const [profileVersion, setProfileVersion] = useState(profile.version);
+  const [profileVersion, setProfileVersion] = useState(profile?.version);
   const [depositPayment, setDepositPayment] = useState(() =>
     initialPayments.items.find((payment) => payment.status === "succeeded") ?? null,
   );
@@ -551,10 +552,14 @@ function OnboardingFlow({
   });
 
   /** The only path by which a platform step becomes saved. */
-  async function putStep(step: OnboardingStep, values: Partial<StudentOnboardingData>) {
-    const nextData = editableOnboardingData({ ...onboarding.data, ...values });
+  async function putStep(
+    step: OnboardingStep,
+    values: Partial<StudentOnboardingData>,
+    current = onboarding,
+  ) {
+    const nextData = editableOnboardingData({ ...current.data, ...values });
     const result = await save.run({
-      expectedVersion: onboarding.version,
+      expectedVersion: current.version,
       currentStep: step,
       data: nextData,
     });
@@ -694,7 +699,7 @@ function OnboardingFlow({
   }
 
   async function savePronouns() {
-    if (draft.pronouns === undefined || draft.pronouns === profile.pronouns) return;
+    if (!profile || profileVersion === undefined || draft.pronouns === undefined || draft.pronouns === profile.pronouns) return;
     try {
       const updated = await updateStudentProfile({
         expectedVersion: profileVersion,
@@ -820,13 +825,17 @@ function OnboardingFlow({
         }
         case "review": {
           await signFerpaWithoutDelegates();
+          // FERPA completion also updates the canonical onboarding record.
+          // Read that version before saving the enrollment acknowledgment.
+          const signed = await getStudentOnboarding();
+          setOnboarding(withScreenConfiguration(signed));
           afterSave(
             await putStep("review_and_sign", {
               signatureFullName: signature.trim(),
               signatureMethod: "typed",
               signatureConsent: true,
               signedDocumentIds: onboardingDocumentsForTenant(tenant.slug).map((doc) => doc.id),
-            }),
+            }, signed),
           );
           break;
         }
@@ -896,7 +905,7 @@ function OnboardingFlow({
       const result = await complete.run(onboarding.version, key);
       completeKey.current = null;
       setOnboarding(withScreenConfiguration(result));
-      window.location.replace(tenantRuntime.href("/dashboard"));
+      window.location.replace(tenantRuntime.href("/enrollment"));
     } catch (caught) {
       if (caught instanceof ApiClientError && caught.status === 409) setConflict(true);
       setFailed(getApiErrorMessage(caught));
@@ -990,6 +999,8 @@ function OnboardingFlow({
         ? await issueLinks(result.authorization)
         : result.authorization;
     setFerpa(withLinks);
+    // Granting or removing access updates onboarding's family permissions.
+    setOnboarding(withScreenConfiguration(await getStudentOnboarding()));
     return withLinks;
   }
 
@@ -1117,9 +1128,10 @@ function OnboardingFlow({
       case "details":
         return (
           <DetailsStep
+            profileAvailable={profile !== null}
             institution={institution}
             data={data}
-            pronouns={draft.pronouns === undefined ? profile.pronouns : draft.pronouns}
+            pronouns={draft.pronouns === undefined ? profile?.pronouns : draft.pronouns}
             coreFields={coreFields}
             customPages={customPages}
             customProblems={attempted ? customProblems : {}}
@@ -1216,7 +1228,7 @@ function OnboardingFlow({
             institution={institution}
             offer={offer}
             data={data}
-            pronouns={draft.pronouns === undefined ? profile.pronouns : draft.pronouns}
+            pronouns={draft.pronouns === undefined ? profile?.pronouns : draft.pronouns}
             identityDocument={identityDocument}
             immunizationDocument={immunizationDocument}
             photoDocument={photoDocument}
@@ -1257,7 +1269,7 @@ function OnboardingFlow({
 
   if (closed) {
     return (
-      <div className="onboarding closed">
+      <div className="onboarding closed portal-refresh">
         <main className="flow-page" id="onboarding-main">
           <header className="topbar flow-topbar">
             <div className="topbar-title" />
@@ -1286,7 +1298,7 @@ function OnboardingFlow({
   }
 
   return (
-    <div className="onboarding">
+    <div className="onboarding portal-refresh">
       <StepRail
         brand={{
           mark: <PortalMark />,
@@ -1363,8 +1375,8 @@ function OnboardingFlow({
                   <p className="step-failed" role="alert">
                     <Icon name="alert" size={16} />
                     <span>
-                      <strong>That didn’t reach {institution}.</strong>
-                      {failed} Nothing was lost, and what you typed is still here.
+                      <strong>That step couldn’t be saved.</strong>{" "}
+                      {failed}{" "}Your entries are still here.
                       {conflict ? (
                         <>
                           {" "}
@@ -1534,7 +1546,7 @@ function OnboardingResource() {
           getStudentOnboarding(signal),
           getStudentDashboard(signal),
           getStudentPayments(signal),
-          getStudentProfile(signal),
+          loadOnboardingProfile(() => getStudentProfile(signal)),
           getStudentHousingPlan(signal),
           getStudentDocuments(signal),
           getStudentFerpaAuthorization(signal),
@@ -1547,12 +1559,12 @@ function OnboardingResource() {
           ...onboarding,
           data: {
             ...onboarding.data,
-            firstName: onboarding.data.firstName || realProfileName(profile.firstName, "Student"),
-            lastName: onboarding.data.lastName || realProfileName(profile.lastName, "Account"),
+            firstName: onboarding.data.firstName || realProfileName(profile?.firstName, "Student"),
+            lastName: onboarding.data.lastName || realProfileName(profile?.lastName, "Account"),
             preferredName:
-              onboarding.data.preferredName || realProfileName(profile.preferredName, "Student"),
-            personalEmail: onboarding.data.personalEmail || profile.email || undefined,
-            mobilePhone: onboarding.data.mobilePhone || profile.mobilePhone || undefined,
+              onboarding.data.preferredName || realProfileName(profile?.preferredName, "Student"),
+            personalEmail: onboarding.data.personalEmail || profile?.email || undefined,
+            mobilePhone: onboarding.data.mobilePhone || profile?.mobilePhone || undefined,
           },
         },
         dashboard,
@@ -1569,7 +1581,7 @@ function OnboardingResource() {
 
   if (onboarding.status === "loading") {
     return (
-      <main className="load-state" aria-busy="true" aria-live="polite">
+      <main className="load-state onboarding-state portal-refresh" aria-busy="true" aria-live="polite">
         <div className="load-state__card">
           <PortalMark />
           <p className="eyebrow">{tenant.name}</p>
@@ -1583,7 +1595,7 @@ function OnboardingResource() {
 
   if (onboarding.status === "error") {
     return (
-      <main className="load-state">
+      <main className="load-state onboarding-state portal-refresh">
         <div className="load-state__card" role="alert">
           <PortalMark />
           <p className="eyebrow">{tenant.name}</p>
@@ -1610,7 +1622,19 @@ function OnboardingResource() {
   }
 
   if (!onboarding.data.dashboard.offer) {
-    return <p>Your application has no admission offer to accept. Review its status on your dashboard.</p>;
+    return (
+      <main className="load-state onboarding-state portal-refresh">
+        <div className="load-state__card">
+          <PortalMark />
+          <p className="eyebrow">{tenant.name}</p>
+          <h1>No admission offer yet</h1>
+          <p>Your application has no admission offer available to accept yet.</p>
+          <button className="button button--primary" type="button" onClick={onboarding.reload}>
+            Check again
+          </button>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -1652,7 +1676,7 @@ export default function OnboardingPage() {
 
   if (bootstrap.status === "loading" || needsSignIn || isDelegate || alreadyComplete) {
     return (
-      <main className="load-state" aria-busy="true" aria-live="polite">
+      <main className="load-state onboarding-state portal-refresh" aria-busy="true" aria-live="polite">
         <div className="load-state__card">
           <PortalMark />
           <p className="eyebrow">{tenant.name}</p>
@@ -1666,7 +1690,7 @@ export default function OnboardingPage() {
 
   if (bootstrap.status === "error") {
     return (
-      <main className="load-state">
+      <main className="load-state onboarding-state portal-refresh">
         <div className="load-state__card" role="alert">
           <PortalMark />
           <p className="eyebrow">{tenant.name}</p>

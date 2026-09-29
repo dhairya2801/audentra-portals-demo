@@ -1,0 +1,100 @@
+/* Extend the existing primitives, without replacing their markup or behavior.
+ * Scope limits keep every Edward surface and contextual entry point on the
+ * original stylesheet. Do not put inherited properties on the scope root. */
+@scope (.portal-refresh) to ([class*="edward"], [aria-label*="Edward"], [data-portal-item="edward"], [data-edward-preserve], .staff-automation-banner, .brew-detail__aside, .upload-failed-actions, .task-action) {
+  :is(.primary-button, .button--primary, .btn.primary, .brew-primary) {
+    background: var(--portal-primary);
+    border-color: var(--portal-primary);
+    color: #fff;
+    border-radius: var(--portal-radius-control);
+    box-shadow: none;
+    font-size: 13px;
+    font-weight: 600;
+    min-height: 38px;
+    transition: background var(--portal-motion), border-color var(--portal-motion);
+  }
+  :is(.primary-button, .button--primary, .btn.primary, .brew-primary):hover:not(:disabled) {
+    background: var(--portal-primary-hover);
+    border-color: var(--portal-primary-hover);
+    box-shadow: none;
+    transform: none;
+  }
+  :is(.secondary-button, .button--secondary, .btn:not(.primary):not(.danger):not(.success):not(.toggled):not(.correction-btn), .brew-secondary) {
+    border: 1px solid var(--portal-border-strong);
+    border-radius: var(--portal-radius-control);
+    background: var(--portal-surface);
+    color: var(--portal-ink);
+    font-size: 13px;
+    font-weight: 550;
+    min-height: 36px;
+    box-shadow: none;
+  }
+  :is(.secondary-button, .button--secondary, .btn:not(.primary):not(.danger):not(.success):not(.toggled):not(.correction-btn), .brew-secondary):hover:not(:disabled) {
+    background: var(--portal-subtle);
+    border-color: var(--portal-muted);
+  }
+  :is(.primary-button, .secondary-button, .button, .btn, .brew-primary, .brew-secondary):disabled:not([aria-busy=true]) {
+    opacity: .5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+  :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--portal-primary);
+    outline-offset: 3px;
+  }
+  :is(.field, .auth-form, .staff-auth-form, .staff-form-grid, .staff-content-form, .step-panel) :is(input:not([type=checkbox]):not([type=radio]), select, textarea) {
+    border: 1px solid var(--portal-border-strong);
+    border-radius: var(--portal-radius-control);
+    background: var(--portal-surface);
+    color: var(--portal-ink);
+    font: 14px/1.5 var(--portal-font);
+    min-height: 42px;
+    box-shadow: none;
+  }
+  :is(.field, .auth-form, .staff-auth-form, .staff-form-grid, .staff-content-form, .step-panel) :is(input, textarea)::placeholder {
+    color: var(--portal-muted);
+    opacity: 1;
+  }
+  :is(.field, .auth-form, .staff-auth-form, .staff-form-grid, .step-panel) :is(input, select, textarea):focus {
+    border-color: var(--portal-primary);
+  }
+  :is(.field, .auth-form, .staff-auth-form, .staff-form-grid, .step-panel) :is(input, select, textarea)[aria-invalid=true] {
+    border-color: var(--portal-danger);
+  }
+  :is(.section-card, .resource-state, .state-card, .staff-panel) {
+    border-color: var(--portal-border);
+    border-radius: var(--portal-radius-card);
+    box-shadow: var(--portal-shadow-card);
+  }
+  :is(.card-heading, .status-heading, .card-foot, .staff-panel__heading) { border-color: var(--portal-border); }
+  :is(.card-heading, .status-heading, .staff-panel__heading) h2 { font-size: 17px; letter-spacing: -.02em; }
+  :is(.card-heading, .status-heading, .staff-panel__heading) p { font-size: 13px; line-height: 1.5; color: var(--portal-muted); }
+  :is(.pill, .status-pill, .staff-status-pill, .badge) { font-variant-numeric: tabular-nums; }
+  :is(.drawer, .modal, .info-modal, .staff-dialog, .action-dialog) {
+    border-color: var(--portal-border);
+    border-radius: var(--portal-radius-panel);
+    box-shadow: var(--portal-shadow-float);
+  }
+  :is(.drawer-title, .modal-title, .staff-dialog__heading h2) { font-size: 22px; letter-spacing: -.025em; }
+  :is(.drawer-content, .modal-body) > p { font-size: 14px; line-height: 1.65; }
+  :is(.action-feedback, .field-error) { font-size: 13px; line-height: 1.5; }
+  .field-error { color: var(--portal-danger); }
+  .action-feedback--success { color: var(--portal-success); background: var(--portal-success-soft); }
+  :is(.resource-state, .state-card) > p { font-size: 14px; color: var(--portal-secondary); }
+  :is(.tabs, .page-tabs, .segmented) { border-color: var(--portal-border); }
+  :is(.tabs, .page-tabs) :is(a, button) { font-size: 13px; min-height: 40px; }
+  :is(.segmented, .segment) button { min-height: 32px; font-size: 12px; }
+  :is(.segmented, .segment) button[aria-pressed=true] { color: var(--portal-primary-ink); background: var(--portal-primary-soft); }
+  @media (prefers-reduced-motion: reduce) {
+    :is(.primary-button, .secondary-button, .button, .btn, .task-card, .section-card, .drawer, .modal, .brew-kpi__primary, .brew-kpi__bar i) {
+      animation: none;
+      transition: none;
+      scroll-behavior: auto;
+    }
+  }
+  @media (max-width: 620px) {
+    :is(.primary-button, .secondary-button, .button, .field input, .field select) { min-height: 44px; }
+    :is(.field, .auth-form, .step-panel) :is(input, select, textarea) { font-size: 16px; }
+  }
+}

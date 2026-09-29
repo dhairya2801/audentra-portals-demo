@@ -1,0 +1,40 @@
+/* Shared by the React portals and their existing embedded workspaces.
+ * Deliberately separate names: Edward continues to resolve the original tokens.
+ * No inherited font, color, or legacy variable is changed at this boundary. */
+.portal-refresh {
+  --portal-primary: #6a38ff;
+  --portal-primary-hover: #5425db;
+  --portal-primary-ink: #5124c6;
+  --portal-primary-soft: #f2eeff;
+  --portal-primary-line: #d9ccff;
+  --portal-ink: #0a1f44;
+  --portal-secondary: #475467;
+  --portal-muted: #667085;
+  --portal-canvas: #f6f7fb;
+  --portal-surface: #fff;
+  --portal-subtle: #f9fafc;
+  --portal-border: #e4e7ee;
+  --portal-border-strong: #c4cbd8;
+  --portal-success: #06745f;
+  --portal-success-soft: #eaf8f2;
+  --portal-info: #1e5bff;
+  --portal-info-ink: #234eab;
+  --portal-info-soft: #eef4ff;
+  --portal-warning: #905a0c;
+  --portal-warning-soft: #fff8e8;
+  --portal-danger: #b42338;
+  --portal-danger-soft: #fff0f2;
+  --portal-radius-control: 8px;
+  --portal-radius-card: 12px;
+  --portal-radius-panel: 16px;
+  --portal-space-xs: 4px;
+  --portal-space-sm: 8px;
+  --portal-space-md: 12px;
+  --portal-space-lg: 16px;
+  --portal-space-xl: 24px;
+  --portal-space-2xl: 32px;
+  --portal-shadow-card: 0 1px 3px #0a1f4408;
+  --portal-shadow-float: 0 20px 60px #0a1f4426, 0 4px 12px #0a1f440d;
+  --portal-font: 'Geist Variable', 'Geist', Arial, sans-serif;
+  --portal-motion: 150ms ease;
+}

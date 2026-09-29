@@ -238,7 +238,7 @@ export function StaffSignIn({ onSignedIn }: { onSignedIn: () => void }) {
   };
 
   return (
-    <main className="staff-entry">
+    <main className="staff-entry portal-refresh">
       <section className="staff-entry__card" aria-labelledby="staff-auth-title">
         <PortalMark />
         <p className="eyebrow">{tenantRuntime.tenant.name}</p>

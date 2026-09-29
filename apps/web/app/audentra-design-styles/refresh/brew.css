@@ -1,0 +1,57 @@
+@scope (.portal-refresh) to ([class*="edward"], [aria-label*="Edward"], [data-portal-item="edward"], [data-edward-preserve], .staff-automation-banner, .brew-detail__aside, .upload-failed-actions) {
+/* The brief keeps its editorial greeting and current sections. The assistant
+   panel and all .brew-kpi__edward / .brew-edward-* controls are untouched. */
+:scope .brew-hero { background: var(--portal-surface); border: 1px solid var(--portal-border); border-radius: var(--portal-radius-card); box-shadow: none; }
+:scope .brew-hero__greeting h1 { font-size: clamp(26px, 2.5vw, 36px); line-height: 1.2; }
+:scope .brew-hero__deck { font-size: 14px; line-height: 1.65; max-width: 36rem; }
+:scope .brew-hero__meta { font-size: 12px; color: var(--portal-muted); }
+:scope .brew-section-head h2 { font: 650 18px/1.4 var(--portal-font); letter-spacing: -.02em; }
+:scope .brew-section-head h2 small { font-size: 12px; color: var(--portal-muted); }
+:scope :is(.brew-panel, .brew-setup) { border-color: var(--portal-border); border-radius: var(--portal-radius-card); background: var(--portal-surface); box-shadow: var(--portal-shadow-card); }
+:scope .brew-panel__head { padding: 16px 18px; }
+:scope .brew-panel__title { font-size: 12px; letter-spacing: .04em; }
+:scope .brew-panel__views { gap: 6px; padding: 10px 16px; }
+:scope .brew-panel__views button { border-radius: 6px; font-size: 11px; min-height: 30px; }
+:scope .brew-panel__views button.is-active { background: var(--portal-primary-soft); color: var(--portal-primary-ink); border-color: var(--portal-primary-line); }
+:scope .brew-kpi { padding: 10px 16px; border-color: var(--portal-border); }
+:scope .brew-kpi__head .brew-stretch { font-size: 12px; color: var(--portal-secondary); }
+:scope .brew-kpi__value { font: 650 28px/1.2 var(--portal-font); letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+:scope .brew-kpi__of { font-size: 12px; color: var(--portal-muted); }
+:scope .brew-kpi__target :is(small, b) { font-size: 11px; }
+:scope .brew-kpi__note { font-size: 11px; color: var(--portal-muted); }
+:scope .brew-move b { font-size: 12px; }
+:scope .brew-move small { font-size: 11px; }
+:scope .brew-row__cue { font-size: 12px; line-height: 1.5; }
+:scope :is(.brew-email__body, .brew-email-row__role) { font-size: 12px; line-height: 1.6; }
+:scope .brew-setup__header h1 { font: 650 clamp(25px, 2.5vw, 32px)/1.25 var(--portal-font); letter-spacing: -.03em; }
+:scope .brew-setup__header p { font-size: 14px; line-height: 1.65; }
+:scope .brew-detail { border: 1px solid var(--portal-border); border-radius: var(--portal-radius-panel); box-shadow: var(--portal-shadow-float); }
+:scope .brew-detail__title-row h1 { font: 650 26px/1.3 var(--portal-font); letter-spacing: -.025em; }
+:scope :is(.brew-detail__lede, .brew-detail__paragraph) { font-size: 14px; line-height: 1.7; color: var(--portal-secondary); }
+:scope .brew-detail__section h2 { font: 600 17px/1.4 var(--portal-font); }
+:scope .brew-detail__note { font-size: 12px; line-height: 1.6; }
+:scope .brew-detail__close { min-width: 36px; min-height: 36px; border-radius: 8px; }
+@media (max-width: 1180px) {
+  :scope .brew-day-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :scope .brew-day-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+@media (max-width: 700px) {
+  :scope .brew-day-grid { grid-template-columns: minmax(0, 1fr); }
+  :scope .brew-hero { padding: 20px; }
+  :scope .brew-hero__cards { grid-template-columns: minmax(0, 1fr); }
+  :scope .brew-panel__views button { min-height: 36px; }
+}
+
+:scope .brew-news-card__fallback { display: grid; place-items: center; background: var(--portal-info-soft); color: var(--portal-info-ink); font: 650 16px/1 var(--portal-font); letter-spacing: -.02em; }
+
+/* Detail views need readable labels and aligned values as well as large KPIs. */
+:scope .brew-table { font: 13px/1.5 var(--portal-font); font-variant-numeric: tabular-nums; }
+:scope .brew-table :is(th, td) { padding: 12px 14px; }
+:scope .brew-table thead th { font-size: 11px; color: var(--portal-muted); }
+:scope .brew-move-list li > span, :scope .brew-move-list li > em { font-size: 12px; }
+:scope .brew-metric-overview > div > :is(small, p) { font-size: 13px; line-height: 1.5; }
+:scope .brew-note-list { font-size: 13px; line-height: 1.65; }
+:scope .brew-goal__target, :scope .brew-goal > small, :scope .brew-goal__outlook { font-size: 12px; }
+:scope .brew-goal__target small { font-size: 11px; }
+
+}

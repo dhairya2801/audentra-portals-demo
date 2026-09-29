@@ -39,6 +39,7 @@ export type DetailsProblems = Partial<
  */
 export function DetailsStep({
   institution,
+  profileAvailable,
   data,
   pronouns,
   coreFields,
@@ -55,6 +56,7 @@ export function DetailsStep({
   onAskHelp,
 }: {
   institution: string;
+  profileAvailable: boolean;
   data: StudentOnboardingData;
   pronouns: string | null | undefined;
   coreFields: Map<keyof StudentOnboardingData, StudentRequirementInputField>;
@@ -116,12 +118,20 @@ export function DetailsStep({
             onChange={(value: string) => onChange({ preferredName: value })}
           />
 
-          <Select
-            label="Pronouns, optional"
-            value={pronouns ?? ""}
-            options={[{ value: "", label: "I’d rather not say" }, ...PRONOUNS]}
-            onChange={(next: string) => onPronouns(next || null)}
-          />
+          <fieldset className="onboarding-profile-field" disabled={!profileAvailable}>
+            <Select
+              label="Pronouns, optional"
+              value={pronouns ?? ""}
+              options={[
+                { value: "", label: profileAvailable ? "I’d rather not say" : "Profile not available yet" },
+                ...PRONOUNS,
+              ]}
+              onChange={(next: string) => onPronouns(next || null)}
+              hint={!profileAvailable
+                ? "Pronouns can be added in My Profile when your student profile is available. You can continue onboarding now."
+                : undefined}
+            />
+          </fieldset>
 
           <Notice tone="quiet" icon="help" action={{ label: "Ask for help", onClick: onAskHelp }}>
             If the name on your offer is wrong, ask now and keep going. Nothing here holds you up,

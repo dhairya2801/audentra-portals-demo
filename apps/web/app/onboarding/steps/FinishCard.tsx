@@ -44,8 +44,8 @@ export function FinishCard({
           title="That’s onboarding done."
           note={
             skipped
-              ? `${saved} steps saved and ${skipped} set aside. Nothing is waiting on you today.`
-              : `All ${saved} steps saved. Nothing is waiting on you today.`
+              ? `${saved} steps saved and ${skipped} set aside. Your enrollment checklist shows what still needs attention.`
+              : `All ${saved} steps saved. Your enrollment checklist shows what still needs attention.`
           }
         />
         <div className="card-body">
@@ -66,7 +66,7 @@ export function FinishCard({
             kind="card"
             icon="half"
             title="What you set aside"
-            note="Still open, still yours, and none of it is late."
+            note="You can return to these in your portal."
           />
           <CardRows>
             {skippedScreens.map((screen) => {

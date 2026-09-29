@@ -13,6 +13,7 @@ import PageError from "../design-system/patterns/PageError.jsx";
 import PageSkeleton from "../design-system/patterns/PageSkeleton.jsx";
 import StateCard from "../design-system/patterns/StateCard.jsx";
 import ToastStack from "../design-system/patterns/Toast.jsx";
+import SummaryFigure from "../design-system/patterns/SummaryFigure.jsx";
 import { useToasts } from "../design-lib/toast.js";
 import { onHandoff, takeHandoff } from "../design-lib/door.js";
 import { AppointmentsBookingDrawer } from "../components/appointments-booking-drawer";
@@ -171,7 +172,19 @@ export default function AppointmentsPage() {
   return (
     <PortalShell
       active="appointments"
-      rail={<AppointmentsRail institution={tenant.shortName} onOpenHow={() => setHow(true)} />}
+      summaryLabel="Your advising summary"
+      summary={appointments.status === "ready" && advising.data ? (
+        <AdviserSummary
+          advising={advising.data}
+          onBook={(node) => openBooking(typeById("academic_advising"), node)}
+        />
+      ) : undefined}
+      rail={
+        <>
+          <AppointmentsRail institution={tenant.shortName} onOpenHow={() => setHow(true)} />
+          {appointments.status === "ready" && advising.data ? <AdvisingContacts advising={advising.data} /> : null}
+        </>
+      }
     >
       {appointments.status === "loading" ? (
         <PageSkeleton label="your appointments" />
@@ -179,12 +192,6 @@ export default function AppointmentsPage() {
         <PageError label="your appointments" onRetry={appointments.reload} />
       ) : (
         <>
-          {advising.data ? (
-            <AdviserCard
-              advising={advising.data}
-              onBook={(node) => openBooking(typeById("academic_advising"), node)}
-            />
-          ) : null}
           <Card aria-labelledby="book-heading">
             <CardHead
               kind="status"
@@ -322,10 +329,53 @@ export default function AppointmentsPage() {
  * Who the student's academic adviser is, what their state means for the student, and the way to
  * book them — the standing relationship the platform now records, shown before any topic list.
  */
-function AdviserCard({ advising, onBook }: { advising: StudentAdvising; onBook: (node: HTMLElement | null) => void }) {
+function AdviserSummary({ advising, onBook }: { advising: StudentAdvising; onBook: (node: HTMLElement | null) => void }) {
   const { tenant } = useTenant();
   const primary = advising.primaryAdviser;
   const gap = advising.gaps[0] ?? null;
+  const standing = advising.advising.status === "completed"
+    ? "You have met"
+    : advising.advising.status === "scheduled"
+      ? "Meeting booked"
+      : advising.advising.status === "missed"
+        ? "A meeting was missed"
+        : "Not yet met";
+  const availability = gap
+    ? gap.message
+    : primary
+      ? primary.availability.nextOpenSlotAt
+        ? `Next open time: ${formatTenantDate(primary.availability.nextOpenSlotAt, tenant, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
+        : "No open times published."
+      : "No academic adviser has been assigned to you yet.";
+
+  return (
+    <>
+      <SummaryFigure label="Academic advising" figure={standing}>
+        {availability}
+      </SummaryFigure>
+      {primary ? (
+        <div className="advisor-bar appointments-summary__adviser">
+          <span className="avatar avatar-md" aria-hidden="true">
+            {primary.staff.name.split(" ").map((part) => part.slice(0, 1)).join("").slice(0, 2)}
+          </span>
+          <div className="advisor-bar-copy">
+            <span className="panel-label">Your adviser</span>
+            <strong>{primary.staff.name}</strong>
+          </div>
+          {!gap ? (
+            <button type="button" className="secondary-button appointments-summary__book" aria-label={`Book time with ${primary.staff.name.split(" ")[0]}`} onClick={(event) => onBook(event.currentTarget)}>
+              Book time
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+/** Supporting details stay available below the compact header summary. */
+function AdvisingContacts({ advising }: { advising: StudentAdvising }) {
+  const primary = advising.primaryAdviser;
   const others = advising.advisers.filter((entry) => entry.role !== "primary_advisor");
   const roleLabel: Record<string, string> = {
     admissions_counselor: "Admissions counselor",
@@ -333,64 +383,28 @@ function AdviserCard({ advising, onBook }: { advising: StudentAdvising; onBook: 
     international_adviser: "International adviser",
     housing_coordinator: "Housing coordinator",
   };
+  if (!primary && others.length === 0) return null;
   return (
-    <Card aria-labelledby="adviser-heading" className="adviser-card">
-      <CardHead
-        kind="status"
-        icon="users"
-        tone={gap ? "locked" : "accent"}
-        title="Your adviser"
-        titleId="adviser-heading"
-        note={
-          advising.advising.status === "completed"
-            ? "You have met"
-            : advising.advising.status === "scheduled"
-              ? "Meeting booked"
-              : advising.advising.status === "missed"
-                ? "A meeting was missed"
-                : "Not yet met"
-        }
-      />
-      <div className="adviser-card__body">
+    <Card aria-labelledby="advising-team-heading">
+      <CardHead title="Your advising team" titleId="advising-team-heading" icon="users" />
+      <ul className="appointments-contacts">
         {primary ? (
-          <div className="adviser-card__person">
-            <span className="adviser-card__avatar" aria-hidden="true">
-              {primary.staff.name.split(" ").map((part) => part.slice(0, 1)).join("").slice(0, 2)}
-            </span>
-            <div>
-              <strong>{primary.staff.name}</strong>
-              <p>
-                {primary.staff.title ?? "Academic adviser"}
-                {primary.staff.officeLocation ? ` · ${primary.staff.officeLocation}` : ""}
-              </p>
-              <p className="adviser-card__meta">
-                {gap
-                  ? gap.message
-                  : primary.availability.nextOpenSlotAt
-                    ? `Next open time: ${formatTenantDate(primary.availability.nextOpenSlotAt, tenant, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} · ${primary.availability.openSlotsNext14Days} open in the next two weeks`
-                    : "No open times published."}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <p className="adviser-card__meta">{gap?.message ?? "No academic adviser has been assigned to you yet."}</p>
-        )}
-        {others.length > 0 ? (
-          <ul className="adviser-card__others">
-            {others.map((entry) => (
-              <li key={entry.role}>
-                <span>{roleLabel[entry.role] ?? entry.role}</span>
-                <strong>{entry.staff.name}</strong>
-              </li>
-            ))}
-          </ul>
+          <li>
+            <span className="panel-label">Your adviser</span>
+            <strong>{primary.staff.name}</strong>
+            <p>{primary.staff.title ?? "Academic adviser"}{primary.staff.officeLocation ? ` · ${primary.staff.officeLocation}` : ""}</p>
+            {!advising.gaps.length && primary.availability.nextOpenSlotAt ? (
+              <p>{primary.availability.openSlotsNext14Days} open in the next two weeks</p>
+            ) : null}
+          </li>
         ) : null}
-        {primary && !gap ? (
-          <button type="button" className="secondary-button" onClick={(event) => onBook(event.currentTarget)}>
-            Book time with {primary.staff.name.split(" ")[0]}
-          </button>
-        ) : null}
-      </div>
+        {others.map((entry) => (
+          <li key={entry.role}>
+            <span className="panel-label">{roleLabel[entry.role] ?? entry.role}</span>
+            <strong>{entry.staff.name}</strong>
+          </li>
+        ))}
+      </ul>
     </Card>
   );
 }

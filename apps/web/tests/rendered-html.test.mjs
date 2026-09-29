@@ -1143,7 +1143,7 @@ test("onboarding preserves the eight-step order and authoritative boundary actio
   }
 
   assert.match(onboarding, /completedSteps/);
-  assert.match(onboarding, /expectedVersion: onboarding\.version/);
+  assert.match(onboarding, /expectedVersion: current\.version/);
   assert.match(onboarding, /acceptAdmissionOffer/);
   assert.match(onboarding, /getPostAcceptanceRoute\(acceptance\)/);
   assert.match(

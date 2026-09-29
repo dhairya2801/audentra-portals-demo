@@ -84,7 +84,11 @@ export default function Select({
     /* A panel is anchored to a rectangle, and a rectangle that moves under it is
        a panel pointing at nothing. Scrolling closes rather than re-places: the
        control has left the place the answer was about. */
-    const onScroll = () => setOpen(false);
+    const onScroll = (event) => {
+      // Scrolling the choices does not move the anchored trigger.
+      if (listRef.current?.contains(event.target)) return;
+      setOpen(false);
+    };
     window.addEventListener('scroll', onScroll, true);
     window.addEventListener('resize', place);
     return () => {
@@ -96,8 +100,14 @@ export default function Select({
   /* Keep the active row in view when the keyboard is what is moving. */
   useEffect(() => {
     if (!open || active < 0) return;
-    const row = listRef.current?.children?.[active];
-    row?.scrollIntoView({ block: 'nearest' });
+    const list = listRef.current;
+    const row = list?.children?.[active];
+    if (!list || !row) return;
+    const bounds = list.getBoundingClientRect();
+    const item = row.getBoundingClientRect();
+    // Only scroll the menu; scrollIntoView can also move the form underneath.
+    if (item.top < bounds.top) list.scrollTop -= bounds.top - item.top;
+    else if (item.bottom > bounds.bottom) list.scrollTop += item.bottom - bounds.bottom;
   }, [open, active]);
 
   function openWith(start) {

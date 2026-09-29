@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function PortalLandingPage() {
   return (
-    <main className="portal-landing">
+    <main className="portal-landing portal-refresh">
       <div className="portal-landing__glow portal-landing__glow--one" aria-hidden="true" />
       <div className="portal-landing__glow portal-landing__glow--two" aria-hidden="true" />
 

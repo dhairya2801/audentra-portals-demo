@@ -206,7 +206,7 @@ export function SignInClient() {
   };
 
   return (
-    <main className="auth-page">
+    <main className="auth-page portal-refresh">
       <section className="auth-panel" aria-labelledby="sign-in-title">
         <Link className="brand" href="/sign-in" aria-label={`${tenant.name} sign in`}>
           <PortalMark />

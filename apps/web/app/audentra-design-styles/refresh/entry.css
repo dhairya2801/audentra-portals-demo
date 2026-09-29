@@ -1,0 +1,22 @@
+@scope (.portal-refresh) to ([class*="edward"], [aria-label*="Edward"], [data-portal-item="edward"], [data-edward-preserve], .staff-automation-banner, .brew-detail__aside, .upload-failed-actions) {
+/* Existing authentication/onboarding layouts, forms, and step order. */
+.auth-page:scope { background: var(--portal-surface); }
+:scope .auth-panel__copy h1 { font: 650 clamp(30px, 3vw, 42px)/1.15 var(--portal-font); letter-spacing: -.04em; color: var(--portal-ink); }
+:scope .auth-panel__copy > p:not(.eyebrow) { font-size: 15px; line-height: 1.65; color: var(--portal-secondary); }
+:scope .auth-mode-switch { padding: 4px; background: var(--portal-canvas); border: 1px solid var(--portal-border); border-radius: 10px; }
+:scope .auth-mode-switch button { min-height: 40px; border-radius: 6px; font-size: 13px; }
+:scope .auth-mode-switch button.is-active { color: var(--portal-primary-ink); background: var(--portal-surface); box-shadow: var(--portal-shadow-card); }
+:scope :is(.auth-demo-student, .staff-demo-login) { border-color: var(--portal-border); background: var(--portal-subtle); border-radius: var(--portal-radius-card); }
+:scope .auth-security-note { border-color: var(--portal-border); background: var(--portal-subtle); }
+:scope .auth-support { font-size: 13px; }
+.staff-entry:scope { background: var(--portal-canvas); }
+:scope .staff-entry__card { border: 1px solid var(--portal-border); border-radius: var(--portal-radius-panel); box-shadow: var(--portal-shadow-card); }
+:scope .staff-entry__card h1 { font: 650 32px/1.2 var(--portal-font); letter-spacing: -.035em; }
+:scope .staff-entry__notice { background: var(--portal-info-soft); border-color: var(--portal-border); color: var(--portal-info-ink); }
+.portal-landing:scope { background: var(--portal-canvas); }
+:scope .portal-landing__hero { border-color: var(--portal-border); box-shadow: var(--portal-shadow-card); }
+:scope .portal-choice { border-radius: var(--portal-radius-card); border-color: var(--portal-border); }
+:scope .portal-choice:hover { border-color: var(--portal-primary-line); box-shadow: 0 4px 20px #0a1f440a; }
+
+
+}

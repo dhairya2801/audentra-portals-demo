@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { topicById } from "./catalog";
 import { Glyph } from "./glyphs";
 import {
@@ -337,16 +338,24 @@ export function NewsCard({
   item: BrewNewsItem;
   level: BrewDetailLevelId;
 }) {
+  const [imageFailed, setImageFailed] = useState(false);
   return (
     <li className="brew-news-card">
-      <img
-        className="brew-news-card__cover"
-        src={item.image}
-        alt={item.imageAlt}
-        loading="lazy"
-        width={200}
-        height={200}
-      />
+      {imageFailed ? (
+        <span className="brew-news-card__cover brew-news-card__fallback" aria-hidden="true">
+          {item.publisherMark}
+        </span>
+      ) : (
+        <img
+          className="brew-news-card__cover"
+          src={item.image}
+          onError={() => setImageFailed(true)}
+          alt={item.imageAlt}
+          loading="lazy"
+          width={200}
+          height={200}
+        />
+      )}
       <div className="brew-news-card__body">
         <span className="brew-news-card__byline">
           {item.publisher}

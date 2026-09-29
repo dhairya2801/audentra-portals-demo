@@ -837,7 +837,7 @@ export function PortalShell({
     : { kicker: eyebrow, title, lede: description, motif: null, ...hero };
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${active !== "edward" && !isParentPortalPath(pathname) ? " portal-refresh" : ""}`}>
       <a className="skip-to-content" href="#main-content">
         Skip to main content
       </a>

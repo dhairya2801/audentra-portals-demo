@@ -1,0 +1,121 @@
+@scope (.portal-refresh) to ([class*="edward"], [aria-label*="Edward"], [data-portal-item="edward"], [data-edward-preserve], .staff-automation-banner, .brew-detail__aside, .upload-failed-actions) {
+/* Student pages keep the familiar summary → next actions → supporting rail. */
+.app-shell:scope { background: var(--portal-canvas); }
+:scope .sidebar { background: var(--portal-surface); backdrop-filter: none; border-color: var(--portal-border); }
+:scope .topbar { background: var(--portal-surface); border-color: var(--portal-border); backdrop-filter: none; }
+:scope .brand-name strong { font-size: 16px; }
+:scope .brand-name span { font-size: 12px; color: var(--portal-muted); }
+:scope .nav-item { border-radius: 8px; min-height: 42px; }
+:scope .nav-item.active { background: var(--portal-primary-soft); color: var(--portal-primary-ink); }
+:scope .nav-group-toggle { min-height: 40px; font-size: 11px; letter-spacing: .07em; color: var(--portal-muted); }
+:scope .profile-name span { font-size: 12px; }
+:scope .powered-by { color: var(--portal-muted); font-size: 11px; }
+:scope .content-wrap { padding-top: 28px; }
+/* Keep the original purple page headers, typography, motifs and summary tuck. */
+:scope .notice-copy { font-size: 13px; line-height: 1.6; }
+:scope .notice-action { font-size: 12px; }
+:scope .notice.urgent { background: var(--portal-danger-soft); color: var(--portal-danger); }
+:scope .notice.soon { background: var(--portal-warning-soft); color: var(--portal-warning); }
+:scope .notice.working { background: var(--portal-info-soft); color: var(--portal-info-ink); }
+:scope .notice.done { background: var(--portal-success-soft); color: var(--portal-success); }
+:scope .page-body { gap: 24px; }
+:scope .section-card { border-radius: var(--portal-radius-card); border-color: var(--portal-border); box-shadow: var(--portal-shadow-card); }
+:scope :is(.card-heading, .status-heading) { padding: 20px 24px; background: var(--portal-surface); }
+:scope :is(.card-heading, .status-heading) h2 { font-size: 18px; font-weight: 650; }
+:scope :is(.card-heading, .status-heading) p { font-size: 13px; color: var(--portal-muted); }
+:scope .task-card { border-color: var(--portal-border); box-shadow: none; }
+:scope .task-card:hover { transform: none; box-shadow: none; background: var(--portal-subtle); }
+:scope .task-card.recommended { background: var(--portal-surface); border-color: var(--portal-primary-line); box-shadow: none; }
+:scope .task-card-body { padding: 22px 24px; column-gap: 16px; }
+:scope .task-main h3 { color: var(--portal-ink); font-size: 17px; line-height: 1.4; font-weight: 600; }
+:scope .task-main > p { font-size: 13px; color: var(--portal-secondary); line-height: 1.65; }
+:scope .task-meta-row { font-size: 10px; color: var(--portal-muted); flex-wrap: wrap; letter-spacing: .065em; }
+:scope .task-facts { font-size: 12px; color: var(--portal-secondary); gap: 12px; margin-top: 12px; }
+:scope .task-card > .action-band .action-band-aside { color: var(--portal-primary-ink); }
+:scope .task-card > .action-band { color: var(--portal-primary-ink); background: var(--portal-primary-soft); font-size: 11px; border-bottom: 1px solid var(--portal-primary-line); }
+/* Keep action-stack metrics: the untouched Ask Edward hit area stretches to it. */
+:scope .task-action .primary-button { background: var(--portal-primary); border-color: var(--portal-primary); box-shadow: none; }
+:scope .task-action .primary-button:hover { background: var(--portal-primary-hover); border-color: var(--portal-primary-hover); transform: none; }
+:scope .anchor-card { background: var(--portal-ink); border-radius: var(--portal-radius-card); box-shadow: none; }
+:scope .anchor-card h3 { font-size: 18px; line-height: 1.45; }
+:scope .anchor-card > p { font-size: 13px; }
+:scope .content-wrap > footer { font-size: 11px; color: var(--portal-muted); gap: 16px; flex-wrap: wrap; padding-top: 32px; }
+:scope .content-wrap > footer > span:last-child { flex-wrap: wrap; }
+/* Feature copy: small text was previously 8.5–11.5px. These classes contain
+   ordinary portal facts, never assistant content or contextual entry points. */
+:scope :is(.row-sub, .row-meta, .card-subtitle, .field-hint, .empty-copy, .locked-copy, .task-help-copy) { font-size: 12px; line-height: 1.6; color: var(--portal-muted); }
+:scope :is(.row-title, .field-label) { font-size: 14px; }
+:scope :is(.course-title, .event-title) { font-size: 17px; }
+:scope :is(.card-body, .drawer-content) > :is(p, ul) { font-size: 14px; line-height: 1.65; }
+@media (max-width: 620px) {
+  :scope .sidebar:not(.sidebar-open) { box-shadow: none; }
+  :scope .task-action .primary-button, :scope .task-action .secondary-button { min-height: 44px; }
+
+  :scope .content-wrap { padding: 20px 16px 28px; }
+  :scope :is(.card-heading, .status-heading) { padding: 18px; flex-wrap: wrap; gap: 12px; }
+  :scope .task-card-body { padding: 18px; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; }
+  :scope .task-type-icon { width: 36px; height: 36px; }
+  :scope .task-main h3 { font-size: 16px; }
+  :scope .nav-item { min-height: 44px; }
+}
+
+
+/* Shared section navigation, records and requirement forms. */
+:scope .group-tabs { gap: 8px; border-color: var(--portal-border); }
+:scope .group-tabs a { font-size: 13px; min-height: 44px; }
+:scope .group-tabs a.active { color: var(--portal-primary-ink); border-color: var(--portal-primary); }
+:scope :is(.filter-chips, .sort-group) button { min-height: 32px; font-size: 12px; border-radius: 7px; }
+:scope :is(.filter-chips, .sort-group) button.selected { color: var(--portal-primary-ink); background: var(--portal-primary-soft); border-color: var(--portal-primary-line); }
+:scope :is(.result-count, .form-help, .field-note, .stated-note, .adviser-card__meta) { font-size: 12px; color: var(--portal-muted); line-height: 1.6; }
+:scope .field-row-label { font-size: 13px; color: var(--portal-secondary); }
+:scope .stated-value { font-size: 15px; }
+:scope :is(.field-edit, .requirement-form, .register-panel) :is(input:not([type=checkbox]):not([type=radio]), textarea, select) {
+  border-color: var(--portal-border-strong); border-radius: 8px; font-size: 14px; min-height: 42px;
+}
+:scope :is(.ask-input, .ask-textarea) { font-size: 14px; border-color: var(--portal-border-strong); border-radius: 8px; }
+:scope .drawer-tabs button { min-height: 40px; font-size: 13px; }
+:scope .drawer-description { font-size: 14px; line-height: 1.65; color: var(--portal-secondary); }
+:scope :is(.how-panel, .why-card, .external-panel) p { font-size: 14px; line-height: 1.65; }
+:scope .drawer-header { padding: 16px 24px; border-color: var(--portal-border); }
+:scope .drawer-label { font-size: 11px; color: var(--portal-muted); }
+:scope .status-pill { font-size: 11px; line-height: 1.5; letter-spacing: .025em; }
+:scope .status-pill.done { color: var(--portal-success); background: var(--portal-success-soft); }
+:scope :is(.status-pill.wait, .status-pill.progress) { color: var(--portal-info-ink); background: var(--portal-info-soft); }
+:scope .status-pill.act { color: var(--portal-warning); background: var(--portal-warning-soft); }
+:scope .status-pill.stop { color: var(--portal-danger); background: var(--portal-danger-soft); }
+@media (max-width: 620px) {
+  :scope :is(.field-edit, .requirement-form, .register-panel) :is(input, select, textarea),
+  :scope :is(.ask-input, .ask-textarea) { font-size: 16px; min-height: 44px; }
+  :scope :is(.filter-chips, .sort-group) button { min-height: 40px; }
+  :scope .drawer-header { padding: 16px 18px; }
+}
+
+
+:scope .momentum-card { background: var(--portal-ink); border-radius: 12px; box-shadow: none; }
+:scope .momentum-header strong { font-size: 18px; line-height: 1.45; }
+:scope .momentum-header p, :scope .level-labels { font-size: 12px; }
+:scope .today-reward { border-radius: 8px; }
+:scope :is(.aster-card, .aster-info-strip) { border-color: var(--portal-border); border-radius: 12px; box-shadow: var(--portal-shadow-card); }
+:scope .aster-card__heading h2 { font: 600 18px/1.4 var(--portal-font); }
+:scope .pop-copy > strong { font-size: 14px; }
+:scope :is(.pop-copy > p, .request-meta, .request-when) { color: var(--portal-muted); font-size: 12px; line-height: 1.5; }
+
+/* Keep Appointments' summary as compact as Enrollment. Supporting contact
+   details belong in the existing rail, below How this works. */
+:scope .appointments-summary__adviser { flex-wrap: nowrap; }
+:scope .appointments-summary__adviser .advisor-bar-copy { flex: 1 1 0; }
+:scope .appointments-summary__book { flex: none; white-space: nowrap; }
+:scope .appointments-contacts { list-style: none; padding: 0 18px; margin: 0; }
+:scope .appointments-contacts li { min-width: 0; padding: 16px 0; }
+:scope .appointments-contacts li + li { border-top: 1px solid var(--portal-border); }
+:scope .appointments-contacts :is(span, strong) { display: block; }
+:scope .appointments-contacts strong {
+  margin-top: 4px;
+  color: var(--portal-ink);
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+:scope .appointments-contacts p { margin: 6px 0 0; color: var(--portal-muted); font-size: 12px; line-height: 1.5; }
+
+}

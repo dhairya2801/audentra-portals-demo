@@ -44,6 +44,7 @@ import { PortalShell } from "../components/portal-shell";
 import { useTenant } from "../components/tenant-provider";
 import { getApiErrorMessage, useApiResource } from "../hooks/use-api-resource";
 import {
+  getStudentAdvising,
   getStudentHousingPlan,
   getStudentOnboarding,
   getStudentRequirements,
@@ -57,11 +58,6 @@ type ShortlistToast = { title: string; body?: string; action?: { label: string; 
 export default function HousingPage() {
   const router = useRouter();
   const { tenant, href } = useTenant();
-  // The institution's real admissions contact — no named advisor exists in the platform.
-  const advisorContact = tenant.contacts.admissions ?? tenant.contacts.support ?? null;
-  const ADVISOR = advisorContact
-    ? { name: advisorContact.label, label: "Your admissions contact", office: null as string | null }
-    : null;
   const { toasts, push, dismiss } = useToasts();
 
   const loadPlan = useCallback((signal: AbortSignal) => getStudentHousingPlan(signal), []);
@@ -70,6 +66,18 @@ export default function HousingPage() {
   const housing = useApiResource(loadPlan);
   const requirements = useApiResource(loadRequirements);
   const onboarding = useApiResource(loadOnboarding);
+  const advising = useApiResource(useCallback((signal: AbortSignal) => getStudentAdvising(signal), []));
+  const housingContact = advising.data?.advisers.find((assignment) => assignment.role === "housing_coordinator")?.staff ?? null;
+  const advisor = housingContact ? {
+    name: housingContact.name,
+    label: "Your housing contact",
+    office: housingContact.component || null,
+  } : null;
+  const contactNote = housingContact?.employmentStatus === "departed"
+    ? "No longer at the university."
+    : housingContact?.employmentStatus === "on_leave"
+      ? "Currently on leave."
+      : undefined;
 
   // The record as last confirmed by Residential Life. A change that did not
   // land never reaches it, so what is shown is always what was saved.
@@ -205,8 +213,9 @@ export default function HousingPage() {
   }
 
   const contactAdvisor = (channel: string) => {
+    if (!housingContact) return;
     if (channel === "email") {
-      window.location.href = `mailto:${tenant.contacts.admissions?.email ?? tenant.contacts.support.email ?? ""}`;
+      window.location.href = `mailto:${housingContact.email}`;
       return;
     }
     router.push(href("/messages"));
@@ -239,13 +248,23 @@ export default function HousingPage() {
             >
               {standing.line}
             </SummaryFigure>
-            {ADVISOR ? (
-              <AdvisorBar
-                advisor={ADVISOR}
-                note={`For anything about enrollment. Your housing plan and your room are ${office}’s to decide.`}
-                onContact={contactAdvisor}
-              />
-            ) : null}
+            {advisor ? (
+              <AdvisorBar advisor={advisor} note={contactNote} onContact={contactAdvisor} />
+            ) : (
+              <div className="advisor-bar" aria-live="polite">
+                <div className="advisor-bar-copy">
+                  <span className="panel-label">Your housing contact</span>
+                  <strong>
+                    {advising.status === "loading" ? "Loading your contact…"
+                      : advising.status === "error" ? "Couldn’t load your contact"
+                        : "No housing contact assigned yet"}
+                  </strong>
+                </div>
+                {advising.status === "error" ? (
+                  <button type="button" className="secondary-button" onClick={advising.reload}>Retry contact lookup</button>
+                ) : null}
+              </div>
+            )}
           </>
         ) : undefined
       }

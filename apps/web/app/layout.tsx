@@ -5,6 +5,7 @@ import { ServerStateProvider } from "./components/server-state-provider";
 import { TenantProvider } from "./components/tenant-provider";
 import "./globals.css";
 import "./audentra-design-styles/student.css";
+import "./audentra-design-styles/refresh/index.css";
 
 const vercelHost =
   process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim() ||

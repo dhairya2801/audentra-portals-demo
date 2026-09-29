@@ -1,0 +1,54 @@
+@import './tokens.css';
+@import './primitives.css';
+/* Presentation only: the original board, list, filters, detail document,
+   drag targets, ordering and connected command handlers remain in place. */
+.portal-refresh { background: var(--portal-canvas); }
+.portal-refresh .main { background: var(--portal-canvas); }
+.portal-refresh .board-heading { padding: 24px 24px 0; }
+.portal-refresh .heading-row h1 { font-size: 25px; font-weight: 650; letter-spacing: -.03em; color: var(--portal-ink); }
+.portal-refresh .breadcrumb { color: var(--portal-muted); font-size: 11px; }
+.portal-refresh .toolbar { padding-inline: 24px; border-color: var(--portal-border); background: var(--portal-surface); }
+.portal-refresh .filter-row { gap: 8px; flex-wrap: wrap; }
+.portal-refresh :is(.filter-select select, .board-search) { border-color: var(--portal-border-strong); border-radius: 7px; min-height: 34px; background: var(--portal-surface); }
+.portal-refresh .board-search input { font-size: 13px; }
+.portal-refresh .filter-select select { font-size: 12px; padding-right: 24px; }
+.portal-refresh .view-tabs button { font-size: 13px; }
+.portal-refresh .column { background: #eef0f5; border: 1px solid var(--portal-border); border-radius: 10px; padding: 0 8px 8px; min-width: 245px; }
+.portal-refresh .column-heading { background: #eef0f5; border-radius: 10px 10px 0 0; padding: 14px 5px 12px; }
+.portal-refresh .column-heading h2 { font-size: 12px; font-weight: 650; color: var(--portal-secondary); }
+.portal-refresh .task-card { padding: 12px; border: 1px solid var(--portal-border); border-radius: 8px; box-shadow: var(--portal-shadow-card); }
+.portal-refresh .task-card.hero-card { border-left: 3px solid #c99242; padding-left: 10px; }
+.portal-refresh .task-card.breached { border-left: 3px solid #bc5365; padding-left: 10px; }
+.portal-refresh.compact .task-card { padding-block: 8px; }
+.portal-refresh.compact .task-card h3 { min-height: 0; }
+.portal-refresh .task-card:hover { border-color: var(--portal-primary-line); box-shadow: 0 3px 10px #0a1f440c; transform: none; }
+.portal-refresh .task-card h3 { font-size: 13px; line-height: 1.45; font-weight: 600; min-height: 38px; color: var(--portal-ink); }
+.portal-refresh .card-student { margin-top: 10px; color: var(--portal-secondary); font-size: 11px; }
+.portal-refresh :is(.card-program, .column-subtitle) { color: var(--portal-muted); font-size: 11px; }
+.portal-refresh .stage-metrics small { color: var(--portal-muted); font-size: 10px; }
+.portal-refresh .card-bottom { border-color: var(--portal-border); gap: 8px; padding-top: 9px; margin-top: 9px; }
+.portal-refresh :is(.task-key, .card-key, .card-meta) { font-size: 11px; color: var(--portal-muted); }
+.portal-refresh .task-card .badge { font-size: 10px; line-height: 1.5; }
+.portal-refresh .task-list { font-size: 13px; font-variant-numeric: tabular-nums; }
+.portal-refresh .task-list th { padding: 12px; font-size: 11px; background: var(--portal-subtle); color: var(--portal-muted); }
+.portal-refresh .task-list td { padding: 13px 12px; border-color: var(--portal-border); }
+.portal-refresh .task-list tbody tr:hover { background: var(--portal-primary-soft); }
+.portal-refresh .task-dialog { border: 1px solid var(--portal-border); border-radius: 14px; box-shadow: var(--portal-shadow-float); }
+.portal-refresh .detail-header { border-color: var(--portal-border); }
+.portal-refresh .detail-header h1 { font-size: 23px; line-height: 1.3; }
+.portal-refresh .detail-main { font-size: 13px; }
+.portal-refresh .context-panel { background: var(--portal-subtle); border-color: var(--portal-border); }
+.portal-refresh .context-fields { font-size: 12px; row-gap: 10px; }
+.portal-refresh .activity-event { font-size: 13px; }
+.portal-refresh .comment-input-wrap textarea { font-size: 13px; min-height: 64px; border-radius: 8px; border-color: var(--portal-border-strong); }
+.portal-refresh .review-table { font-size: 12px; }
+.portal-refresh .review-table small { font-size: 11px; }
+.portal-refresh .field-evidence { font-size: 11px; }
+@media (max-width: 700px) {
+  .portal-refresh .board-heading { padding-inline: 16px; }
+  .portal-refresh .toolbar { padding-inline: 16px; }
+  .portal-refresh .task-dialog { width: calc(100vw - 16px); height: calc(100dvh - 16px); border-radius: 10px; }
+  .portal-refresh .filter-select select { min-height: 40px; }
+  .portal-refresh .board-search { min-height: 40px; }
+  .portal-refresh .board-search input { font-size: 16px; }
+}

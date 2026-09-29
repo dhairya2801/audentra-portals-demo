@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <style>
+    .portrait-head { transform-origin:40px 48px; animation:greeting 1.4s cubic-bezier(.42,0,.58,1) 1; }
+    @keyframes greeting { 0%,100%{transform:rotate(0)} 35%{transform:rotate(-7deg)} 65%{transform:rotate(3deg)} }
+    @media(prefers-reduced-motion:reduce){.portrait-head{animation:none}}
+  </style>
+  <rect width="80" height="80" fill="#e9e2ff"/>
+  <path d="M12 80c2-16 14-24 28-24s26 8 28 24Z" fill="#6a38ff"/>
+  <path d="m32 57 8 9 8-9" fill="#f6f3ff"/>
+  <g class="portrait-head">
+    <path d="M35 44h10v14c-3 4-7 4-10 0Z" fill="#c7b5f2"/>
+    <circle cx="40" cy="34" r="15" fill="#f6f3ff"/>
+    <path d="M25 32c0-11 7-17 15-17s16 6 15 17c-3-6-9-8-15-8s-12 2-15 8Z" fill="#0a1f44"/>
+    <circle cx="35" cy="35" r="1.3" fill="#0a1f44"/>
+    <circle cx="45" cy="35" r="1.3" fill="#0a1f44"/>
+    <path d="M36 41q4 4 8 0" fill="none" stroke="#7356b8" stroke-width="1.5" stroke-linecap="round"/>
+  </g>
+</svg>

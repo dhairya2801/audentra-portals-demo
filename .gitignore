@@ -34,3 +34,7 @@ test-results/
 /artifacts/financials/
 
 /artifacts/demo-reset/
+
+# Local UI review captures and session state (never commit session cookies).
+/artifacts/ui-refresh/
+/node_modules

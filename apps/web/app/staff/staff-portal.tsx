@@ -39,6 +39,8 @@ import {
 import { TenantLink as Link } from "../components/tenant-link";
 import { StaffEdwardAssistant } from "../components/staff-edward-assistant";
 import { PortalMark } from "../components/portal-ui";
+import { useTenant } from "../components/tenant-provider";
+import Icon from "../design-system/Icon.jsx";
 import { useApiAction, useApiResource } from "../hooks/use-api-resource";
 import {
   ApiClientError,
@@ -233,22 +235,22 @@ const navigation: Array<{
   {
     label: "Workspace",
     items: [
-      { id: "morning_brew", label: "Morning Brew", icon: "✦" },
-      { id: "tasks", label: "Task Board", icon: "✓", badge: "tasks" },
-      { id: "students", label: "Student 360", icon: "◎" },
+      { id: "morning_brew", label: "Morning Brew", icon: "brew" },
+      { id: "tasks", label: "Task Board", icon: "checklist", badge: "tasks" },
+      { id: "students", label: "Student 360", icon: "student" },
     ],
   },
   {
     label: "Developing",
     items: [
-      { id: "outreach", label: "Action Center", icon: "↗" },
-      { id: "overview", label: "Today", icon: "⌂" },
-      { id: "messages", label: "Messages", icon: "M", badge: "inquiries" },
-      { id: "journeys", label: "Journeys", icon: "J" },
-      { id: "campus_life", label: "Campus life", icon: "C" },
-      { id: "academics", label: "Academics", icon: "A" },
-      { id: "knowledge", label: "Knowledge base", icon: "K" },
-      { id: "core_plays", label: "Core plays", icon: "P" },
+      { id: "outreach", label: "Action Center", icon: "megaphone" },
+      { id: "overview", label: "Today", icon: "home" },
+      { id: "messages", label: "Messages", icon: "message", badge: "inquiries" },
+      { id: "journeys", label: "Journeys", icon: "flow" },
+      { id: "campus_life", label: "Campus life", icon: "buildings" },
+      { id: "academics", label: "Academics", icon: "graduation" },
+      { id: "knowledge", label: "Knowledge base", icon: "book" },
+      { id: "core_plays", label: "Core plays", icon: "follow" },
       { id: "edward", label: "Edward", icon: "E" },
     ],
   },
@@ -4697,6 +4699,7 @@ function StaffSidebar({
                 <button
                   className={view === item.id ? "staff-sidebar__active" : undefined}
                   type="button"
+                  data-portal-item={item.id}
                   aria-current={view === item.id ? "page" : undefined}
                   title={
                     item.badge === "tasks"
@@ -4710,7 +4713,7 @@ function StaffSidebar({
                   onClick={() => navigate(item.id)}
                   key={item.id}
                 >
-                  <span aria-hidden="true">{item.icon}</span>
+                  <span aria-hidden="true">{item.id === "edward" ? item.icon : <Icon name={item.icon} size={18} />}</span>
                   <strong>{item.label}</strong>
                   {badge > 0 ? (
                     <i aria-label={item.badge === "tasks" ? `${badge} assigned to you` : undefined}>
@@ -4726,7 +4729,7 @@ function StaffSidebar({
         })}
       </nav>
       <div className="staff-sidebar__note">
-        <strong>Institutional intelligence</strong>
+        <strong>{view === "edward" ? "Institutional intelligence" : "Powered by Audentra"}</strong>
         <p>
           Convert more admitted students with earlier signals and clearer next actions.
         </p>
@@ -4742,6 +4745,7 @@ function StaffWorkspaceShell({
   workspace: StaffOperationsWorkspace;
   refresh: () => void;
 }) {
+  const { tenant } = useTenant();
   const [view, setView] = useState<StaffView>("morning_brew");
   const [taskBoardContext, setTaskBoardContext] = useState<StaffTaskBoardContext | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -4885,7 +4889,7 @@ function StaffWorkspaceShell({
     .slice(0, 2);
 
   return (
-    <div className="staff-shell staff-shell--workspace">
+    <div className={`staff-shell staff-shell--workspace${view !== "edward" ? " portal-refresh" : ""}`}>
       <header className="staff-topbar staff-topbar--workspace">
         <button
           className="staff-mobile-menu"
@@ -4901,8 +4905,8 @@ function StaffWorkspaceShell({
         <div className="staff-brand">
           <PortalMark />
           <div>
-            <strong>Audentra</strong>
-            <span>Higher Education Intelligence</span>
+            <strong>{view === "edward" ? "Audentra" : tenant.name}</strong>
+            <span>{view === "edward" ? "Higher Education Intelligence" : "Staff portal"}</span>
           </div>
         </div>
         <form
