@@ -2810,38 +2810,29 @@ test("Edward talks over LiveKit when the platform offers voice and falls back to
   assert.match(globalStyles, /\.edward-message__mode/);
 });
 
-test("staff CRM searches the whole tenant server-side and shows counted signals, never a fake risk score", async () => {
+test("Student 360 keeps canonical records separate from labeled score previews", async () => {
   const [source, api, contracts] = await Promise.all([
-    readFile(new URL("../app/staff/staff-portal.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/staff/student360.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/api-client.ts", import.meta.url), "utf8"),
     readFile(new URL("../../../packages/contracts/src/index.ts", import.meta.url), "utf8"),
   ]);
 
-  // The Students view reads one bounded page of the server search, and a
-  // student's open work is its own server query — never a slice of the first
-  // board page or a 1,000-row browser copy.
-  assert.match(source, /searchStaffStudents\(\{ query: debouncedQuery, limit: 50 \}/);
-  assert.match(source, /getStaffActionCenter\(\{ studentId: operationId, status: "open"/);
+  // Search remains server-side and bounded; student work is independently read.
+  assert.match(source, /searchStaffStudents\(\{ query: debouncedQuery, limit: 200 \}/);
+  assert.match(source, /getStaffActionCenter\(\s*\{ studentId: student.id, status: "all"/);
+  assert.match(source, /getStaffStudentRecord\(student.id, signal\)/);
   assert.match(api, /`\/v1\/staff\/students\$\{suffix\}`/);
   assert.match(contracts, /export interface StaffStudentSearch \{/);
   assert.match(contracts, /export interface StaffStudentAttention \{/);
   assert.doesNotMatch(contracts, /meltLikelihoodPercent|modelVersion: string/);
 
-  // Nothing browser-invented remains on the roster surface.
-  for (const stale of [
-    "Search 400 test students",
-    "Fall 2027 students",
-    "Export view",
-    "deterministic test cohort",
-    "Melt score",
-    "melt risk",
-    "Canonical student record",
-  ]) {
-    assert.doesNotMatch(source, new RegExp(stale));
-  }
-  assert.doesNotMatch(source, /\.risk\.(band|score|category)/);
-  assert.match(source, /function AttentionPills\(/);
-  assert.match(source, /There is no risk model/);
+  // Mock scores are explicitly presentation-only, with no invented persistence.
+  assert.match(source, /Melt risk and financial coverage are mock previews/);
+  assert.match(source, /Enrollment and\s+staff work reflect platform records/);
+  assert.doesNotMatch(source, /localStorage|sessionStorage|simulateStaffOutreach/);
+  // Source files use the credentialed, tenant-aware blob reader.
+  assert.match(source, /getStaffDocumentContent\(file.contentUrl\)/);
+  assert.match(source, /URL.revokeObjectURL\(objectUrl\)/);
 });
 
 test("the Action Center keeps evidence durable while AI and scheduled rules run asynchronously", async () => {

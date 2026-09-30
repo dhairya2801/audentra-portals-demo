@@ -121,20 +121,20 @@ function RecordContent({ data, domain }: { data: UniversityRecord; domain: Unive
   </Section>;
 }
 
-export function UniversityRecordPanel({ studentId, initialDomain = "overview" }: { studentId?: string; initialDomain?: UniversityDomain }) {
+export function UniversityRecordPanel({ studentId, initialDomain = "overview", embedded = false }: { studentId?: string; initialDomain?: UniversityDomain; embedded?: boolean }) {
   const [domain, setDomain] = useState<UniversityDomain>(initialDomain);
   const id = useId();
   const load = useCallback(async (signal: AbortSignal) => {
     try { return await getUniversityRecord(domain, studentId, signal); }
     catch (error) { if (error instanceof ApiClientError && error.status === 404) return null; throw error; }
   }, [domain, studentId]);
-  const resource = useApiResource(load, { refreshOnAmbient: false });
+  const resource = useApiResource(load, { refreshOnAmbient: embedded });
   const data = resource.data;
-  if (resource.status === "ready" && !data) return null;
+  if (resource.status === "ready" && !data) return embedded ? <p className="university-empty">No university records available for this student yet.</p> : null;
   const matching = data?.domain === domain && (!studentId || data.student.id === studentId);
   return <section className="university-record" aria-label="University record">
-    <header className="university-record__header"><div className="university-record__identity"><span className="university-record__icon" aria-hidden="true"><Icon name="book" size={22} /></span><div><h2>{studentId && matching ? `${data.student.name} · University record` : "My university record"}</h2><p>{matching ? `${data.student.external_ref} · ${data.student.program_name}` : "Your academic, financial, and support records"}</p></div></div>{matching && <span className="university-record__snapshot">As of {date(data.snapshotAt)}<small>New York time</small></span>}</header>
-    <nav className="university-record__tabs" aria-label="University record sections">{domains.map(item => <button key={item.id} type="button" aria-pressed={domain === item.id} aria-controls={`${id}-content`} onClick={() => setDomain(item.id)}><Icon name={item.icon} size={16} />{item.title}</button>)}</nav>
+    {!embedded && <header className="university-record__header"><div className="university-record__identity"><span className="university-record__icon" aria-hidden="true"><Icon name="book" size={22} /></span><div><h2>{studentId && matching ? `${data.student.name} · University record` : "My university record"}</h2><p>{matching ? `${data.student.external_ref} · ${data.student.program_name}` : "Your academic, financial, and support records"}</p></div></div>{matching && <span className="university-record__snapshot">As of {date(data.snapshotAt)}<small>New York time</small></span>}</header>}
+    {!embedded && <nav className="university-record__tabs" aria-label="University record sections">{domains.map(item => <button key={item.id} type="button" aria-pressed={domain === item.id} aria-controls={`${id}-content`} onClick={() => setDomain(item.id)}><Icon name={item.icon} size={16} />{item.title}</button>)}</nav>}
     <div id={`${id}-content`} className="university-record__content" aria-busy={resource.isRefreshing || resource.status === "loading"}>
       {resource.status === "error" || (!matching && resource.refreshError) ? <div className="university-empty" role="alert"><p>University record could not be loaded.</p><button className="university-button" type="button" onClick={resource.reload}>Try again</button></div> : !matching ? <p className="university-empty" role="status">Loading {domains.find(item => item.id === domain)?.title.toLowerCase()}…</p> : <>
         {resource.refreshError && <p className="university-note" role="status">The latest update could not be loaded. Showing the last available record. <button type="button" className="university-button" onClick={resource.reload}>Retry</button></p>}

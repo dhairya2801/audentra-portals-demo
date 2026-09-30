@@ -55,3 +55,38 @@
 :scope .brew-goal__target small { font-size: 11px; }
 
 }
+
+@scope (.portal-refresh) to ([class*="edward"], [aria-label*="Edward"], [data-portal-item="edward"], [data-edward-preserve], .staff-automation-banner, .brew-detail__aside, .upload-failed-actions) {
+  :scope .brew-hero { position: relative; grid-template-columns: minmax(0, 1.1fr) 120px minmax(0, 1fr); align-items: center; gap: 22px; padding: 30px 34px; border: 0; border-radius: 22px; background: linear-gradient(115deg, #151b2e 0%, #30275c 55%, #55439f 100%); color: #fff; overflow: hidden; }
+  :scope .brew-hero__eyebrow { display: block; margin-bottom: 16px; color: #ddd7f1; font-size: 11px; font-weight: 500; }
+  :scope .brew-hero__greeting h1 { color: #fff; font-family: var(--portal-font); font-style: normal; font-size: clamp(25px, 2.2vw, 36px); font-weight: 700; }
+  :scope .brew-hero__deck { color: #ded9ed; font-size: 13px; }
+  :scope .brew-hero__meta, :scope .brew-hero__meta svg { color: #c4bddb; }
+  :scope .brew-hero__coffee { width: 120px; height: 158px; background: url('/images/staff/coffee-brew.png') center / contain no-repeat; align-self: end; }
+  :scope .brew-hero__cards { border-left: 1px solid #ffffff35; padding-left: 24px; }
+  :scope .brew-glance { padding: 16px 13px; border: 1px solid #ffffff0d; border-radius: 18px; background: #ffffff0d; box-shadow: none; }
+  :scope .brew-glance:hover { background: #ffffff18; border-color: #ffffff4d; }
+  :scope .brew-glance > strong { color: #fff; font-size: 34px; }
+  :scope .brew-glance__head, :scope .brew-glance > small, :scope .brew-glance__link { color: #e0d9fa; }
+  :scope .brew-glance > em { color: #ffe09b; }
+  :scope .brew-insights .brew-insight { overflow: hidden; }
+  :scope .brew-insights .brew-insight__top { margin: -1.05rem -1.05rem 0; padding: 18px 17px; min-height: 74px; background: #ece9f9; align-items: center; }
+  :scope .brew-insights .brew-insight__top h3 { color: #35285e; }
+  :scope .brew-insights .brew-insight__rank { color: white; background: #7546f7; }
+  @media (max-width: 1200px) {
+    :scope .brew-hero { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    :scope .brew-hero__greeting { padding-right: 70px; }
+    :scope .brew-hero__coffee { position: absolute; width: 78px; height: 108px; left: calc(50% - 95px); bottom: 24px; }
+  }
+  @media (max-width: 850px) {
+    :scope .brew-hero { grid-template-columns: 1fr; padding: 25px; }
+    :scope .brew-hero__greeting { padding-right: 90px; }
+    :scope .brew-hero__coffee { left: auto; right: 24px; top: 25px; bottom: auto; align-self: start; }
+    :scope .brew-hero__cards { border-left: 0; padding-left: 0; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @media (max-width: 480px) {
+    :scope .brew-hero__cards { grid-template-columns: 1fr; }
+    :scope .brew-glance { min-height: 0; }
+    :scope .brew-hero__coffee { width: 64px; height: 90px; }
+  }
+}

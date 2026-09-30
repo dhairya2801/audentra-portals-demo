@@ -363,6 +363,7 @@ export function MorningBrewDashboard({
 
       <section className="brew-hero">
         <div className="brew-hero__greeting">
+          <span className="brew-hero__eyebrow">MORNING BREW · Your daily enrollment briefing</span>
           <h1>Good Morning {briefing.greetingName},</h1>
           <p className="brew-hero__deck">{briefing.deck}</p>
           <p className="brew-hero__meta">
@@ -370,6 +371,7 @@ export function MorningBrewDashboard({
           </p>
         </div>
 
+        <div className="brew-hero__coffee" aria-hidden="true" />
         <div className="brew-hero__cards">
           <button
             className="brew-glance"

@@ -1,8 +1,8 @@
 "use client";
-import {Student360Summary} from "./student360-summary";
+import { StudentsView } from "./student360";
 import { ResetDemo } from "./reset-demo";
 
-import { UniversityOperationsPanel, UniversityRecordPanel } from "../components/university-record";
+import { UniversityOperationsPanel } from "../components/university-record";
 
 import type {
   CampusEvent,
@@ -53,7 +53,6 @@ import {
   getStaffInquiryThread,
   getStaffMe,
   getStaffOperationsWorkspace,
-  searchStaffStudents,
   signOutStaff,
   simulateStaffOutreach,
   updateStaffClub,
@@ -66,7 +65,6 @@ import {
 } from "../lib/api-client";
 import {
   StaffSignIn,
-  StudentInspector,
   WorkItemCard,
   WorkItemSignals,
 } from "./staff-action-center";
@@ -79,7 +77,6 @@ import { NotificationCenter } from "./notification-center";
 import { StaffProfileView } from "./staff-profile";
 import { connectStaffRealtime, type StaffRealtimeEvent } from "./staff-realtime";
 import {
-  assignmentRoleLabel,
   buildActionCenterQuery,
   clearedTaskBoardFilters,
   defaultTaskBoardScope,
@@ -1786,324 +1783,6 @@ function AttentionPills({
         ? null
         : attention.signals.map((signal) => <li key={signal.code}>{signal.label}</li>)}
     </ul>
-  );
-}
-
-function StudentsView({
-  refresh,
-  openTaskBoard,
-  initialStudentId,
-  initialQuery,
-}: {
-  refresh: () => void;
-  openTaskBoard: (query: StaffActionCenterQuery) => void;
-  /** A student opened from elsewhere in the workspace (the profile caseload, a search). */
-  initialStudentId: string | null;
-  initialQuery: string;
-}) {
-  const [query, setQuery] = useState(initialQuery);
-  const [debouncedQuery, setDebouncedQuery] = useState(initialQuery.trim());
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 250);
-    return () => window.clearTimeout(timer);
-  }, [query]);
-
-  // The whole tenant is searched on the server; this is one bounded page of it.
-  const search = useApiResource(
-    useCallback(
-      (signal: AbortSignal) => searchStaffStudents({ query: debouncedQuery, limit: 50 }, signal),
-      [debouncedQuery],
-    ),
-    { refreshOnAmbient: false },
-  );
-  const results = useMemo(() => search.data?.items ?? [], [search.data]);
-  const [selectedId, setSelectedId] = useState<string | null>(initialStudentId ?? "ac2fa509-b4e3-402d-900b-ffb8440fc430");
-  const selectedInResults = results.find((student) => student.id === selectedId) ?? null;
-
-  // A student opened from elsewhere may not be on this page: read that one row on its own.
-  const needsPinned = selectedId !== null && selectedInResults === null;
-  const pinned = useApiResource(
-    useCallback(
-      (signal: AbortSignal) =>
-        needsPinned && selectedId
-          ? searchStaffStudents({ studentId: selectedId, limit: 1 }, signal)
-          : Promise.resolve(null),
-      [needsPinned, selectedId],
-    ),
-    { refreshOnAmbient: false },
-  );
-  const operation: StaffStudentOperation | null =
-    selectedInResults ??
-    (needsPinned ? (pinned.data?.items[0] ?? null) : null) ??
-    results[0] ??
-    null;
-  const operationId = operation?.id ?? null;
-
-  // The student's open work is its own bounded server query, never a slice of
-  // whichever board page the workspace happened to load.
-  const openWork = useApiResource(
-    useCallback(
-      (signal: AbortSignal) =>
-        operationId
-          ? getStaffActionCenter({ studentId: operationId, status: "open", limit: 10 }, signal)
-          : Promise.resolve(null),
-      [operationId],
-    ),
-    { refreshOnAmbient: false },
-  );
-  const work = openWork.data?.items ?? [];
-  const inspectorItem = work[0] ?? null;
-  const onBoardChanged = () => {
-    refresh();
-    openWork.refresh();
-    search.refresh();
-  };
-
-  const cohortTotal = search.data?.cohortTotal ?? null;
-  const searchField = (
-    <div className="staff-heading-actions">
-      <label className="staff-search-field staff-search-field--compact">
-        <span aria-hidden="true">⌕</span>
-        <span className="sr-only">Search students</span>
-        <input
-          type="search"
-          placeholder={
-            cohortTotal !== null
-              ? `Search ${cohortTotal.toLocaleString()} students by name, ID or program`
-              : "Search students by name, ID or program"
-          }
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-      </label>
-    </div>
-  );
-
-  if (search.status === "error" && !search.data) {
-    return (
-      <>
-        <PageHeading view="students" action={searchField} />
-        <section className="staff-panel staff-empty-panel" role="alert">
-          <h2>Students could not be loaded</h2>
-          <p>{search.error}</p>
-          <button className="button button--secondary" type="button" onClick={search.reload}>
-            Try again
-          </button>
-        </section>
-      </>
-    );
-  }
-
-  return (
-    <>
-      <PageHeading view="students" action={searchField} />
-
-      <div className="staff-student-layout student360-layout">
-        <section className="staff-panel staff-student-directory">
-          <header className="staff-panel__heading">
-            <div>
-              <p className="eyebrow">{debouncedQuery ? "Search results" : "Every student"}</p>
-              <h2>
-                {search.data
-                  ? debouncedQuery
-                    ? `${search.data.total.toLocaleString()} match${search.data.total === 1 ? "" : "es"}`
-                    : `${search.data.cohortTotal.toLocaleString()} students`
-                  : "Students"}
-              </h2>
-            </div>
-            <span>
-              {search.data && search.data.total > search.data.items.length
-                ? `Showing ${search.data.items.length} of ${search.data.total.toLocaleString()} · narrow the search`
-                : search.status === "loading"
-                  ? "Searching…"
-                  : ""}
-            </span>
-          </header>
-          <div className="staff-student-directory__list">
-            {search.status === "ready" && results.length === 0 ? (
-              <div className="staff-empty-panel">
-                <h3>No students match</h3>
-                <p>Try part of a name, a student ID, or a program.</p>
-              </div>
-            ) : null}
-            {(needsPinned && pinned.data?.items[0] && !debouncedQuery ? [pinned.data.items[0], ...results] : results).map((student) => (
-              <button
-                className={student.id === operationId ? "is-selected" : undefined}
-                type="button"
-                onClick={() => setSelectedId(student.id)}
-                key={student.id}
-              >
-                <span className="staff-avatar">{student.preferredName.slice(0, 1)}</span>
-                <span>
-                  <strong>{student.name}</strong>
-                  <small>
-                    {student.programName}
-                    {student.externalRef ? ` · ${student.externalRef}` : ""}
-                  </small>
-                </span>
-                <span>
-                  <AttentionPills attention={student.attention} compact />
-                  <small>
-                    {student.openWorkItems} open · {student.journey.completedTasks}/{student.journey.totalTasks} checklist
-                  </small>
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        {operation ? (
-          <section className="staff-student-record">
-            <header className="staff-student-record__hero">
-              <div className="staff-avatar staff-avatar--large">{operation.preferredName.slice(0, 1)}</div>
-              <div>
-                <p className="eyebrow">Student record{operation.externalRef ? ` · ${operation.externalRef}` : ""}</p>
-                <h2>{operation.name}</h2>
-                <p>
-                  {[
-                    operation.programName,
-                    `Class of ${operation.classYear}`,
-                    operation.termName,
-                    operation.campusName,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              </div>
-              <AttentionPills attention={operation.attention} compact />
-            </header>
-            <div className="staff-student-facts staff-student-facts--five">
-              <article>
-                <span>Journey stage</span>
-                <strong>{operation.journey.stage}</strong>
-                <small>Last activity {formatTime(operation.journey.lastActivityAt)}</small>
-              </article>
-              <article>
-                <span>Enrollment checklist</span>
-                <strong>
-                  {operation.journey.completedTasks}/{operation.journey.totalTasks}
-                </strong>
-                <small>Configured tasks complete</small>
-              </article>
-              <article>
-                <span>Open work</span>
-                <strong>{operation.openWorkItems}</strong>
-                <small>
-                  {operation.overdueWorkItems > 0
-                    ? `${operation.overdueWorkItems} overdue`
-                    : "None overdue"}
-                </small>
-              </article>
-              <article>
-                <span>Primary adviser</span>
-                <strong>{operation.primaryAdviser?.name ?? "Not assigned"}</strong>
-                <small>{operation.primaryAdviser ? "Active assignment" : "No active primary-adviser assignment"}</small>
-              </article>
-              <article>
-                <span>Your role</span>
-                <strong>
-                  {operation.viewerAssignmentRoles.length > 0
-                    ? operation.viewerAssignmentRoles.map(assignmentRoleLabel).join(", ")
-                    : "Not on your caseload"}
-                </strong>
-                <small
-                  title={operation.openWorkOwners.map((owner) => `${owner.name} (${owner.component})`).join(", ")}
-                >
-                  {operation.openWorkOwners.length === 0
-                    ? "No open work owners"
-                    : operation.openWorkOwners.length === 1
-                      ? `Open work owned by ${operation.openWorkOwners[0].name}`
-                      : `Open work owned by ${operation.openWorkOwners.length} people: ${operation.openWorkOwners
-                          .slice(0, 2)
-                          .map((owner) => owner.name)
-                          .join(", ")}${operation.openWorkOwners.length > 2 ? ` +${operation.openWorkOwners.length - 2}` : ""}`}
-                </small>
-              </article>
-            </div>
-            <details className="staff-record-sections student360-work-disclosure"><summary>Enrollment progress & active work</summary>
-              <article>
-                <p className="eyebrow">Journey snapshot</p>
-                <h3>Enrollment readiness</h3>
-                <div className="staff-progress-track">
-                  <span
-                    style={{
-                      width: `${
-                        operation.journey.totalTasks === 0
-                          ? 0
-                          : Math.round(
-                              (operation.journey.completedTasks / operation.journey.totalTasks) * 100,
-                            )
-                      }%`,
-                    }}
-                  />
-                </div>
-                <p className="eyebrow">Attention signals</p>
-                {operation.attention.signals.length === 0 ? (
-                  <p>No rule-based signals: nothing overdue, blocked, or escalated on this record.</p>
-                ) : (
-                  <AttentionPills attention={operation.attention} />
-                )}
-                <p>
-                  <small>
-                    Counted from requirements, staff work and adviser assignments at{" "}
-                    {formatTime(operation.attention.evaluatedAt)}. There is no risk model behind these.
-                  </small>
-                </p>
-              </article>
-              <article>
-                <p className="eyebrow">Open work</p>
-                <h3>
-                  {openWork.status === "loading" && !openWork.data
-                    ? "Loading open work…"
-                    : work.length > 0
-                      ? `${openWork.data?.page.total ?? work.length} open staff ${(openWork.data?.page.total ?? work.length) === 1 ? "task" : "tasks"}`
-                      : "No open staff tasks"}
-                </h3>
-                <p>
-                  <button
-                    className="staff-inline-link"
-                    type="button"
-                    onClick={() => openTaskBoard({ studentId: operation.id, status: "all" })}
-                  >
-                    Open every task for {operation.preferredName} on the board →
-                  </button>
-                </p>
-                <ul>
-                  {work.slice(0, 3).map((item) => (
-                    <li key={item.id}>
-                      <span>{item.key}</span>
-                      <strong>{item.title}</strong>
-                      <small>
-                        {item.status.replaceAll("_", " ")} · {item.assignee?.name ?? "Unassigned"}
-                        {item.assignee ? ` (${item.assignee.component})` : ""}
-                      </small>
-                    </li>
-                  ))}
-                </ul>
-              </article>
-            </details>
-            <Student360Summary key={operation.id} studentId={operation.id} name={operation.name} /><div className="staff-student-university"><UniversityRecordPanel key={operation.id} studentId={operation.id} /></div>
-          </section>
-        ) : search.status === "loading" ? (
-          <section className="staff-panel staff-empty-panel" aria-live="polite">
-            <h2>Loading students…</h2>
-          </section>
-        ) : (
-          <section className="staff-panel staff-empty-panel">
-            <h2>No student selected</h2>
-            <p>Pick a student from the list, or search the whole roster.</p>
-          </section>
-        )}
-        {inspectorItem && openWork.data ? (
-          <details className="student360-inspector"><summary>Student workspace · documents, requirements & communications</summary><StudentInspector
-            item={inspectorItem}
-            center={openWork.data}
-            onBoardChanged={onBoardChanged}
-            key={inspectorItem.id}
-          /></details>
-        ) : null}
-      </div>
-    </>
   );
 }
 
@@ -5052,6 +4731,8 @@ function StaffWorkspaceShell({
         ) : view === "students" ? (
           <StudentsView
             key={`students-${studentsRequest?.key ?? 0}`}
+            subscribeToRealtimeInvalidation={subscribeToRealtimeInvalidation}
+            openWorkItem={openWorkItem}
             refresh={refresh}
             openTaskBoard={openTaskBoard}
             initialStudentId={studentsRequest?.studentId ?? null}

@@ -44,7 +44,7 @@
   :scope .staff-brand > div > span { display: none; }
 }
 @media (max-width: 620px) {
-  :scope .staff-main--workspace { padding: 20px 16px; }
+  :scope .staff-main--workspace { padding: calc(4.8rem + 20px) 16px 20px; }
   :scope .staff-page-heading h1 { font-size: 25px; }
   :scope .staff-heading-actions { width: 100%; }
 }

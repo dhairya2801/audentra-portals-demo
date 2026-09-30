@@ -187,7 +187,7 @@ function focusReviewField(id,showSource){
  if(row&&pane){const delta=row.getBoundingClientRect().top-pane.getBoundingClientRect().top-36;if(delta<0||row.getBoundingClientRect().bottom>pane.getBoundingClientRect().bottom)pane.scrollTop+=delta;row.querySelector('button')?.focus({preventScroll:true});}
  if(showSource){const mark=document.querySelector(`.document-sheet [data-evidence="${id}"]`),pdf=document.querySelector('#pdf-scroll');if(mark&&pdf)pdf.scrollTop+=mark.getBoundingClientRect().top-pdf.getBoundingClientRect().top-pdf.clientHeight/3;}
 }
-function openDeepLink(){let key;try{key=decodeURIComponent(location.hash.slice(1));}catch{return;}const task=store.tasks.find(t=>t.key===key);if(task){actionDialog.close();switchBoard(task.board);openTask(key);}}
+function openDeepLink(){let key;try{key=decodeURIComponent(location.hash.slice(1));}catch{return;}const task=store.tasks.find(t=>t.key===key||t.workItemId===key||t.id===key);if(task){actionDialog.close();switchBoard(task.board);openTask(task.key);}}
 window.addEventListener('hashchange',openDeepLink);
 try{await initializeIdentities();shell();openDeepLink();}
 catch{
