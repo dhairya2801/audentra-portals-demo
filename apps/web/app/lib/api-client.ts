@@ -1075,6 +1075,10 @@ export function searchStaffStudents(query: StaffStudentSearchQuery = {}, signal?
   if (query.query?.trim()) params.set("query", query.query.trim());
   if (query.studentId) params.set("studentId", query.studentId);
   if (query.limit) params.set("limit", String(query.limit));
+  if (query.offset !== undefined) params.set("offset", String(query.offset));
+  for (const key of ["sort", "program", "stage", "risk", "view", "featuredStudentId"] as const) {
+    if (query[key]) params.set(key, query[key]);
+  }
   const suffix = params.size > 0 ? `?${params.toString()}` : "";
   return request<StaffStudentSearch>(`/v1/staff/students${suffix}`, {
     method: "GET",

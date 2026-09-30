@@ -2818,7 +2818,8 @@ test("Student 360 keeps canonical records separate from labeled score previews",
   ]);
 
   // Search remains server-side and bounded; student work is independently read.
-  assert.match(source, /searchStaffStudents\(\{ query: debouncedQuery, limit: 200 \}/);
+  assert.match(source, /searchStaffStudents\(directoryQuery, signal\)/);
+  assert.match(source, /offset: page \* 7/);
   assert.match(source, /getStaffActionCenter\(\s*\{ studentId: student.id, status: "all"/);
   assert.match(source, /getStaffStudentRecord\(student.id, signal\)/);
   assert.match(api, /`\/v1\/staff\/students\$\{suffix\}`/);

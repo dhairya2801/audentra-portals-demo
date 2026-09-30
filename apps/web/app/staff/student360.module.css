@@ -624,6 +624,22 @@
   gap: 10px;
   align-items: center;
 }
+.pageJump {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pageJump input {
+  width: 55px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--ink);
+  background: white;
+}
+.pagination .pageJump button {
+  font-size: 11px;
+}
 .pagination button {
   width: 30px;
   height: 30px;

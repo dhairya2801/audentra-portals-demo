@@ -11,7 +11,7 @@ const page = await context.newPage();
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
 const shot = async name => { if (output) { await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(300); await fs.mkdir(output, { recursive: true }); await page.screenshot({ path: `${output}/${name}.png`, fullPage: true }); } };
-const noOverflow = async () => assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'Page overflows horizontally');
+const noOverflow = async () => expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth > innerWidth), { message: 'Page overflows horizontally' }).toBe(false);
 const tab = name => page.getByRole('navigation', { name: 'Student record sections' }).getByRole('button', { name, exact: true });
 try {
   await page.goto(`${base}/staff`);
@@ -34,14 +34,17 @@ try {
   assert.equal(csv.split('\r\n').length, 8);
   assert.ok(csv.includes('mock preview'));
   await page.getByRole('checkbox', { name: 'Select students on this page' }).uncheck();
+  const riskResponse = page.waitForResponse(response => response.url().includes('/v1/staff/students?') && new URL(response.url()).searchParams.get('view') === 'risk' && response.ok());
   await page.getByRole('button', { name: /^High risk / }).click();
+  await riskResponse;
+  await expect(table).toHaveAttribute('aria-busy', 'false');
   for (const row of await table.locator('tbody tr').all()) assert.match(await row.innerText(), /Critical|High/);
   await page.getByRole('button', { name: 'Clear filters' }).click();
   await shot('directory-desktop');
   await noOverflow();
   await page.getByPlaceholder('Search by student, ID, or program').fill('no-such-student-360');
   await expect(page.getByRole('heading', { name: 'No students match this view' })).toBeVisible();
-  await page.getByPlaceholder('Search by student, ID, or program').fill('Ada');
+  await page.getByPlaceholder('Search by student, ID, or program').fill('SYN-000061');
   await table.getByRole('button', { name: /Ada Kettleby/ }).click();
   await expect(page.getByRole('heading', { name: 'Ada Kettleby', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: /Ada’s path to enrollment/ })).toBeVisible();
@@ -76,7 +79,7 @@ try {
   await noOverflow();
   await shot('overview-mobile');
   await page.getByRole('button', { name: 'Back to all students' }).click();
-  await expect(page.getByPlaceholder('Search by student, ID, or program')).toHaveValue('Ada');
+  await expect(page.getByPlaceholder('Search by student, ID, or program')).toHaveValue('SYN-000061');
   await page.getByRole('button', { name: 'Clear filters' }).click();
   await noOverflow();
   await shot('directory-mobile');
@@ -101,7 +104,7 @@ try {
   await shot('morning-brew-mobile');
   await page.setViewportSize({ width: 1440, height: 1050 });
   await page.getByRole('button', { name: 'Student 360', exact: true }).filter({ visible: true }).click();
-  await page.getByPlaceholder('Search by student, ID, or program').fill('Ada');
+  await page.getByPlaceholder('Search by student, ID, or program').fill('SYN-000061');
   await page.getByRole('button', { name: /Ada Kettleby/ }).click();
   await page.getByRole('button', { name: 'Open recommended action →', exact: true }).click();
   await expect(page.frameLocator('#approved-task-board').locator('#task-dialog')).toBeVisible();

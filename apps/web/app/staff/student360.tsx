@@ -12,6 +12,7 @@ import {
 import type {
   StaffActionCenterQuery,
   StaffStudentOperation,
+  StaffStudentSearchQuery,
   StaffStudentRecord,
   StaffWorkItem,
   StudentDocument,
@@ -251,7 +252,7 @@ export function StudentsView({
   const [program, setProgram] = useState("");
   const [stage, setStage] = useState("");
   const [risk, setRisk] = useState("");
-  const [sort, setSort] = useState("risk");
+  const [sort, setSort] = useState("recommended");
   const [view, setView] = useState("all");
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<string[]>([]);
@@ -259,11 +260,25 @@ export function StudentsView({
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 250);
     return () => window.clearTimeout(timer);
   }, [query]);
+  const featuredStudentId = personas.data?.students[0]?.id;
+  const directoryQuery = useMemo<StaffStudentSearchQuery>(
+    () => ({
+      query: debouncedQuery,
+      limit: 7,
+      offset: page * 7,
+      sort: sort as StaffStudentSearchQuery["sort"],
+      program,
+      stage,
+      risk,
+      view: view as StaffStudentSearchQuery["view"],
+      featuredStudentId,
+    }),
+    [debouncedQuery, page, sort, program, stage, risk, view, featuredStudentId],
+  );
   const search = useApiResource(
     useCallback(
-      (signal: AbortSignal) =>
-        searchStaffStudents({ query: debouncedQuery, limit: 200 }, signal),
-      [debouncedQuery],
+      (signal: AbortSignal) => searchStaffStudents(directoryQuery, signal),
+      [directoryQuery],
     ),
   );
   const results = useMemo(() => search.data?.items ?? [], [search.data]);
@@ -279,42 +294,18 @@ export function StudentsView({
   const student =
     results.find((item) => item.id === selectedId) ??
     pinned.data?.items.find((item) => item.id === selectedId);
-  const filtered = useMemo(
-    () =>
-      results
-        .filter(
-          (item) =>
-            (!program || item.programName === program) &&
-            (!stage || item.journey.stage === stage) &&
-            (!risk || riskLabel(previewRisk(item)) === risk) &&
-            (view !== "risk" || previewRisk(item) >= 60) &&
-            (view !== "blocked" || blocked(item)) &&
-            (view !== "inactive" || inactive(item)),
-        )
-        .sort((a, b) =>
-          sort === "name"
-            ? a.name.localeCompare(b.name)
-            : sort === "readiness"
-              ? readiness(a) - readiness(b)
-              : previewRisk(b) - previewRisk(a),
-        ),
-    [results, program, stage, risk, view, sort],
-  );
-  const currentPage = Math.min(
-    page,
-    Math.max(0, Math.ceil(filtered.length / 7) - 1),
-  );
-  const shown = filtered.slice(currentPage * 7, currentPage * 7 + 7);
+  const shown = results;
+  const matchCount = search.data?.total ?? 0;
+  const currentPage = Math.floor((search.data?.offset ?? page * 7) / 7);
+  const summary = search.data?.summary;
+  const changingPage = search.status === "loading" || search.isRefreshing;
   const changeFilter = (setter: (value: string) => void, value: string) => {
     setter(value);
     setPage(0);
     setSelected([]);
   };
-  const complete = results.reduce(
-    (sum, item) => sum + item.journey.completedTasks,
-    0,
-  );
-  const total = results.reduce((sum, item) => sum + item.journey.totalTasks, 0);
+  const complete = summary?.completedTasks ?? 0;
+  const total = summary?.totalTasks ?? 0;
   const ready = total ? Math.round((complete / total) * 100) : 0;
   const clear = () => {
     setQuery("");
@@ -322,13 +313,14 @@ export function StudentsView({
     setStage("");
     setRisk("");
     setView("all");
+    setSort("recommended");
     setPage(0);
     setSelected([]);
   };
   const exportRows = () => {
     const rows = selected.length
-      ? filtered.filter((item) => selected.includes(item.id))
-      : filtered;
+      ? shown.filter((item) => selected.includes(item.id))
+      : shown;
     const cell = (value: string | number) =>
       `"${String(value)
         .replace(/^[=+@\-\t\r]/, "'$&")
@@ -441,9 +433,9 @@ export function StudentsView({
           type="button"
           className={styles.heroButton}
           onClick={exportRows}
-          disabled={!filtered.length}
+          disabled={!shown.length || changingPage}
         >
-          ↓ Export{selected.length ? ` (${selected.length})` : ""}
+          ↓ Export{selected.length ? ` (${selected.length})` : " page"}
         </button>
         <div className={styles.orbit} aria-hidden="true">
           <span>▣</span>
@@ -497,7 +489,8 @@ export function StudentsView({
             onChange={(event) => changeFilter(setProgram, event.target.value)}
           >
             <option value="">All programs</option>
-            {[...new Set(results.map((item) => item.programName))]
+            {[...new Set([program, ...(search.data?.facets?.programs ?? [])])]
+              .filter(Boolean)
               .sort()
               .map((value) => (
                 <option key={value}>{value}</option>
@@ -511,7 +504,8 @@ export function StudentsView({
             onChange={(event) => changeFilter(setStage, event.target.value)}
           >
             <option value="">All stages</option>
-            {[...new Set(results.map((item) => item.journey.stage))]
+            {[...new Set([stage, ...(search.data?.facets?.stages ?? [])])]
+              .filter(Boolean)
               .sort()
               .map((value) => (
                 <option key={value}>{value}</option>
@@ -536,7 +530,8 @@ export function StudentsView({
             value={sort}
             onChange={(event) => changeFilter(setSort, event.target.value)}
           >
-            <option value="risk">Highest melt risk</option>
+            <option value="recommended">Most complete records</option>
+            <option value="risk">Highest melt risk · mock</option>
             <option value="readiness">Lowest readiness</option>
             <option value="name">Student name</option>
           </select>
@@ -557,11 +552,11 @@ export function StudentsView({
           value={`${ready}%`}
           note={`${complete.toLocaleString()} of ${total.toLocaleString()} milestones complete`}
           aside={<Ring value={ready} />}
-          badge="Loaded roster"
+          badge="Matching students"
         />
         <Metric
           label="Students at risk · mock"
-          value={results.filter((item) => previewRisk(item) >= 60).length}
+          value={summary?.highRisk ?? 0}
           note="High or critical preview scores"
           aside={
             <span className={styles.metricSymbol} data-tone="rose">
@@ -572,16 +567,7 @@ export function StudentsView({
         />
         <Metric
           label="Blocked enrollment steps"
-          value={results.reduce(
-            (sum, item) =>
-              sum +
-              item.attention.signals
-                .filter(
-                  (signal) => signal.code === "blocking_requirements_open",
-                )
-                .reduce((n, signal) => n + signal.count, 0),
-            0,
-          )}
+          value={summary?.blockingSteps ?? 0}
           note="Open blocking requirements"
           aside={<span className={styles.metricSymbol}>✓</span>}
           badge="Needs attention"
@@ -601,8 +587,8 @@ export function StudentsView({
         <div>
           <span className={styles.eyebrow}>YOUR NEXT CONVERSATION</span>
           <strong>
-            {results.filter(blocked).length}{" "}
-            {results.filter(blocked).length === 1
+            {summary?.blockedStudents ?? 0}{" "}
+            {(summary?.blockedStudents ?? 0) === 1
               ? "student has"
               : "students have"}{" "}
             enrollment blockers that need attention.
@@ -627,20 +613,17 @@ export function StudentsView({
         <header>
           <h2 id="students-attention-title">Students requiring attention</h2>
           <p>
-            Prioritized by melt risk, blockers, inactivity, and staff urgency.
+            Students with enrollment progress and connected staff work appear
+            first. Search and filters cover the entire institution.
           </p>
         </header>
         <div className={styles.tableControls}>
           <div className={styles.chips}>
             {[
-              [
-                "risk",
-                "High risk",
-                results.filter((item) => previewRisk(item) >= 60).length,
-              ],
-              ["blocked", "Blocked", results.filter(blocked).length],
-              ["inactive", "Inactive 7d+", results.filter(inactive).length],
-              ["all", "All students", results.length],
+              ["risk", "High risk", summary?.highRisk ?? 0],
+              ["blocked", "Blocked", summary?.blockedStudents ?? 0],
+              ["inactive", "Inactive 7d+", summary?.inactiveStudents ?? 0],
+              ["all", "All students", summary?.students ?? 0],
             ].map(([id, label, count]) => (
               <button
                 type="button"
@@ -659,9 +642,7 @@ export function StudentsView({
         <p className={styles.tableNote}>
           Melt risk and financial coverage are mock previews. Enrollment and
           staff work reflect platform records.
-          {search.data && search.data.total > results.length
-            ? ` Showing ${results.length} of ${search.data.total.toLocaleString()} matches; search to narrow the full roster.`
-            : ""}
+          {search.isRefreshing && " Refreshing directory…"}
           {selected.length > 0 && ` ${selected.length} selected for export.`}
         </p>
         <div
@@ -669,6 +650,7 @@ export function StudentsView({
           tabIndex={0}
           role="region"
           aria-label="Student directory"
+          aria-busy={changingPage}
         >
           <table className={styles.table}>
             <thead>
@@ -676,6 +658,7 @@ export function StudentsView({
                 <th>
                   <input
                     aria-label="Select students on this page"
+                    disabled={changingPage}
                     type="checkbox"
                     checked={
                       shown.length > 0 &&
@@ -720,6 +703,7 @@ export function StudentsView({
                     <input
                       type="checkbox"
                       aria-label={`Select ${item.name}`}
+                      disabled={changingPage}
                       checked={selected.includes(item.id)}
                       onChange={(event) =>
                         setSelected(
@@ -741,7 +725,8 @@ export function StudentsView({
                       <span>
                         <strong>{item.name}</strong>
                         <small>
-                          {item.programName} · Class of {item.classYear}
+                          {item.externalRef} · {item.programName} · Class of{" "}
+                          {item.classYear}
                         </small>
                       </span>
                     </button>
@@ -758,11 +743,18 @@ export function StudentsView({
                     </div>
                   </td>
                   <td>
-                    <b>{readiness(item)}%</b>
-                    <Progress value={readiness(item)} />
+                    <b>
+                      {item.journey.totalTasks
+                        ? `${readiness(item)}%`
+                        : "Not started"}
+                    </b>
+                    {item.journey.totalTasks > 0 && (
+                      <Progress value={readiness(item)} />
+                    )}
                     <small>
-                      {item.journey.completedTasks}/{item.journey.totalTasks}{" "}
-                      milestones
+                      {item.journey.totalTasks
+                        ? `${item.journey.completedTasks}/${item.journey.totalTasks} milestones`
+                        : "No milestones assigned"}
                     </small>
                   </td>
                   <td>
@@ -829,8 +821,8 @@ export function StudentsView({
         ) : null}
         <footer className={styles.pagination}>
           <span>
-            {filtered.length
-              ? `Showing ${currentPage * 7 + 1}–${Math.min(currentPage * 7 + 7, filtered.length)} of ${filtered.length} students`
+            {shown.length
+              ? `Showing ${currentPage * 7 + 1}–${currentPage * 7 + shown.length} of ${matchCount.toLocaleString()} students`
               : "0 students"}
             {search.data
               ? ` · ${search.data.cohortTotal.toLocaleString()} in the institution`
@@ -839,18 +831,59 @@ export function StudentsView({
           <div>
             <button
               aria-label="Previous page"
-              disabled={currentPage === 0}
-              onClick={() => setPage(currentPage - 1)}
+              disabled={currentPage === 0 || changingPage}
+              onClick={() => {
+                setSelected([]);
+                setPage(currentPage - 1);
+              }}
             >
               ‹
             </button>
-            <span>
-              {currentPage + 1} / {Math.max(1, Math.ceil(filtered.length / 7))}
-            </span>
+            <form
+              className={styles.pageJump}
+              onSubmit={(event) => {
+                event.preventDefault();
+                const value = Number(
+                  new FormData(event.currentTarget).get("page"),
+                );
+                if (
+                  Number.isInteger(value) &&
+                  value >= 1 &&
+                  value <= Math.max(1, Math.ceil(matchCount / 7))
+                ) {
+                  setSelected([]);
+                  setPage(value - 1);
+                }
+              }}
+            >
+              <input
+                key={currentPage}
+                aria-label="Page number"
+                name="page"
+                type="number"
+                min={1}
+                max={Math.max(1, Math.ceil(matchCount / 7))}
+                defaultValue={currentPage + 1}
+                disabled={changingPage}
+              />
+              <span>
+                of {Math.max(1, Math.ceil(matchCount / 7)).toLocaleString()}
+              </span>
+              <button
+                type="submit"
+                aria-label="Go to page"
+                disabled={changingPage}
+              >
+                Go
+              </button>
+            </form>
             <button
               aria-label="Next page"
-              disabled={(currentPage + 1) * 7 >= filtered.length}
-              onClick={() => setPage(currentPage + 1)}
+              disabled={(currentPage + 1) * 7 >= matchCount || changingPage}
+              onClick={() => {
+                setSelected([]);
+                setPage(currentPage + 1);
+              }}
             >
               ›
             </button>
