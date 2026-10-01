@@ -15,6 +15,7 @@
 import type {
   AskStaffEdwardResponse,
   StaffTaskBoardContext,
+  StaffAssistantPageContext,
   AssistantResponseBlock,
   EdwardActionIntent,
   EdwardActionReceipt,
@@ -35,6 +36,8 @@ import {
   createStaffAssistantConversation,
   getStaffAssistantConversationMessages,
 } from "../lib/api-client";
+import { useTenant } from "./tenant-provider";
+import type { StaffEdwardOpening } from "../lib/staff-edward-opening";
 import { AssistantBlocks } from "./assistant-blocks";
 import { EdwardResponseFeedback } from "./edward-response-feedback";
 import { EdwardActionCard } from "./edward-action-card";
@@ -93,8 +96,8 @@ function receiptSummary(receipt: EdwardActionReceipt) {
   return `${outcome} · ${receipt.action.replaceAll(".", " › ").replaceAll("_", " ")} · ${records}`;
 }
 
-function conversationStorageKey(): string {
-  return "audentra.staff-edward.portal-conversation.v1";
+function conversationStorageKey(scope: string): string {
+  return `audentra.staff-edward.portal-conversation.v2:${scope}`;
 }
 
 function readStoredConversationId(key: string): string | null {
@@ -193,19 +196,28 @@ function StaffBlocks({
 
 export function StaffEdwardAssistant({
   staffName,
+  staffId,
   variant = "floating",
   pageContext,
 }: {
   staffName: string;
+  staffId?: string;
   variant?: "floating" | "embedded";
   pageContext?: StaffTaskBoardContext;
 }) {
+  const {tenant} = useTenant();
+  const storageKey = conversationStorageKey(`${tenant.id}:${staffId ?? staffName}`);
   const [open, setOpen] = useState(variant === "embedded");
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [restoring, setRestoring] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const pendingRequest = useRef<AbortController | null>(null);
-  const failedRequest = useRef<{ message: string; id: string; pageContext?: StaffTaskBoardContext } | null>(null);
+  const failedRequest = useRef<{ message: string; id: string; pageContext?: StaffAssistantPageContext; historyAfter?: string } | null>(null);
+  const [cardOpening, setCardOpening] = useState<StaffEdwardOpening | null>(null);
+  const scopeKey = useRef("");
+  const historyAfter = useRef<string | undefined>(undefined);
+  const submissionLock = useRef(false);
   const [messages, setMessages] = useState<StaffDisplayMessage[]>([
     welcomeMessage(staffName),
   ]);
@@ -231,14 +243,49 @@ export function StaffEdwardAssistant({
   }, [open, variant]);
 
   useEffect(() => {
+    const activate = (opening: StaffEdwardOpening) => {
+      const nextKey = JSON.stringify(opening.context ?? null);
+      if (scopeKey.current !== nextKey) {
+        scopeKey.current = nextKey;
+        historyAfter.current = crypto.randomUUID();
+        failedRequest.current = null;
+        setError(null);
+        setCardOpening(opening.context ? opening : null);
+      }
+      setOpen(true);
+      if (opening.question) setDraft(opening.question.slice(0, 2000));
+      window.setTimeout(() => input.current?.focus(), 0);
+    };
+    const launch = (event: Event) => activate((event as CustomEvent<StaffEdwardOpening>).detail);
+    window.addEventListener("audentra:staff-edward:open", launch);
+    return () => window.removeEventListener("audentra:staff-edward:open", launch);
+  }, []);
+
+  useEffect(() => {
     const ask = (event: Event) => {
       const question = (event as CustomEvent<{question?:string}>).detail?.question;
       if (typeof question !== "string" || !question.trim()) return;
+      setCardOpening(null);
+      scopeKey.current = "";
+      historyAfter.current = crypto.randomUUID();
+      failedRequest.current = null;
       setOpen(true);
       setDraft(question.slice(0,2000));
     };
     window.addEventListener("audentra:staff-edward:ask",ask);
     return () => window.removeEventListener("audentra:staff-edward:ask",ask);
+  }, []);
+
+  useEffect(() => {
+    const clear = () => {
+      if (!scopeKey.current) return;
+      scopeKey.current = "";
+      historyAfter.current = crypto.randomUUID();
+      failedRequest.current = null;
+      setCardOpening(null);
+    };
+    window.addEventListener("audentra:staff-navigation", clear);
+    return () => window.removeEventListener("audentra:staff-navigation", clear);
   }, []);
 
   useEffect(() => {
@@ -263,16 +310,21 @@ export function StaffEdwardAssistant({
   // shows what the server holds — receipts included — rather than an empty
   // panel that only remembers the conversation id.
   useEffect(() => {
-    const storedId = readStoredConversationId(conversationStorageKey());
-    if (!storedId) return;
+    // Migrate the legacy tab pointer only after the server verifies ownership.
+    const legacyKey = "audentra.staff-edward.portal-conversation.v1";
+    const storedId = readStoredConversationId(storageKey) ?? readStoredConversationId(legacyKey);
+    if (!storedId) { queueMicrotask(() => setRestoring(false)); return; }
     const abort = new AbortController();
     void getStaffAssistantConversationMessages(storedId, abort.signal)
       .then((result) => {
         if (abort.signal.aborted) return;
         conversationRef.current = result.conversationId;
-        setMessages([
+        writeStoredConversationId(storageKey, result.conversationId);
+        writeStoredConversationId(legacyKey, null);
+        setMessages(current => [
           welcomeMessage(staffName),
           ...result.messages.map(persistedMessageToDisplay),
+          ...current.filter(message => message.id !== "welcome"),
         ]);
       })
       .catch((caught) => {
@@ -283,11 +335,11 @@ export function StaffEdwardAssistant({
         ) {
           // Gone on the server, or not this person's: the next send starts fresh.
           conversationRef.current = null;
-          writeStoredConversationId(conversationStorageKey(), null);
+          writeStoredConversationId(storageKey, null);
         }
-      });
+      }).finally(() => { if (!abort.signal.aborted) setRestoring(false); });
     return () => abort.abort();
-  }, [staffName]);
+  }, [staffName, storageKey]);
 
   /**
    * The durable conversation for this tab: resumed from sessionStorage when
@@ -295,7 +347,7 @@ export function StaffEdwardAssistant({
    */
   const ensureConversation = async (): Promise<string | null> => {
     if (conversationRef.current) return conversationRef.current;
-    const stored = readStoredConversationId(conversationStorageKey());
+    const stored = readStoredConversationId(storageKey);
     if (stored) {
       conversationRef.current = stored;
       return stored;
@@ -303,7 +355,7 @@ export function StaffEdwardAssistant({
     try {
       const conversation = await createStaffAssistantConversation();
       conversationRef.current = conversation.id;
-      writeStoredConversationId(conversationStorageKey(), conversation.id);
+      writeStoredConversationId(storageKey, conversation.id);
       return conversation.id;
     } catch {
       // A stateless turn still answers; the next send tries again.
@@ -313,24 +365,31 @@ export function StaffEdwardAssistant({
 
   const dropConversation = useCallback(() => {
     conversationRef.current = null;
-    writeStoredConversationId(conversationStorageKey(), null);
-  }, []);
+    writeStoredConversationId(storageKey, null);
+  }, [storageKey]);
 
   const send = async (message: string) => {
     const normalized = message.trim();
-    if (!normalized || sending) return;
+    if (!normalized || submissionLock.current || restoring) return;
+    submissionLock.current = true;
     const retrying = failedRequest.current?.message === normalized;
+    if (!retrying && failedRequest.current?.id === historyAfter.current) {
+      // A different question abandons an uncertain first turn; give it a fresh boundary.
+      historyAfter.current = crypto.randomUUID();
+    }
     const clientMessageId = retrying
       ? failedRequest.current!.id
-      : crypto.randomUUID();
-    const requestContext = retrying ? failedRequest.current!.pageContext : pageContext;
-    failedRequest.current = { message: normalized, id: clientMessageId, pageContext: requestContext };
+      : (historyAfter.current && !messages.some(m => m.id === historyAfter.current) ? historyAfter.current : crypto.randomUUID());
+    let requestHistoryAfter = retrying ? failedRequest.current!.historyAfter : historyAfter.current;
+    const requestContext = retrying ? failedRequest.current!.pageContext : cardOpening?.context ?? pageContext;
+    const requestScope = scopeKey.current;
+    failedRequest.current = { message: normalized, id: clientMessageId, pageContext: requestContext, historyAfter: requestHistoryAfter };
     const controller = new AbortController();
     pendingRequest.current = controller;
     if (!retrying)
       setMessages((current) => [
         ...current,
-        { id: crypto.randomUUID(), role: "user", content: normalized },
+        { id: clientMessageId, role: "user", content: normalized },
       ]);
     setDraft("");
     setError(null);
@@ -338,7 +397,7 @@ export function StaffEdwardAssistant({
     try {
       const reusedConversation =
         conversationRef.current !== null ||
-        readStoredConversationId(conversationStorageKey()) !== null;
+        readStoredConversationId(storageKey) !== null;
       let serverConversationId = await ensureConversation();
       let response: AskStaffEdwardResponse;
       try {
@@ -349,6 +408,7 @@ export function StaffEdwardAssistant({
               ? { conversationId: serverConversationId }
               : {}),
             clientMessageId,
+            ...(requestHistoryAfter ? {historyAfter: requestHistoryAfter} : {}),
             ...(requestContext ? {pageContext: requestContext} : {}),
           },
           controller.signal,
@@ -365,6 +425,11 @@ export function StaffEdwardAssistant({
           throw caught;
         }
         dropConversation();
+        if (requestHistoryAfter) {
+          requestHistoryAfter = clientMessageId;
+          if (scopeKey.current === requestScope) historyAfter.current = clientMessageId;
+          if (failedRequest.current?.id === clientMessageId) failedRequest.current.historyAfter = clientMessageId;
+        }
         serverConversationId = await ensureConversation();
         response = await askStaffEdward(
           {
@@ -373,6 +438,7 @@ export function StaffEdwardAssistant({
               ? { conversationId: serverConversationId }
               : {}),
             clientMessageId,
+            ...(requestHistoryAfter ? {historyAfter: requestHistoryAfter} : {}),
             ...(requestContext ? {pageContext: requestContext} : {}),
           },
           controller.signal,
@@ -381,11 +447,11 @@ export function StaffEdwardAssistant({
       if (response.conversationId) {
         conversationRef.current = response.conversationId;
         writeStoredConversationId(
-          conversationStorageKey(),
+          storageKey,
           response.conversationId,
         );
       }
-      failedRequest.current = null;
+      if (scopeKey.current === requestScope) failedRequest.current = null;
       setMessages((current) => [
         ...current,
         {
@@ -406,6 +472,7 @@ export function StaffEdwardAssistant({
         },
       ]);
     } catch (caught) {
+      if (scopeKey.current !== requestScope) return;
       setError(
         controller.signal.aborted
           ? "Stopped waiting. Your request may still finish; retry checks the same request."
@@ -416,6 +483,7 @@ export function StaffEdwardAssistant({
       setDraft((current) => (current.trim() ? current : normalized));
     } finally {
       pendingRequest.current = null;
+      submissionLock.current = false;
       setSending(false);
     }
   };
@@ -447,7 +515,7 @@ export function StaffEdwardAssistant({
           type="button"
           className={experience.newConversation}
           aria-label="New conversation"
-          disabled={sending}
+          disabled={sending || restoring}
           onClick={() => {
             dropConversation();
             setMessages([welcomeMessage(staffName)]);
@@ -473,7 +541,12 @@ export function StaffEdwardAssistant({
       </header>
 
       <div ref={transcript} className="edward-transcript" aria-live="polite">
-        {messages.map((message) => (
+        {cardOpening?.greeting ? (
+          <article className="edward-message edward-message--assistant" data-card-greeting>
+            <p>{cardOpening.greeting}</p>
+          </article>
+        ) : null}
+        {messages.filter(message => !cardOpening || message.id !== "welcome").map((message) => (
           <article
             className={`edward-message edward-message--${message.role}`}
             key={message.id}
@@ -563,7 +636,7 @@ export function StaffEdwardAssistant({
         ) : null}
       </div>
 
-      {messages.length === 1 ? (
+      {cardOpening || messages.length === 1 ? (
         <div className="edward-prompts" aria-label="Suggested questions">
           {quickPrompts.map((prompt) => (
             <button
@@ -605,7 +678,7 @@ export function StaffEdwardAssistant({
           <button
             className="edward-send-button"
             type={sending ? "button" : "submit"}
-            disabled={!sending && draft.trim().length === 0}
+            disabled={restoring || (!sending && draft.trim().length === 0)}
             aria-label={sending ? "Stop waiting" : "Send message"}
             onClick={
               sending ? () => pendingRequest.current?.abort() : undefined

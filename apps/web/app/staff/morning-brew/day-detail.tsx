@@ -404,6 +404,7 @@ export function DayDetail({
   const ask = () =>
     onAskEdward({
       mode: "ask",
+      sourceId: item.id,
       context: title,
       greeting: `${briefing.reader.firstName}, what would you like to know about ${title}?`,
     });
@@ -485,6 +486,7 @@ export function DayDetail({
           onRevision={(instruction, text) =>
             onAskEdward({
               mode: "ask",
+              sourceId: item.id,
               context: title,
               question: `Revise this draft using this instruction: ${instruction}\n\nDraft:\n${text}`,
             })

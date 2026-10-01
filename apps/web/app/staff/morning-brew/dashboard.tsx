@@ -496,7 +496,7 @@ export function MorningBrewDashboard({
             {briefing.insights.map((insight) => (
               <IntelligenceCard key={insight.id} insight={insight} level={intelligenceLevel}
                 onOpen={() => onOpenDetail({ kind: "insight", id: insight.id })}
-                onAskEdward={() => onAskEdward({ mode: "cohort", context: insight.cohort.question })} />
+                onAskEdward={() => onAskEdward({ mode: "cohort", sourceId: insight.id, context: insight.cohort.question })} />
             ))}
           </div>
         </section>
@@ -511,6 +511,7 @@ export function MorningBrewDashboard({
         onAskEdwardFor={(kpi) =>
           onAskEdward({
             mode: "cohort",
+            sourceId: kpi.id,
             context: kpi.label,
             greeting: edwardKpiGreeting(briefing.reader.firstName, kpi.label),
           })

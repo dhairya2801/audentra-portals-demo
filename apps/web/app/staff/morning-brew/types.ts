@@ -457,6 +457,7 @@ export type BrewDetailRef =
 export type EdwardMode = "ask" | "summarize" | "insights" | "cohort";
 
 export interface EdwardRequest {
+  sourceId?: string;
   mode: EdwardMode;
   /** Human label for the surface Edward was launched from. */
   context: string;

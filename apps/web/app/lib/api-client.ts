@@ -1146,6 +1146,10 @@ export function getStaffWorkItemDetail(
   );
 }
 
+export function getStaffWorkspaceNavigation(signal?: AbortSignal) {
+  return request<import("@vv/contracts").StaffWorkspaceNavigation>("/v1/staff/workspace?projection=navigation", {method: "GET", signal});
+}
+
 export function getStaffOperationsWorkspace(signal?: AbortSignal) {
   return request<StaffOperationsWorkspace>("/v1/staff/workspace", {
     method: "GET",

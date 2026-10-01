@@ -267,7 +267,7 @@ export function MorningBrewDetail({
         }
         mark={<Glyph name={topic?.icon ?? "students"} size={20} />}
         className="brew-detail--intelligence"
-        onAskEdward={() => onAskEdward({ mode: "cohort", context: insight.cohort.question })}
+        onAskEdward={() => onAskEdward({ mode: "cohort", sourceId: insight.id, context: insight.cohort.question })}
         accent="amber"
         title={insight.title}
         onBack={onBack}
@@ -387,7 +387,7 @@ export function MorningBrewDetail({
         title={kpi.label}
         onBack={onBack}
         className="brew-detail--metric"
-        onAskEdward={() => onAskEdward({ mode: "cohort", context: kpi.cohort.question })}
+        onAskEdward={() => onAskEdward({ mode: "cohort", sourceId: kpi.id, context: kpi.cohort.question })}
         actions={openWorkspace("students")}
       >
         <p className="brew-detail__lede">{kpi.detail.definition}</p>
@@ -453,7 +453,7 @@ export function MorningBrewDetail({
       <DetailShell
         eyebrow={`${topic?.title ?? "Enrollment"} · Action Center`}
         mark={<Glyph name={topic?.icon ?? "actions"} size={20} />}
-        onAskEdward={() => onAskEdward({ mode: "ask", context: priority.title })}
+        onAskEdward={() => onAskEdward({ mode: "ask", sourceId: priority.id, context: priority.title })}
         accent="blue"
         title={priority.title}
         onBack={onBack}

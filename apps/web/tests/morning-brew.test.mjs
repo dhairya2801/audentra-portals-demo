@@ -26,7 +26,7 @@ import ts from "typescript";
  * a data: URL cannot resolve a relative specifier.
  */
 const SOURCE_DIR = new URL("../app/staff/morning-brew/", import.meta.url);
-const MODULES = ["data", "catalog", "demo-brew", "news", "preferences", "types", "presentation"];
+const MODULES = ["data", "catalog", "demo-brew", "news", "preferences", "types", "presentation", "edward-context"];
 
 let compiledDir = null;
 
@@ -588,4 +588,25 @@ test("movement tone follows metric intent and flat changes stay neutral", async 
   assert.equal(movementLabel("vs yesterday"), "Since yesterday");
   assert.equal(movementLabel("vs last 7 days"), "Over the last 7 days");
   assert.equal(initialsOf("Dr. Marcus Okonjo"), "MO");
+});
+
+
+test("every Brew card supplies navigation scope without sending demo evidence or a question", async () => {
+  const { brewEdwardOpening } = await importMorningBrewModule("edward-context");
+  const { demoBrewSource } = await loadCorpus();
+  const source = demoBrewSource();
+  const briefing = {...source, updatedAt: source.generatedAt};
+  for (const card of [...source.kpis, ...source.insights]) {
+    for (const request of [{mode:"cohort",context:card.label}, {mode:"cohort",context:card.cohort.question}]) {
+      const opening = brewEdwardOpening({...request, sourceId: card.id}, briefing, null);
+      assert.equal(opening.context.sourceId, card.id);
+      assert.equal(opening.context.topic, card.topic);
+      assert.deepEqual(opening.context.cohort, card.cohort);
+      assert.equal(opening.context.dataOrigin, "demo");
+      assert.equal(opening.question, undefined);
+      assert.ok(opening.greeting.startsWith("Hi!"));
+      assert.ok(!("value" in opening.context));
+      assert.ok(!("students" in opening.context));
+    }
+  }
 });

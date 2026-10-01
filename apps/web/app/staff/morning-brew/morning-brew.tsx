@@ -8,7 +8,8 @@ import { buildBrewBriefing } from "./data";
 import { demoBrewSource } from "./demo-brew";
 import { MorningBrewDashboard } from "./dashboard";
 import { MorningBrewDetail } from "./detail";
-import { EdwardPanel } from "./edward-panel";
+import { openStaffEdward } from "../../lib/staff-edward-opening";
+import { brewEdwardOpening } from "./edward-context";
 import { BrewLoading } from "./loading";
 import { MorningBrewOnboarding, type OnboardingDraft, type OnboardingStep } from "./onboarding";
 import { browserBrewPreferenceStore, DEFAULT_BREW_PREFERENCES } from "./preferences";
@@ -41,10 +42,11 @@ export function MorningBrewView({
   workspace,
   navigate,
 }: {
-  workspace: StaffOperationsWorkspace;
+  workspace: Pick<StaffOperationsWorkspace, "currentStaff">;
   navigate: MorningBrewNavigate;
 }) {
   const scope = `demo:${workspace.currentStaff.id}`;
+  const firstName = workspace.currentStaff.name.trim().split(/\s+/)[0] || "there";
 
   // The corpus is one pinned morning — May 20, 2025, 7:30 AM ET — because
   // every relative label in it is counted from that date.
@@ -59,7 +61,7 @@ export function MorningBrewView({
   const [replies, setReplies] = useState<Record<string, string>>({});
   const detailOpener = useRef<HTMLElement | null>(null);
   const [detail, setDetail] = useState<BrewDetailRef | null>(null);
-  const [edward, setEdward] = useState<EdwardRequest | null>(null);
+
 
   useEffect(() => {
     const stored = browserBrewPreferenceStore.load(scope);
@@ -89,9 +91,14 @@ export function MorningBrewView({
   );
 
   const briefing = useMemo(
-    () => buildBrewBriefing(source, preferences),
-    [source, preferences],
+    () => buildBrewBriefing(source, preferences, firstName),
+    [source, preferences, firstName],
   );
+
+  const askEdward = (request: EdwardRequest) => {
+    openStaffEdward(brewEdwardOpening(request, briefing, detail));
+    setDetail(null);
+  };
 
   /* Setup previews the draft, not the saved copy, so the miniature on screen
      reacts to a choice before it has been committed. */
@@ -103,8 +110,8 @@ export function MorningBrewView({
         version: 7,
         updatedAt: "",
         onboardingComplete: false,
-      }),
-    [source, draft],
+      }, firstName),
+    [source, draft, firstName],
   );
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
@@ -215,13 +222,13 @@ export function MorningBrewView({
 
   return (
     <>
-      <div inert={Boolean(detail || edward)}>
+      <div inert={Boolean(detail)}>
         <MorningBrewDashboard
           briefing={briefing}
           preferences={preferences}
           replies={replies}
           onOpenDetail={openDetail}
-          onAskEdward={setEdward}
+          onAskEdward={askEdward}
           onCustomize={() => openOnboarding(1)}
           onManageConnections={() => openOnboarding(2)}
         />
@@ -238,10 +245,9 @@ export function MorningBrewView({
           replies={replies}
           onDemoReply={(id, text) => setReplies(current => ({ ...current, [id]: text }))}
           navigate={navigate}
-          onAskEdward={setEdward}
+          onAskEdward={askEdward}
         />
       ) : null}
-      <EdwardPanel request={edward} briefing={briefing} onClose={() => setEdward(null)} />
     </>
   );
 }

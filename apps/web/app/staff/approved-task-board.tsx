@@ -105,6 +105,10 @@ export function ApprovedTaskBoard({ onOpenWorkspace, demo = false, initialTask, 
         void call.then(result => send(result)).catch((error: unknown) => send(null, error instanceof ApiClientError && error.status < 500 ? error.message : "The operation could not complete. Your draft is retained; retry to check whether it saved.", error instanceof ApiClientError ? error.code : "REQUEST_FAILED"));
         return;
       }
+      if (event.data?.type === "audentra:board:student") {
+        if (typeof event.data.studentId === "string" && /^[a-f0-9-]{36}$/i.test(event.data.studentId)) onOpenWorkspace(event.data.studentId);
+        return;
+      }
       if (event.data?.type === "audentra:board:full-workspace") {
         if (demo) return;
         onOpenWorkspace(typeof event.data.studentId === "string" ? event.data.studentId : undefined);

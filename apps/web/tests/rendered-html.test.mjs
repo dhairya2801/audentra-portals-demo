@@ -1266,7 +1266,7 @@ test("Morning Brew renders the demo corpus, and says that it is one", async () =
       ),
       readFile(new URL("../app/staff/morning-brew/onboarding.tsx", import.meta.url), "utf8"),
       readFile(new URL("../app/staff/morning-brew/dashboard.tsx", import.meta.url), "utf8"),
-      readFile(new URL("../app/staff/morning-brew/edward-panel.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/components/staff-edward-assistant.tsx", import.meta.url), "utf8"),
       readFile(new URL("../app/staff/morning-brew/data.ts", import.meta.url), "utf8"),
       readFile(new URL("../app/staff/morning-brew/preferences.ts", import.meta.url), "utf8"),
       readFile(new URL("../app/globals.css", import.meta.url), "utf8"),

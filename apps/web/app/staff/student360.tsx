@@ -280,6 +280,7 @@ export function StudentsView({
       (signal: AbortSignal) => searchStaffStudents(directoryQuery, signal),
       [directoryQuery],
     ),
+    {enabled: !selectedId},
   );
   const results = useMemo(() => search.data?.items ?? [], [search.data]);
   const pinned = useApiResource(
@@ -362,6 +363,8 @@ export function StudentsView({
             type="button"
             onClick={() => {
               setSelectedId(null);
+              const url = new URL(window.location.href); url.searchParams.delete("studentId");
+              window.history.replaceState(null, "", url);
               search.refresh();
             }}
           >
@@ -546,17 +549,22 @@ export function StudentsView({
           <button onClick={search.reload}>Retry</button>
         </div>
       ) : null}
+      {search.data && !summary ? (
+        <div role="status" className={styles.notice}>
+          Directory totals are unavailable. <button onClick={search.reload}>Retry</button>
+        </div>
+      ) : null}
       <div className={styles.metrics}>
         <Metric
           label="Enrollment readiness"
-          value={`${ready}%`}
-          note={`${complete.toLocaleString()} of ${total.toLocaleString()} milestones complete`}
-          aside={<Ring value={ready} />}
+          value={summary ? `${ready}%` : "—"}
+          note={summary ? `${complete.toLocaleString()} of ${total.toLocaleString()} milestones complete` : search.status === "loading" ? "Loading milestones…" : "Milestone totals unavailable"}
+          aside={summary ? <Ring value={ready} /> : undefined}
           badge="Matching students"
         />
         <Metric
           label="Students at risk · mock"
-          value={summary?.highRisk ?? 0}
+          value={summary?.highRisk ?? "—"}
           note="High or critical preview scores"
           aside={
             <span className={styles.metricSymbol} data-tone="rose">
@@ -567,7 +575,7 @@ export function StudentsView({
         />
         <Metric
           label="Blocked enrollment steps"
-          value={summary?.blockingSteps ?? 0}
+          value={summary?.blockingSteps ?? "—"}
           note="Open blocking requirements"
           aside={<span className={styles.metricSymbol}>✓</span>}
           badge="Needs attention"
@@ -587,11 +595,9 @@ export function StudentsView({
         <div>
           <span className={styles.eyebrow}>YOUR NEXT CONVERSATION</span>
           <strong>
-            {summary?.blockedStudents ?? 0}{" "}
-            {(summary?.blockedStudents ?? 0) === 1
-              ? "student has"
-              : "students have"}{" "}
-            enrollment blockers that need attention.
+            {summary
+              ? `${summary.blockedStudents} ${summary.blockedStudents === 1 ? "student has" : "students have"} enrollment blockers that need attention.`
+              : "Review students waiting on an enrollment step."}
           </strong>
           <p>
             Bring the right context to every conversation. Start with the
@@ -620,10 +626,10 @@ export function StudentsView({
         <div className={styles.tableControls}>
           <div className={styles.chips}>
             {[
-              ["risk", "High risk", summary?.highRisk ?? 0],
-              ["blocked", "Blocked", summary?.blockedStudents ?? 0],
-              ["inactive", "Inactive 7d+", summary?.inactiveStudents ?? 0],
-              ["all", "All students", summary?.students ?? 0],
+              ["risk", "High risk", summary?.highRisk ?? "—"],
+              ["blocked", "Blocked", summary?.blockedStudents ?? "—"],
+              ["inactive", "Inactive 7d+", summary?.inactiveStudents ?? "—"],
+              ["all", "All students", summary?.students ?? "—"],
             ].map(([id, label, count]) => (
               <button
                 type="button"

@@ -157,6 +157,7 @@ function deckFor(source: BrewDemoSource): string {
 export function buildBrewBriefing(
   source: BrewDemoSource,
   preferences: BrewPreferences,
+  greetingName: string = source.reader.firstName,
 ): BrewBriefing {
   const topics = new Set<BrewTopicId>(preferences.topics);
   const pulse = enabled(preferences, "pulse");
@@ -198,9 +199,8 @@ export function buildBrewBriefing(
     : [];
 
   return {
-    // The demo brief is written for one named reader, so the greeting is the
-    // corpus's own rather than whichever persona opened the workspace.
-    greetingName: source.reader.firstName,
+    // Address the signed-in staff member while retaining the sample briefing.
+    greetingName,
     reader: source.reader,
     cycleLabel: source.cycleLabel,
     deck: deckFor(source),

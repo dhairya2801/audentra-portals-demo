@@ -29,6 +29,7 @@ type UseApiResourceOptions = {
    * between windows or restores the tab.
    */
   refreshOnAmbient?: boolean;
+  enabled?: boolean;
 };
 
 function messageFor(error: unknown) {
@@ -58,7 +59,9 @@ export function useApiResource<T>(
     lastUpdatedAt: null,
   });
 
+  const enabled = options.enabled !== false;
   useEffect(() => {
+    if (!enabled) return;
     const controller = new AbortController();
 
     queueMicrotask(() => {
@@ -125,7 +128,7 @@ export function useApiResource<T>(
       });
 
     return () => controller.abort();
-  }, [ambientRevision, loader, requestVersion]);
+  }, [ambientRevision, loader, requestVersion, enabled]);
 
   const reload = useCallback(() => {
     setState((current) => ({

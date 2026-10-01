@@ -19,6 +19,7 @@ import type {
   StaffManagedConfigurationKind,
   StaffMemberSummary,
   StaffOperationsWorkspace,
+  StaffWorkspaceNavigation,
   StaffStudentOperation,
   StaffWorkItem,
   StaffTaskBoardContext,
@@ -53,6 +54,7 @@ import {
   getStaffInquiryThread,
   getStaffMe,
   getStaffOperationsWorkspace,
+  getStaffWorkspaceNavigation,
   signOutStaff,
   simulateStaffOutreach,
   updateStaffClub,
@@ -4346,7 +4348,7 @@ function StaffSidebar({
   navigate,
 }: {
   view: StaffView;
-  workspace: StaffOperationsWorkspace;
+  workspace: StaffWorkspaceNavigation;
   navigate: (view: StaffView) => void;
 }) {
   // The badge is the member's own open work; the institution's total is the
@@ -4356,9 +4358,7 @@ function StaffSidebar({
   const demoBoard = view === "tasks" && workspace.currentStaff.id === "01973261-954a-5019-8e9e-24a699abea7b";
   const openTasks = demoBoard ? boardOpenCount ?? 0 : scopes?.mine.open ?? 0;
   const institutionOpen = demoBoard ? null : scopes?.all.open ?? null;
-  const inquiries = workspace.inquiries.filter(
-    (item) => item.status === "new",
-  ).length;
+  const inquiries = workspace.newInquiries;
   return (
     <aside className="staff-sidebar staff-sidebar--workspace">
       <nav aria-label="Staff workspace">
@@ -4417,11 +4417,34 @@ function StaffSidebar({
   );
 }
 
+function StaffContentView({view, navigate, refreshNavigation, openTaskBoard, subscribeToRealtimeInvalidation}: {
+  view: StaffView;
+  navigate: (view: StaffView) => void;
+  refreshNavigation: () => void;
+  openTaskBoard: (query: StaffActionCenterQuery) => void;
+  subscribeToRealtimeInvalidation: (invalidate: () => void) => () => void;
+}) {
+  const resource = useApiResource(useCallback((signal: AbortSignal) => getStaffOperationsWorkspace(signal), []));
+  useEffect(() => subscribeToRealtimeInvalidation(resource.refresh), [subscribeToRealtimeInvalidation, resource.refresh]);
+  const refresh = () => {resource.refresh(); refreshNavigation();};
+  if (!resource.data) return <section aria-live="polite"><p>{resource.error ?? "Loading workspace content…"}</p>{resource.status === "error" && <button onClick={resource.reload}>Try again</button>}</section>;
+  const workspace = resource.data;
+  if (view === "overview") return <><OverviewView workspace={workspace} navigate={navigate} /><UniversityOperationsPanel /></>;
+  if (view === "journeys") return <JourneysView workspace={workspace} refresh={refresh} />;
+  if (view === "knowledge") return <KnowledgeView workspace={workspace} refresh={refresh} />;
+  if (view === "core_plays") return <CorePlaysView workspace={workspace} refresh={refresh} />;
+  if (view === "messages") return <MessagesView workspace={workspace} refresh={refresh} subscribeToRealtimeInvalidation={subscribeToRealtimeInvalidation} />;
+  if (view === "campus_life") return <CampusLifeView workspace={workspace} refresh={refresh} />;
+  if (view === "academics") return <AcademicsView workspace={workspace} refresh={refresh} />;
+  if (view === "outreach") return <OutreachView workspace={workspace} refresh={refresh} openTaskBoard={openTaskBoard} />;
+  return null;
+}
+
 function StaffWorkspaceShell({
   workspace,
   refresh,
 }: {
-  workspace: StaffOperationsWorkspace;
+  workspace: StaffWorkspaceNavigation;
   refresh: () => void;
 }) {
   const { tenant } = useTenant();
@@ -4468,6 +4491,10 @@ function StaffWorkspaceShell({
     const candidate = window.location.hash.replace(/^#/, "");
     if (viewOrder.includes(candidate as StaffView)) {
       setView(candidate as StaffView);
+      if (candidate === "students") {
+        const studentId = new URL(window.location.href).searchParams.get("studentId");
+        if (studentId && /^[a-f0-9-]{36}$/i.test(studentId)) setStudentsRequest(current => ({studentId, query: "", key: (current?.key ?? 0) + 1}));
+      }
     } else if (candidate === "student-record") {
       setView("students");
     }
@@ -4513,10 +4540,14 @@ function StaffWorkspaceShell({
   }, []);
 
   const showView = (next: StaffView) => {
+    if (next !== view) window.dispatchEvent(new Event("audentra:staff-navigation"));
     setView(next);
     setMobileNavOpen(false);
     setMenuOpen(false);
-    window.history.replaceState(null, "", `#${next}`);
+    const url = new URL(window.location.href);
+    url.hash = next;
+    if (next !== "students") url.searchParams.delete("studentId");
+    window.history.replaceState(null, "", url);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -4531,12 +4562,16 @@ function StaffWorkspaceShell({
   const openStudent = (studentId: string) => {
     setStudentsRequest((current) => ({ studentId, query: "", key: (current?.key ?? 0) + 1 }));
     showView("students");
+    const url = new URL(window.location.href); url.searchParams.set("studentId", studentId);
+    window.history.replaceState(null, "", url);
   };
 
   /** Hand the top-bar search to the server-side student search. */
   const searchStudents = (query: string) => {
     setStudentsRequest((current) => ({ studentId: null, query, key: (current?.key ?? 0) + 1 }));
     showView("students");
+    const url = new URL(window.location.href); url.searchParams.delete("studentId");
+    window.history.replaceState(null, "", url);
   };
 
   /** Change view; a `boardQuery` opens the task board pre-filtered instead. */
@@ -4718,8 +4753,7 @@ function StaffWorkspaceShell({
       <main className="staff-main staff-main--workspace">
         {view === "morning_brew" ? (
           <MorningBrewView workspace={workspace} navigate={navigate} />
-        ) : view === "overview" ? (
-          <><OverviewView workspace={workspace} navigate={navigate} /><UniversityOperationsPanel /></>
+
         ) : view === "tasks" ? (
           <ApprovedTaskBoard
             key={requestedWorkItemId ?? `task-board-${taskBoardRequest?.key ?? 0}`}
@@ -4745,30 +4779,15 @@ function StaffWorkspaceShell({
             openStudent={openStudent}
             onSignOut={() => void signOut()}
           />
-        ) : view === "journeys" ? (
-          <JourneysView workspace={workspace} refresh={refresh} />
-        ) : view === "knowledge" ? (
-          <KnowledgeView workspace={workspace} refresh={refresh} />
-        ) : view === "core_plays" ? (
-          <CorePlaysView workspace={workspace} refresh={refresh} />
-        ) : view === "messages" ? (
-          <MessagesView
-            workspace={workspace}
-            refresh={refresh}
-            subscribeToRealtimeInvalidation={subscribeToRealtimeInvalidation}
-          />
-        ) : view === "campus_life" ? (
-          <CampusLifeView workspace={workspace} refresh={refresh} />
-        ) : view === "academics" ? (
-          <AcademicsView workspace={workspace} refresh={refresh} />
-        ) : view === "outreach" ? (
-          <OutreachView workspace={workspace} refresh={refresh} openTaskBoard={openTaskBoard} />
-        ) : (
+        ) : view === "edward" ? (
           <EdwardView staffName={workspace.currentStaff.name} />
+        ) : (
+          <StaffContentView view={view} navigate={navigate} refreshNavigation={refresh}
+            openTaskBoard={openTaskBoard} subscribeToRealtimeInvalidation={subscribeToRealtimeInvalidation} />
         )}
       </main>
       {view !== "edward" ? (
-        <StaffEdwardAssistant staffName={workspace.currentStaff.name}
+        <StaffEdwardAssistant key={`${tenant.id}:${workspace.currentStaff.id}`} staffId={workspace.currentStaff.id} staffName={workspace.currentStaff.name}
           pageContext={view === "tasks" ? taskBoardContext ?? {surface:"task_board"} : undefined} />
       ) : null}
     </div>
@@ -4777,7 +4796,7 @@ function StaffWorkspaceShell({
 
 export default function StaffPortal() {
   const loadWorkspace = useCallback(
-    (signal: AbortSignal) => getStaffOperationsWorkspace(signal),
+    (signal: AbortSignal) => getStaffWorkspaceNavigation(signal),
     [],
   );
   const workspace = useApiResource(loadWorkspace, {
@@ -4809,7 +4828,7 @@ export default function StaffPortal() {
           <PortalMark />
           <p className="eyebrow">Staff workspace</p>
           <h1>Opening operations</h1>
-          <p>Loading the latest tasks, student records, and managed content…</p>
+          <p>Opening your staff navigation…</p>
           <span className="loader" aria-hidden="true" />
         </section>
       </main>
