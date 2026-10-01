@@ -52,8 +52,15 @@ export function ConceptFinancialPlan() {
       )
         return;
       if (event.data?.type === "financial-plan:request" && typeof event.data.id === "string") {
-        const send = (result: unknown, error?: string) => frame.current?.contentWindow?.postMessage(
-          {type: "financial-plan:response", id: event.data.id, result, error}, window.location.origin);
+        const target = event.source as Window;
+        const id = event.data.id;
+        // Safari can retain the requesting frame as the incumbent sender in
+        // promise continuations. A parent-window task restores the correct
+        // MessageEvent.source without weakening the iframe's sender check.
+        const send = (result: unknown, error?: string) => window.setTimeout(() => {
+          if (target !== frame.current?.contentWindow) return;
+          target.postMessage({type: "financial-plan:response", id, result, error}, window.location.origin);
+        }, 0);
         const operation = event.data.operation === "read" ? getFinancialPlan()
           : event.data.operation === "simulate" ? simulateFinancialPlan(event.data.payload)
           : event.data.operation === "save-inputs" ? saveFinancialPlanInputs(event.data.payload, event.data.idempotencyKey)
