@@ -369,7 +369,7 @@ export function MorningBrewOnboarding({
   const focus = step === 2 && draft.sources[expanded].enabled ? expanded : null;
 
   const heading =
-    step === 1 ? `${preview.reader.firstName}, start your morning with what matters.` : "Nice. What should we bring you?";
+    step === 1 ? `${preview.greetingName}, start your morning with what matters.` : "Nice. What should we bring you?";
 
   const lede =
     step === 1

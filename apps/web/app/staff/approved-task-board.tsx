@@ -1,7 +1,7 @@
 "use client";
 
 import type { StaffActionCenterQuery, StaffTaskBoardContext } from "@vv/contracts";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiClientError, writeDemoTaskActivity, reviewDemoDocument, getDemoTaskBoard, getWorkBoard, getStaffDocumentReviewOptions, getStaffWorkItemDetail, updateStaffWorkItem, createStaffWorkComment, reviewStaffDocument, getStaffDocumentContent, startStaffInteraction, recordStaffCommunication, saveStaffOutreachDraft } from "../lib/api-client";
 import styles from "./approved-task-board.module.css";
 
@@ -64,6 +64,8 @@ export function ApprovedBoardNavigation({ onSelect }: { onSelect: () => void }) 
 export function ApprovedTaskBoard({ onOpenWorkspace, demo = false, initialTask, initialQuery, onContextChange }: { onOpenWorkspace: (id?: string) => void; demo?: boolean; initialTask?: string | null; initialQuery?: StaffActionCenterQuery; onContextChange?: (context: StaffTaskBoardContext | null) => void }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [ready, setReady] = useState(false);
+  const openWorkspace = useRef(onOpenWorkspace);
+  useEffect(() => { openWorkspace.current = onOpenWorkspace; }, [onOpenWorkspace]);
   useEffect(() => {
     const receive = (event: MessageEvent) => {
       if (!fromBoard(event) || event.data?.type !== "audentra:approved-board:state") return;
@@ -79,13 +81,20 @@ export function ApprovedTaskBoard({ onOpenWorkspace, demo = false, initialTask, 
   useEffect(() => {
     const previousOverflow = document.documentElement.style.overflow;
     const previousGutter = document.documentElement.style.scrollbarGutter;
+    let active = true;
     document.documentElement.style.overflow = "hidden";
     document.documentElement.style.scrollbarGutter = "auto";
     const receive = (event: MessageEvent) => {
       if (!fromBoard(event)) return;
       if (event.data?.type === "audentra:board:request" && typeof event.data.id === "string") {
         const {operation, payload, id} = event.data;
-        const send = (result: unknown, error?: string, errorCode?: string) => document.querySelector<HTMLIFrameElement>("#approved-task-board")?.contentWindow?.postMessage({type: "audentra:board:response", id, result, error, errorCode}, window.location.origin);
+        const target = event.source as Window;
+        // Run in a parent-window task: WebKit otherwise attributes async replies
+        // to the requesting iframe. Retain both origin and sender validation.
+        const send = (result: unknown, error?: string, errorCode?: string) => window.setTimeout(() => {
+          if (!active || target !== document.querySelector<HTMLIFrameElement>("#approved-task-board")?.contentWindow) return;
+          target.postMessage({type: "audentra:board:response", id, result, error, errorCode}, window.location.origin);
+        }, 0);
         const call = demo ? (operation === "demo-identities" ? getDemoTaskBoard()
           : operation === "demo-document" && typeof payload?.path === "string" && /^\/v1\/staff\/documents\/[a-f0-9-]+\/content$/.test(payload.path) ? getStaffDocumentContent(payload.path)
           : operation === "demo-write" ? writeDemoTaskActivity(payload.workItemId, payload.input, payload.idempotencyKey)
@@ -106,12 +115,12 @@ export function ApprovedTaskBoard({ onOpenWorkspace, demo = false, initialTask, 
         return;
       }
       if (event.data?.type === "audentra:board:student") {
-        if (typeof event.data.studentId === "string" && /^[a-f0-9-]{36}$/i.test(event.data.studentId)) onOpenWorkspace(event.data.studentId);
+        if (typeof event.data.studentId === "string" && /^[a-f0-9-]{36}$/i.test(event.data.studentId)) openWorkspace.current(event.data.studentId);
         return;
       }
       if (event.data?.type === "audentra:board:full-workspace") {
         if (demo) return;
-        onOpenWorkspace(typeof event.data.studentId === "string" ? event.data.studentId : undefined);
+        openWorkspace.current(typeof event.data.studentId === "string" ? event.data.studentId : undefined);
         return;
       }
       if (event.data?.type === "audentra:board:original" && typeof event.data.path === "string" && /^\/v1\/.*documents\/[a-f0-9-]+\/content$/.test(event.data.path)) {
@@ -133,12 +142,13 @@ export function ApprovedTaskBoard({ onOpenWorkspace, demo = false, initialTask, 
     window.addEventListener("vv:student-record-changed", invalidate);
     window.addEventListener("message", receive);
     return () => {
+      active = false;
       window.removeEventListener("vv:student-record-changed", invalidate);
       window.removeEventListener("message", receive);
       document.documentElement.style.overflow = previousOverflow;
       document.documentElement.style.scrollbarGutter = previousGutter;
     };
-  }, [onOpenWorkspace, demo]);
+  }, [demo]);
   return <iframe id="approved-task-board" title="Audentra Task Board"
     src={demo
       ? `/action-center-demo/index.html${initialTask ? `#${encodeURIComponent(initialTask)}` : ""}`
