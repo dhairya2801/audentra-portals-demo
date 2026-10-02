@@ -2,21 +2,33 @@
 import { PEOPLE, seedTasks } from './data.js';
 
 let snapshot = null;
-export function boardRequest(operation, payload) {
+export function boardRequest(operation, payload, signal) {
   const id = crypto.randomUUID();
   return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      clearTimeout(timer);
+      window.removeEventListener('message', receive);
+      signal?.removeEventListener('abort', cancel);
+    };
+    const cancel = () => {
+      cleanup();
+      parent.postMessage({type:'audentra:board:cancel',id}, location.origin);
+      reject(new DOMException('Document preview closed', 'AbortError'));
+    };
     const receive = event => {
       if (event.origin !== location.origin || event.source !== parent ||
           event.data?.type !== 'audentra:board:response' || event.data.id !== id) return;
-      clearTimeout(timer);
-      window.removeEventListener('message', receive);
+      cleanup();
       if (event.data.error) reject(Object.assign(new Error(event.data.error), {code:event.data.errorCode}));
       else resolve(event.data.result);
     };
     const timer = setTimeout(() => {
-      window.removeEventListener('message', receive);
+      cleanup();
+      parent.postMessage({type:'audentra:board:cancel',id}, location.origin);
       reject(new Error('The requested data could not load. Please retry.'));
-    }, 15000);
+    }, operation === 'demo-document' ? 25000 : 15000);
+    if (signal?.aborted) { cancel(); return; }
+    signal?.addEventListener('abort', cancel, {once:true});
     window.addEventListener('message', receive);
     parent.postMessage({ type:'audentra:board:request', operation, payload, id }, location.origin);
   });

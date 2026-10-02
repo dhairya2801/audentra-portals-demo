@@ -81,11 +81,17 @@ export function ApprovedTaskBoard({ onOpenWorkspace, demo = false, initialTask, 
   useEffect(() => {
     const previousOverflow = document.documentElement.style.overflow;
     const previousGutter = document.documentElement.style.scrollbarGutter;
+    const documentReads = new Map<string, AbortController>();
     let active = true;
     document.documentElement.style.overflow = "hidden";
     document.documentElement.style.scrollbarGutter = "auto";
     const receive = (event: MessageEvent) => {
       if (!fromBoard(event)) return;
+      if (event.data?.type === "audentra:board:cancel" && typeof event.data.id === "string") {
+        documentReads.get(event.data.id)?.abort();
+        documentReads.delete(event.data.id);
+        return;
+      }
       if (event.data?.type === "audentra:board:request" && typeof event.data.id === "string") {
         const {operation, payload, id} = event.data;
         const target = event.source as Window;
@@ -95,8 +101,10 @@ export function ApprovedTaskBoard({ onOpenWorkspace, demo = false, initialTask, 
           if (!active || target !== document.querySelector<HTMLIFrameElement>("#approved-task-board")?.contentWindow) return;
           target.postMessage({type: "audentra:board:response", id, result, error, errorCode}, window.location.origin);
         }, 0);
+        const controller = operation === "demo-document" ? new AbortController() : undefined;
+        if (controller) documentReads.set(id, controller);
         const call = demo ? (operation === "demo-identities" ? getDemoTaskBoard()
-          : operation === "demo-document" && typeof payload?.path === "string" && /^\/v1\/staff\/documents\/[a-f0-9-]+\/content$/.test(payload.path) ? getStaffDocumentContent(payload.path)
+          : operation === "demo-document" && typeof payload?.path === "string" && /^\/v1\/staff\/documents\/[a-f0-9-]+\/content$/.test(payload.path) ? getStaffDocumentContent(payload.path, controller?.signal)
           : operation === "demo-write" ? writeDemoTaskActivity(payload.workItemId, payload.input, payload.idempotencyKey)
           : operation === "demo-review" ? reviewDemoDocument(payload.documentId, payload.input, payload.idempotencyKey)
           : operation === "demo-review-options" ? getStaffDocumentReviewOptions()
@@ -111,7 +119,16 @@ export function ApprovedTaskBoard({ onOpenWorkspace, demo = false, initialTask, 
           : operation === "save-draft" ? saveStaffOutreachDraft(payload.workItemId, payload.input, payload.idempotencyKey)
           : operation === "communicate" ? recordStaffCommunication(payload.interactionId, payload.input, payload.idempotencyKey)
           : Promise.reject(new Error("This operation is unavailable"));
-        void call.then(result => send(result)).catch((error: unknown) => send(null, error instanceof ApiClientError && error.status < 500 ? error.message : "The operation could not complete. Your draft is retained; retry to check whether it saved.", error instanceof ApiClientError ? error.code : "REQUEST_FAILED"));
+        void call.then(result => {
+          if (!controller?.signal.aborted) send(result);
+        }).catch((error: unknown) => {
+          if (!controller?.signal.aborted) send(null,
+            error instanceof ApiClientError && error.status === 401 ? "Your staff session has expired. Sign in again, then retry."
+              : error instanceof ApiClientError && error.status < 500 ? error.message
+              : controller ? "The protected document could not be loaded. Please retry."
+              : "The operation could not complete. Your draft is retained; retry to check whether it saved.",
+            error instanceof ApiClientError ? error.code : "REQUEST_FAILED");
+        }).finally(() => documentReads.delete(id));
         return;
       }
       if (event.data?.type === "audentra:board:student") {
@@ -143,13 +160,17 @@ export function ApprovedTaskBoard({ onOpenWorkspace, demo = false, initialTask, 
     window.addEventListener("message", receive);
     return () => {
       active = false;
+      documentReads.forEach(controller => controller.abort());
+      documentReads.clear();
       window.removeEventListener("vv:student-record-changed", invalidate);
       window.removeEventListener("message", receive);
       document.documentElement.style.overflow = previousOverflow;
       document.documentElement.style.scrollbarGutter = previousGutter;
     };
   }, [demo]);
-  return <iframe id="approved-task-board" title="Audentra Task Board"
+  return <>
+    {!ready && <p className={styles.frame} role="status" style={{ display: "grid", placeItems: "center", margin: 0 }}>Loading Task Board…</p>}
+    <iframe id="approved-task-board" title="Audentra Task Board"
     src={demo
       ? `/action-center-demo/index.html${initialTask ? `#${encodeURIComponent(initialTask)}` : ""}`
       : `/action-center-approved/index.html?${new URLSearchParams({demo: "0", task: initialTask ?? "", scope: JSON.stringify(initialQuery ?? {})})}`}
@@ -171,5 +192,6 @@ export function ApprovedTaskBoard({ onOpenWorkspace, demo = false, initialTask, 
       const task = new URL(window.location.href).searchParams.get("actionTask");
       if (task && /^[A-Z]+-\d+$/.test(task) && frame.contentWindow) frame.contentWindow.location.hash = task;
 
-    }} />;
+    }} />
+  </>;
 }

@@ -2832,7 +2832,7 @@ test("Student 360 keeps canonical records separate from labeled score previews",
   assert.match(source, /Enrollment and\s+staff work reflect platform records/);
   assert.doesNotMatch(source, /localStorage|sessionStorage|simulateStaffOutreach/);
   // Source files use the credentialed, tenant-aware blob reader.
-  assert.match(source, /getStaffDocumentContent\(file.contentUrl\)/);
+  assert.match(source, /getStaffDocumentContent\(file.contentUrl, controller.signal\)/);
   assert.match(source, /URL.revokeObjectURL\(objectUrl\)/);
 });
 

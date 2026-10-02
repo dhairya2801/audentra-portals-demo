@@ -2212,8 +2212,32 @@ export function getWorkBoard(offset = 0, project?: string, filters: import("@vv/
 export function simulateFinancialPlan(input: Record<string, unknown>) {
   return request<Record<string, unknown>>("/v1/student/financial-plan/simulate", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(input)});
 }
-export function getStaffDocumentContent(path: string) {
-  return requestBlob(path, { method: "GET" });
+export async function getStaffDocumentContent(path: string, signal?: AbortSignal) {
+  // A staff preview must never borrow a student session or follow an arbitrary
+  // URL. The API projects canonical staff links, including signed documents.
+  if (!/^\/v1\/staff\/documents\/[a-f0-9-]{36}\/content$/i.test(path)) {
+    throw new ApiClientError("This document link is unavailable. Refresh the student record.", {
+      status: 400, code: "invalid_staff_document_link",
+    });
+  }
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  if (signal?.aborted) cancel();
+  else signal?.addEventListener("abort", cancel, { once: true });
+  const timer = globalThis.setTimeout(cancel, 20_000);
+  try {
+    return await requestBlob(path, { method: "GET", signal: controller.signal, cache: "no-store" });
+  } catch (error) {
+    if (controller.signal.aborted && !signal?.aborted) {
+      throw new ApiClientError("The protected document took too long to load. Please retry.", {
+        status: 504, code: "document_content_timeout",
+      });
+    }
+    throw error;
+  } finally {
+    globalThis.clearTimeout(timer);
+    signal?.removeEventListener("abort", cancel);
+  }
 }
 
 export function getStaffDocumentReviewOptions(signal?: AbortSignal) {

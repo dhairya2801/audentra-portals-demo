@@ -19,6 +19,7 @@ import type {
   UniversityRecord,
 } from "@vv/contracts";
 import {
+  ApiClientError,
   getDemoPersonas,
   getStaffActionCenter,
   getStaffDocumentContent,
@@ -29,6 +30,7 @@ import {
 import { useApiResource } from "../hooks/use-api-resource";
 import { useServerStateCoordinator } from "../components/server-state-provider";
 import { UniversityRecordPanel } from "../components/university-record";
+import { DocumentPdfPreview } from "../components/document-pdf-preview";
 import { Student360Summary } from "./student360-summary";
 import styles from "./student360.module.css";
 
@@ -2004,6 +2006,7 @@ function Documents({
       )}
       {selected && (
         <DocumentPreview
+          key={`${selected.id}:${selected.contentUrl}`}
           document={selected}
           onClose={() => setSelected(null)}
           onWork={onWork}
@@ -2023,7 +2026,8 @@ function DocumentPreview({
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [url, setUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const renderingFailed = useCallback(() => setFailure("The protected document could not be displayed. Please retry."), []);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     const element = dialog.current;
@@ -2035,20 +2039,26 @@ function DocumentPreview({
     };
   }, []);
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
     let objectUrl: string | null = null;
     if (file.contentUrl)
-      void getStaffDocumentContent(file.contentUrl)
+      void getStaffDocumentContent(file.contentUrl, controller.signal)
         .then((blob) => {
-          if (cancelled) return;
+          if (controller.signal.aborted) return;
           objectUrl = URL.createObjectURL(blob);
           setUrl(objectUrl);
         })
-        .catch(() => {
-          if (!cancelled) setFailed(true);
+        .catch((error: unknown) => {
+          if (!controller.signal.aborted) setFailure(
+            error instanceof ApiClientError && error.status === 401
+              ? "Your staff session has expired. Sign in again, then retry."
+              : error instanceof ApiClientError && error.status === 404
+                ? "This source document is no longer available. Refresh the student record."
+                : "The protected document could not be loaded.",
+          );
         });
     return () => {
-      cancelled = true;
+      controller.abort();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [file.contentUrl, attempt]);
@@ -2117,14 +2127,15 @@ function DocumentPreview({
             <Empty title="Source preview unavailable">
               This record does not include an accessible source file.
             </Empty>
-          ) : failed ? (
+          ) : failure ? (
             <div role="alert">
-              <p>The protected document could not be loaded.</p>
+              <p>{failure}</p>
               <button
                 className={styles.button}
                 onClick={() => {
-                  setFailed(false);
-                  setAttempt(attempt + 1);
+                  setUrl(null);
+                  setFailure(null);
+                  setAttempt(current => current + 1);
                 }}
               >
                 Retry preview
@@ -2133,22 +2144,11 @@ function DocumentPreview({
           ) : !url ? (
             <p role="status">Loading protected document…</p>
           ) : file.mimeType === "application/pdf" ? (
-            <object
-              data={url}
-              type="application/pdf"
-              aria-label={`${file.fileName} preview`}
-            >
-              <p>
-                Your browser cannot display this PDF.{" "}
-                <a href={url} target="_blank" rel="noopener noreferrer">
-                  Open source document
-                </a>
-              </p>
-            </object>
+            <DocumentPdfPreview key={url} url={url} name={file.fileName} onError={renderingFailed} />
           ) : (
             // Protected blob URLs are already fetched with tenant credentials.
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={url} alt={`Original document: ${file.fileName}`} />
+            <img src={url} alt={`Original document: ${file.fileName}`} onError={() => setFailure("The protected document could not be displayed. Please retry.")} />
           )}
         </div>
       </div>

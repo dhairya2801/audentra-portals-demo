@@ -6,7 +6,7 @@ Implemented in an isolated frontend worktree, with rendered desktop, laptop and 
 
 ## Worktree and preview
 
-- Worktree: `/home/dhairya2801/Dhairya/projects/worktrees/audentra-vnext/audentra-portal-refresh`
+- Worktree: `/path/to/projects/worktrees/audentra-vnext/audentra-portal-refresh`
 - Branch: `design/cohesive-portals-refresh`
 - Frontend base: `a749ff1725291c4f90d8d9c70638563ff9cedc76`
 - Source checkout: `../portals`, branch `integration/audentra-vnext-portals`.
@@ -15,7 +15,7 @@ Implemented in an isolated frontend worktree, with rendered desktop, laptop and 
 - Dependencies were copied from the existing installation into an ignored, independent `node_modules`. No package or lockfile changed. A fresh checkout can use `npm ci` with Node 22.
 
 ```sh
-cd /home/dhairya2801/Dhairya/projects/worktrees/audentra-vnext/audentra-portal-refresh
+cd /path/to/projects/worktrees/audentra-vnext/audentra-portal-refresh
 API_PROXY_ORIGIN=http://127.0.0.1:4102 \
 NEXT_PUBLIC_DEMO_STUDENT_LOGIN_ENABLED=true \
 NEXT_PUBLIC_DEMO_STAFF_LOGIN_ENABLED=true \
