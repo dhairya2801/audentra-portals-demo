@@ -42,6 +42,5 @@ npm run start
 ```
 
 Live: <https://test.audentra.ai> uses Vercel → HTTPS proxy → GCP VM/Caddy → API,
-PostgreSQL and MinIO; its frozen demo runs without a worker. New branches do not
-replace production. See the backend [handoff notes](https://github.com/dhairya2801/audentra-platform-demo/blob/test.audentra-2oct/docs/handoff-2oct.md)
+PostgreSQL and MinIO; its frozen demo runs without a worker. This handoff was explicitly deployed from the new branches; `main` is unchanged. See the backend [handoff notes](https://github.com/dhairya2801/audentra-platform-demo/blob/test.audentra-2oct/docs/handoff-2oct.md)
 for environment names, deployment/rollback, verified checks and limitations.
