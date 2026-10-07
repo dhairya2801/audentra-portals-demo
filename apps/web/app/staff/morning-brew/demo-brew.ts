@@ -1,4 +1,3 @@
-import { DEMO_EMERGING_INSIGHTS } from "./demo-emerging-insights";
 import type {
   BrewInsight,
   BrewKpi,
@@ -708,7 +707,6 @@ export const DEMO_KPIS: BrewKpi[] = [
  * `data.ts` picks them and pads from the rest so the band is never short.
  */
 export const DEMO_INSIGHTS: BrewInsight[] = [
-  ...DEMO_EMERGING_INSIGHTS,
   {
     id: "commuter-deposit-pace",
     topic: "enrollment",
@@ -2023,7 +2021,7 @@ export function demoBrewSource(): BrewDemoSource {
         "This briefing is running on demo data. Every figure is illustrative and no student record was read to produce it.",
         "Rates move in points and counts move in students. A rate's comparison is never stated as a percentage of a percentage.",
         "Deposits paid is a level, net of withdrawals and refunds, so it can fall on a day with more withdrawals than deposits.",
-        "The emerging-insight design examples use $24,000 of net tuition per student; older illustrative findings retain their stated assumptions.",
+        "Every impact figure in the findings uses one conversion: $19,500 of net tuition per enrolled student.",
       ],
       unsupported: [
         {

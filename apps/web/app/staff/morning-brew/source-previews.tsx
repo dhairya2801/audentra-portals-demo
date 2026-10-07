@@ -3,10 +3,10 @@
 import {
   CalendarRow,
   EmailRow,
+  IntelligenceCard,
   NewsCard,
   PriorityRow,
 } from "./cards";
-import { InstitutionalInsightCard } from "./insight-card";
 import { PulseCard } from "./pulse";
 import type { BrewBriefing, BrewDetailLevelId, BrewSourceId } from "./types";
 
@@ -38,9 +38,10 @@ export function SourcePreview({
         </>
       ) : null}
       {sourceId === "intelligence" && briefing.insights[0] ? (
-        <InstitutionalInsightCard
+        <IntelligenceCard
           insight={briefing.insights[0]}
           level={level}
+          preview
         />
       ) : null}
       {sourceId === "email" ? (

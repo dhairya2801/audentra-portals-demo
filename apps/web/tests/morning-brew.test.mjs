@@ -26,7 +26,7 @@ import ts from "typescript";
  * a data: URL cannot resolve a relative specifier.
  */
 const SOURCE_DIR = new URL("../app/staff/morning-brew/", import.meta.url);
-const MODULES = ["data", "catalog", "demo-brew", "demo-emerging-insights", "news", "preferences", "types", "presentation", "edward-context"];
+const MODULES = ["data", "catalog", "demo-brew", "news", "preferences", "types", "presentation", "edward-context"];
 
 let compiledDir = null;
 
@@ -249,26 +249,6 @@ test("a finding's impact figures are the arithmetic of the sentence above them",
   assert.ok(labels.includes("−$1.6M"), `impact chips were ${labels.join(", ")}`);
   assert.ok(labels.includes("−82 Enrolled Students"));
   assert.equal(Math.round((82 * 19500) / 100000) / 10, 1.6, "82 students is $1.6M at $19.5K each");
-});
-
-test("the supplied emerging insights keep exposure, loss range and tuition distinct", async () => {
-  const { buildBrewBriefing } = await load();
-  const briefing = buildBrewBriefing(await brew(), await preferences());
-  assert.deepEqual(briefing.insights.map((item) => item.id), [
-    "deposited-aid-delay", "registration-capacity", "deposited-disengagement",
-  ]);
-  assert.deepEqual(briefing.insights.map((item) => item.forecast.studentsExposed), [38, 32, 54]);
-  assert.deepEqual(briefing.insights.map((item) => item.forecast.estimatedLoss.map(
-    (count) => count * item.forecast.netTuitionPerStudent,
-  )), [[192000, 264000], [168000, 240000], [216000, 312000]]);
-  for (const item of briefing.insights) {
-    const [low, high] = item.forecast.estimatedLoss;
-    assert.ok(low > 0 && low <= high && high <= item.forecast.studentsExposed);
-    assert.equal(item.detail.students.length, 0, "illustrative findings must not invent identified students");
-    assert.equal(item.cohortAvailable, false, "design examples must not claim a queryable cohort");
-    assert.ok(item.detail.narrative.includes(item.deepDive), "detail and disclosure must use the same evidence");
-    assert.ok(item.detail.evidence.some((note) => note.includes("not a model output")));
-  }
 });
 
 test("topics only ever subtract from the countable bands", async () => {

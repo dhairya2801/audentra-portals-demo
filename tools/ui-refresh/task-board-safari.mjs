@@ -24,7 +24,7 @@ for (const engine of [webkit, chromium]) {
       // Exercise the actual demo sign-in UI and an empty preference store.
       await page.goto(base + '/staff');
       await page.getByRole('button', {name: /Camila/}).click();
-      await expect(page.getByRole('heading', {name: 'Camila, your briefing starts here.'})).toBeVisible();
+      await expect(page.getByRole('heading', {name: 'Camila, start your morning with what matters.'})).toBeVisible();
       const frame = page.frameLocator('#approved-task-board');
       const ready = async () => {
         await expect(frame.locator('[data-task]').first()).toBeVisible();
@@ -49,7 +49,7 @@ for (const engine of [webkit, chromium]) {
       await ready();
       // An in-app round trip remounts the bridge without reloading the shell.
       await page.evaluate(() => { location.hash = 'morning_brew'; });
-      await expect(page.getByRole('heading', {name: 'Camila, your briefing starts here.'})).toBeVisible();
+      await expect(page.getByRole('heading', {name: 'Camila, start your morning with what matters.'})).toBeVisible();
       await page.evaluate(() => { location.hash = 'tasks'; });
       await ready();
       // Async errors need the same sender correction as successful API replies.
@@ -69,7 +69,7 @@ for (const engine of [webkit, chromium]) {
         await route.fulfill({response, json: data});
       });
       await page.goto(base + '/staff#morning_brew');
-      await expect(page.getByRole('heading', {name: 'Jordan, your briefing starts here.'})).toBeVisible();
+      await expect(page.getByRole('heading', {name: 'Jordan, start your morning with what matters.'})).toBeVisible();
       assert.deepEqual(errors, []);
       console.log('PASS', engine.name(), mobile ? 'mobile' : 'desktop', 'UI sign-in, actual staff greeting, canonical cards/filter, task detail, reload, navigation, parent sender, error/retry, dynamic name');
       await context.close();
