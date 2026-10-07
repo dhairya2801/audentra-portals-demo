@@ -368,7 +368,13 @@ export function MorningBrewDetail({
           </section>
         ) : null}
 
-        <CohortEvidence cohort={insight.cohort} onAskEdward={onAskEdward} />
+        {insight.cohortAvailable === false ? (
+          <section className="brew-detail__section brew-detail__section--quiet">
+            <h2>About this example</h2>
+            <p>{insight.detail.studentsNote}</p>
+            <p>Forecast ranges and confidence values come from the illustrative design, not a live model or a verified student cohort.</p>
+          </section>
+        ) : <CohortEvidence cohort={insight.cohort} onAskEdward={onAskEdward} />}
       </DetailShell>
     );
   }

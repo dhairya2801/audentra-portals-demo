@@ -25,7 +25,7 @@ export const BREW_TOPICS: BrewTopic[] = [
   {
     id: "financial_aid",
     title: "Financial Aid",
-    blurb: "Where aid files are stuck, and who is waiting on whom.",
+    blurb: "See where aid stands and what needs attention.",
     preview: "Verification · packaging · disbursement",
     icon: "aid",
     accent: "purple",
@@ -35,7 +35,7 @@ export const BREW_TOPICS: BrewTopic[] = [
   {
     id: "admissions",
     title: "Admissions",
-    blurb: "Applications, admits, and the pace the funnel is filling at.",
+    blurb: "Track applications, admissions, and emerging trends.",
     preview: "Applications · admits · transfer volume",
     icon: "applications",
     accent: "blue",
@@ -45,7 +45,7 @@ export const BREW_TOPICS: BrewTopic[] = [
   {
     id: "enrollment",
     title: "Enrollment",
-    blurb: "Who paid, who cleared, and who will actually be in a seat.",
+    blurb: "Follow deposits, enrollment trends, and next steps.",
     preview: "Deposits · deposit rate · yield · net tuition",
     icon: "deposit",
     accent: "teal",
@@ -55,7 +55,7 @@ export const BREW_TOPICS: BrewTopic[] = [
   {
     id: "housing",
     title: "Housing",
-    blurb: "The housing step, and anything holding it closed.",
+    blurb: "Follow housing contracts, assignments, and waitlists.",
     preview: "Contracts signed · assignments · waitlist",
     icon: "housing",
     accent: "amber",
@@ -65,7 +65,7 @@ export const BREW_TOPICS: BrewTopic[] = [
   {
     id: "campus_life",
     title: "Campus Life",
-    blurb: "Orientation, admitted-student events, and campus visits.",
+    blurb: "Follow orientation, campus events, and student engagement.",
     preview: "Orientation · yield events · visit volume",
     icon: "events",
     accent: "navy",
@@ -82,7 +82,7 @@ export const BREW_SOURCES: BrewSourceDefinition[] = [
     title: "Institutional Pulse",
     kicker: "Keep a pulse on what matters",
     description:
-      "We bring the figures that carry your cycle from your systems every morning—where each one stands today, how far it has moved since the last time it was worth checking, and how it is tracking against the goal you set for it.",
+      "Get a view of key metrics, what’s changed, and how they’re tracking against your goals.",
     source: "Offers, payments, and journeys in your Audentra database",
     icon: "pulse",
     accent: "teal",
@@ -117,7 +117,7 @@ export const BREW_SOURCES: BrewSourceDefinition[] = [
     title: "Higher Ed News",
     kicker: "Stay ahead of what’s happening in higher education",
     description:
-      "We bring the higher-education stories that would change how your own figures read—policy, aid, and the moves peer institutions are already making.",
+      "Follow higher education news and developments that could shape your institution’s priorities.",
     source: "An outside editorial feed, credited and linked on every card",
     icon: "broadcast",
     accent: "navy",
@@ -157,7 +157,7 @@ export const BREW_SOURCES: BrewSourceDefinition[] = [
     title: "Calendar",
     kicker: "Start the day knowing what’s ahead",
     description:
-      "We bring today’s meetings in order—who is in them, how long they run, and which ones carry a decision—so the first thing you read is the shape of your own day.",
+      "Get a clear view of today’s meetings, key details, and decisions to prepare for.",
     source: "Your calendar, and the enrollment work attached to each invitation",
     icon: "calendar",
     accent: "purple",
@@ -192,7 +192,7 @@ export const BREW_SOURCES: BrewSourceDefinition[] = [
     title: "Email",
     kicker: "See what needs your attention in your inbox",
     description:
-      "We surface the messages most relevant to you each morning, so you can quickly see what is important, what is waiting, and what needs your attention without working through the full inbox.",
+      "See key emails, pending responses, and what needs your attention.",
     source: "Your connected Outlook mailbox and student support conversations",
     icon: "outlook",
     accent: "blue",
@@ -227,7 +227,7 @@ export const BREW_SOURCES: BrewSourceDefinition[] = [
     title: "Action Center",
     kicker: "Know what needs attention today",
     description:
-      "Your command center for enrollment work—tasks, follow-ups, approvals, alerts, student issues, and workload signals—so you know what needs attention and why.",
+      "Get a clear view of workflow progress, bottlenecks, and emerging risks to see where your attention is needed.",
     source: "Open work items, approvals, and alerts on the task board",
     icon: "actions",
     accent: "blue",
@@ -262,7 +262,7 @@ export const BREW_SOURCES: BrewSourceDefinition[] = [
     title: "Institutional Intelligence",
     kicker: "See what your data is telling you",
     description:
-      "Three institutional developments to watch: what changed, the potential impact and the next action to consider.",
+      "Explore key findings from your data, their potential impact, and recommended next steps.",
     source: "Applications, payments, requirements, and aid records",
     icon: "sparkle",
     accent: "amber",

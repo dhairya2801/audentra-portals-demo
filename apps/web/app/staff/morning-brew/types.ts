@@ -182,6 +182,14 @@ export interface BrewInsight {
   context: string;
   /** The longer reading that replaces it at "Deep Dive". */
   deepDive: string;
+  /** Optional presentation data; populated only by the supplied demo examples. */
+  forecast?: {
+    studentsExposed: number;
+    estimatedLoss: [number, number];
+    netTuitionPerStudent: number;
+    note: string;
+  };
+  whyItMatters?: string;
   impactLabel: string;
   impact: BrewImpactChip[];
   /** What to do about it, stated at the depth the reader asked for. */
@@ -192,6 +200,8 @@ export interface BrewInsight {
   /** How firm the reading is, as a whole percent. Printed in the card's foot. */
   confidence: number;
   destination: MorningBrewDestination;
+  /** False for design examples that do not identify a queryable student cohort. */
+  cohortAvailable?: boolean;
   cohort: StaffBrewCohortRef;
   detail: {
     narrative: string[];

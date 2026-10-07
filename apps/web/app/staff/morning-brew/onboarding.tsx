@@ -369,11 +369,11 @@ export function MorningBrewOnboarding({
   const focus = step === 2 && draft.sources[expanded].enabled ? expanded : null;
 
   const heading =
-    step === 1 ? `${preview.greetingName}, start your morning with what matters.` : "Nice. What should we bring you?";
+    step === 1 ? `${preview.greetingName}, your briefing starts here.` : "Nice. What should we bring you?";
 
   const lede =
     step === 1
-      ? `As ${preview.reader.role}, you need a clear view of the areas you lead. We’ve selected topics around your responsibilities. Choose what belongs in your morning.`
+      ? "Start your day with a clearer view of the areas you lead. Review your selections and choose what matters most to you."
       : "Each of these is a slice of your live enrollment data. Switch off anything you don't want in front of you and the section simply won't appear.";
 
   return (
