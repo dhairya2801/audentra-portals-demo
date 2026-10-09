@@ -1,14 +1,16 @@
 import {chromium,expect} from '@playwright/test';
 import fs from 'node:fs/promises';
+const base=process.env.PORTAL_URL||'http://localhost:3012';
+const apiBase=process.env.API_URL||'http://localhost:4112';
 const root='../morning-brew-platform-sprint-1oct-v2/artifacts/conference';
 const inv=JSON.parse(await fs.readFile(`${root}/inventory.json`));
-const tenant='00000000-0000-7000-8000-000000000003',headers={'x-tenant-id':tenant,origin:'http://localhost:3012'};
+const tenant='00000000-0000-7000-8000-000000000003',headers={'x-tenant-id':tenant,origin:base};
 const browser=await chromium.launch({headless:true});const ctx=await browser.newContext({viewport:{width:1440,height:1000}});const report=[];
-async function api(path,body,method='GET') {const r=await ctx.request.fetch('http://localhost:4112'+path,{method,headers:{...headers,'Idempotency-Key':crypto.randomUUID()},...(body?{data:body}:{})});if(!r.ok())throw Error(`${r.status()} ${await r.text()}`);return r.json();}
+async function api(path,body,method='GET') {const r=await ctx.request.fetch(apiBase+path,{method,headers:{...headers,'Idempotency-Key':crypto.randomUUID()},...(body?{data:body}:{})});if(!r.ok())throw Error(`API request failed: ${r.status()} ${path}`);return r.json();}
 for(const [path,data] of [['sign-in-as',{studentRef:'SYN-000061'}],['staff/sign-in-as',{staffRef:'AU-55ff7e408818'}]])await api('/v1/auth/demo/'+path,data,'POST');
 const student=await ctx.newPage(),staff=await ctx.newPage();const errors=[];for(const p of [student,staff])p.on('pageerror',e=>{errors.push(e.message);console.error('PAGE ERROR',e.message);});
-await student.goto('http://localhost:3012/enrollment');await student.getByRole('heading',{name:'Your next steps'}).waitFor();
-await staff.goto('http://localhost:3012/staff#tasks');await staff.getByRole('button',{name:'Reset demo',exact:true}).click();await staff.getByRole('dialog').getByRole('button',{name:'Reset demo',exact:true}).click();
+await student.goto(base+'/enrollment');await student.getByRole('heading',{name:'Your next steps'}).waitFor();
+await staff.goto(base+'/staff#tasks');await staff.getByRole('button',{name:'Reset demo',exact:true}).click();await staff.getByRole('dialog').getByRole('button',{name:'Reset demo',exact:true}).click();
 await expect(staff.getByRole('dialog')).toHaveCount(0);await student.bringToFront();
 await expect(student.getByRole('heading',{name:'Upload your passport',exact:true})).toBeVisible({timeout:45000});
 const heading=student.getByRole('heading',{name:'Upload your passport',exact:true});

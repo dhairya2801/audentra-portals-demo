@@ -4,7 +4,7 @@ const engine=process.env.MB_BROWSER||'chrome';
 const browser=engine==='webkit'?await webkit.launch({executablePath:'/tmp/morning-brew-v2-webkit/run'}):await chromium.launch({channel:'chrome'});
 const page=await browser.newPage({viewport:{width:1440,height:1000}});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
-await page.goto('http://localhost:3012/staff');
+await page.goto((process.env.PORTAL_URL||'http://localhost:3012')+'/staff');
 await page.getByRole('button',{name:/Camila/}).click();
 await page.getByRole('button',{name:'Looks good',exact:true}).click();
 await expect(page.getByRole('switch',{name:'Remove Institutional Intelligence'})).toBeEnabled();
