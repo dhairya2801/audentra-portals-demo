@@ -232,8 +232,8 @@ test("tenant branding and capabilities load from the server-configured instituti
   assert.match(shell, /tenant\.publicLinks\.institution/);
   // The advisor bar moved from the shell into the enrollment page; its contact
   // link still goes through the tenant runtime.
-  assert.match(enrollment, /tenant\.contacts\.admissions \?\? tenant\.contacts\.support/);
-  assert.match(enrollment, /window\.location\.assign\(href\(contact\.url\)\)/);
+  assert.match(enrollment, /tenant\.contacts\.support \?\? tenant\.contacts\.admissions/);
+  assert.match(enrollment, /contactEmail/);
   assert.match(help, /href=\{runtime\.href\}/);
   assert.match(help, /href=\{href\(support\.url\)\}/);
   assert.match(signIn, /tenantRuntime\.href\(support\.url\)/);
@@ -1297,7 +1297,9 @@ test("Morning Brew renders the demo corpus, and says that it is one", async () =
   assert.match(onboarding, /Nice\. What should we bring you\?/);
   assert.doesNotMatch(onboarding, /how do you like it\?/);
   assert.match(onboarding, /Step \{step\} of 2/);
-  assert.match(dashboard, /Customize \$\{briefing\.reader\.name\}'s Morning Brew/);
+  assert.doesNotMatch(dashboard, /<header className="brew-masthead"/);
+  assert.match(dashboard, /brew-colophon--simple/);
+  assert.doesNotMatch(dashboard, /All times in Eastern Time|Customize brief/);
 
   // Each section carries the name of the source the reader switched on, so the
   // question they answered and the band they meet share a title.
@@ -1373,7 +1375,7 @@ test("Morning Brew renders the demo corpus, and says that it is one", async () =
   );
   assert.match(
     dashboard,
-    /except the dotted forecast line/,
+    /dotted forecast line/,
     "the one drawn value nobody counted has to be named in the colophon",
   );
 
@@ -1845,7 +1847,7 @@ test("DSM feedback surfaces remain connected to portal data and safe fallbacks",
   assert.match(enrollment, /contacts\.admissions/);
   assert.match(enrollment, /Your next steps/);
   assert.match(enrollment, /Coming up later/);
-  assert.match(enrollment, /Your admissions contact/);
+  assert.match(enrollment, /Your Enrollment Contact/);
   assert.match(enrollment, /Start here/);
   assert.match(enrollment, /In review/);
   assert.match(enrollment, /Completed/);

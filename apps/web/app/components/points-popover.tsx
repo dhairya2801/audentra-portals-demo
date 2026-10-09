@@ -1,5 +1,7 @@
 "use client";
 
+import "./student-meeting-refresh.css";
+import { useState } from "react";
 import type { StudentRequirementDetail, StudentRewardSummary } from "@vv/contracts";
 import Icon from "../design-system/Icon.jsx";
 import AnchorCard from "../design-system/primitives/AnchorCard.jsx";
@@ -57,7 +59,7 @@ export function PointsPopover({
     <>
       <AnchorCard
         variant="balance"
-        label="Your momentum"
+        label="Your Momentum"
         figure={
           <>
             {balance.toLocaleString()} <small>pts</small>
@@ -133,8 +135,7 @@ export function PointsPopover({
             },
           }}
         >
-          Points come from {tenant.shortName}’s published reward list. What you’ve already earned
-          never changes when that list does.
+          {`Points recognize your progress at ${tenant.shortName}. Your earned balance is kept separate from available task rewards.`}
         </Notice>
       </CardFoot>
     </>
@@ -154,6 +155,7 @@ export function PointsInfoModal({
   onClose: () => void;
 }) {
   const { tenant } = useTenant();
+  const [days, setDays] = useState(0);
   const rules = [
     `Each step starts with a reward set by ${tenant.shortName}.`,
     `${rewards.pointsPerUsd.toLocaleString()} ${rewards.pointName} are worth ${formatTenantMoney(100, tenant)} of bookstore credit.`,
@@ -180,6 +182,15 @@ export function PointsInfoModal({
           <span>Bookstore credit</span>
           <strong>{formatTenantMoney(rewards.bookstoreCreditCents, tenant)}</strong>
         </div>
+      </div>
+      <div className="reward-timing-example">
+        <span className="panel-label">WHY START TODAY? · ILLUSTRATIVE RULE</span>
+        <h3>Early effort goes a little further.</h3>
+        <p>An example task starts at 100 points and drops by 5 each day. Points already earned stay yours.</p>
+        <label htmlFor="reward-day">Complete in <strong>{days === 0 ? "Today" : `${days} days`}</strong></label>
+        <input id="reward-day" type="range" min="0" max="10" value={days} onChange={event => setDays(Number(event.target.value))}/>
+        <div className="reward-example-result"><strong>{100-days*5} points</strong><span>{formatTenantMoney((100-days*5)*100/rewards.pointsPerUsd,tenant)} bookstore value</span></div>
+        <small>This example explains daily incentives; your university sets the actual reward schedule.</small>
       </div>
       <ul className="point-rules">
         {rules.map((rule) => (

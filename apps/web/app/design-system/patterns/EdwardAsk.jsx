@@ -14,12 +14,13 @@ export default function EdwardAsk({ label = 'Ask Edward', mark, onClick, classNa
     <button
       type="button"
       className={['text-button', 'edward-ask', className].filter(Boolean).join(' ')}
+      aria-label={label}
+      title={label}
       onClick={onClick}
     >
       <span className="edward-ask-mark" aria-hidden="true">
         {mark}
       </span>
-      {label}
     </button>
   );
 }

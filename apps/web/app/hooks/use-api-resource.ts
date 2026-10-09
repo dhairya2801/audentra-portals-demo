@@ -29,6 +29,7 @@ type UseApiResourceOptions = {
    * between windows or restores the tab.
    */
   refreshOnAmbient?: boolean;
+  refreshOnStudentEvents?: boolean;
   enabled?: boolean;
 };
 
@@ -129,6 +130,14 @@ export function useApiResource<T>(
 
     return () => controller.abort();
   }, [ambientRevision, loader, requestVersion, enabled]);
+
+  useEffect(() => {
+    if (!enabled || !options.refreshOnStudentEvents) return;
+    const refresh = () => setRequestVersion(current => current + 1);
+    window.addEventListener("vv:student-realtime", refresh);
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") refresh(); }, 15000);
+    return () => { window.removeEventListener("vv:student-realtime", refresh); window.clearInterval(timer); };
+  }, [enabled, options.refreshOnStudentEvents]);
 
   const reload = useCallback(() => {
     setState((current) => ({

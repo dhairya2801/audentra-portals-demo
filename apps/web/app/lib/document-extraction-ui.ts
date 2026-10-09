@@ -97,6 +97,9 @@ export function currentDocumentProjection(
   activeDocument: StudentDocument | null | undefined,
 ) {
   if (!activeDocument) return localDocument ?? null;
+  if (localDocument?.id === activeDocument.id && localDocument.updatedAt && activeDocument.updatedAt) {
+    return Date.parse(localDocument.updatedAt) > Date.parse(activeDocument.updatedAt) ? localDocument : activeDocument;
+  }
   if (!localDocument || localDocument.id === activeDocument.id) {
     return activeDocument;
   }

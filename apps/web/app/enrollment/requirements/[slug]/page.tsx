@@ -858,7 +858,7 @@ function DocumentAction({
     (signal: AbortSignal) => getStudentDocuments(signal),
     [],
   );
-  const documents = useApiResource(loadDocuments);
+  const documents = useApiResource(loadDocuments, {refreshOnStudentEvents: true});
   const latestStoredDocument = useMemo(() => {
     const matchingDocuments =
       documents.status === "ready"
@@ -913,6 +913,10 @@ function DocumentAction({
       latestStoredDocument?.processingMode === "manual_review" &&
       ["accepted", "rejected"].includes(latestStoredDocument.status)) {
     selectedDocument = latestStoredDocument;
+  }
+  if (documents.status === "ready" && !documents.isRefreshing && !latestStoredDocument && selectedDocument &&
+      (documents.lastUpdatedAt ?? 0) > Date.parse(selectedDocument.updatedAt ?? selectedDocument.createdAt)) {
+    selectedDocument = null;
   }
   const staffReview = selectedDocument?.review;
   const extraction = selectedDocument?.extraction;
@@ -1030,6 +1034,7 @@ function DocumentAction({
       ) : (
         <RequirementUpload
           requirementId={requirement.id}
+          demoDocumentFilename={typeof requirement.inputConfig?.demoDocumentFilename === "string" ? requirement.inputConfig.demoDocumentFilename : undefined}
           categoryHint={requirement.documentCategory ?? undefined}
           activeDocument={selectedDocument}
           onUploaded={rememberDocument}
@@ -1048,6 +1053,7 @@ function DocumentAction({
         </Notice>
       ) : null}
 
+      {extraction?.validation && <Notice tone={extraction.validation.outcome === "wrong_type" ? "danger" : "info"} icon="info" title={extraction.validation.message}>{extraction.validation.missingFields.length > 0 ? `Missing or uncertain: ${extraction.validation.missingFields.join(", ")}` : "Staff review is required before approval."}</Notice>}
       {selectedDocument && extraction ? (
         <section className="document-check" aria-label="Edward’s document check">
           <RequirementExtractReview
@@ -1770,7 +1776,7 @@ export default function RequirementDetailPage() {
     (signal: AbortSignal) => getStudentRequirement(slug, signal),
     [slug],
   );
-  const requirement = useApiResource(loadRequirement);
+  const requirement = useApiResource(loadRequirement, {refreshOnStudentEvents: true});
   const loadBootstrap = useCallback(
     (signal: AbortSignal) => getStudentBootstrap(signal),
     [],

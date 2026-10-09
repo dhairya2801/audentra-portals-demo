@@ -5,9 +5,8 @@ import { formatTenantDate, type TenantConfig } from "../lib/tenant";
 /**
  * The checklist's vocabulary, read from the platform's requirement records —
  * the production counterpart of the reference's `features/enrollment/logic.js`.
- * Nothing here invents a figure the backend does not hold: a step has no
- * duration, no "tomorrow" value and no author-written "why", so the helpers
- * derive what they can (priority, unlocks, days left) and say nothing else.
+ * Priority, unlocks and deadlines derive from canonical records. Effort durations
+ * are explicitly illustrative UI estimates until the platform publishes them.
  */
 
 export type RequirementGroup = "next" | "reviewing" | "later" | "completed";
@@ -56,7 +55,22 @@ export function kindOf(item: StudentRequirementDetail): RequirementKind {
 }
 
 export function iconOf(item: StudentRequirementDetail) {
+  if (item.submissionType === "document") return "upload";
+  if (item.submissionType === "payment") return "card";
+  if (item.interactionType === "signature" || item.interactionType === "ferpa") return "pen";
+  if (item.submissionType === "form") return "checklist";
   return kindIcon(kindOf(item));
+}
+
+/** Illustrative effort estimates for the UI review, until the platform publishes durations.
+ * Kept separate from requirement records and presented as estimates, never processing SLAs. */
+export function estimatedMinutes(item: StudentRequirementDetail) {
+  if (/emergency/.test(item.code)) return 2;
+  if (item.submissionType === "document") return 5;
+  if (item.submissionType === "payment") return 3;
+  if (item.submissionType === "appointment") return 4;
+  if (item.interactionType === "signature" || item.interactionType === "ferpa") return 3;
+  return item.submissionType === "form" ? 4 : 2;
 }
 
 export function progressOf(item: StudentRequirementDetail) {
@@ -153,23 +167,39 @@ export function requirementHref(item: StudentRequirementDetail) {
   return `/enrollment/requirements/${encodeURIComponent(item.slug)}`;
 }
 
-/**
- * The reference's three orders. `quick` sorted by minutes; the platform holds
- * no duration, so the closest-to-done step comes first instead — the honest
- * reading of "fastest" with the data there is.
- */
+/** Longest dependent path and minimum deadline slack, derived from canonical edges.
+ * Review/processing time is not supplied, so effort is an illustrative lower bound. */
+export function criticalPath(item: StudentRequirementDetail, all: StudentRequirementDetail[], now = Date.now()) {
+  const walk = (node: StudentRequirementDetail, seen: Set<string>): {minutes: number; deadline: number; slack: number; count: number} => {
+    if (seen.has(node.code) || isTerminal(node)) return {minutes: 0, deadline: Infinity, slack: Infinity, count: 0};
+    const nextSeen = new Set([...seen, node.code]);
+    const children = all.filter(other => other.dependencyCodes.includes(node.code) && !isTerminal(other));
+    const paths = children.map(child => walk(child, nextSeen));
+    const effort = isReviewing(node) ? 0 : estimatedMinutes(node);
+    return {minutes: effort + Math.max(0, ...paths.map(path => path.minutes)),
+      deadline: Math.min(dueTime(node), ...paths.map(path => path.deadline)),
+      slack: Math.min((dueTime(node)-now)/60000-effort, ...paths.map(path=>path.slack-effort)),
+      count: new Set(all.filter(other => other.code !== node.code && dependsOn(other, node.code, all)).map(other => other.code)).size};
+  };
+  const path = walk(item, new Set());
+  return path;
+}
+function dependsOn(item: StudentRequirementDetail, code: string, all: StudentRequirementDetail[], seen = new Set<string>()): boolean {
+  if (seen.has(item.code) || isTerminal(item)) return false;
+  if (item.dependencyCodes.includes(code)) return true;
+  const next = new Set([...seen, item.code]);
+  return item.dependencyCodes.some(dependency => { const parent = all.find(task => task.code === dependency); return parent ? dependsOn(parent, code, all, next) : false; });
+}
 export function sortTasks(tasks: StudentRequirementDetail[], mode: SortMode, all: StudentRequirementDetail[]) {
   const list = [...tasks];
-  if (mode === "quick") list.sort((a, b) => progressOf(b) - progressOf(a) || dueTime(a) - dueTime(b));
-  if (mode === "due") list.sort((a, b) => dueTime(a) - dueTime(b));
+  if (mode === "quick") list.sort((a,b) => estimatedMinutes(a)-estimatedMinutes(b) || dueTime(a)-dueTime(b));
+  if (mode === "due") list.sort((a,b) => dueTime(a)-dueTime(b));
   if (mode === "smart") {
-    list.sort(
-      (a, b) =>
-        PRIORITY_ORDER[priorityOf(a)] - PRIORITY_ORDER[priorityOf(b)] ||
-        unlocksOf(b, all) - unlocksOf(a, all) ||
-        dueTime(a) - dueTime(b) ||
-        (a.order ?? 0) - (b.order ?? 0),
-    );
+    const now=Date.now(), paths=new Map(list.map(item=>[item.id,criticalPath(item,all,now)]));
+    list.sort((a,b)=>{
+      const x=paths.get(a.id)!,y=paths.get(b.id)!;
+      return Number(!a.blocking)-Number(!b.blocking) || x.slack-y.slack || y.count-x.count || y.minutes-x.minutes || PRIORITY_ORDER[priorityOf(a)] - PRIORITY_ORDER[priorityOf(b)] || estimatedMinutes(a)-estimatedMinutes(b) || (a.order??0)-(b.order??0);
+    });
   }
   return list;
 }

@@ -1,0 +1,155 @@
+{
+  "studentId": "3bedfe91-6802-4937-893b-72cb7779ecfa",
+  "reference": "SYN-000061",
+  "name": "Ada Kettleby",
+  "birthDate": "2007-03-08",
+  "requirements": [
+    {
+      "id": "e0a8d781-12b0-5866-b009-a586eb5d6c7c",
+      "code": "ada_demo_transcript",
+      "expectedType": "transcript",
+      "category": "transcript",
+      "fixture": "transcript.pdf"
+    },
+    {
+      "id": "4079cd6e-6b7b-51cb-99ce-f27ea5f0a81b",
+      "code": "ada_updated_transcript",
+      "expectedType": "transcript",
+      "category": "transcript",
+      "fixture": "transcript.pdf"
+    },
+    {
+      "id": "eddbed8f-d33c-5842-9206-68d354341b90",
+      "code": "camila_enr_190",
+      "expectedType": "transcript",
+      "category": "transcript",
+      "fixture": "transcript.pdf"
+    },
+    {
+      "id": "36da4071-4dd4-501d-a884-c8dfd8f1a0da",
+      "code": "official_transcript",
+      "expectedType": "transcript",
+      "category": "transcript",
+      "fixture": "transcript.pdf"
+    },
+    {
+      "id": "fecdf843-7528-5c39-b04a-52e623ec6286",
+      "code": "identity_document",
+      "expectedType": "identity",
+      "category": "identity",
+      "fixture": "passport.pdf"
+    },
+    {
+      "id": "514abb99-599c-5a57-8f87-eaa0beef9f0b",
+      "code": "immunization_record",
+      "expectedType": "immunization",
+      "category": "health",
+      "fixture": "immunization.pdf"
+    },
+    {
+      "id": "dfedc711-bc55-5071-8571-4282b7eb75fa",
+      "code": "camila_fin_154",
+      "expectedType": "financial_aid",
+      "category": "financial_aid",
+      "fixture": "financial-aid.pdf"
+    },
+    {
+      "id": "d4dbd818-c5c0-56e8-9ff7-d6a1794dfa4d",
+      "code": "financial_aid_verification",
+      "expectedType": "financial_aid",
+      "category": "financial_aid",
+      "fixture": "financial-aid.pdf"
+    },
+    {
+      "id": "5387f813-1528-5b75-8a74-4a00611eea9f",
+      "code": "ada_passport",
+      "expectedType": "passport",
+      "category": "identity",
+      "fixture": "passport.pdf"
+    }
+  ],
+  "documentTypes": {
+    "transcript": {
+      "required": [
+        "studentName",
+        "institutionName",
+        "courses"
+      ],
+      "optional": [
+        "date_of_birth",
+        "issueDate",
+        "transcript_type",
+        "credential",
+        "attendance_dates",
+        "gpa",
+        "gpa_scale",
+        "credits"
+      ],
+      "repeated": "courses: term, sourceCode, title, credits, grade, score, confidence",
+      "identification": "Academic record with institution and academic/grade/course evidence; filename is not evidence"
+    },
+    "identity/passport": {
+      "required": [
+        "studentName",
+        "date_of_birth"
+      ],
+      "passportRequired": [
+        "document_subtype=passport",
+        "nationality",
+        "issuing_country",
+        "passport_number",
+        "issueDate",
+        "expiry_date"
+      ],
+      "optional": [
+        "issuing_authority",
+        "birth_place"
+      ],
+      "identification": "Identity biographical document; passport requirement additionally requires passport subtype. Generic identity requirement accepts passport"
+    },
+    "immunization": {
+      "required": [
+        "studentName",
+        "date_of_birth",
+        "institutionName",
+        "vaccination dose records"
+      ],
+      "optional": [
+        "issueDate",
+        "explicit exemption",
+        "explicit titer result"
+      ],
+      "repeated": "vaccine, dose, administrationDate, confidence",
+      "identification": "Patient and provider vaccination record; no inferred health compliance"
+    },
+    "financial_aid": {
+      "required": [
+        "studentName",
+        "academicTerm",
+        "tax_year",
+        "household_size",
+        "household_income"
+      ],
+      "optional": [
+        "parent_income",
+        "student_income",
+        "number_in_college",
+        "signature/attestation",
+        "issueDate"
+      ],
+      "identification": "Financial verification worksheet or household income evidence"
+    }
+  },
+  "lifecycle": {
+    "reset": "requirement ready; active originals superseded; scoped work cancelled and cards archived",
+    "uploaded": "stored original, type check processing",
+    "typeMatched": "document needs_review; extraction pending_staff with empty fields; requirement under_review",
+    "staffParsing": "staff command -> document processing -> completed extraction, needs_review / under_review (no approval)",
+    "wrongType": "document rejected, requirement ready, immediate replacement allowed",
+    "unreadable": "stored original retained with safe non-retryable parse error; replacement required",
+    "ambiguousOrIncomplete": "original retained for staff review, no fabricated values",
+    "temporaryFailure": "failed extraction, original retained, bounded retry on same document",
+    "staffEdit": "expected task version + idempotency; canonical correction and before/after audit; realtime invalidation",
+    "staffApproval": "separate authorized original-reviewed decision; updates requirement only after review"
+  }
+}

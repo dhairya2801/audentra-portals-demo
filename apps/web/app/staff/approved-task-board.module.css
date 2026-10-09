@@ -1,5 +1,5 @@
 .frame { position: fixed; left: 15.25rem; top: 4.65rem; width: calc(100% - 15.25rem); height: calc(100dvh - 4.65rem); border: 0; z-index: 10; background: #f5f5f8; }
-.expanded { inset: 0; width: 100%; height: 100dvh; z-index: 100; }
+.expanded { inset: 0; width: 100%; height: 100dvh; z-index: 130; }
 .tree { margin: 4px 0 10px 7px; padding-left: 5px; border-left: 1px solid #ffffff24; }
 .tree .space { display: flex; gap: 5px; align-items: center; width: 100%; min-height: 31px; padding: 5px 3px; background: transparent; border: 0; color: #d8e0ee; text-align: left; border-radius: 4px; }
 .tree .space > strong { font-size: 11px; font-weight: 600; }
@@ -14,3 +14,16 @@
 .tree .space:hover,.tree .board:hover { background: #ffffff12; }
 .tree button:focus-visible { outline: 2px solid #b7aaff; outline-offset: 1px; }
 @media (max-width: 900px) { .frame { left: 0; width: 100%; } .expanded { top: 0; height: 100dvh; } }
+
+.tree .summary { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 9px; margin: 3px 0 6px; border: 0; border-radius: 5px; background: transparent; color: #d8cee9; text-align: left; font-size: 11px; }
+.tree .summary small { margin-left: auto; font-size: 9px; color: #a493bf; }
+.tree .summary:hover { background: #ffffff12; }
+.tree .summary.selected { background: #7665cf55; color: white; box-shadow: inset 2px 0 #b7aaff; }
+.tree .summary > span { width: auto; height: auto; padding: 0; background: none; border: 0; border-radius: 0; display: block; white-space: nowrap; font-size: 11px; color: inherit; }
+/* An advisory refresh notice must not cover For You's view switch. */
+:global(.staff-shell):has(.frame[data-summary-active="true"]) :global(.staff-realtime-notice) { top: auto; bottom: 1rem; right: auto; left: calc(15.5rem + 24px); width: min(38rem, calc(100vw - 19rem)); }
+@media (max-width: 900px) { :global(.staff-shell):has(.frame[data-summary-active="true"]) :global(.staff-realtime-notice) { left: 1rem; width: calc(100vw - 2rem); } }
+.loading { position: fixed; inset: 4.65rem 0 0 15.25rem; display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: center; background: #f5f5f8; color: #34405a; font-size: 14px; }
+.loading p { margin: 0; color: #778197; font-size: 12px; }
+.loadingMark { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid #ded7eb; background: #efebf7; border-radius: 12px; color: #7760b7; font-size: 28px; margin-bottom: 8px; }
+@media (max-width: 900px) { .loading { left: 0; } }

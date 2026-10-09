@@ -1,9 +1,11 @@
 // Portal-only navigation adapter. Approved workspace modules remain unchanged.
 import { toast } from './src/ui.js';
 import { SPACES, BOARDS } from './src/data.js';
-import { view, switchBoard } from './src/board.js';
+import { view } from './src/board.js';
 import { store } from './src/store.js';
+import { identitiesReady } from './src/identities.js';
 import { currentTask } from './src/detail.js';
+import { summaryActive } from './src/summary.js';
 
 let previous = '';
 function publish() {
@@ -12,7 +14,7 @@ function publish() {
     taskContext: {surface:'task_board', project:view.board,
       ...(document.querySelector('#task-dialog[open]') && currentTask() ? {workItemKey:currentTask().key} : {})},
     dialogOpen: !!document.querySelector('dialog[open]'),
-    navigation: { board: view.board, spaces: SPACES.map(space => ({
+    navigation: { summaryAvailable: identitiesReady(), board: summaryActive() ? 'summary' : view.board, spaces: SPACES.map(space => ({
       id: space.id, name: space.name, color: space.color,
       boards: space.boards.map(id => ({ id, name: BOARDS[id].name, count: store.tasks.filter(task => task.board === id && task.status !== 'completed').length })),
     })) },
@@ -21,10 +23,6 @@ function publish() {
   if (encoded !== previous) { previous = encoded; parent.postMessage(state, location.origin); }
 }
 new MutationObserver(publish).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['open'] });
-window.addEventListener('message', event => {
-  if (event.origin !== location.origin || event.source !== parent) return;
-  if (event.data?.type === 'audentra:approved-board:select' && BOARDS[event.data.board]) switchBoard(event.data.board);
-});
 document.addEventListener('click', event => {
   if (!event.target.closest('[data-action="copy-task"]')) return;
   event.preventDefault(); event.stopImmediatePropagation();
@@ -35,3 +33,6 @@ document.addEventListener('click', event => {
   navigator.clipboard?.writeText(url.href).then(() => toast(`${key} link copied`)).catch(() => toast('Task link: ' + url.href));
 }, true);
 publish();
+
+window.addEventListener('audentra:summary-navigation',publish);
+window.addEventListener('audentra:demo-tasks-changed',publish);

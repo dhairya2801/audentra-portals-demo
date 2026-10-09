@@ -1,3 +1,4 @@
+import {liveFieldSchema} from './live-document.js';
 // One field schema and decision model for manual entry and agent extraction.
 const courseRows = [
  ['calculus','AP Calculus BC','1.0 credit · A','MATH elective · grade ≥ C'],
@@ -8,6 +9,7 @@ const courseRows = [
  ['arts','Visual Arts','0.5 credit · A','Elective · grade ≥ C']
 ];
 export function fieldSchema(t) {
+ if(t.actualDocument)return liveFieldSchema(t);
  const flag=id=>(t.sourceExceptions||t.exceptions).includes(id)&&t.version===1;
  const row=(id,label,source,system,policy,extra={})=>({id,label,source,system,policy,page:1,...extra});
  const name=row('name','Full name',flag('name')?(t.student.split(' ')[0]+' '+t.student.split(' ').at(-1)[0]+'.'):(t.student),t.student,'ENR-02 · Legal identity',{number:1,reason:'Name differs from the application. Compare date of birth and institution before accepting the variation.'});
@@ -28,6 +30,11 @@ export function fieldSchema(t) {
  return fields;
 }
 export function reviewFor(t) {
+ if(t.actualDocument){
+  const e=t.actualDocument.extraction||{},revision=JSON.stringify(e);
+  if(t.review?.evidenceRevision!==revision)t.review={version:t.version,evidenceRevision:revision,mode:t.review?.mode||'agent',lastProcessor:e.staffCorrected?'manual':'agent',values:Object.fromEntries(fieldSchema(t).map(f=>[f.id,f.source])),decisions:e.fieldDecisions||{},processed:e.status==='completed'};
+  return t.review;
+ }
  t.sourceExceptions??=[...t.exceptions];
  if(!t.review||t.review.version!==t.version){
   const manual=t.processingMode==='manual';
@@ -39,7 +46,7 @@ export function reviewFor(t) {
 }
 const normalize=value=>value.toLowerCase().replace(/[−–]/g,'-').replace(/\s+/g,' ').trim();
 export function checkField(field,value) {
- if(!value?.trim())return 'empty';
+ if(!value?.trim())return field.optional?'recorded':'empty';
  if(field.rule==='record')return 'recorded';
  if(field.rule==='gpa')return /^\d+(\.\d+)?\s*\/\s*4\.00$/.test(value.trim())&&parseFloat(value)>=2.5&&parseFloat(value)<=4?'match':'flag';
  if(field.rule==='course')return normalize(value)===normalize(field.source)?'match':'flag';

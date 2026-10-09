@@ -125,3 +125,30 @@ export const insightPreviewActions: Record<string, string> = {
   "orientation-melt-signal": "Rebalance sessions and follow up.",
   "discount-rate-creep": "Adjust the top two merit bands.",
 };
+
+/** MB-02: each eligible message belongs to exactly one rule category. */
+export function briefEmailCategory(
+  request: BrewRequest,
+  replied = false,
+): "important" | "pending" | "waiting" | null {
+  if (request.status === "resolved") return null;
+  if (request.status === "waiting_on_student" || replied) return "waiting";
+  if (request.important && request.unread) return "important";
+  if (emailPresentation(request).pendingResponse) return "pending";
+  return null;
+}
+export function briefEmailCounts(
+  requests: BrewRequest[],
+  replies: Record<string, string> = {},
+) {
+  const unique = [...new Map(requests.map((r) => [r.id, r])).values()];
+  const counts = { important: 0, pending: 0, waiting: 0, total: 0 };
+  for (const r of unique) {
+    const category = briefEmailCategory(r, !!replies[r.id]);
+    if (category) {
+      counts[category]++;
+      counts.total++;
+    }
+  }
+  return counts;
+}

@@ -85,6 +85,7 @@ function statusLabel(
       return "Stored for staff review";
     }
     const extraction = document?.extraction;
+    if (extraction?.validation) return extraction.validation.message;
     return extraction?.status === "processing"
       ? document?.processingMode === "classification_only"
         ? "Stored · Edward is checking the document type"
@@ -120,11 +121,13 @@ function matchesExpectedCategory(
 export function RequirementUpload({
   requirementId,
   categoryHint,
+  demoDocumentFilename,
   activeDocument,
   onUploaded,
 }: {
   requirementId?: string;
   categoryHint?: StudentDocumentCategory;
+  demoDocumentFilename?: string;
   activeDocument?: StudentDocument | null;
   onUploaded: (document: StudentDocument) => void | Promise<void>;
 }) {
@@ -142,7 +145,7 @@ export function RequirementUpload({
     ? documentProcessingModeForCategory(categoryHint)
     : "manual_review";
   const parsingEnabled = processingMode !== "manual_review";
-  const classificationOnly = processingMode === "classification_only";
+  const classificationOnly = processingMode === "classification_only" && !demoDocumentFilename;
   const localActiveDocument = activeDocument
     ? documents.find((item) => item.document?.id === activeDocument.id)?.document
     : null;
@@ -305,6 +308,10 @@ export function RequirementUpload({
                 document.extraction?.status === "completed" &&
                 matchesExpectedCategory(document, categoryHint),
             ).length;
+            if (changed.every(document => document.extraction?.status === "pending_staff" && document.status !== "rejected")) {
+              setBundleMessage("Original received. Awaiting staff parsing and review.");
+              return;
+            }
             const attentionCount = changed.length - acceptedCount;
             const completedVerb = classificationOnly ? "checked" : "read";
             setBundleMessage(
@@ -404,6 +411,24 @@ export function RequirementUpload({
 
       return [...current, ...additions];
     });
+  };
+
+  const uploadDemoDocument = async () => {
+    if (!demoDocumentFilename || isUploading || serverProcessing) return;
+    setIsUploading(true);
+    setBundleMessage(null);
+    try {
+      const response = await fetch(`/demo-documents/ada/${encodeURIComponent(demoDocumentFilename)}`);
+      if (!response.ok) throw new Error("Demo document unavailable");
+      const file = new File([await response.blob()], demoDocumentFilename, { type: "application/pdf" });
+      const results = await uploadStudentDocumentBundle([{file, idempotencyKey: crypto.randomUUID()}], {categoryHint, requirementId});
+      const result = results[0];
+      if (result?.status !== "uploaded") throw new Error("Demo upload failed");
+      await onUploaded(result.document);
+      setBundleMessage("Demo original saved. Its type is being checked; staff will start parsing and review.");
+    } catch (error) {
+      setBundleMessage(getUploadErrorMessage(error));
+    } finally { setIsUploading(false); }
   };
 
   const handleFileSelection = (event: ChangeEvent<HTMLInputElement>) => {
@@ -568,7 +593,7 @@ export function RequirementUpload({
           ? "Drop to add"
           : rules;
   const privacy =
-    categoryHint === "transcript"
+    demoDocumentFilename ? "Your original is stored securely. Edward extracts visible fields for authorized staff review; parsing does not approve the document." : categoryHint === "transcript"
       ? `Encrypted, read by Edward to build your course record, and reviewed by ${tenant.shortName} staff.`
       : categoryHint === "identity"
         ? `Encrypted. Edward locates the portrait for your ID preview; only authorized ${tenant.shortName} staff see the original.`
@@ -589,6 +614,7 @@ export function RequirementUpload({
         onChange={handleFileSelection}
         disabled={serverProcessing}
       />
+      {demoDocumentFilename && <div className="upload-demo-actions"><button type="button" className="text-btn" disabled={isUploading || serverProcessing} onClick={() => void uploadDemoDocument()}>Use demo document</button>{" · "}<a href={`/demo-documents/ada/${encodeURIComponent(demoDocumentFilename)}`} download>Download sample</a></div>}
       <div
         className={`upload-zone ${zoneState}${isDragging ? " dragging" : ""}`}
         onDragEnter={(event) => {

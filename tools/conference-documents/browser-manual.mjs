@@ -1,0 +1,12 @@
+import {chromium,expect} from '@playwright/test';
+import fs from 'node:fs/promises';
+const root='../morning-brew-platform-sprint-1oct-v2/artifacts/conference',tenant='00000000-0000-7000-8000-000000000003';
+const browser=await chromium.launch();const ctx=await browser.newContext({viewport:{width:1440,height:1000}});const headers={'x-tenant-id':tenant,origin:'http://localhost:3012'};
+await ctx.request.post('http://localhost:4112/v1/auth/demo/sign-in-as',{headers,data:{studentRef:'SYN-000061'}});
+const page=await ctx.newPage();await page.goto('http://localhost:3012/enrollment/requirements/immunization-upload');
+await page.locator('input[type=file]').first().setInputFiles('apps/web/public/demo-documents/ada/immunization.png');
+await page.getByRole('button',{name:'Send to Aster',exact:true}).click();
+let doc;await expect.poll(async()=>{const r=await ctx.request.get('http://localhost:4112/v1/student/documents',{headers});doc=(await r.json()).items.find(d=>d.fileName==='immunization.png');return doc?.extraction?.status;},{timeout:90000}).toBe('pending_staff');
+await expect(page.getByText('Received for staff review',{exact:true})).toBeVisible();
+await page.screenshot({path:`${root}/manual-png-upload.png`,fullPage:true});
+await fs.writeFile(`${root}/manual-upload-result.json`,JSON.stringify({manualUpload:true,format:'PNG',documentId:doc.id,status:doc.extraction.status,fields:doc.extraction.fields}));console.log('PASS manual PNG file-picker upload, classified immunization, no fields extracted before staff action');await browser.close();

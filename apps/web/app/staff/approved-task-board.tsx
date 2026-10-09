@@ -1,4 +1,5 @@
 "use client";
+import { correctStaffDocumentExtraction, retryStaffDocumentExtraction, uploadStaffStudentDocument } from "../lib/api-client";
 
 import type { StaffActionCenterQuery, StaffTaskBoardContext } from "@vv/contracts";
 import { useEffect, useRef, useState } from "react";
@@ -6,7 +7,7 @@ import { ApiClientError, writeDemoTaskActivity, reviewDemoDocument, getDemoTaskB
 import styles from "./approved-task-board.module.css";
 
 type BoardSpace = { id: string; name: string; color: string; boards: { id: string; name: string; count: number }[] };
-type BoardNavigation = { board: string; spaces: BoardSpace[] };
+type BoardNavigation = { board: string; spaces: BoardSpace[]; summaryAvailable?: boolean };
 
 function fromBoard(event: MessageEvent) {
   const frame = document.querySelector<HTMLIFrameElement>("#approved-task-board");
@@ -42,6 +43,16 @@ export function ApprovedBoardNavigation({ onSelect }: { onSelect: () => void }) 
     return () => window.removeEventListener("message", receive);
   }, []);
   return <div className={styles.tree} aria-label="Task Board projects">
+    {navigation?.summaryAvailable ? <button type="button"
+      className={`${styles.summary} ${navigation.board === "summary" ? styles.selected : ""}`}
+      aria-current={navigation.board === "summary" ? "page" : undefined}
+      onClick={() => {
+        document.querySelector<HTMLIFrameElement>("#approved-task-board")?.contentWindow?.postMessage({ type: "audentra:approved-board:summary" }, window.location.origin);
+        onSelect();
+      }}>
+      <svg width="15" height="15" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 3h5v5H3zm9 0h5v5h-5zM3 12h5v5H3zm9 0h5v5h-5z" fill="none" stroke="currentColor" strokeWidth="1.3" /></svg>
+      <span>For You</span><small>3 views</small>
+    </button> : null}
     {navigation?.spaces.map(space => <div key={space.id}>
       <button type="button" className={styles.space} data-board-space={space.id}
         aria-expanded={!!expanded[space.id]} onClick={() => setExpanded(current => ({ ...current, [space.id]: !current[space.id] }))}>
@@ -63,6 +74,7 @@ export function ApprovedBoardNavigation({ onSelect }: { onSelect: () => void }) 
 /** Keep the approved workspace isolated while retaining the portal's own shell. */
 export function ApprovedTaskBoard({ onOpenWorkspace, demo = false, initialTask, initialQuery, onContextChange }: { onOpenWorkspace: (id?: string) => void; demo?: boolean; initialTask?: string | null; initialQuery?: StaffActionCenterQuery; onContextChange?: (context: StaffTaskBoardContext | null) => void }) {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [ready, setReady] = useState(false);
   const openWorkspace = useRef(onOpenWorkspace);
   useEffect(() => { openWorkspace.current = onOpenWorkspace; }, [onOpenWorkspace]);
@@ -105,6 +117,9 @@ export function ApprovedTaskBoard({ onOpenWorkspace, demo = false, initialTask, 
         if (controller) documentReads.set(id, controller);
         const call = demo ? (operation === "demo-identities" ? getDemoTaskBoard()
           : operation === "demo-document" && typeof payload?.path === "string" && /^\/v1\/staff\/documents\/[a-f0-9-]+\/content$/.test(payload.path) ? getStaffDocumentContent(payload.path, controller?.signal)
+          : operation === "demo-correct" ? correctStaffDocumentExtraction(payload.documentId, payload.input, payload.idempotencyKey)
+          : operation === "demo-retry" ? retryStaffDocumentExtraction(payload.documentId, payload.idempotencyKey)
+          : operation === "demo-upload" ? uploadStaffStudentDocument(payload.studentId, payload.file, payload.requirementId, payload.category, payload.idempotencyKey)
           : operation === "demo-write" ? writeDemoTaskActivity(payload.workItemId, payload.input, payload.idempotencyKey)
           : operation === "demo-review" ? reviewDemoDocument(payload.documentId, payload.input, payload.idempotencyKey)
           : operation === "demo-review-options" ? getStaffDocumentReviewOptions()
@@ -152,6 +167,7 @@ export function ApprovedTaskBoard({ onOpenWorkspace, demo = false, initialTask, 
       if (event.data?.type !== "audentra:approved-board:state") return;
       setReady(true);
       setDialogOpen(event.data.dialogOpen === true);
+      setSummaryOpen(demo && event.data.navigation?.board === "summary");
     };
     const invalidate = () => {
       document.querySelector<HTMLIFrameElement>("#approved-task-board")?.contentWindow?.postMessage({type:"audentra:board:invalidate"},window.location.origin);
@@ -169,8 +185,12 @@ export function ApprovedTaskBoard({ onOpenWorkspace, demo = false, initialTask, 
     };
   }, [demo]);
   return <>
-    {!ready && <p className={styles.frame} role="status" style={{ display: "grid", placeItems: "center", margin: 0 }}>Loading Task Board…</p>}
-    <iframe id="approved-task-board" title="Audentra Task Board"
+    {!ready && demo ? <div className={styles.loading} role="status">
+      <span className={styles.loadingMark} aria-hidden="true">⋯</span>
+      <strong>Loading your task workspace</strong>
+      <p>Gathering your visible boards and tasks…</p>
+    </div> : null}
+    <iframe id="approved-task-board" title="Audentra Task Board" data-summary-active={summaryOpen || undefined}
     src={demo
       ? `/action-center-demo/index.html${initialTask ? `#${encodeURIComponent(initialTask)}` : ""}`
       : `/action-center-approved/index.html?${new URLSearchParams({demo: "0", task: initialTask ?? "", scope: JSON.stringify(initialQuery ?? {})})}`}

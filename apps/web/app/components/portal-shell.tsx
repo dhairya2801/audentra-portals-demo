@@ -44,6 +44,7 @@ import {
   destinationById,
 } from "../design-lib/navigation.js";
 import { NotificationPanel } from "./notification-panel";
+import { sampleRewards } from "./student-ui-preview";
 import { PointsInfoModal, PointsPopover } from "./points-popover";
 import { PageShell, type HeroCopy } from "./page-shell";
 
@@ -823,7 +824,8 @@ export function PortalShell({
     : studentStanding(identity.data.onboarding);
   const help = destinationById(UTILITY_ID)!;
   const profile = destinationById(PROFILE_ID)!;
-  const rewards = !delegateActor ? identity.data.rewards : undefined;
+
+  const rewards = !delegateActor ? identity.data.rewards ?? sampleRewards : undefined;
   const destination = activeDestinationId ? destinationById(activeDestinationId) : null;
   const heroCopy: HeroCopy = destination
     ? {
@@ -837,7 +839,7 @@ export function PortalShell({
     : { kicker: eyebrow, title, lede: description, motif: null, ...hero };
 
   return (
-    <div className={`app-shell${active !== "edward" && !isParentPortalPath(pathname) ? " portal-refresh" : ""}`}>
+    <div className={`app-shell student-portal${["enrollment", "appointments"].includes(active) ? " student-meeting-refresh" : ""}${active !== "edward" && !isParentPortalPath(pathname) ? " portal-refresh" : ""}`}>
       <a className="skip-to-content" href="#main-content">
         Skip to main content
       </a>
@@ -1175,7 +1177,7 @@ export function PortalShell({
         />
       ) : null}
 
-      {experienceUpdates.length === 0 && rewards && !delegateActor ? (
+      {experienceUpdates.length === 0 && identity.data.rewards && rewards && !delegateActor ? (
         <RewardCelebration
           tenantSlug={tenant.slug}
           studentId={student.id}

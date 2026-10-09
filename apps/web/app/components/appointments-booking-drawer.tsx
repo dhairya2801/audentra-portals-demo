@@ -1,5 +1,7 @@
 "use client";
 
+import { StaffAvatar } from "./staff-avatar";
+
 import type {
   AppointmentAvailabilityStaff,
   AppointmentSlot,
@@ -53,7 +55,7 @@ export function AppointmentsBookingDrawer({
   type: ConversationType;
   tenant: TenantConfig;
   now: number;
-  prefill?: { subject?: string } | null;
+  prefill?: { subject?: string; staffMemberId?: string } | null;
   reschedule?: StudentAppointment | null;
   onBooked: (appointment: StudentAppointment) => void;
   onClose: () => void;
@@ -92,9 +94,9 @@ export function AppointmentsBookingDrawer({
     },
   );
   const people = useMemo(() => availability.data?.staff ?? [], [availability.data]);
-  const [personId, setPersonId] = useState<string | null>(null);
+  const [personId, setPersonId] = useState<string | null>(prefill?.staffMemberId ?? null);
   const person: AppointmentAvailabilityStaff | null =
-    people.find((entry) => entry.id === (personId ?? people[0]?.id)) ?? null;
+    people.find((entry) => entry.id === personId) ?? people.find(entry => entry.relationship === (type.id === "academic_advising" ? "primary_advisor" : type.id === "financial_aid" ? "financial_aid_counselor" : type.id === "enrollment_support" || type.id === "admissions_counseling" ? "admissions_counselor" : "international_adviser")) ?? people[0] ?? null;
   useEffect(() => {
     personName.current = person?.name ?? type.team;
   }, [person, type.team]);
@@ -161,7 +163,7 @@ export function AppointmentsBookingDrawer({
       <div className="booking-chosen">
         <span className="panel-label">{reschedule ? "Moving to" : "You are booking"}</span>
         <strong>{chosen ?? (freeTime ? "Choose a date and time above" : "Choose a time above")}</strong>
-        <span>{person ? `${person.name}${person.title ? ` · ${person.title}` : ""}` : type.team}</span>
+        <span className="booking-footer-person">{person && <StaffAvatar person={person} size="xs"/>}{person ? `${person.name}${person.title ? ` · ${person.title}` : ""}` : type.team}</span>
       </div>
       <div className="drawer-actions">
         <Button kind="primary" full icon="arrow" disabled={!canBook} pending={action.status === "loading"} onClick={book}>
@@ -176,7 +178,7 @@ export function AppointmentsBookingDrawer({
 
   return (
     <Drawer
-      variant="booking"
+      variant="booking booking-modal"
       label={[type.category, ...(reschedule ? ["Reschedule"] : [])]}
       titleId="booking-drawer-title"
       closeLabel="Close"
@@ -251,7 +253,7 @@ export function AppointmentsBookingDrawer({
           <p className="drawer-description">
             {reschedule
               ? `Currently ${longDate(reschedule.startsAt, tenant)} at ${clockTime(reschedule.startsAt, tenant)}. Pick the new time; the old one is released when the new one is confirmed.`
-              : `${type.blurb} ${type.team}.`}
+              : type.blurb}
           </p>
 
           <div className="action-panel">
@@ -288,6 +290,7 @@ export function AppointmentsBookingDrawer({
                           setSlot(null);
                         }}
                       >
+                        <StaffAvatar person={entry} size="sm"/>
                         <strong>{entry.name}</strong>
                         <small>
                           {entry.title ?? entry.component}
@@ -299,7 +302,8 @@ export function AppointmentsBookingDrawer({
                   </div>
                 ) : null}
                 {person ? (
-                  <div className="booking-with">
+                  <div className="booking-with booking-with-portrait">
+                    <StaffAvatar person={person} size="md"/>
                     <span className="panel-label">
                       {person.relationship === "primary_advisor"
                         ? "Your academic adviser"
@@ -329,7 +333,7 @@ export function AppointmentsBookingDrawer({
                           : `${person.name} does not take this kind of conversation.`}
                   </p>
                 ) : person ? (
-                  <SlotPicker person={person} tenant={tenant} selected={slot} onSelect={setSlot} />
+                  <SlotPicker key={person.id} person={person} tenant={tenant} selected={slot} onSelect={setSlot} />
                 ) : null}
               </>
             )}
@@ -358,61 +362,67 @@ export function AppointmentsBookingDrawer({
   );
 }
 
-function SlotPicker({
-  person,
-  tenant,
-  selected,
-  onSelect,
-}: {
+function SlotPicker({ person, tenant, selected, onSelect }: {
   person: AppointmentAvailabilityStaff;
   tenant: TenantConfig;
   selected: AppointmentSlot | null;
-  onSelect: (slot: AppointmentSlot) => void;
+  onSelect: (slot: AppointmentSlot | null) => void;
 }) {
   const days = useMemo(() => groupSlotsByDay(person.slots, tenant), [person.slots, tenant]);
   const [openDay, setOpenDay] = useState<string | null>(null);
-  const activeDay = openDay ?? days[0]?.day ?? null;
-  if (days.length === 0) return null;
+  const [page, setPage] = useState(0);
+  const activeDay = days.find(day => day.day === openDay) ?? days[0];
+  const visibleDays = days.slice(page * 5, page * 5 + 5);
+  if (!days.length) return null;
+
+  function changePage(next: number) {
+    setPage(next);
+    setOpenDay(days[next * 5].day);
+    onSelect(null);
+  }
+
   return (
-    <div className="booking-slots">
-      <span className="drawer-field-label">When?</span>
-      <div className="booking-days" role="tablist" aria-label="Day">
-        {days.map((day) => (
-          <button
-            key={day.day}
-            type="button"
-            role="tab"
-            aria-selected={day.day === activeDay}
-            className={`booking-day${day.day === activeDay ? " is-active" : ""}`}
-            onClick={() => setOpenDay(day.day)}
-          >
-            {day.day}
-            <small>{day.slots.length} open</small>
-          </button>
-        ))}
+    <div className="booking-calendar-layout">
+      <div className="booking-date-panel">
+        <div className="calendar-panel-title">
+          <span>Choose a day</span>
+          <div>
+            <button type="button" aria-label="Previous dates" disabled={!page} onClick={() => changePage(page - 1)}>‹</button>
+            <button type="button" aria-label="Next dates" disabled={(page + 1) * 5 >= days.length} onClick={() => changePage(page + 1)}>›</button>
+          </div>
+        </div>
+        <div className="booking-date-grid" aria-label="Available days">
+          {visibleDays.map(day => (
+            <button type="button" key={day.day} aria-pressed={day.day === activeDay.day}
+              onClick={() => { setOpenDay(day.day); onSelect(null); }}>
+              <span>{day.day.split(",")[0]}</span>
+              <strong>{new Intl.DateTimeFormat("en-US", {
+                month: "short", day: "numeric", timeZone: tenant.localization.timeZone,
+              }).format(new Date(day.slots[0].startsAt))}</strong>
+              <small>{day.slots.length} times available</small>
+            </button>
+          ))}
+        </div>
+        <p className="calendar-timezone"><Icon name="clock" size={14} /> {tenant.localization.timeZone.replaceAll("_", " ")}</p>
       </div>
-      <div className="booking-times" role="radiogroup" aria-label="Time">
-        {days
-          .find((day) => day.day === activeDay)
-          ?.slots.map((entry) => {
-            const isSelected = selected?.startsAt === entry.startsAt;
-            return (
-              <button
-                key={entry.startsAt}
-                type="button"
-                role="radio"
-                aria-checked={isSelected}
-                className={`booking-time${isSelected ? " is-selected" : ""}`}
-                onClick={() => onSelect(entry)}
-              >
-                {clockTime(entry.startsAt, tenant)}
-                <small>
-                  {entry.modality === "either" ? "in person or online" : entry.modality.replace("_", " ")}
-                  {entry.location ? ` · ${entry.location}` : ""}
-                </small>
-              </button>
-            );
-          })}
+      <div className="booking-time-panel">
+        <span className="calendar-panel-title">{activeDay.day}</span>
+        <p>Pick the time that fits your day.</p>
+        <div className="booking-time-grid" role="group" aria-label="Available times">
+          {activeDay.slots.map(entry => (
+            <button type="button" key={entry.startsAt} aria-pressed={selected?.startsAt === entry.startsAt} onClick={() => onSelect(entry)}>
+              {clockTime(entry.startsAt, tenant)}
+              {selected?.startsAt === entry.startsAt ? <Icon name="check" size={14} /> : null}
+            </button>
+          ))}
+        </div>
+        {selected ? (
+          <p className="selected-slot-location">
+            <Icon name="check" size={15} />
+            {selected.modality === "either" ? "In person or online" : selected.modality.replaceAll("_", " ")}
+            {selected.location ? ` · ${selected.location}` : ""}
+          </p>
+        ) : null}
       </div>
     </div>
   );

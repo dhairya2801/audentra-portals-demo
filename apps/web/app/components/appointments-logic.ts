@@ -212,3 +212,9 @@ export function localInputValue(date: Date) {
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
+
+/** Only explicit HTTPS locations become external meeting links. */
+export function meetingHref(appointment: StudentAppointment): string | null {
+  if (appointment.modality !== "virtual" || !appointment.location) return null;
+  try { const url=new URL(appointment.location.trim()); return url.protocol === "https:" && !url.username && !url.password ? url.href : null; } catch { return null; }
+}

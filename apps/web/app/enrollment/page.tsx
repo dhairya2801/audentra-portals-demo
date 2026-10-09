@@ -11,11 +11,15 @@ import type {
 import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import "../components/student-meeting-refresh.css";
+import { EnrollmentTour } from "../components/enrollment-tour";
+import { TenantLink as Link } from "../components/tenant-link";
+import { formatTenantDate } from "../lib/tenant";
 import Icon from "../design-system/Icon.jsx";
 import Card, { CardHead, CardRows } from "../design-system/primitives/Card.jsx";
 import StatusPill from "../design-system/primitives/StatusPill.jsx";
 import Tooltip from "../design-system/primitives/Tooltip.jsx";
-import AdvisorBar from "../design-system/patterns/AdvisorBar.jsx";
+import { StaffAvatar } from "../components/staff-avatar";
 import InfoModal from "../design-system/patterns/InfoModal.jsx";
 import Notice from "../design-system/patterns/Notice.jsx";
 import PageError from "../design-system/patterns/PageError.jsx";
@@ -26,6 +30,8 @@ import { PortalShell } from "../components/portal-shell";
 import { PointsInfoModal } from "../components/points-popover";
 import { EnrollmentTaskCard } from "../components/enrollment-task-card";
 import { EnrollmentTaskDrawer, type DrawerTab } from "../components/enrollment-task-drawer";
+import { sampleRewards, displayedTaskPoints } from "../components/student-ui-preview";
+import { EnrollmentCalendar } from "../components/enrollment-calendar";
 import { MomentumCard, SkippedCard } from "../components/enrollment-rail";
 import {
   GROUPS_DEFAULT,
@@ -33,6 +39,7 @@ import {
   type GroupId,
   type RequirementGroup,
   type SortMode,
+  criticalPath,
   completedLabel,
   daysLeft,
   dueLabel,
@@ -40,6 +47,7 @@ import {
   iconOf,
   kindOf,
   prerequisiteLine,
+  requirementHref,
   sortTasks,
   unlocksOf,
 } from "../components/enrollment-model";
@@ -47,6 +55,8 @@ import { useTenant } from "../components/tenant-provider";
 import { useApiResource } from "../hooks/use-api-resource";
 import { durationBucket, useActivityTracking } from "../hooks/use-activity-tracking";
 import {
+  getStudentAdvising,
+  getStudentDocuments,
   getStudentBootstrap,
   getStudentFerpaAuthorization,
   getStudentOnboarding,
@@ -93,7 +103,9 @@ export default function EnrollmentPage() {
     ]);
     return { bootstrap, requirements, onboarding, authorization: ferpa.authorization, delegateScopes };
   }, []);
-  const enrollment = useApiResource(loadEnrollment);
+  const enrollment = useApiResource(loadEnrollment, {refreshOnStudentEvents: true});
+  const advising = useApiResource(useCallback((signal: AbortSignal) => getStudentAdvising(signal), []));
+  const documents = useApiResource(useCallback((signal: AbortSignal) => getStudentDocuments(signal), []));
   const { track } = useActivityTracking();
   const viewedAt = useRef(0);
   const lastTask = useRef<StudentRequirementDetail | null>(null);
@@ -104,6 +116,7 @@ export default function EnrollmentPage() {
   );
   const [activeId, setActiveId] = useState<string | null>(null);
   const [drawerTab, setDrawerTab] = useState<DrawerTab>("action");
+  const [tourOpen, setTourOpen] = useState(false);
   const [smartModal, setSmartModal] = useState(false);
   const [pointsModal, setPointsModal] = useState(false);
 
@@ -145,11 +158,15 @@ export default function EnrollmentPage() {
 
   const openTask = useCallback(
     (item: StudentRequirementDetail, tab: DrawerTab = "action") => {
+      viewTask(item);
+      if (tab === "action" && item.submissionType === "document" && item.status !== "blocked") {
+        router.push(href(requirementHref(item)));
+        return;
+      }
       setActiveId(item.id);
       setDrawerTab(tab);
-      viewTask(item);
     },
-    [viewTask],
+    [href, router, viewTask],
   );
   const closeTask = useCallback(() => setActiveId(null), []);
   const closeModals = useCallback(() => {
@@ -185,14 +202,13 @@ export default function EnrollmentPage() {
   }
 
   const data = enrollment.data;
-  const rewards = data.bootstrap.rewards ?? null;
+  const rewards = data.bootstrap.rewards ?? sampleRewards;
   const rewardsOn = rewards !== null;
   const totalSteps = data.requirements.total || items.length;
   const completedCount = groups.completed.length;
   const progress = totalSteps > 0 ? Math.round((completedCount / totalSteps) * 100) : 0;
   const earnedPoints = rewards?.lifetimePoints ?? 0;
-  const availableToday = groups.next.reduce((sum, item) => sum + (item.reward?.points ?? 0), 0);
-  const messagesAllowed = data.delegateScopes === null || data.delegateScopes.includes("messages");
+  const availableToday = groups.next.reduce((sum, item) => sum + displayedTaskPoints(item), 0);
   const canToggle = true;
   const open = (id: GroupId) => groupsOpen[id];
   const toggle = (id: GroupId) => setGroupsOpen((current) => ({ ...current, [id]: !current[id] }));
@@ -206,21 +222,11 @@ export default function EnrollmentPage() {
     return days != null && days <= 7;
   });
 
-  const contact = tenant.contacts.admissions ?? tenant.contacts.support ?? null;
-  const advisor = contact
-    ? { name: contact.label, label: "Your admissions contact", office: null as string | null }
-    : null;
-  const onContact = (kind: "email" | "message") => {
-    if (kind === "message" && messagesAllowed) {
-      router.push(href("/messages"));
-      return;
-    }
-    if (contact?.email) {
-      window.location.href = `mailto:${contact.email}`;
-      return;
-    }
-    if (contact?.url) window.location.assign(href(contact.url));
-  };
+  const contact = tenant.contacts.support ?? tenant.contacts.admissions ?? null;
+  const enrollmentStaff = advising.data?.advisers.find(entry => entry.role === "admissions_counselor")?.staff;
+  const advisor = enrollmentStaff ?? {name: "Bennett Abernathy", title: "Enrollment Support", email: null};
+  const contactEmail = advisor.email || contact?.email;
+  const contactPhone = contact?.phone;
 
   const skipped = data.onboarding?.data.skippedSteps ?? [];
   const resumeTarget = skipped
@@ -254,7 +260,19 @@ export default function EnrollmentPage() {
           >
             {summaryLine}
           </SummaryFigure>
-          {advisor ? <AdvisorBar advisor={advisor} onContact={onContact} /> : null}
+          <div className="enrollment-adviser">
+            <figure className="enrollment-adviser-portrait"><StaffAvatar person={advisor} size="lg"/><figcaption>Sample photo</figcaption></figure>
+            <div className="enrollment-adviser-copy">
+              <span className="panel-label">Your Enrollment Contact</span>
+              <strong>{advisor.name}</strong>
+              <span>{advisor.title}</span>
+              <span className="enrollment-contact-phone">{contactPhone ? <a href={`tel:${contactPhone.replace(/[^+0-9]/g, "")}`}>{contactPhone}</a> : "(202) 555-0143 · sample phone"}</span>
+              <div className="enrollment-contact-actions">
+                {contactEmail && <a href={`mailto:${contactEmail}`}><Icon name="mail" size={14}/>Email</a>}
+                <Link href={`/appointments?topic=enrollment_support${enrollmentStaff ? `&staff=${encodeURIComponent(enrollmentStaff.id)}` : ""}`}><Icon name="calendar" size={14}/>Book a Meeting</Link>
+              </div>
+            </div>
+          </div>
         </>
       }
       notice={
@@ -265,8 +283,9 @@ export default function EnrollmentPage() {
             action={{
               label: `See the ${gatingMine.length === 1 ? "step" : `${gatingMine.length} steps`}`,
               onClick: () => {
-                const first = document.querySelector(".task-card.gating");
-                first?.scrollIntoView({ behavior: "smooth", block: "center" });
+                const first = gatingMine[0];
+                setGroupsOpen(current => ({...current, [groupOf(first)]: true}));
+                openTask(first, first.status === "blocked" ? "how" : "action");
               },
             }}
           >
@@ -286,6 +305,7 @@ export default function EnrollmentPage() {
           {rewards ? (
             <MomentumCard rewards={rewards} availableToday={availableToday} onOpenPoints={() => setPointsModal(true)} />
           ) : null}
+          <EnrollmentCalendar items={items} onOpen={item => openTask(item, "how")} />
           {skipped.length > 0 ? (
             <SkippedCard
               student={{ name: data.bootstrap.student.fullName }}
@@ -302,6 +322,7 @@ export default function EnrollmentPage() {
         </>
       }
     >
+      <div className="enrollment-intro"><span><Icon name="spark" size={15} /> A little progress, every day.</span><button type="button" onClick={()=>setTourOpen(true)}><Icon name="preview" size={15}/> Take a quick tour</button></div>
       {totalSteps === 0 ? (
         <Card>
           <StateCard variant="empty" icon="checklist" title="No steps assigned yet." className="inset">
@@ -350,6 +371,7 @@ export default function EnrollmentPage() {
                     item={item}
                     unlocks={unlocksOf(item, items)}
                     recommended={index === 0 && sort === "smart"}
+                    feedback={documents.data?.items.filter(doc=>doc.requirementId===item.id && ['rejected','needs_resubmission'].includes(doc.status)).sort((a,b)=>Date.parse(b.review?.decidedAt||'')-Date.parse(a.review?.decidedAt||''))[0]?.review?.note || undefined}
                     rewardsOn={rewardsOn}
                     studentManaged={data.delegateScopes !== null && item.interactionType === "ferpa"}
                     onOpen={openTask}
@@ -501,7 +523,12 @@ export default function EnrollmentPage() {
         />
       )}
 
-      {smartModal && <InfoModal variant="smart" onClose={closeModals} />}
+      {tourOpen && <EnrollmentTour onClose={()=>setTourOpen(false)} />}
+      {smartModal && <InfoModal variant="smart" title="The path that moves you forward." icon="flow" kicker="SMART ORDER · EXPLAINED" onClose={closeModals}>
+        <p>We follow the prerequisites published by your university, then look at the longest chain of remaining work, its nearest deadline and your estimated effort. Registration requirements come first.</p>
+        <div className="smart-path-list">{groups.next.slice(0,3).map(item=>{const path=criticalPath(item,items);return <div key={item.id}><strong>{item.title}</strong><span>{path.count} dependent steps · about {path.minutes} min across the longest path</span><small>{Number.isFinite(path.deadline)?`Nearest deadline: ${formatTenantDate(new Date(path.deadline).toISOString(),tenant,{month:'short',day:'numeric'})}`:'No deadline published'}</small></div>;})}</div>
+        <p>Effort is an estimate of your time. University review can take longer. Due soon sorts by date alone; Fastest starts with the shortest individual task.</p>
+      </InfoModal>}
       {pointsModal && rewards && <PointsInfoModal rewards={rewards} onClose={closeModals} />}
     </PortalShell>
   );

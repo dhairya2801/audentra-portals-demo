@@ -1,0 +1,33 @@
+{
+  "persona": {
+    "name": "Ada Kettleby",
+    "reference": "SYN-000061",
+    "birthDate": "2007-03-08"
+  },
+  "expected": {
+    "transcript": {
+      "studentName": "Ada Kettleby",
+      "institutionName": "Cedar Vale Academy",
+      "courseCount": 8,
+      "gpa": "3.75",
+      "credits": "8.0"
+    },
+    "passport": {
+      "passport_number": "DEMO-US-061",
+      "date_of_birth": "2007-03-08",
+      "expiry_date": "2035-09-19",
+      "nationality": "UNITED STATES OF AMERICA"
+    },
+    "immunization": {
+      "doseCount": 7,
+      "provider": "Willow Creek Clinic",
+      "lastDose": "2024-07-15"
+    },
+    "financial-aid": {
+      "household_size": "3",
+      "tax_year": "2024",
+      "household_income": "60500",
+      "academicTerm": "2026-2027"
+    }
+  }
+}

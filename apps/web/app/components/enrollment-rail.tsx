@@ -32,13 +32,14 @@ export function MomentumCard({
           <Icon name="spark" size={21} />
         </span>
         <div>
-          <span>Your momentum</span>
+          <span>Your Momentum</span>
           <strong>
             {next.away.toLocaleString()} pts to {formatTenantMoney(next.dollars * 100, tenant)} in bookstore credit
           </strong>
         </div>
       </div>
 
+      <div className="momentum-balance"><strong>{rewards.lifetimePoints.toLocaleString()}<small> points</small></strong><span>{formatTenantMoney(rewards.bookstoreCreditCents,tenant)} bookstore credit</span></div>
       <div className="level-track">
         <span style={{ width: `${fill}%` }} />
       </div>

@@ -1,7 +1,8 @@
 "use client";
 
+import { StaffAvatar } from "./staff-avatar";
+
 import Icon from "../design-system/Icon.jsx";
-import ActionBand from "../design-system/patterns/ActionBand.jsx";
 import EdwardAsk from "../design-system/patterns/EdwardAsk.jsx";
 import Button from "../design-system/primitives/Button.jsx";
 import { openEdward } from "../design-lib/door.js";
@@ -16,11 +17,13 @@ export function AppointmentsTopicRow({
   type,
   band = null,
   mark,
+  person,
   onChoose,
 }: {
   type: ConversationType;
   band?: "start" | null;
   mark: string;
+  person?: { name: string; title?: string | null; component?: string | null } | null;
   onChoose: (type: ConversationType, node: HTMLElement | null) => void;
 }) {
   const recommended = Boolean(band);
@@ -28,7 +31,7 @@ export function AppointmentsTopicRow({
 
   return (
     <article className={["task-card", "topic-row", recommended && "recommended"].filter(Boolean).join(" ")}>
-      {band === "start" && <ActionBand icon="spark" label="Start here" />}
+
 
       <div className="task-card-body">
         <div className="task-type-icon meeting" aria-hidden="true">
@@ -36,24 +39,14 @@ export function AppointmentsTopicRow({
         </div>
 
         <div className="task-main">
-          <div className="task-meta-row">
-            <span>{type.category}</span>
-          </div>
           <h3>{type.label}</h3>
           <p>{type.blurb}</p>
-          <div className="task-facts">
-            <span>
-              <Icon name="users" size={15} /> {type.team}
-            </span>
-            <span>
-              <Icon name="calendar" size={15} /> Pick an open time
-            </span>
-          </div>
+          <div className="meeting-owner"><span className="meeting-owner-avatar">{person ? <StaffAvatar person={person}/> : type.team.split(" ").map(word => word[0]).slice(0,2).join("")}</span><span><strong>{person?.name || type.team}</strong><small>{[person?.title, person?.component].filter(Boolean).join(" · ") || "Your student support team"}</small></span></div>
         </div>
 
         <div className="task-action">
           <Button kind={recommended ? "primary" : "secondary"} icon="arrow" onClick={(event: React.MouseEvent<HTMLButtonElement>) => onChoose(type, event.currentTarget)}>
-            Book a time
+            Find a time
           </Button>
           <EdwardAsk
             mark={mark}

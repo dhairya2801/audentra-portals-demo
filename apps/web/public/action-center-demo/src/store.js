@@ -15,13 +15,14 @@ export async function refreshIdentities(){
  if(JSON.stringify(tasks)===JSON.stringify(store.tasks))return false;
  store.tasks=tasks;save();return true;
 }
-export function save(){const key=identityStorageKey();if(key)try{localStorage.setItem(key,JSON.stringify(store));}catch{}}
+export function save(){const key=identityStorageKey();if(key)try{localStorage.setItem(key,JSON.stringify({...store,tasks:store.tasks.map(task=>task.actualDocument?{...task,actualDocument:undefined,documents:task.documents.map(d=>({id:d.id})),review:undefined}:task)}));}catch{} window.dispatchEvent(new Event('audentra:demo-tasks-changed'));}
 export function now(){return new Date(store.clock);}
 export function event(task,text,kind='history',who='ML',extra={}){task.updated=store.clock;task.activity.push({text,kind,who,at:store.clock,...extra});save();}
 export function tick(){store.clock=new Date(Date.parse(store.clock)+60000).toISOString();}
 export function reset(){Object.assign(store,freshState());save();}
 export function sla(task){
- if(!task.due||task.actualDocument&&task.status==='completed')return {label:'SLA met',short:'Completed',tone:'green',remaining:0,percent:100};
+ if(task.status==='completed')return {label:'SLA met',short:'Completed',tone:'green',remaining:0,percent:100};
+ if(!task.due||!Number.isFinite(Date.parse(task.due)))return {label:'No deadline set',short:'No deadline',tone:'muted',remaining:Infinity,percent:0};
  const clock=task.actualDocument?Date.now():Date.parse(store.clock);
  const remaining=(Date.parse(task.due)-clock)/3600000;
  const stage=stageFor(task),elapsed=(clock-Date.parse(task.entered))/3600000;

@@ -2269,3 +2269,28 @@ export function reviewDemoDocument(documentId: string, input: ReviewStaffDocumen
       body: JSON.stringify(input),
     }, {notifyStudentRecordChanged: false});
 }
+
+export function getBrewTeamSettings() {
+  return request<import('@vv/contracts').StaffBrewTeamSettings>('/v1/staff/morning-brew/team-settings', {method:'GET'});
+}
+export function saveBrewTeamSettings(input: {expectedVersion:number; intelligenceEnabled:boolean}) {
+  return request<import('@vv/contracts').StaffBrewTeamSettings>('/v1/staff/morning-brew/team-settings', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(input)});
+}
+export function getBrewNews(refresh=false) {
+  return request<import('@vv/contracts').StaffBrewNewsFeed>(`/v1/staff/morning-brew/news?refresh=${refresh}`, {method:'GET'});
+}
+export function submitBrewPrepFeedback(input: import('@vv/contracts').StaffBrewPrepFeedback) {
+  return request<{id:string;saved:boolean;dataOrigin:'demo'}>('/v1/staff/morning-brew/prep-feedback', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)});
+}
+
+export function retryStaffDocumentExtraction(documentId: string, idempotencyKey = crypto.randomUUID()) {
+  return request<StudentDocument>(`/v1/staff/documents/${encodeURIComponent(documentId)}/retry-extraction`, {method:"POST",headers:{"Idempotency-Key":idempotencyKey}});
+}
+export function uploadStaffStudentDocument(studentId: string, file: File, requirementId: string, category: string, idempotencyKey = crypto.randomUUID()) {
+  const body = new FormData(); body.append("file",file); body.append("requirementId",requirementId); body.append("category",category);
+  return request<StudentDocument>(`/v1/staff/students/${encodeURIComponent(studentId)}/documents/upload`,{method:"POST",headers:{"Idempotency-Key":idempotencyKey},body});
+}
+
+export function correctStaffDocumentExtraction(documentId: string, input: import("@vv/contracts").CorrectStaffDocumentExtractionInput, idempotencyKey: string) {
+  return request<{saved: boolean; workItemVersion: number}>(`/v1/staff/documents/${encodeURIComponent(documentId)}/extraction`, {method: "POST", body: JSON.stringify(input), headers: {"Content-Type": "application/json", "Idempotency-Key": idempotencyKey}});
+}

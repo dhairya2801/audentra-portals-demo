@@ -149,6 +149,12 @@ export function RequirementExtractReview({
     );
   }
 
+  if (extraction.status === "pending_staff") {
+    return <Notice tone="info" icon="clock" title="Received for staff review">
+      Your original is saved. Staff will start Edward parsing and review the document.
+    </Notice>;
+  }
+
   if (extraction.status === "pending_configuration") {
     return (
       <RetryRead
@@ -222,7 +228,7 @@ export function RequirementExtractReview({
   };
   const reviewable =
     document.processingMode === "agentic" && extraction.fields.length > 0;
-  const deciding = document.status === "needs_review";
+  const deciding = document.status === "needs_review" && !extraction.requiresStaffReview;
   const left = reviewable && deciding
     ? extraction.fields.length - acceptedKeys.size
     : 0;
@@ -333,7 +339,7 @@ export function RequirementExtractReview({
                     ) : (
                       <span className={`extract-verdict ${accepted ? "right" : "fixed"}`}>
                         <Icon name={accepted ? "check" : "pen"} size={14} />{" "}
-                        {accepted ? "Confirmed" : "Left for staff"}
+                        {extraction.requiresStaffReview ? "For staff review" : accepted ? "Confirmed" : "Left for staff"}
                       </span>
                     )}
                   </div>

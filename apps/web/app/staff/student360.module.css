@@ -1389,10 +1389,6 @@
   object-fit: contain;
 }
 @media (min-width: 1600px) {
-  .root {
-    max-width: 1700px;
-    margin: auto;
-  }
   .recordBody {
     grid-template-columns: minmax(0, 1fr) 310px;
   }

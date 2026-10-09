@@ -1,0 +1,111 @@
+Audentra conference document workflow — local handoff
+
+Host: http://localhost:3012
+Student: /enrollment (demo selector: Ada Kettleby, SYN-000061)
+Staff: /staff#tasks (demo selector: Camila Abernathy, AU-55ff7e408818)
+API: http://127.0.0.1:4112
+Backend worktree: ../morning-brew-platform-sprint-1oct-v2
+No deployment, push, or hosted data mutation was performed.
+
+Workflow
+1. Open Ada and Camila in separate tabs. The populated staff board contains real
+   stored synthetic originals and persisted extraction results, awaiting approval.
+2. Use the staff header's Reset demo button. Only the configured Ada document
+   requirements/cards reset; unrelated cards, next steps, and history survive.
+3. From Ada's Your next steps, open a document action directly. Use demo document
+   or choose the matching downloaded PDF/JPEG/PNG. The backend stores it and checks
+   its contents against the expected type. A transcript cannot satisfy passport.
+4. Open the fresh staff card. The existing preview, four-column field table,
+   processing selector, edit pencils, Activity and Workflow tabs remain. Fields
+   initially show --. Choose Run Edward parsing to extract from the stored original.
+5. Compare fields with the preview. Pencil edits save canonical corrections with
+   the task's expected version, idempotency, and before/after audit evidence.
+   Accept/correction field decisions also persist. Parsing does not approve the
+   document, complete enrollment, award credit, or determine health eligibility.
+6. Ask Edward which documents remain pending versus received/awaiting staff review.
+   Both assistants read the same canonical requirements. Reset and repeat.
+
+Requirements and fixtures
+See tools/conference-documents/requirements.json for all nine existing/new stable
+requirement IDs, schemas, required/optional fields, repeated structures and states.
+The current portal has four transcript requirements, two financial-aid requirements,
+one generic identity requirement and one immunization requirement. Passport was
+added as a ninth requirement. The passport specimen also supports generic identity.
+No existing journey requirements were silently merged or deleted.
+
+Downloadable fixtures: apps/web/public/demo-documents/ada/
+  transcript.pdf: Cedar Vale Academy letterhead, eight course/term rows, GPA 3.75/4,
+    final-year credits 8, cumulative credits 24, diploma/attendance/issue details.
+  passport.pdf: US-style specimen, generated fictional portrait, Ada's DOB
+    2007-03-08, DEMO-US-061, issue 2025-09-20, expiry 2035-09-19.
+  immunization.pdf: Willow Creek Clinic patient/provider layout and seven doses.
+  financial-aid.pdf: 2026–27 verification, tax year 2024, household 3, income $60,500.
+  immunization-scanned.pdf and immunization-scan.jpg: image-only OCR cases.
+Each specimen is visibly marked DEMO / NOT VALID. There is no functional passport
+MRZ, seal, or security feature. Fixtures use Ada's configured synthetic profile.
+The original uploaded bytes are stored in the isolated conference-oct8 object
+bucket. Fixture downloads are durable public project assets, not canned parser data.
+
+Backend behavior
+Migration 0082 adds an explicit demo requirement mapping and superseded/archive
+markers. Reset resolves the configured demo external reference to its stable ID,
+takes the same per-student transaction lock as upload/attach/completion/review,
+supersedes active document submissions, archives associated review-card membership,
+cancels only scoped document-review work, and changes requirements back to ready.
+The linked financial worksheet also returns to not_started. Originals, parse results,
+decisions and audit history remain. No other student's records are deleted.
+A delayed parser result sees its original superseded/rejected and cannot restore
+an active card or satisfy a reset requirement. Repeated identical uploads reuse the
+same requirement/digest submission; new originals reuse the requirement's card.
+
+Uploads initially perform a bounded content-type check. Successful type checks
+persist pending_staff with empty field values. The authorized staff parsing action
+queues the existing worker; successful extraction remains needs_review/under_review.
+Missing and low-confidence values remain empty or flagged. Corrupt originals remain
+available with a safe unreadable error. Temporary failures can retry the same stored
+original. There is one bounded automatic retry and no expensive fallback chain.
+
+Canonical updatedAt versions reconcile mutation receipts with later server reads.
+Student document/journey pages invalidate on existing SSE events and use a bounded
+15-second visible-page fallback plus focus refresh. The staff board retains its
+existing 10-second/focus refresh. Events cause refetches; payloads are not records.
+Parsed fields and original bytes are not persisted in board localStorage.
+
+Model and budget
+The configured OpenAI key was used only on the server. /v1/models confirmed the
+actual ID gpt-6-luna; it is not an assumed public alias for a Codex agent name.
+Official model reference: https://developers.openai.com/api/docs/models/gpt-6-luna
+Rates used: $0.10 / million input tokens and $0.50 / million output tokens.
+The classifier and extractor use strict structured output. Representative live
+PDF/image extraction selected this small model. The local runtime meters both
+parsing and Edward calls in backend artifacts/conference/spend.json, including a
+conservative reservation for failures without usage. It refuses paid calls before
+the $2 task cap is exceeded. No provider responses or keys are committed.
+
+Verification and limitations
+Live browser results: backend artifacts/conference/browser-workflow-results.json.
+Live model/HTTP results: backend artifacts/conference/final-workflow-results.json.
+Manual PNG upload, retry, previews and transaction results are adjacent JSON files.
+The timeout retry test injects a deterministic stored failure and then performs a
+LIVE parser retry; it is not represented as a naturally occurring provider outage.
+Unit tests are deterministic, not live model tests. Browser tests use Chromium.
+WebKit cannot launch here because system libraries including libavif.so.13 are
+missing; sudo requires a password. Native Safari was therefore not verified.
+The default backend run skips integration tests without their dedicated test env.
+Backend: 1,484 API tests passed, 173 skipped; aggregate coverage 61.9% fails the
+67% gate. Node suites, typecheck, lint and build passed. Frontend: all 172 tests,
+typecheck, lint (23 warnings, no errors) and build passed.
+Metered task API testing cost: $0.089071 across 149 completed calls, including
+classification, extraction and student/staff Edward verification. No pending or
+unmetered failed attempts remained at handoff. The $2 cap remains enabled.
+
+Local operation
+API: from backend, PYTHONPATH=apps/api/src apps/api/.venv/bin/python tools/conference/runtime.py
+Worker: from backend, PYTHONPATH=apps/api/src apps/api/.venv/bin/python tools/conference/worker.py
+Frontend: npm --workspace @vv/web run dev -- --port 3012
+The runtime uses the existing local PostgreSQL (5548) and Minio (9148) services,
+the isolated audentra_university_conference_oct8 database, and conference-oct8 bucket.
+It reads existing local service credentials from ../handoff-platform-2oct/.env.handoff
+and the configured OPENAI_API_KEY environment variable. No secret is a browser env.
+The configured $2 testing cap stays active in this local runtime for your session.
+Before any later deployment, review both worktrees and their migrations/configuration.

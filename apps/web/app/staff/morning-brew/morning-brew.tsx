@@ -2,6 +2,11 @@
 
 import "./morning-brew.css";
 
+import {
+  getBrewTeamSettings,
+  saveBrewTeamSettings,
+} from "../../lib/api-client";
+import type { StaffBrewTeamSettings } from "@vv/contracts";
 import type { StaffOperationsWorkspace } from "@vv/contracts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildBrewBriefing } from "./data";
@@ -11,8 +16,15 @@ import { MorningBrewDetail } from "./detail";
 import { openStaffEdward } from "../../lib/staff-edward-opening";
 import { brewEdwardOpening } from "./edward-context";
 import { BrewLoading } from "./loading";
-import { MorningBrewOnboarding, type OnboardingDraft, type OnboardingStep } from "./onboarding";
-import { browserBrewPreferenceStore, DEFAULT_BREW_PREFERENCES } from "./preferences";
+import {
+  MorningBrewOnboarding,
+  type OnboardingDraft,
+  type OnboardingStep,
+} from "./onboarding";
+import {
+  browserBrewPreferenceStore,
+  DEFAULT_BREW_PREFERENCES,
+} from "./preferences";
 import type {
   BrewDetailRef,
   BrewPreferences,
@@ -31,37 +43,49 @@ import type {
  */
 type Mode = "loading" | "onboarding" | "building" | "briefing";
 
-const draftFrom = (preferences: Omit<BrewPreferences, "version" | "updatedAt">): OnboardingDraft => ({
+const draftFrom = (
+  preferences: Omit<BrewPreferences, "version" | "updatedAt">,
+): OnboardingDraft => ({
   topics: [...preferences.topics],
   sources: Object.fromEntries(
-    Object.entries(preferences.sources).map(([id, source]) => [id, { ...source }]),
+    Object.entries(preferences.sources).map(([id, source]) => [
+      id,
+      { ...source },
+    ]),
   ) as Record<BrewSourceId, BrewSourcePreference>,
 });
 
 export function MorningBrewView({
   workspace,
   navigate,
+  subscribeToRealtimeInvalidation,
 }: {
   workspace: Pick<StaffOperationsWorkspace, "currentStaff">;
   navigate: MorningBrewNavigate;
+  subscribeToRealtimeInvalidation?: (invalidate: () => void) => () => void;
 }) {
   const scope = `demo:${workspace.currentStaff.id}`;
-  const firstName = workspace.currentStaff.name.trim().split(/\s+/)[0] || "there";
+  const firstName =
+    workspace.currentStaff.name.trim().split(/\s+/)[0] || "there";
 
   // The corpus is one pinned morning — May 20, 2025, 7:30 AM ET — because
   // every relative label in it is counted from that date.
   const source = useMemo(() => demoBrewSource(), []);
 
+  const [team, setTeam] = useState<StaffBrewTeamSettings | null>(null);
+  const [teamError, setTeamError] = useState("");
+  const [savingTeam, setSavingTeam] = useState(false);
   const [mode, setMode] = useState<Mode>("loading");
   const [step, setStep] = useState<OnboardingStep>(1);
   const [direction, setDirection] = useState<1 | -1>(1);
-  const [draft, setDraft] = useState<OnboardingDraft>(() => draftFrom(DEFAULT_BREW_PREFERENCES));
+  const [draft, setDraft] = useState<OnboardingDraft>(() =>
+    draftFrom(DEFAULT_BREW_PREFERENCES),
+  );
   const [saved, setSaved] = useState<BrewPreferences | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [replies, setReplies] = useState<Record<string, string>>({});
   const detailOpener = useRef<HTMLElement | null>(null);
   const [detail, setDetail] = useState<BrewDetailRef | null>(null);
-
 
   useEffect(() => {
     const stored = browserBrewPreferenceStore.load(scope);
@@ -74,9 +98,64 @@ export function MorningBrewView({
       } else {
         setMode("onboarding");
       }
+      void getBrewTeamSettings()
+        .then((value) => {
+          setTeam(value);
+          setDraft((current) => ({
+            ...current,
+            sources: {
+              ...current.sources,
+              intelligence: {
+                ...current.sources.intelligence,
+                enabled: value.intelligenceEnabled,
+              },
+            },
+          }));
+        })
+        .catch(() =>
+          setTeamError(
+            "Team setting unavailable. Your saved personal preview is shown; team controls are disabled.",
+          ),
+        );
     }, 180);
     return () => window.clearTimeout(timer);
   }, [scope]);
+
+  // Canonical team changes invalidate the read. Never replace unsaved setup choices.
+  useEffect(() => {
+    if (mode !== "briefing") return;
+    let active = true,
+      pending = false;
+    const refreshTeam = () => {
+      if (pending || document.hidden) return;
+      pending = true;
+      void getBrewTeamSettings()
+        .then((value) => {
+          if (active) {
+            setTeam(value);
+            setTeamError("");
+          }
+        })
+        .catch(() => {
+          if (active)
+            setTeamError(
+              "Team visibility could not be refreshed. Showing the last saved setting.",
+            );
+        })
+        .finally(() => {
+          pending = false;
+        });
+    };
+    const unsubscribe = subscribeToRealtimeInvalidation?.(refreshTeam);
+    window.addEventListener("focus", refreshTeam);
+    const timer = window.setInterval(refreshTeam, 60000);
+    return () => {
+      active = false;
+      unsubscribe?.();
+      window.removeEventListener("focus", refreshTeam);
+      window.clearInterval(timer);
+    };
+  }, [mode, subscribeToRealtimeInvalidation]);
 
   const preferences: BrewPreferences = useMemo(
     () =>
@@ -91,8 +170,24 @@ export function MorningBrewView({
   );
 
   const briefing = useMemo(
-    () => buildBrewBriefing(source, preferences, firstName),
-    [source, preferences, firstName],
+    () =>
+      buildBrewBriefing(
+        source,
+        {
+          ...preferences,
+          sources: {
+            ...preferences.sources,
+            intelligence: {
+              ...preferences.sources.intelligence,
+              enabled:
+                team?.intelligenceEnabled ??
+                preferences.sources.intelligence.enabled,
+            },
+          },
+        },
+        firstName,
+      ),
+    [source, preferences, firstName, team],
   );
 
   const askEdward = (request: EdwardRequest) => {
@@ -104,13 +199,17 @@ export function MorningBrewView({
      reacts to a choice before it has been committed. */
   const draftBriefing = useMemo(
     () =>
-      buildBrewBriefing(source, {
-        ...DEFAULT_BREW_PREFERENCES,
-        ...draft,
-        version: 7,
-        updatedAt: "",
-        onboardingComplete: false,
-      }, firstName),
+      buildBrewBriefing(
+        source,
+        {
+          ...DEFAULT_BREW_PREFERENCES,
+          ...draft,
+          version: 7,
+          updatedAt: "",
+          onboardingComplete: false,
+        },
+        firstName,
+      ),
     [source, draft, firstName],
   );
 
@@ -122,12 +221,39 @@ export function MorningBrewView({
     scrollToTop();
   };
 
-  const complete = () => {
-    if (!draft.topics.length) return;
+  const complete = async () => {
+    if (!draft.topics.length || savingTeam) return;
+    if (
+      team &&
+      team.intelligenceEnabled !== draft.sources.intelligence.enabled
+    ) {
+      if (!team.canManage) return;
+      setSavingTeam(true);
+      setTeamError("");
+      try {
+        setTeam(
+          await saveBrewTeamSettings({
+            expectedVersion: team.version,
+            intelligenceEnabled: draft.sources.intelligence.enabled,
+          }),
+        );
+      } catch {
+        setTeamError(
+          "Your team setting could not be saved or changed elsewhere. Your choices are retained. Review the current team setting and try again.",
+        );
+        try {
+          setTeam(await getBrewTeamSettings());
+        } catch {}
+        setSavingTeam(false);
+        return;
+      }
+      setSavingTeam(false);
+    }
     setSaved(
       browserBrewPreferenceStore.save(scope, {
         ...draft,
-        deliveryTime: saved?.deliveryTime ?? DEFAULT_BREW_PREFERENCES.deliveryTime,
+        deliveryTime:
+          saved?.deliveryTime ?? DEFAULT_BREW_PREFERENCES.deliveryTime,
         onboardingComplete: true,
       }),
     );
@@ -140,14 +266,39 @@ export function MorningBrewView({
 
   const cancel = () => {
     if (!saved) return;
-    setDraft(draftFrom(saved));
+    setDraft(
+      draftFrom({
+        ...saved,
+        sources: {
+          ...saved.sources,
+          intelligence: {
+            ...saved.sources.intelligence,
+            enabled:
+              team?.intelligenceEnabled ?? saved.sources.intelligence.enabled,
+          },
+        },
+      }),
+    );
     setStep(1);
     setDirection(1);
     setMode("briefing");
   };
 
   const openOnboarding = (target: OnboardingStep) => {
-    if (saved) setDraft(draftFrom(saved));
+    if (saved)
+      setDraft(
+        draftFrom({
+          ...saved,
+          sources: {
+            ...saved.sources,
+            intelligence: {
+              ...saved.sources.intelligence,
+              enabled:
+                team?.intelligenceEnabled ?? saved.sources.intelligence.enabled,
+            },
+          },
+        }),
+      );
     setDetail(null);
     setStep(target);
     setDirection(1);
@@ -157,7 +308,8 @@ export function MorningBrewView({
 
   const openDetail = useCallback((ref: BrewDetailRef) => {
     if (!ref.id) return;
-    if (!document.querySelector(".brew-detail-layer")) detailOpener.current = document.activeElement as HTMLElement;
+    if (!document.querySelector(".brew-detail-layer"))
+      detailOpener.current = document.activeElement as HTMLElement;
     setDetail(ref);
   }, []);
 
@@ -195,8 +347,14 @@ export function MorningBrewView({
         draft={draft}
         preview={draftBriefing}
         sample={buildBrewBriefing(source, {
-          ...preferences, topics: draft.topics,
-          sources: Object.fromEntries(Object.entries(draft.sources).map(([id, source]) => [id, { ...source, enabled: true, detail: "deep" }])) as BrewPreferences["sources"],
+          ...preferences,
+          topics: draft.topics,
+          sources: Object.fromEntries(
+            Object.entries(draft.sources).map(([id, source]) => [
+              id,
+              { ...source, enabled: true, detail: "deep" },
+            ]),
+          ) as BrewPreferences["sources"],
         })}
         customizing={Boolean(saved?.onboardingComplete)}
         onToggleTopic={(topic: BrewTopicId) =>
@@ -207,14 +365,39 @@ export function MorningBrewView({
               : [...current.topics, topic],
           }))
         }
-        onChangeSource={(id: BrewSourceId, patch: Partial<BrewSourcePreference>) =>
+        onChangeSource={(
+          id: BrewSourceId,
+          patch: Partial<BrewSourcePreference>,
+        ) =>
           setDraft((current) => ({
             ...current,
-            sources: { ...current.sources, [id]: { ...current.sources[id], ...patch } },
+            sources: {
+              ...current.sources,
+              [id]: { ...current.sources[id], ...patch },
+            },
           }))
         }
         onStep={goToStep}
-        onComplete={complete}
+        canManageTeam={Boolean(team?.canManage)}
+        saving={savingTeam}
+        teamNotice={
+          <div className="brew-team-notice" role="status">
+            {team ? (
+              <>
+                <strong>Team setting · {team.team}</strong>
+                <span>
+                  {team.canManage
+                    ? "Changing this switch applies to everyone on your team when you save."
+                    : "Your team administrator controls visibility. Your reading depth remains personal."}
+                </span>
+              </>
+            ) : (
+              "Loading your team setting…"
+            )}
+            {teamError ? <p role="alert">{teamError}</p> : null}
+          </div>
+        }
+        onComplete={() => void complete()}
         onCancel={saved ? cancel : undefined}
       />
     );
@@ -224,6 +407,7 @@ export function MorningBrewView({
     <>
       <div inert={Boolean(detail)}>
         <MorningBrewDashboard
+          liveNews
           briefing={briefing}
           preferences={preferences}
           replies={replies}
@@ -241,9 +425,13 @@ export function MorningBrewView({
           onOpenDetail={openDetail}
           onManagePreferences={() => openOnboarding(2)}
           drafts={drafts}
-          onDraftChange={(id, text) => setDrafts(current => ({ ...current, [id]: text }))}
+          onDraftChange={(id, text) =>
+            setDrafts((current) => ({ ...current, [id]: text }))
+          }
           replies={replies}
-          onDemoReply={(id, text) => setReplies(current => ({ ...current, [id]: text }))}
+          onDemoReply={(id, text) =>
+            setReplies((current) => ({ ...current, [id]: text }))
+          }
           navigate={navigate}
           onAskEdward={askEdward}
         />

@@ -1,6 +1,7 @@
 "use client";
 
 import type { StudentRequirementDetail } from "@vv/contracts";
+import { displayedTaskPoints } from "./student-ui-preview";
 import Icon from "../design-system/Icon.jsx";
 import ActionBand from "../design-system/patterns/ActionBand.jsx";
 import EdwardAsk from "../design-system/patterns/EdwardAsk.jsx";
@@ -10,6 +11,7 @@ import {
   daysClause,
   dueShort,
   edwardAskFor,
+  estimatedMinutes,
   iconOf,
   kindOf,
   priorityLabel,
@@ -33,6 +35,7 @@ export function EnrollmentTaskCard({
   unlocks,
   recommended,
   rewardsOn,
+  feedback,
   studentManaged,
   onOpen,
 }: {
@@ -40,6 +43,7 @@ export function EnrollmentTaskCard({
   unlocks: number;
   recommended: boolean;
   rewardsOn: boolean;
+  feedback?: string;
   studentManaged: boolean;
   onOpen: (item: StudentRequirementDetail, tab?: "action" | "how") => void;
 }) {
@@ -48,7 +52,7 @@ export function EnrollmentTaskCard({
   const priority = priorityOf(item);
   const due = dueShort(item, tenant);
   const clause = daysClause(item);
-  const points = item.reward?.points ?? 0;
+  const points = displayedTaskPoints(item);
   const gates = item.blocking;
 
   return (
@@ -73,12 +77,14 @@ export function EnrollmentTaskCard({
           </div>
           <h3>{item.title}</h3>
           <p>{item.description}</p>
+          {item.status === "rejected" ? <div className="task-return-note"><Icon name="alert" size={14} /> {feedback ? `Changes requested · ${feedback}` : "Action needed · Open your submission to review the requested changes."}</div> : null}
           {gates && <GateChip />}
           <div className="task-facts">
             <span>
               <Icon name="calendar" size={15} /> {due ? `Due ${due}` : "No deadline"}
               {clause ? <b> · {clause}</b> : null}
             </span>
+            <span title="Illustrative estimate of your effort; university review time is separate."><Icon name="clock" size={15} /> About {estimatedMinutes(item)} min</span>
             {item.submissionType === "payment" && (
               <span>
                 <Icon name="shield" size={15} /> Verified automatically
@@ -91,7 +97,7 @@ export function EnrollmentTaskCard({
           {rewardsOn && points > 0 && (
             <div className="point-reward">
               <span>
-                <Icon name="spark" size={14} /> {points} pts today
+                <Icon name="spark" size={14} /> {`${points} pts today`}
               </span>
             </div>
           )}

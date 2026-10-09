@@ -1,5 +1,7 @@
 "use client";
 
+import { StaffAvatar } from "./staff-avatar";
+
 import type { StudentAppointment } from "@vv/contracts";
 import { useState } from "react";
 import Icon from "../design-system/Icon.jsx";
@@ -11,6 +13,7 @@ import type { TenantConfig } from "../lib/tenant";
 import {
   type ConversationType,
   calendarHref,
+  meetingHref,
   clockTime,
   longDate,
   relativeDay,
@@ -120,6 +123,7 @@ export function AppointmentsDrawer({
         {type.label} · {who}
       </h2>
       <p className="drawer-description">{type.blurb}</p>
+      {appointment.staff && <div className="appointment-person-detail"><StaffAvatar person={appointment.staff} size="lg"/><div><strong>{appointment.staff.name}</strong><span>{appointment.staff.title || type.team}</span></div></div>}
 
       <div className={`appt-note ${banner.tone}`}>
         <span aria-hidden="true">
@@ -191,7 +195,8 @@ export function AppointmentsDrawer({
 
       {state.tone === "confirmed" && (
         <div className="drawer-actions">
-          <a className="primary-button full" href={calendarHref(appointment, type)} download="appointment.ics">
+          {meetingHref(appointment) && <a className="primary-button full" href={meetingHref(appointment)!} target="_blank" rel="noopener noreferrer">Join online meeting ↗</a>}
+          <a className="secondary-button full" href={calendarHref(appointment, type)} download="appointment.ics">
             Add to calendar <Icon name="calendar" size={17} />
           </a>
           <Button kind="secondary" full icon="refresh" onClick={() => onReschedule(appointment)}>

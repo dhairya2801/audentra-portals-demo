@@ -1,0 +1,83 @@
+{
+  "observedAt": "2026-10-08",
+  "source": "Authenticated read-only browser inspection of https://test.audentra.ai",
+  "student": {
+    "reference": "SYN-000061",
+    "id": "3bedfe91-6802-4937-893b-72cb7779ecfa",
+    "name": "Ada Kettleby"
+  },
+  "requirements": [
+    {
+      "code": "ada_demo_transcript",
+      "id": "e0a8d781-12b0-5866-b009-a586eb5d6c7c",
+      "status": "ready",
+      "category": null
+    },
+    {
+      "code": "ada_updated_transcript",
+      "id": "4079cd6e-6b7b-51cb-99ce-f27ea5f0a81b",
+      "status": "completed",
+      "category": null
+    },
+    {
+      "code": "camila_enr_190",
+      "id": "eddbed8f-d33c-5842-9206-68d354341b90",
+      "status": "under_review",
+      "category": null
+    },
+    {
+      "code": "camila_fin_154",
+      "id": "dfedc711-bc55-5071-8571-4282b7eb75fa",
+      "status": "under_review",
+      "category": null
+    },
+    {
+      "code": "identity_document",
+      "id": "fecdf843-7528-5c39-b04a-52e623ec6286",
+      "status": "completed",
+      "category": "identity"
+    },
+    {
+      "code": "official_transcript",
+      "id": "36da4071-4dd4-501d-a884-c8dfd8f1a0da",
+      "status": "completed",
+      "category": "transcript"
+    },
+    {
+      "code": "financial_aid_verification",
+      "id": "d4dbd818-c5c0-56e8-9ff7-d6a1794dfa4d",
+      "status": "completed",
+      "category": "financial_aid"
+    },
+    {
+      "code": "immunization_record",
+      "id": "514abb99-599c-5a57-8f87-eaa0beef9f0b",
+      "status": "completed",
+      "category": "health"
+    }
+  ],
+  "findings": [
+    "No passport-specific requirement in the live requirement list. Identity documentation exists; add a passport requirement through backend configuration.",
+    "Live next-step transcript action opens an intermediate drawer, then /enrollment/requirements/ada-demo-transcript.",
+    "Active transcript requirement has no category. Existing demo review originals have manual_review processing mode and no extraction in student document projection.",
+    "Separate conference-core-demo-r1 branches contain reusable extraction/review wiring, but their scenario requirements differ from the live deployment.",
+    "Existing visible reset endpoint restores the demo database; separate conference operator reset deletes selected history. Neither meets the requested narrowly scoped history-preserving reset unchanged.",
+    "No private originals downloaded. No model calls, resets, document uploads, or approvals performed."
+  ],
+  "localChange": "Document action on enrollment next steps now routes directly to existing requirement page; blocked prerequisites and How this works retain existing interactions.",
+  "validation": {
+    "typecheck": "pass",
+    "lint": "pass with 25 existing warnings",
+    "test": "blocked: build prerequisite writes through shared read-only node_modules",
+    "build": "blocked: shared node_modules/.vite-temp is read-only",
+    "browser": "Live baseline inspected; local changes not browser-verified",
+    "paidApiSpendUsd": 0
+  },
+  "remainingAccess": {
+    "backendWritable": false,
+    "localSocketBind": "Operation not permitted",
+    "shellDns": "Name or service not known",
+    "browser": "Intermittent: live inspection succeeded; later snapshot calls require approval while policy is never"
+  },
+  "complete": false
+}

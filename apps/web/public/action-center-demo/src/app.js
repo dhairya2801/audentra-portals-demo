@@ -12,12 +12,16 @@ import {exceptionInfo,documentSheet,filename} from './documents.js';
 const actionDialog=document.querySelector('#action-dialog');
 let actionSubmit=null,dragged=null;
 actionDialog.addEventListener('close',()=>{if(!actionDialog.open){actionDialog.innerHTML='';actionSubmit=null;}});
-function refresh(){document.querySelectorAll('[data-board]').forEach(el=>{const count=el.querySelector('.nav-count');if(count)count.textContent=store.tasks.filter(t=>t.board===el.dataset.board&&t.status!=='completed').length;});renderHeader();renderTools();renderBoard();if(currentTask()&&document.querySelector('#task-dialog').open)renderDetail();}
+function refresh(){if(!currentTask()&&document.querySelector("#task-dialog").open)closeTask();document.querySelectorAll('[data-board]').forEach(el=>{const count=el.querySelector('.nav-count');if(count)count.textContent=store.tasks.filter(t=>t.board===el.dataset.board&&t.status!=='completed').length;});renderHeader();renderTools();renderBoard();if(currentTask()&&document.querySelector('#task-dialog').open)renderDetail();}
 function actionModal(title,subtitle,body,{submitLabel='Save',onSubmit,cls='',tone='primary',footnote='Changes are saved in this browser'}={}){
  actionDialog.className='action-dialog '+cls;
  actionDialog.innerHTML=`<form id="action-form"><header><div><h2 id="action-title">${esc(title)}</h2>${subtitle?`<p>${esc(subtitle)}</p>`:''}</div>${ib('close','Close dialog','close-action')}</header><div class="action-body">${body}<div id="action-error" class="action-error" role="alert"></div></div><footer><span class="muted">${esc(footnote)}</span>${btn(onSubmit?'Cancel':'Close','close-action')}${onSubmit?`<button class="btn ${tone}" type="submit">${esc(submitLabel)}</button>`:''}</footer></form>`;
  actionDialog.querySelectorAll('button[data-action]').forEach(b=>b.type='button');actionSubmit=onSubmit||null;
  if(!actionDialog.open)actionDialog.showModal();
+}
+async function saveFieldDecision(t,id,action,note='') {
+ try{await command(t.id+':decision:'+id,'demo-correct',{documentId:t.actualDocument.id,input:{workItemId:t.id,expectedWorkItemVersion:t.backendVersion,values:{},decisions:{[id]:{action,note}},note:note||'Staff reviewed field against original'}});await refreshIdentities();detail.reviewAction=null;refresh();toast('Field decision saved.');}
+ catch(error){toast(error.message);}
 }
 async function reviewOriginal(t,decision) {
  try {
@@ -25,7 +29,7 @@ async function reviewOriginal(t,decision) {
   const doc=t.actualDocument;
   if(!doc)throw Error('There is no stored document to review.');
   actionModal(decision==='accepted'?'Approve original document':'Request document changes',`${t.key} · ${t.student}`,
-   `<p>${esc(doc.fileName)}</p>${options?field('Reason',`<select name="reason" required>${options.rejectionReasons.map(r=>`<option value="${esc(r.code)}">${esc(r.label)}</option>`).join('')}</select>`):''}${field('Message to the student',`<textarea name="note" aria-label="Review message" rows="4" minlength="3" maxlength="500" required></textarea>`)}<label><input type="checkbox" name="originalReviewed" required> I reviewed the original document. The simulated fields do not determine this decision.</label>`,
+   `<p>${esc(doc.fileName)}</p>${options?field('Reason',`<select name="reason" required>${options.rejectionReasons.map(r=>`<option value="${esc(r.code)}">${esc(r.label)}</option>`).join('')}</select>`):''}${field('Message to the student',`<textarea name="note" aria-label="Review message" rows="4" minlength="3" maxlength="500" required></textarea>`)}<label><input type="checkbox" name="originalReviewed" required> I reviewed the original document. Parsing supports this decision; it does not grant approval.</label>`,
    {submitLabel:decision==='accepted'?'Approve document':'Request changes',footnote:'Saves the decision and notifies the student',onSubmit:async form=>{
     await command(t.id+':review','demo-review',{documentId:doc.id,input:{workItemId:t.id,
       expectedWorkItemVersion:t.backendVersion,decision,note:form.get('note').trim(),
@@ -56,7 +60,7 @@ async function writeActivity(t,body,kind,formElement) {
 }
 function completeTransition(t,to,options={}){try{move(t,to,options);refresh();toast(`${t.key} moved to ${stageFor(t).name}`);}catch(error){toast(error.message);}}
 function transition(t,to){
- if(t.actualDocument){if(to==='completed')void reviewOriginal(t,'accepted');else if(to==='correction')void reviewOriginal(t,'rejected');else if(['clean','exceptions'].includes(to)){processDocument(t);refresh();}else toast('Use the student portal to submit a replacement document.');return;}
+ if(t.actualDocument){if(['clean','exceptions'].includes(to)){action('real-retry');return;}if(to==='completed')void reviewOriginal(t,'accepted');else if(to==='correction')void reviewOriginal(t,'rejected');else if(['clean','exceptions'].includes(to)){processDocument(t);refresh();}else toast('Use the student portal to submit a replacement document.');return;}
  if(!transitionsFor(t).some(a=>a.to===to)){toast('This transition is not available from the current stage.');return;}
  if(t.type==='document'){
   if(to==='completed'){try{approveDocument(t);refresh();toast('Document approved. Requirement satisfied.');}catch(error){detail.tab='workspace';renderDetail();toast(error.message);}return;}
@@ -84,7 +88,7 @@ function demoGuide(){actionModal('A quick tour for your demo','Audentra Action C
 function shellPreview(name){actionModal(name,'Aster University · Staff workspace',`<p>This prototype focuses on the Action Center. ${esc(name)} is shown in the navigation to preserve the surrounding Audentra workspace.</p><p>Open a task and select its student or linked requirement to see the connected context preview.</p>`,{footnote:'Surrounding product navigation is a visual reference'});}
 function action(name){const t=currentTask();if(name.startsWith('transition:')){if(t)transition(t,name.split(':')[1]);return;}if(name.startsWith('shell:')){shellPreview(name.slice(6));return;}
  switch(name){
- case 'process-document':try{processDocument(t);detail.reviewAction=null;refresh();toast('Processing complete. Checks determine the review queue.');}catch(error){toast(error.message);}break;
+ case 'process-document':if(t.actualDocument){action('real-retry');break;}try{processDocument(t);detail.reviewAction=null;refresh();toast('Processing complete. Checks determine the review queue.');}catch(error){toast(error.message);}break;
  case 'real-approve':void reviewOriginal(t,'accepted');break;
  case 'real-reject':void reviewOriginal(t,'rejected');break;
  case 'approve-document':if(t.actualDocument){void reviewOriginal(t,'accepted');break;}try{approveDocument(t);refresh();toast('Document approved. Requirement satisfied.');}catch(error){toast(error.message);}break;
@@ -111,6 +115,8 @@ function action(name){const t=currentTask();if(name.startsWith('transition:')){i
  case 'doc-next':detail.page=t.actualDocument?Math.min(detail.page+1,originalPageCount(t.actualDocument.id)):2;renderMain();break;
  case 'doc-prev':detail.page=Math.max(1,detail.page-1);renderMain();break;
  case 'doc-zoom':detail.zoom=!detail.zoom;renderMain();break;
+ case 'real-upload':actionModal('Upload replacement',`${t.key} · ${t.student}`,field('Document',`<input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required>`),{submitLabel:'Upload for review',onSubmit:async form=>{const file=form.get('file');if(!(file instanceof File)||!file.size)throw Error('Choose a document.');await command(t.id+':upload','demo-upload',{studentId:t.studentRecordId,file,requirementId:t.actualDocument.requirementId||t.requirements[0]?.id,category:t.actualDocument.category,idempotencyKey:crypto.randomUUID()});await refreshIdentities();refresh();toast('Original received for parsing and staff review.');}});break;
+ case 'real-retry':{void command(t.id+':retry','demo-retry',{documentId:t.actualDocument.id}).then(()=>refreshIdentities()).then(()=>{refresh();toast('Parsing queued for the stored original.');}).catch(e=>toast(e.message));break;}
  case 'expand-document':actionModal(filename(t),t.actualDocument?`Uploaded ${date(t.actualDocument.uploadedAt,true)}`:`Version ${t.version} · Page ${detail.page} of 2`,documentSheet(t,detail.page),{cls:'document-expanded',footnote:t.actualDocument?'Original uploaded document':'Mock document preview'});break;
  case 'download-document':{if(t.actualDocument){void downloadOriginal(t.actualDocument).catch(()=>toast('The original could not be downloaded. Please retry.'));break;}const blob=new Blob([`<!doctype html><meta charset="utf-8"><title>${esc(filename(t))}</title><style>body{font-family:Georgia;max-width:650px;margin:40px auto;line-height:1.8}table{width:100%;text-align:left}td{border-bottom:1px solid #ddd}dd{margin-bottom:10px}svg{display:none}.paper-footer{margin-top:30px;color:#888}</style>${documentSheet(t,detail.page)}`],{type:'text/html'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=filename(t).replace('.pdf','.html');link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000);toast('Sample document downloaded as printable HTML.');break;}
  case 'escalate':actionModal('Escalate to the registrar',`${t.key} · ${t.student}`,`${field('Reason for escalation',`<textarea name="note" rows="4" required placeholder="What judgment or policy guidance is needed?">Please review the document exceptions and advise on an acceptable resolution.</textarea>`)}<p>The task stays in its review queue. Sarah Park becomes the assigned specialist; the stage SLA continues.</p>`,{submitLabel:'Escalate',onSubmit:form=>{tick();const old=t.owner;t.owner='SP';t.delegation='Specific team member';t.escalated=true;event(t,`Escalated to Sarah Park: ${form.get('note').trim()}`);event(t,`Assignee changed: ${PEOPLE[old].name} → Sarah Park.`);refresh();toast('Escalated to Sarah Park. Review SLA continues.');}});break;
@@ -131,22 +137,28 @@ document.addEventListener('click',e=>{
  const edge=e.target.closest('[data-transition]');if(edge){transition(currentTask(),edge.dataset.transition);return;}
  const source=e.target.closest('[data-evidence]');if(source){focusReviewField(source.dataset.evidence,false);return;}
  const evidence=e.target.closest('[data-evidence-link]');if(evidence){focusReviewField(evidence.dataset.evidenceLink,true);return;}
- const accept=e.target.closest('[data-review-accept]');if(accept){try{decideField(currentTask(),accept.dataset.reviewAccept,'accept');detail.reviewAction=null;refresh();toast(currentTask().status==='correction'?'Correction sent to student.':'Field accepted.');}catch(error){toast(error.message);}return;}
+ const accept=e.target.closest('[data-review-accept]');if(accept){if(currentTask().actualDocument){void saveFieldDecision(currentTask(),accept.dataset.reviewAccept,'accept');return;}try{decideField(currentTask(),accept.dataset.reviewAccept,'accept');detail.reviewAction=null;refresh();toast(currentTask().status==='correction'?'Correction sent to student.':'Field accepted.');}catch(error){toast(error.message);}return;}
  const correction=e.target.closest('[data-review-correction]');if(correction){detail.reviewAction={id:correction.dataset.reviewCorrection,action:'correction'};renderDetail();focusCorrection();return;}
  const note=e.target.closest('[data-review-note]');if(note){detail.reviewAction={id:note.dataset.reviewNote,action:'accept'};renderDetail();focusCorrection();return;}
- const undo=e.target.closest('[data-review-undo]');if(undo){const t=currentTask();delete reviewFor(t).decisions[undo.dataset.reviewUndo];t.resolved=t.resolved.filter(id=>id!==undo.dataset.reviewUndo);tick();event(t,`Field decision reopened: ${undo.dataset.reviewUndo}.`);refresh();return;}
+ const undo=e.target.closest('[data-review-undo]');if(undo){const t=currentTask();if(t.actualDocument){void saveFieldDecision(t,undo.dataset.reviewUndo,'undo');return;}delete reviewFor(t).decisions[undo.dataset.reviewUndo];t.resolved=t.resolved.filter(id=>id!==undo.dataset.reviewUndo);tick();event(t,`Field decision reopened: ${undo.dataset.reviewUndo}.`);refresh();return;}
  const edit=e.target.closest('[data-review-edit]');if(edit){detail.reviewEdit=edit.dataset.reviewEdit;renderDetail();document.querySelector(`[data-document-value="${detail.reviewEdit}"]`).focus();return;}
  const requestAction=e.target.closest('[data-request-action]');if(requestAction){try{runRequestAction(currentTask(),requestAction.dataset.requestAction);refresh();toast('Action completed with sample evidence.');}catch(error){toast(error.message);}return;}
  const simulation=e.target.closest('[data-simulate]');if(simulation){try{simulateResolution(currentTask(),simulation.dataset.simulate);refresh();toast('Resolution trigger simulated; history updated.');}catch(error){toast(error.message);}return;}
  if(e.target.closest('[data-create-status]'))createTask();
 });
 document.addEventListener('input',e=>{if(e.target.name==='portalMessage')drafts.set(currentTask().id,e.target.value);if(e.target.id==='board-search'){view.q=e.target.value;renderBoard();document.querySelector('.clear-filters').classList.toggle('invisible',!view.q&&view.quick==='all'&&view.owner==='all'&&view.priority==='all'&&view.category==='all');}if(e.target.name==='comment')detail.commentDrafts[detail.key]=e.target.value;if(e.target.id==='request-guidance'){requestState(currentTask()).draft=e.target.value;save();}});
-document.addEventListener('change',e=>{
+document.addEventListener('change',async e=>{
  const map={'filter-quick':'quick','filter-owner':'owner','filter-category':'category','filter-priority':'priority','filter-group':'group','filter-sort':'sort'};
  if(map[e.target.id]){view[map[e.target.id]]=e.target.value;renderTools();renderBoard();return;}
  const t=currentTask();if(!t)return;
  if(e.target.id==='review-mode'){try{setReviewMode(t,e.target.value);renderDetail();}catch(error){toast(error.message);}return;}
- if(e.target.matches('[data-document-value]')){try{setDocumentValue(t,e.target.dataset.documentValue,e.target.value);setTimeout(()=>{if(currentTask()?.key!==t.key)return;const active=document.activeElement?.dataset.documentValue;renderDetail();if(active)document.querySelector(`[data-document-value="${active}"]`)?.focus();},0);}catch(error){toast(error.message);}return;}
+ if(e.target.matches('[data-document-value]')){if(t.actualDocument){
+  const input=e.target,value=input.value,id=input.dataset.documentValue;
+  input.disabled=true;
+  try{await command(t.id+':field:'+id,'demo-correct',{documentId:t.actualDocument.id,input:{workItemId:t.id,expectedWorkItemVersion:t.backendVersion,values:{[id]:value},note:'Staff correction after reviewing original'},idempotencyKey:crypto.randomUUID()});await refreshIdentities();detail.reviewEdit=null;refresh();toast('Document value saved.');}
+  catch(error){toast(error.message+' Your entry is retained; retry the edit.');input.disabled=false;input.value=value;input.focus();}
+  return;
+ }try{setDocumentValue(t,e.target.dataset.documentValue,e.target.value);setTimeout(()=>{if(currentTask()?.key!==t.key)return;const active=document.activeElement?.dataset.documentValue;renderDetail();if(active)document.querySelector(`[data-document-value="${active}"]`)?.focus();},0);}catch(error){toast(error.message);}return;}
  if(e.target.id==='request-operator'){requestState(t).operator=e.target.value;tick();event(t,`Request action operator changed to ${e.target.value==='agent'?'EDgent':'staff'}.`);renderMain();return;}
  if(e.target.id==='request-resolution-rule'){requestState(t).rule=e.target.value;save();renderMain();return;}
 
@@ -161,7 +173,7 @@ document.addEventListener('submit',async e=>{
  if(e.target.id==='connected-message-form'){await writeActivity(t,form.get('portalMessage'),'message',e.target);return;}
  if(e.target.id==='comment-form'&&t.workItemId){await writeActivity(t,form.get('comment'),'note',e.target);return;}
  if(e.target.id==='request-guidance-form'&&t.workItemId){await writeActivity(t,form.get('guidance'),'message',e.target);return;}
- if(e.target.matches('.field-decision-form')){try{decideField(t,e.target.dataset.field,e.target.dataset.decision,form.get('reason'));detail.reviewAction=null;refresh();toast(t.status==='correction'?'Correction sent. Student SLA started.':'Field decision recorded.');}catch(error){toast(error.message);}return;}
+ if(e.target.matches('.field-decision-form')){if(t.actualDocument){await saveFieldDecision(t,e.target.dataset.field,e.target.dataset.decision,form.get('reason'));return;}try{decideField(t,e.target.dataset.field,e.target.dataset.decision,form.get('reason'));detail.reviewAction=null;refresh();toast(t.status==='correction'?'Correction sent. Student SLA started.':'Field decision recorded.');}catch(error){toast(error.message);}return;}
  if(e.target.id==='request-guidance-form'){try{sendGuidance(t,form.get('guidance'));refresh();toast('Guidance sent locally. Resolution rule armed.');}catch(error){toast(error.message);}return;}
  if(e.target.id==='override-form'){try{simulateResolution(t,'override',form.get('evidence'));t.showOverride=false;refresh();toast('Override recorded with evidence.');}catch(error){toast(error.message);}return;}
  if(e.target.id==='comment-form'){const text=form.get('comment').trim();if(!text)return;tick();event(t,text,'comment','ML',{visibility:BOARDS[t.board].team});detail.commentDrafts[t.key]='';renderDetail();toast('Comment added.');}

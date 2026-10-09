@@ -597,6 +597,7 @@ dialog.pop::backdrop{background:var(--scrim);backdrop-filter:blur(3px)}
 
 <link rel="stylesheet" href="canonical-plan.css">
 <link rel="stylesheet" href="../portal-theme/financials.css">
+<link rel="stylesheet" href="meeting-refresh.css">
 </head>
 <body class="portal-refresh">
 <div class="app-shell">
@@ -626,8 +627,6 @@ dialog.pop::backdrop{background:var(--scrim);backdrop-filter:blur(3px)}
         <div class="summary-alert"><div class="action-band" id="band"></div></div>
       </section>
 
-      <nav class="group-tabs" id="tabs" aria-label="My Financials sections"></nav>
-      <label class="mobile-financial-nav">Financial Plan<select id="mobile-financial-section" onchange="location.hash=this.value"><option value="overview">Overview</option><option value="payments">Payments · Out of pocket</option><option value="expenses">Expenses</option><option value="aid">Loans & aid · What you receive</option></select></label>
       <div id="tab-root"></div>
 
       <footer class="page-foot"><span>My Financials · Aster University · campus images are illustrative</span><span>Posted account facts and student planning estimates are shown separately.</span></footer>
@@ -661,5 +660,6 @@ const esc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replac
 
 
 </script>
+<script src="meeting-feedback.js"></script>
 <script src="canonical-plan.js"></script>
 </body></html>

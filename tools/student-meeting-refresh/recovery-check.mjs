@@ -1,0 +1,52 @@
+// Failure paths use browser-only interception. No canonical data is changed.
+import {chromium, expect} from '@playwright/test';
+const base=process.env.STUDENT_PORTAL_URL || 'http://localhost:3012';
+if(!['localhost','127.0.0.1'].includes(new URL(base).hostname)) throw new Error('Local portal required.');
+const browser=await chromium.launch({channel:'chrome'});
+const page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce',storageState:process.env.STUDENT_SESSION || '/tmp/student-refresh-session.json'});
+try {
+ await page.route('**/v1/student/financial-plan',route=>route.fulfill({status:503,json:{error:{code:'unavailable',message:'Unavailable'}}}));
+ await page.goto(base+'/financials');
+ const frame=page.frameLocator('iframe');
+ await expect(frame.getByRole('alert')).toContainText('Your financial plan is unavailable');
+ await page.unroute('**/v1/student/financial-plan');
+ await frame.getByRole('button',{name:'Retry',exact:true}).click();
+ await expect(frame.locator('#budget-form')).toBeVisible();
+ console.log('PASS financial read failure and retry');
+ let submitted;
+ await page.route('**/v1/student/financial-plan/inputs',async route=>{submitted=route.request().postDataJSON();await route.fulfill({status:409,json:{error:{code:'version_conflict',message:'A newer version is available'}}});});
+ await frame.getByRole('spinbutton',{name:'Books & supplies amount'}).fill('725');
+ await frame.getByRole('button',{name:'Save term estimates'}).click();
+ await expect(frame.locator('#budget-status')).toContainText('draft is retained');
+ await expect(frame.getByRole('spinbutton',{name:'Books & supplies amount'})).toHaveValue('725');
+ expect(submitted.expectedVersion).toBeDefined();
+ expect(submitted.inputs.booksCents).toBe(72500);
+ console.log('PASS budget conflict preserves draft and sends expected version');
+ await page.goto(base+'/appointments');
+ await page.getByRole('button',{name:'Find a time'}).first().click();
+ await page.getByRole('group',{name:'Available times'}).getByRole('button').first().click();
+ await page.getByRole('dialog').locator('textarea').fill('Retain this topic after a booking conflict');
+ await page.route('**/v1/student/appointments',async route=>route.request().method()==='POST'?route.fulfill({status:409,json:{error:{code:'slot_unavailable',message:'This time was just booked. Choose another time.'}}}):route.continue());
+ await page.getByRole('button',{name:'Book this time'}).click();
+ await expect(page.getByRole('dialog')).toContainText(/This time was just booked|no longer|already/);
+ await expect(page.getByRole('dialog').locator('textarea')).toHaveValue('Retain this topic after a booking conflict');
+ await page.keyboard.press('Escape');
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ console.log('PASS booking conflict retains topic without false confirmation');
+ await page.route('**/v1/student/appointments/availability?*', async route => {
+   const response=await route.fetch(), data=await response.json();
+   data.staff=[data.staff[0], {...data.staff[0], id:'ui-preview-adviser', name:'Demo Adviser'}];
+   await route.fulfill({response,json:data});
+ });
+ await page.getByRole('button',{name:'Find a time'}).first().click();
+ await page.getByRole('button',{name:'Next dates'}).click();
+ await page.getByRole('radio',{name:/Demo Adviser/}).click();
+ await expect(page.getByRole('button',{name:'Previous dates'})).toBeDisabled();
+ await expect(page.locator('.booking-date-grid [aria-pressed=true]')).toBeVisible();
+ console.log('PASS switching advisers resets date pagination');
+ await page.keyboard.press('Escape');
+ await page.goto(base+'/appointments?topic=financial_aid');
+ await expect(page.getByRole('dialog').getByRole('heading',{name:'Financial aid',exact:true})).toBeVisible();
+ await page.getByRole('group',{name:'Available times'}).waitFor();
+ console.log('PASS financial contact link opens the requested booking service');
+} finally {await page.unrouteAll({behavior:'wait'});await browser.close();}

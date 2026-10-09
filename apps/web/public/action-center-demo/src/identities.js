@@ -35,7 +35,7 @@ export function boardRequest(operation, payload, signal) {
 }
 export async function loadIdentities() {
   snapshot = await boardRequest('demo-identities');
-  if (!snapshot?.cards?.length || !snapshot.staff?.id) throw new Error('The demo board has not been configured.');
+  if (!Array.isArray(snapshot?.cards) || !snapshot.staff?.id) throw new Error('The demo board has not been configured.');
   PEOPLE.ML = {name:snapshot.staff.name, role:snapshot.staff.title || snapshot.staff.component,
     color:'purple', initials:snapshot.staff.name.split(' ').map(part => part[0]).slice(0,2).join('')};
 }
@@ -92,7 +92,9 @@ export function identityTasks(previews = []) {
       }
       if (doc.status === 'accepted') {task.status = 'completed';task.due=null;}
       else if (doc.status === 'rejected') task.status = 'correction';
-      else if (['completed','correction','requested','resubmitted'].includes(task.status)) task.status = 'processing';
+      else if (['uploaded','processing'].includes(doc.status)||doc.extraction?.status==='pending_staff') task.status = 'processing';
+      else task.status = doc.checks?.length && doc.checks.every(check => check.status === 'pass') ? 'clean' : 'exceptions';
+      task.category = {transcript:'Transcript',identity:'Identity / passport',health:'Immunization',financial_aid:'Financial aid'}[doc.category] || 'Document';
       task.correctionNote = doc.decisions?.[0]?.note || '';
     } else delete task.actualDocument;
     task.requirements = card.requirements || [];
@@ -102,7 +104,7 @@ export function identityTasks(previews = []) {
       text:e.message,at:e.createdAt,kind:e.action==='commented'?'comment':e.action==='communication_recorded'?'communication':'history'}));
     if (!task.activity.length) task.activity = [{who:'ML',text:'Task assigned to '+snapshot.staff.name,at:card.createdAt,kind:'history'}];
     // Canonical operational fields override cached preview values, including
-    // confirmed Edward edits. Workflow stages and parser previews remain mock.
+    // confirmed Edward edits. Document stages and evidence come from the canonical document.
     task.updated = card.updatedAt;
     task.priority = card.priority[0].toUpperCase()+card.priority.slice(1);
     task.due = card.dueAt;
@@ -119,3 +121,5 @@ export function identityTasks(previews = []) {
 export function identityStorageKey() {
   return snapshot ? `audentra.demo-board.preview:${snapshot.scenarioVersion}:${snapshot.staff.id}` : null;
 }
+
+export function identitiesReady() { return !!snapshot?.staff?.id && Array.isArray(snapshot.cards); }

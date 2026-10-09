@@ -179,7 +179,7 @@ export function PulseCard({
   level: BrewDetailLevelId;
   readerFirstName: string;
   onOpen?: () => void;
-  onAskEdward?: () => void;
+  onAskEdward?: (comparison: BrewKpiComparison | null) => void;
 }) {
   const [comparisonIndex, setComparisonIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -217,7 +217,7 @@ export function PulseCard({
         <button className="brew-stretch" type="button" onClick={onOpen}>
           {kpi.label}
         </button>
-        <EdwardButton label={edwardKpiGreeting(readerFirstName, kpi.label)} onClick={onAskEdward} />
+        <EdwardButton label={edwardKpiGreeting(readerFirstName, kpi.label)} onClick={() => onAskEdward?.(current)} />
       </span>
 
       <span className="brew-kpi__figure">
@@ -344,7 +344,7 @@ export function InstitutionalPulse({
   readerFirstName: string;
   onOpenKpi: (id: string) => void;
   /** Edward, opened on one figure rather than on the funnel. */
-  onAskEdwardFor: (kpi: BrewKpi) => void;
+  onAskEdwardFor: (kpi: BrewKpi, comparison: BrewKpiComparison | null) => void;
   refreshedAt: string;
 }) {
   const [reelTrack, reel] = useReel();
@@ -397,7 +397,7 @@ export function InstitutionalPulse({
             level={level}
             readerFirstName={readerFirstName}
             onOpen={() => onOpenKpi(kpi.id)}
-            onAskEdward={() => onAskEdwardFor(kpi)}
+            onAskEdward={(comparison) => onAskEdwardFor(kpi, comparison)}
             key={kpi.id}
           />
         ))}

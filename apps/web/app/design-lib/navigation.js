@@ -163,7 +163,7 @@ export const DESTINATIONS = [
 
   {
     id: 'financials-overview',
-    label: 'Overview',
+    label: 'Financial Overview',
     route: '/financials',
     icon: 'wallet',
     group: 'financials',
@@ -175,7 +175,7 @@ export const DESTINATIONS = [
   },
   {
     id: 'financials-aid',
-    label: 'Loans & aid',
+    label: 'Aid and Loans',
     route: '/financials/aid',
     icon: 'award',
     group: 'financials',
@@ -191,7 +191,7 @@ export const DESTINATIONS = [
   {
     id: 'financials-payments',
     label: 'Payments',
-    route: '/payments',
+    route: '/financials/payments',
     icon: 'card',
     group: 'financials',
     lede: 'What Aster bills you, when each payment is due, and what it has recorded.',
@@ -468,7 +468,7 @@ export const NAV = [
     kind: 'group',
     id: 'financials',
     label: GROUPS.financials,
-    items: ['financials-overview', 'financials-payments', 'financials-expenses', 'financials-aid'],
+    items: ['financials-overview', 'financials-aid', 'financials-payments', 'financials-expenses'],
   },
   { kind: 'group', id: 'campus', label: GROUPS.campus, items: ['events', 'clubs'] },
 ];

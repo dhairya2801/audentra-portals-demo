@@ -14,7 +14,7 @@ export function ResetDemo() {
     const controller = new AbortController();
     void getDemoResetStatus(controller.signal).then(result => setEnabled(result.enabled)).catch(() => {});
     const onReset = (event: StorageEvent) => {
-      if (event.key === "audentra:demo-reset") window.location.assign("/staff");
+      if (event.key === "audentra:demo-reset") window.dispatchEvent(new Event("focus"));
     };
     window.addEventListener("storage", onReset);
     return () => { controller.abort(); window.removeEventListener("storage", onReset); };
@@ -31,12 +31,14 @@ export function ResetDemo() {
       return;
     }
     try {
-      for (const key of Object.keys(localStorage)) {
-        if (key.startsWith("audentra.demo-board.preview:")) localStorage.removeItem(key);
-      }
       localStorage.setItem("audentra:demo-reset", String(Date.now()));
     } catch { /* Storage is optional; the server has already restored the demo. */ }
-    window.location.assign("/staff");
+    dialog.current?.close();
+    setPending(false);
+    window.dispatchEvent(new Event("focus"));
+    document.querySelector<HTMLIFrameElement>("#approved-task-board")?.contentWindow?.postMessage(
+      {type: "audentra:board:invalidate"}, window.location.origin,
+    );
   }
 
   if (!enabled) return null;
@@ -45,9 +47,8 @@ export function ResetDemo() {
     <dialog ref={dialog} className={styles.dialog} aria-labelledby="reset-demo-title"
       onCancel={event => { if (pending) event.preventDefault(); }}>
       <h2 id="reset-demo-title">Start a fresh demo?</h2>
-      <p>This restores the saved starting state for both Ada and Camila, including steps, points,
-        uploads, reviews, messages, and financial changes made during this demo.</p>
-      <p>Everyone using this demo will need to sign in again. Changes since the starting state will be discarded.</p>
+      <p>This returns Ada’s configured transcript, identity/passport, immunization and financial-aid document requirements to pending and removes their review cards.</p>
+      <p>Other students, unrelated tasks and next steps are preserved. Original documents and review history remain on file; you stay signed in.</p>
       {error && <p role="alert">{error}</p>}
       <div className={styles.actions}>
         <button type="button" disabled={pending} onClick={() => dialog.current?.close()}>Cancel</button>
@@ -55,7 +56,7 @@ export function ResetDemo() {
           {pending ? "Resetting…" : "Reset demo"}
         </button>
       </div>
-      {pending && <p role="status">Restoring the demo. Please keep this page open.</p>}
+      {pending && <p role="status">Resetting Ada’s document requirements. Please keep this page open.</p>}
     </dialog>
   </div>;
 }

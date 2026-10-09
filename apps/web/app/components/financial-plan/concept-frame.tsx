@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { PortalShell, type PortalSection } from "../portal-shell";
 import { openEdward } from "../../design-lib/door.js";
-import { getFinancialPlan, saveFinancialPlanInputs, simulateFinancialPlan } from "../../lib/api-client";
+import { getFinancialPlan, getStudentHousingPlan, getStudentAdvising, saveFinancialPlanInputs, simulateFinancialPlan } from "../../lib/api-client";
 import { useTenant } from "../tenant-provider";
 import {
   conceptRoutes,
@@ -18,7 +18,7 @@ const documentUrl = "/financial-plan/concept-4-plan-studio.html";
  * shell, route navigation and live Edward assistant. */
 export function ConceptFinancialPlan() {
   const pathname = usePathname() || "/financials";
-  const { href } = useTenant();
+  const { href, tenant } = useTenant();
   const frame = useRef<HTMLIFrameElement>(null);
   const detach = useRef<(() => void) | null>(null);
   // Keep one document alive across financial routes so the concept retains its state.
@@ -61,7 +61,7 @@ export function ConceptFinancialPlan() {
           if (target !== frame.current?.contentWindow) return;
           target.postMessage({type: "financial-plan:response", id, result, error}, window.location.origin);
         }, 0);
-        const operation = event.data.operation === "read" ? getFinancialPlan()
+        const operation = event.data.operation === "read" ? Promise.all([getFinancialPlan(),getStudentHousingPlan().catch(()=>null),getStudentAdvising().catch(()=>null)]).then(([result,housing,advising])=>({...result,presentation:{contacts:tenant.contacts,institution:tenant.shortName,housingPreference:housing?.preference,financialAdviser:advising?.advisers.find(entry=>entry.role==="financial_aid_counselor")?.staff}}))
           : event.data.operation === "simulate" ? simulateFinancialPlan(event.data.payload)
           : event.data.operation === "save-inputs" ? saveFinancialPlanInputs(event.data.payload, event.data.idempotencyKey)
           : Promise.reject(new Error("This planning operation is unavailable"));
@@ -84,7 +84,7 @@ export function ConceptFinancialPlan() {
       window.removeEventListener("hashchange", synchronizeFrame);
       detach.current?.();
     };
-  }, []);
+  }, [tenant]);
 
   function connectDocument() {
     detach.current?.();

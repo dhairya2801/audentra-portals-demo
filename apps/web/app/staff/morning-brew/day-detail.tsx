@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { DraftContext } from "./draft-context";
+import { PrepFeedback } from "./prep-feedback";
 import { Avatar, EdwardButton } from "./cards";
 import {
   CalendarThumbnail,
@@ -122,17 +124,28 @@ function RelatedContext({
                 className="brew-context-card"
                 type="button"
                 onClick={() =>
-                  request.id === id
-                    ? setAttachment(attachment === "thread" ? null : "thread")
-                    : onOpen({ kind: "request", id: request.id })
+                  setAttachment(attachment === "thread" ? null : "thread")
                 }
               >
                 <ThreadThumbnail request={request} />
                 <span className="brew-context-card__label">
                   <i className="brew-file-mark is-mail">MAIL</i>
                   <span>
-                    <strong>Scholarship reallocation conversation</strong>
-                    <small>Email</small>
+                    <strong>{request.subject}</strong>
+                    <small>
+                      Sent date: not supplied. Received:{" "}
+                      {emailPresentation(request).receivedAt
+                        ? new Date(
+                            emailPresentation(request).receivedAt!,
+                          ).toLocaleString("en-US", {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                            timeZone: "America/New_York",
+                          }) + " ET (demo timestamp)"
+                        : "not supplied"}
+                    </small>
+                    <small>From: {request.fromName} · CC: not supplied</small>
+                    <small>{request.summary}</small>
                   </span>
                 </span>
               </button>
@@ -142,9 +155,7 @@ function RelatedContext({
                 className="brew-context-card"
                 type="button"
                 onClick={() =>
-                  meeting.id === id
-                    ? setAttachment(attachment === "meeting" ? null : "meeting")
-                    : onOpen({ kind: "meeting", id: meeting.id })
+                  setAttachment(attachment === "meeting" ? null : "meeting")
                 }
               >
                 <CalendarThumbnail meeting={meeting} />
@@ -152,7 +163,25 @@ function RelatedContext({
                   <i className="brew-file-mark is-calendar">CAL</i>
                   <span>
                     <strong>{meeting.title}</strong>
-                    <small>Calendar</small>
+                    <small>
+                      {new Date(briefing.updatedAt).toLocaleDateString(
+                        "en-US",
+                        { dateStyle: "medium", timeZone: "America/New_York" },
+                      )}{" "}
+                      · {meeting.timeLabel} ET · {meeting.durationMinutes} min
+                    </small>
+                    <small>Attendees: {meeting.attendees.join(", ")}</small>
+                    <small>
+                      Repeats:{" "}
+                      {meeting.id === "m-leadership-huddle"
+                        ? "Weekly on weekdays (demo record)"
+                        : "not supplied"}
+                      . Last / next occurrence: not supplied.
+                    </small>
+                    <small>
+                      Agenda: {meeting.detail}. Discussion summary: not
+                      supplied.
+                    </small>
                   </span>
                 </span>
               </button>
@@ -216,7 +245,9 @@ function DraftPanel({
   onRevision,
   sent,
   onSend,
+  context,
 }: {
+  context?: React.ReactNode;
   id: string;
   heading: string;
   title: string;
@@ -281,6 +312,7 @@ function DraftPanel({
           setCopyStatus("");
         }}
       />
+      {context}
       {onSend ? (
         <form
           className="brew-draft-composer"
@@ -291,8 +323,8 @@ function DraftPanel({
         >
           <div>
             <input
-              aria-label="Say what to change"
-              placeholder="Say what to change"
+              aria-label="What to change"
+              placeholder="What to change"
               value={instruction}
               onChange={(event) => setInstruction(event.target.value)}
             />
@@ -302,7 +334,7 @@ function DraftPanel({
                 type="submit"
                 aria-label="Ask Edward to revise draft"
               >
-                <Glyph name="arrow" size={16} />
+                <span aria-hidden="true">↑</span>
               </button>
             ) : null}
           </div>
@@ -498,6 +530,23 @@ export function DayDetail({
           onAskEdward={ask}
           sent={replies[item.id]}
           onSend={request ? onDemoReply : undefined}
+          context={
+            request ? (
+              <DraftContext
+                key={request.id}
+                request={request}
+                briefing={briefing}
+                draft={drafts[item.id] ?? request.draftReply}
+                onChange={(text) => onDraftChange(item.id, text)}
+              />
+            ) : (
+              <PrepFeedback
+                key={item.id}
+                subjectId={item.id}
+                snapshotAt={briefing.updatedAt}
+              />
+            )
+          }
         />
       }
       footer={

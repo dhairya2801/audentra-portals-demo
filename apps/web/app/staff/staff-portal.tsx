@@ -4382,20 +4382,25 @@ function StaffSidebar({
                   aria-current={view === item.id ? "page" : undefined}
                   title={
                     item.badge === "tasks"
-                      ? `${openTasks.toLocaleString()} open task${openTasks === 1 ? "" : "s"} assigned to you${
+                      ? `${openTasks.toLocaleString()} open task${openTasks === 1 ? "" : "s"} ${demoBoard ? "across the demo boards" : "assigned to you"}${
                           institutionOpen !== null
                             ? ` · ${institutionOpen.toLocaleString()} open across the institution`
                             : ""
                         }`
                       : undefined
                   }
-                  onClick={() => navigate(item.id)}
+                  onClick={() => {
+                    if (demoBoard && item.id === "tasks") {
+                      document.querySelector<HTMLIFrameElement>("#approved-task-board")?.contentWindow?.postMessage({ type: "audentra:approved-board:show-board" }, window.location.origin);
+                    }
+                    navigate(item.id);
+                  }}
                   key={item.id}
                 >
                   <span aria-hidden="true">{item.id === "edward" ? item.icon : <Icon name={item.icon} size={18} />}</span>
                   <strong>{item.label}</strong>
                   {badge > 0 ? (
-                    <i aria-label={item.badge === "tasks" ? `${badge} assigned to you` : undefined}>
+                    <i aria-label={item.badge === "tasks" ? `${badge} ${demoBoard ? "open across the demo boards" : "assigned to you"}` : undefined}>
                       {badge}
                     </i>
                   ) : null}
@@ -4752,7 +4757,7 @@ function StaffWorkspaceShell({
       <StaffSidebar view={view} workspace={workspace} navigate={navigate} />
       <main className="staff-main staff-main--workspace">
         {view === "morning_brew" ? (
-          <MorningBrewView workspace={workspace} navigate={navigate} />
+          <MorningBrewView workspace={workspace} navigate={navigate} subscribeToRealtimeInvalidation={subscribeToRealtimeInvalidation} />
 
         ) : view === "tasks" ? (
           <ApprovedTaskBoard

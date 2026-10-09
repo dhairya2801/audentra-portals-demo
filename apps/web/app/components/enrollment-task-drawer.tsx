@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import type { StudentRequirementDetail } from "@vv/contracts";
+import { displayedTaskPoints } from "./student-ui-preview";
 import Icon from "../design-system/Icon.jsx";
 import Drawer from "../design-system/primitives/Drawer.jsx";
 import Tooltip from "../design-system/primitives/Tooltip.jsx";
@@ -10,6 +12,7 @@ import {
   actionLabel,
   daysClause,
   dueShort,
+  estimatedMinutes,
   iconOf,
   kindOf,
   requirementHref,
@@ -46,10 +49,11 @@ export function EnrollmentTaskDrawer({
   onView: (item: StudentRequirementDetail) => void;
 }) {
   const { tenant } = useTenant();
+  const [sample, setSample] = useState(false);
   const kind = kindOf(item);
   const due = dueShort(item, tenant);
   const clause = daysClause(item);
-  const points = item.reward?.points ?? 0;
+  const points = displayedTaskPoints(item);
   const office = item.responsibleOffice || "your enrollment team";
   const steps = stepsOf(item);
   const action = actionLabel(item);
@@ -81,6 +85,7 @@ export function EnrollmentTaskDrawer({
 
   return (
     <Drawer
+      variant="enrollment-task"
       label={[item.responsibleOffice || "Enrollment", due ? `Due ${due}` : "No deadline"]}
       titleId="drawer-title"
       closeLabel="Close task"
@@ -92,6 +97,7 @@ export function EnrollmentTaskDrawer({
       </div>
       <h2 id="drawer-title">{item.title}</h2>
       <p className="drawer-description">{item.description}</p>
+      <div className="task-detail-facts"><span><Icon name="clock" size={15} /> About {estimatedMinutes(item)} minutes</span><span><Icon name="calendar" size={15} /> {due ? `Due ${due}` : "At your pace"}</span></div>
       {item.blocking && <GateChip />}
 
       {rewardsOn && points > 0 && (
@@ -99,7 +105,7 @@ export function EnrollmentTaskDrawer({
           <div>
             <Icon name="spark" size={18} />
             <span>
-              <strong>Earn {points} points today</strong>
+              <strong>{`Earn ${points} points today`}</strong>
             </span>
           </div>
           <Tooltip tip="How points work">
@@ -110,6 +116,7 @@ export function EnrollmentTaskDrawer({
         </div>
       )}
 
+      {item.submissionType === "document" && (item.documentCategory === "transcript" || /transcript/i.test(item.title)) && <div className="sample-transcript"><span className="panel-label">DEMO ONLY · FICTIONAL DOCUMENT</span><h3>Try a sample transcript.</h3><p>Explore the upload result without finding or sharing a personal file.</p>{sample ? <div className="sample-transcript-result"><Icon name="check" size={20}/><span><strong>Sample transcript ready for review</strong><small>Example University · 24 credits · no document uploaded or task completed.</small></span></div> : <button type="button" className="secondary-button" onClick={()=>setSample(true)}>Use sample transcript →</button>}</div>}
       <div className="drawer-tabs" role="tablist">
         <button
           type="button"

@@ -26,7 +26,7 @@ import ts from "typescript";
  * a data: URL cannot resolve a relative specifier.
  */
 const SOURCE_DIR = new URL("../app/staff/morning-brew/", import.meta.url);
-const MODULES = ["data", "catalog", "demo-brew", "news", "preferences", "types", "presentation", "edward-context"];
+const MODULES = ["data", "catalog", "demo-brew", "news", "preferences", "types", "presentation", "edward-context", "email-context"];
 
 let compiledDir = null;
 
@@ -609,4 +609,50 @@ test("every Brew card supplies navigation scope without sending demo evidence or
       assert.ok(!("students" in opening.context));
     }
   }
+});
+
+
+test("MB-02 counts unique eligible messages with exclusive precedence", async () => {
+  const { briefEmailCounts, briefEmailCategory } = await importMorningBrewModule("presentation");
+  const { demoBrewSource } = await loadCorpus();
+  const requests = demoBrewSource().requests;
+  const counts = briefEmailCounts([...requests, requests[0]]);
+  assert.equal(counts.total, counts.important + counts.pending + counts.waiting);
+  assert.deepEqual(counts, { important: 4, pending: 4, waiting: 0, total: 8 });
+  assert.equal(briefEmailCategory({...requests[0], status:"waiting_on_student", important:true, unread:true}), "waiting");
+  assert.equal(briefEmailCategory({...requests[0], status:"resolved"}, true), null);
+  const after = briefEmailCounts(requests, {[requests[0].id]: "Demo reply"});
+  assert.equal(after.total, counts.total);
+  assert.equal(after.waiting, 1);
+  assert.equal(after.important, counts.important - 1);
+});
+
+test("MB-12 Pulse context preserves the active comparison and displayed figures", async () => {
+  const { brewEdwardOpening } = await importMorningBrewModule("edward-context");
+  const { demoBrewSource } = await loadCorpus();
+  const source = demoBrewSource(), metric = source.kpis[0];
+  const selected = metric.comparisons.at(-1);
+  const opening = brewEdwardOpening({mode:"ask",context:metric.label,sourceId:metric.id,pulseComparison:selected}, {...source, updatedAt:source.generatedAt}, null);
+  const shown = opening.context.displayedPulse;
+  assert.equal(shown.value, metric.display);
+  assert.equal(shown.target, metric.targetDisplay);
+  assert.equal(shown.period, metric.window);
+  assert.ok(shown.comparison.includes(selected.label));
+  assert.deepEqual(opening.context.cohort, metric.cohort);
+});
+
+test("MB-16 meeting detection and proposals preserve the draft without claiming availability", async () => {
+  const { detectsMeetingRequest, relatedMeetings, meetingStart, proposalDraft } = await importMorningBrewModule("email-context");
+  const { demoBrewSource } = await loadCorpus();
+  const source = demoBrewSource(), briefing = {...source,updatedAt:source.generatedAt};
+  const request = source.requests.find(r=>r.subject.includes("1:1"));
+  assert.ok(detectsMeetingRequest(request));
+  assert.equal(detectsMeetingRequest({...request,subject:"Tuition review",summary:"Please reply with your decision"}), false);
+  const meeting = relatedMeetings(request,briefing)[0];
+  assert.ok(meeting.title.includes("Provost"));
+  assert.equal(meetingStart(meeting,briefing.updatedAt).toISOString(), "2025-05-20T19:30:00.000Z");
+  const text = proposalDraft("Keep my carefully edited reply", "2025-05-20T15:30");
+  assert.ok(text.startsWith("Keep my carefully edited reply"));
+  assert.ok(text.includes("availability has not been checked"));
+  assert.equal(proposalDraft(text, "2025-05-20T16:00").split("Proposed time:").length, 2);
 });

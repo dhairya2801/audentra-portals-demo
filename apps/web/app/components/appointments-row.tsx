@@ -1,5 +1,7 @@
 "use client";
 
+import { StaffAvatar } from "./staff-avatar";
+
 import type { StudentAppointment } from "@vv/contracts";
 import Icon from "../design-system/Icon.jsx";
 import Button from "../design-system/primitives/Button.jsx";
@@ -7,6 +9,7 @@ import type { TenantConfig } from "../lib/tenant";
 import {
   type ConversationType,
   calendarHref,
+  meetingHref,
   clockTime,
   dateTile,
   stateOf,
@@ -51,6 +54,7 @@ export function AppointmentsRow({
 
         <div className="campus-row-copy">
           <span className="campus-row-when">
+            {appointment.staff && <StaffAvatar person={appointment.staff} size="xs"/>}
             {clockTime(appointment.startsAt, tenant)}
             <i aria-hidden="true">·</i>
             {whoLabel(appointment)}
@@ -72,6 +76,7 @@ export function AppointmentsRow({
         <div className="task-action">
           <span className={`appt-state ${state.tone}`}>{state.label}</span>
 
+          {state.tone === "confirmed" && meetingHref(appointment) && <a className="primary-button" href={meetingHref(appointment)!} target="_blank" rel="noopener noreferrer">Join meeting ↗</a>}
           {state.tone === "confirmed" && (
             <a className="secondary-button" href={calendarHref(appointment, type)} download="appointment.ics">
               <Icon name="calendar" size={16} /> Add to calendar

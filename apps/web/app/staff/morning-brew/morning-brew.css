@@ -2032,3 +2032,398 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Spreadsheet MB-02, MB-09, MB-13–18, MB-21/25/26. Intelligence styles remain unchanged. */
+.brew-email-counts {
+  display: grid;
+  gap: 5px;
+  margin: 10px 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #ece8ff;
+}
+.brew-email-counts > span {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+.brew-email-counts b {
+  font-size: 12px;
+  color: white;
+  min-width: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.brew-team-notice,
+.brew-provisional {
+  margin: 0 18px 15px;
+  padding: 12px 14px;
+  border: 1px solid #e2dcf5;
+  border-radius: 9px;
+  background: #faf9fd;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #655b79;
+}
+.brew-team-notice strong,
+.brew-team-notice span {
+  display: block;
+}
+.brew-provisional {
+  margin: 0 0 14px;
+}
+.brew-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.brew-draft-composer {
+  display: flex !important;
+  flex-direction: column;
+  align-items: stretch !important;
+  gap: 16px !important;
+}
+.brew-draft-composer > div {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.brew-draft-composer > .button {
+  align-self: flex-end;
+}
+.brew-draft-composer .brew-draft-revise {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #7141eb;
+  color: #fff;
+  border: 0;
+  font-size: 23px;
+  line-height: 1;
+  box-shadow: 0 2px 5px #5730b426;
+}
+.brew-draft-context {
+  margin: 16px 0 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.brew-proposed-time {
+  padding: 14px;
+  background: #f7f4ff;
+  border: 1px solid #ded3ff;
+  border-radius: 12px;
+}
+.brew-proposed-time > strong {
+  display: block;
+  color: #54338b;
+}
+.brew-proposed-time p {
+  margin: 8px 0;
+}
+.brew-proposed-time small,
+.brew-context-note {
+  color: #6b617b;
+}
+.brew-proposed-time label {
+  display: grid;
+  gap: 5px;
+  margin-top: 12px;
+  color: #4d405f;
+}
+.brew-proposed-time input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px;
+  background: white;
+  border: 1px solid #d8cceb;
+  border-radius: 7px;
+  font: inherit;
+}
+.brew-proposal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.brew-proposal-actions button,
+.brew-calendar-toggle,
+.brew-feedback-actions button,
+.brew-news-refresh {
+  padding: 8px 12px;
+  border: 1px solid #d9d0ee;
+  background: white;
+  color: #6537b9;
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+}
+.brew-proposal-actions button:disabled {
+  color: #787184;
+  background: #f0edf5;
+  cursor: not-allowed;
+}
+.brew-calendar-toggle {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin-top: 10px;
+  text-align: left;
+}
+.brew-calendar-inspector {
+  margin-top: 8px;
+  padding: 14px;
+  border: 1px solid #e1e4ec;
+  background: white;
+  border-radius: 10px;
+  max-height: 330px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.brew-calendar-inspector > p {
+  color: #727a8a;
+}
+.brew-calendar-inspector details {
+  padding: 10px 0;
+  border-bottom: 1px solid #edf0f6;
+}
+.brew-calendar-inspector summary {
+  cursor: pointer;
+  color: #37445e;
+}
+.brew-calendar-inspector time {
+  color: #7861a4;
+  margin-right: 6px;
+}
+.brew-calendar-inspector h3 {
+  font-size: 12px;
+  margin: 16px 0 5px;
+}
+.brew-prep-rating {
+  margin-top: 16px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.brew-prep-rating > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.brew-prep-rating button {
+  cursor: pointer;
+}
+.brew-prep-rating > div > button {
+  background: white;
+  border: 1px solid #ddd2f5;
+  padding: 7px 10px;
+  border-radius: 8px;
+}
+.brew-prep-rating button[aria-pressed="true"] {
+  background: #eae1ff;
+  border-color: #966bdd;
+}
+.brew-prep-feedback-popup {
+  padding: 15px;
+  margin-top: 10px;
+  background: white;
+  border: 1px solid #dbd3e9;
+  border-radius: 12px;
+  box-shadow: 0 8px 28px #312a4b12;
+}
+.brew-prep-feedback-popup header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.brew-prep-feedback-popup header button {
+  border: 0;
+  background: transparent;
+  font-size: 20px;
+}
+.brew-prep-feedback-popup fieldset {
+  border: 0;
+  margin: 0;
+  padding: 8px 0;
+}
+.brew-prep-feedback-popup label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 7px 0;
+}
+.brew-prep-feedback-popup .brew-feedback-comment {
+  display: grid;
+  gap: 5px;
+}
+.brew-prep-feedback-popup textarea {
+  min-height: 65px !important;
+  height: 65px !important;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #dad3e8;
+  border-radius: 7px;
+  padding: 8px;
+  font: inherit;
+}
+.brew-feedback-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+.brew-feedback-actions button[type="submit"] {
+  background: #7141eb;
+  color: #fff;
+}
+.brew-live-news .brew-section-head {
+  justify-content: space-between;
+  gap: 15px;
+}
+.brew-news-refresh {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.brew-news-refresh:disabled {
+  opacity: 0.6;
+}
+.brew-news-status {
+  font-size: 12px;
+  color: #768097;
+  margin: 8px 0 16px;
+}
+.brew-live-news .brew-news__rail {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: visible;
+  gap: 20px;
+}
+.brew-live-news .brew-news-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.brew-live-news .brew-news-card__cover {
+  width: 100%;
+  height: 112px;
+  object-fit: cover;
+  border-radius: 9px;
+}
+.brew-live-news .brew-news-card__body {
+  min-width: 0;
+}
+.brew-live-news .brew-news-card h3 {
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 7px 0;
+}
+.brew-live-news .brew-news-card__bearing {
+  display: block;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #66718a;
+  margin: 8px 0;
+}
+.brew-live-news .brew-news-card__byline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 9px;
+}
+.brew-live-news .brew-news-card small {
+  font-size: 11px;
+  color: #7d8291;
+}
+.brew-context-card__label small {
+  white-space: normal;
+}
+.brew-context-card__label strong {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+.brew-live-news .brew-news-card__fallback {
+  display: grid;
+  place-items: center;
+  background: #f0edf8;
+  color: #6e559c;
+  font-weight: 700;
+  font-size: 23px;
+}
+@media (max-width: 1000px) {
+  .brew-live-news .brew-news__rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .brew-live-news .brew-news__rail {
+    grid-template-columns: 1fr;
+  }
+  .brew-live-news .brew-news-card {
+    display: grid;
+    grid-template-columns: 80px minmax(0, 1fr);
+    gap: 12px;
+  }
+  .brew-live-news .brew-news-card__cover {
+    height: 80px;
+  }
+  .brew-live-news .brew-section-head {
+    align-items: flex-start;
+  }
+  .brew-live-news .brew-section-head h2 {
+    flex-wrap: wrap;
+  }
+  .brew-proposal-actions {
+    flex-direction: column;
+  }
+  .brew-proposal-actions button {
+    text-align: center;
+  }
+}
+
+/* MB-14/15: give the related record metadata room beside a small preview. */
+.brew-related__groups > div:nth-child(2) .brew-related__cards {
+  grid-template-columns: minmax(0, 1fr);
+}
+.brew-related__groups > div:nth-child(2) .brew-context-card {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  padding: 12px;
+}
+.brew-related__groups > div:nth-child(2) .brew-context-card__label {
+  align-items: flex-start;
+  padding: 0;
+}
+@media (max-width: 560px) {
+  .brew-related__groups > div:nth-child(2) .brew-context-card {
+    grid-template-columns: 66px minmax(0, 1fr);
+    gap: 8px;
+  }
+}
+
+/* Keep the daily briefing aligned with the portal gutters on every monitor. */
+.staff-main .brew { width: 100%; }
+.brew-colophon.brew-colophon--simple { justify-content: flex-end; flex-direction: row; padding: 4px 0; border: 0; background: transparent; }
+.brew-colophon--simple button { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; padding: 9px 13px; }
+.brew-news-actions { display: flex; align-items: center; gap: 12px; }
+.brew-news-position { color: #717b8e; font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.brew-live-news .brew-news__rail { --news-per-page: 4; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: calc((100% - (var(--news-per-page) - 1) * 16px) / var(--news-per-page)); gap: 16px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; padding-bottom: 2px; }
+.brew-live-news .brew-news__rail::-webkit-scrollbar { display: none; }
+.brew-live-news .brew-news-card { scroll-snap-align: start; display: flex; flex-direction: column; gap: 0; padding: 0; }
+.brew-live-news .brew-news-card__cover { height: 116px; border-radius: 8px; flex: 0 0 116px; }
+.brew-live-news .brew-news-card__body { display: flex; flex-direction: column; flex: 1; }
+.brew-live-news .brew-news-card h3 { line-height: 1.45; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.brew-live-news .brew-news-card__bearing { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: 1.5; margin: 0 0 9px; }
+.brew-live-news .brew-news-card small { margin-top: auto; }
+.brew-live-news .brew-news__basis { margin-top: 15px; }
+@media (max-width: 1100px) { .brew-live-news .brew-news__rail { --news-per-page: 2; } }
+@media (max-width: 560px) { .brew-live-news .brew-news__rail { --news-per-page: 1; } .brew-news-actions { gap: 8px; flex-wrap: wrap; justify-content: flex-end; } .brew-news-position { display: none; } }
+.brew-live-news .brew-news-card__bearing { background: transparent; padding: 0; border: 0; border-radius: 0; }
+.brew-live-news .brew-news-card h3 { min-height: 3.9em; }
+.brew-live-news .brew-news-status { margin: 8px 0 14px; }
+.brew-live-news { row-gap: 10px; }
+.brew-live-news .brew-section-head { margin-bottom: 0; }
+.brew-live-news .brew-news-status { margin: 0 0 4px; }
+.brew-live-news .brew-news__basis { margin-top: 4px; }
+.brew-live-news .brew-news-card h3 { min-height: 4.35em; }
