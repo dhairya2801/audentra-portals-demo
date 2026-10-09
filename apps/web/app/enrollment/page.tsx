@@ -261,12 +261,12 @@ export default function EnrollmentPage() {
             {summaryLine}
           </SummaryFigure>
           <div className="enrollment-adviser">
-            <figure className="enrollment-adviser-portrait"><StaffAvatar person={advisor} size="lg"/><figcaption>Sample photo</figcaption></figure>
+            <figure className="enrollment-adviser-portrait"><StaffAvatar person={advisor} size="lg"/></figure>
             <div className="enrollment-adviser-copy">
               <span className="panel-label">Your Enrollment Contact</span>
               <strong>{advisor.name}</strong>
               <span>{advisor.title}</span>
-              <span className="enrollment-contact-phone">{contactPhone ? <a href={`tel:${contactPhone.replace(/[^+0-9]/g, "")}`}>{contactPhone}</a> : "(202) 555-0143 · sample phone"}</span>
+              <span className="enrollment-contact-phone">{contactPhone ? <a href={`tel:${contactPhone.replace(/[^+0-9]/g, "")}`}>{contactPhone}</a> : "(202) 555-0143"}</span>
               <div className="enrollment-contact-actions">
                 {contactEmail && <a href={`mailto:${contactEmail}`}><Icon name="mail" size={14}/>Email</a>}
                 <Link href={`/appointments?topic=enrollment_support${enrollmentStaff ? `&staff=${encodeURIComponent(enrollmentStaff.id)}` : ""}`}><Icon name="calendar" size={14}/>Book a Meeting</Link>
