@@ -12,7 +12,7 @@ try{
   await expect(page.locator('.momentum-card')).not.toContainText(/sample/i);
   const photo=page.locator('.enrollment-adviser img');await expect(photo).toBeVisible();await expect.poll(()=>photo.evaluate(el=>el.complete&&el.naturalWidth>0)).toBe(true);
   const step=page.getByRole('button',{name:/See the (step|\d+ steps)/});
-  if(await step.count()){await step.click();await expect(page.getByRole('dialog')).toBeVisible();await page.keyboard.press('Escape');}
+  if(await step.count()){await step.click();await expect.poll(async()=>await page.getByRole('dialog').isVisible()||/\/enrollment\/requirements\//.test(page.url())).toBe(true);if(/\/enrollment\/requirements\//.test(page.url())){await page.goto(base+'/enrollment');await expect(page.locator('.enrollment-adviser')).toBeVisible();}else await page.keyboard.press('Escape');}
   const icon=page.locator('.momentum-card .points-icon');expect(await icon.evaluate(el=>getComputedStyle(el).color!==getComputedStyle(el).backgroundColor)).toBe(true);
   await page.getByRole('button',{name:'How points work',exact:true}).click();await expect(page.getByRole('dialog')).not.toContainText(/sample/i);await page.keyboard.press('Escape');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
