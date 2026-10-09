@@ -175,3 +175,31 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible {o
 button.budget-loan-remainder{border:1px solid #e4ddee;width:100%;cursor:pointer;color:#6a547d;font-family:inherit;text-align:left}button.budget-loan-remainder:hover{background:#eee7f9}
 /* The contextual E matches student cards; the portal's floating launcher stays intact. */
 .portal-refresh .edward-ask{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;min-height:28px;padding:3px;margin:0;border:1px solid #e4daf6;border-radius:8px;background:#fbf8ff;box-shadow:0 2px 6px #39255709;flex-shrink:0;font-size:0;line-height:1;text-decoration:none}.portal-refresh .edward-ask .edward-ask-mark{display:grid;place-items:center;width:20px;height:20px;border-radius:6px;background:linear-gradient(145deg,#8060dd,#5540b5);color:#fff;font:600 13px/1 Georgia,serif;box-shadow:none;order:0}.portal-refresh .edward-ask:hover{background:#eee7fb}.portal-refresh .edward-ask:focus-visible{outline:2px solid #7657c7;outline-offset:3px}.portal-refresh .story{position:relative}.portal-refresh .story>.edward-ask{position:absolute;top:20px;right:20px}.portal-refresh .story:has(>.edward-ask)>.story-head{padding-right:44px}.portal-refresh .story-head{align-items:flex-start}.portal-refresh .story-head>.tools{margin-left:auto}.portal-refresh .pop-head>.edward-ask{margin-left:auto}
+
+/* The financial document has its own viewport inside the portal shell. */
+.portal-refresh .content-wrap { padding-bottom: max(96px, env(safe-area-inset-bottom)); }
+.portal-refresh #pop .pop-body { overscroll-behavior: contain; }
+.portal-refresh .contact-links { flex-wrap: wrap; gap: 6px 16px; }
+@media (max-width: 760px) {
+  .portal-refresh :is(.decision-buttons, .pay-option, .balance-action, .pop-foot) :is(.primary-button, .secondary-button) { min-height: 44px; }
+  .portal-refresh #budget-form .budget-value :is(input, select),
+  .portal-refresh .housing-choice select { font-size: 16px; min-height: 44px; }
+  .portal-refresh #budget-form .budget-value { grid-template-columns: minmax(0, 1fr) 108px; }
+  .portal-refresh #budget-form .living-expense-entry { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .portal-refresh .contact-links a { min-height: 36px; }
+}
+@media (max-width: 480px) {
+  .portal-refresh .cov-mini-row { grid-template-columns: 32px minmax(0, 1fr); gap: 8px 12px; }
+  .portal-refresh .cov-mini-row .status-pill { grid-column: 2; justify-self: start; min-height: 36px; }
+  .portal-refresh .next-list li { grid-template-columns: 44px minmax(0, 1fr); gap: 8px 12px; }
+  .portal-refresh .next-list .a { grid-column: 2; justify-self: start; font-size: 17px; }
+  .portal-refresh .pop-head { align-items: flex-start; gap: 8px; padding: 18px; }
+  .portal-refresh .pop-head > .tile { display: none; }
+  .portal-refresh .pop-head h2 { font-size: 20px; overflow-wrap: anywhere; }
+  .portal-refresh .pop-head .detail-close { width: 36px; height: 36px; }
+  .portal-refresh .condition-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-height: 500px) {
+  .portal-refresh .pop-head { padding-block: 12px; }
+  .portal-refresh .pop-foot { padding-block: 8px; }
+}

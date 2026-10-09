@@ -1,0 +1,103 @@
+@scope (.student-portal) to ([class*="edward"], [aria-label*="Edward"], [data-portal-item="edward"], [data-edward-preserve]) {
+/* Post-login student layouts. Size cards by their available space, not by
+   the screen alone: a persistent sidebar can consume a quarter of a laptop. */
+/* Wrapping headers keep their intrinsic title width without putting fixed
+   dialogs inside a CSS containment block. */
+:scope .status-heading:has(.sort-group, .requests-standing) { display: flex; flex-wrap: wrap; gap: 12px; }
+:scope .status-heading:has(.sort-group, .requests-standing) > .status-icon { flex: 0 0 24px; }
+:scope .status-heading:has(.sort-group, .requests-standing) > div:not(.sort-group, .requests-standing) { flex: 1 1 180px; }
+:scope .status-heading :is(.sort-group, .requests-standing) { flex: 0 1 auto; }
+:scope .status-heading > div { min-width: 0; }
+:scope .sort-group { min-width: 0; max-width: 100%; }
+:scope .sort-group button { min-width: 0; }
+:scope .requests-standing { flex-wrap: wrap; }
+:scope .request-body strong { overflow-wrap: anywhere; }
+:scope .drawer-header { flex-shrink: 0; }
+:scope .info-modal { max-height: calc(100dvh - 32px); }
+:scope .drawer-content { overscroll-behavior: contain; }
+:scope .content-wrap > footer { padding-bottom: max(76px, env(safe-area-inset-bottom)); }
+
+@media (max-width: 1400px) {
+  :scope.student-meeting-refresh :is(.task-card-body, .topic-row .task-card-body) {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+  :scope.student-meeting-refresh .task-card-body .task-action,
+  :scope.student-meeting-refresh .task-card-body:has(.edward-ask) .task-action {
+    grid-column: 2;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    min-width: 0;
+    padding-top: 0;
+  }
+  :scope .task-card-body:has(.edward-ask) .task-meta-row,
+  :scope .topic-row:has(.edward-ask) h3 { padding-right: 32px; }
+}
+
+@media (min-width: 1600px) {
+  :scope .content-wrap { max-width: 1440px; padding-inline: 40px; }
+  :scope.student-meeting-refresh .page-body { grid-template-columns: minmax(0, 1fr) 320px; gap: 28px; }
+  :scope.student-meeting-refresh .hero-lede { font-size: 15px; }
+  :scope.student-meeting-refresh :is(.meeting-owner strong, .meeting-owner small, .agenda-help p, .support-service-grid p) { font-size: 13px; line-height: 1.65; }
+}
+
+@media (max-width: 1180px) {
+  :scope.student-meeting-refresh .page-body { grid-template-columns: minmax(0, 1fr); }
+  :scope.student-meeting-refresh .page-rail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  :scope .student-agenda { position: static; grid-column: 1 / -1; }
+}
+
+/* Tablets and landscape phones need the full workspace, with navigation
+   available from the same menu as portrait phones. Keep CSS and the shell's
+   matchMedia breakpoint in sync. */
+@media (max-width: 1024px) {
+  :scope { --portal-student-topbar-height: 62px; }
+  :scope .workspace { margin-left: 0; }
+  :scope .sidebar { width: min(300px, calc(100vw - 24px)); padding-bottom: max(76px, env(safe-area-inset-bottom)); transform: translateX(-100%); visibility: hidden; transition: transform .24s; }
+  :scope .sidebar .brand-row { height: auto; min-height: 82px; padding-block: 12px; }
+  :scope .sidebar.sidebar-open { transform: translateX(0); visibility: visible; box-shadow: 15px 0 45px #12172733; }
+  :scope .nav-close { display: grid; }
+  :scope .nav-scrim { display: block; position: fixed; inset: 0; z-index: var(--z-nav-scrim); border: 0; background: #0f132159; backdrop-filter: blur(3px); }
+  :scope .topbar { height: var(--portal-student-topbar-height); padding-inline: 20px; }
+  :scope :is(.mobile-menu, .mobile-school, .mobile-avatar) { display: grid !important; }
+  :scope .mobile-school { font-family: Georgia, serif; font-weight: 700; }
+  :scope .topbar-title { display: flex; align-items: center; gap: 12px; }
+  :scope .help-button { display: none; }
+}
+
+@media (max-width: 620px) {
+  :scope .topbar { padding-inline: 14px; }
+  :scope .status-heading:has(.requests-standing) { grid-template-columns: 24px minmax(0, 1fr); }
+  :scope .requests-standing { grid-column: 1 / -1; justify-content: space-between; }
+  :scope .request-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  :scope .request-trail { flex-direction: row; justify-content: space-between; align-items: center; gap: 12px; text-align: left; }
+  :scope.student-meeting-refresh .page-rail { display: flex; }
+  :scope.student-meeting-refresh .sort-group { display: grid; grid-template-columns: minmax(0, 1.3fr) repeat(2, minmax(0, 1fr)) 28px; gap: 2px; }
+  :scope.student-meeting-refresh .sort-group button { padding-inline: 3px; font-size: 11px; min-height: 40px; gap: 3px; }
+  :scope.student-meeting-refresh .sort-group button:first-child > svg { display: none; }
+  :scope .action-band { flex-wrap: wrap; gap: 6px 12px; }
+  :scope .enrollment-contact-actions { gap: 4px 14px; }
+  :scope .enrollment-contact-actions a { min-height: 36px; }
+  :scope.student-meeting-refresh .booking-modal-drawer .booking-foot { padding: 12px 16px; gap: 8px; }
+  :scope.student-meeting-refresh .booking-foot .drawer-actions .full { min-height: 44px; }
+  :scope .booking-time-grid > button { min-height: 44px; }
+  :scope .booking-modal-drawer :is(textarea, select, input) { font-size: 16px; }
+}
+
+/* Keep the current time and actions reachable with a phone keyboard open or
+   in landscape. The middle of the drawer scrolls independently. */
+@media (max-height: 500px) {
+  :scope.student-meeting-refresh .booking-modal-drawer { max-height: calc(100dvh - 16px); }
+  :scope.student-meeting-refresh .booking-modal-drawer .drawer-header { height: 48px; padding-block: 6px; }
+  :scope.student-meeting-refresh .booking-modal-drawer .booking-foot { padding: 10px 18px; }
+  :scope .booking-foot .panel-label { display: none; }
+  :scope .sidebar .brand-row { min-height: 52px; }
+  :scope .sidebar .sidebar-bottom { padding-top: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :scope .sidebar { transition: none; }
+}
+
+}

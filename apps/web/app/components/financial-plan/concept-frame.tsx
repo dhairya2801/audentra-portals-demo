@@ -145,7 +145,7 @@ export function ConceptFinancialPlan() {
         title="My Financials · Concept 4 Plan Studio"
         style={{
           width: "100%",
-          height: "calc(100dvh - var(--topbar-height, 70px))",
+          height: "calc(100dvh - var(--portal-student-topbar-height, var(--topbar-height, 70px)))",
           border: 0,
           display: "block",
           background: "#f5f5fa",

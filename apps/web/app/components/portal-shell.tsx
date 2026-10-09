@@ -410,6 +410,14 @@ export function PortalShell({
   }, []);
   const menuButton = useRef<HTMLButtonElement>(null);
   const navigationPanel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 1025px)");
+    const closeDesktopMenu = () => {
+      if (desktop.matches) setMenuOpen(false);
+    };
+    desktop.addEventListener("change", closeDesktopMenu);
+    return () => desktop.removeEventListener("change", closeDesktopMenu);
+  }, []);
   // Groups closed by default, the one holding the page you are on opened for
   // you, and what she opens after that remembered. The sidebar only renders
   // once the bootstrap has loaded on the client, so storage is readable here.
@@ -568,7 +576,8 @@ export function PortalShell({
       'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
     const focusable = () =>
       Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector)).filter(
-        (element) => element.getClientRects().length > 0,
+        (element) => element.getClientRects().length > 0 &&
+          window.getComputedStyle(element).visibility === "visible",
       );
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -592,8 +601,17 @@ export function PortalShell({
 
     document.body.style.overflow = "hidden";
     panel.addEventListener("keydown", onKeyDown);
-    window.requestAnimationFrame(() => focusable()[0]?.focus());
+    // Wait for the off-canvas panel's visibility change before moving focus.
+    // Focusing an element while it is hidden silently leaves focus behind.
+    let focusFrame = 0;
+    const focusNavigation = () => {
+      const first = focusable()[0];
+      if (first) first.focus({ preventScroll: true });
+      else focusFrame = window.requestAnimationFrame(focusNavigation);
+    };
+    focusFrame = window.requestAnimationFrame(focusNavigation);
     return () => {
+      window.cancelAnimationFrame(focusFrame);
       panel.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previousOverflow;
       if (previousFocus && document.contains(previousFocus)) previousFocus.focus();
