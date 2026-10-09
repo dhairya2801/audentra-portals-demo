@@ -43,7 +43,7 @@ export function ResetDemo() {
 
   if (!enabled) return null;
   return <div className={styles.control}>
-    <button type="button" className={styles.trigger} onClick={() => { setError(""); dialog.current?.showModal(); }}>Reset demo</button>
+    <button type="button" className={styles.trigger} aria-label="Reset demo" title="Reset demo" onClick={() => { setError(""); dialog.current?.showModal(); }}><span aria-hidden="true" className={styles.resetIcon}>↺</span><span className={styles.resetLabel}>Reset demo</span></button>
     <dialog ref={dialog} className={styles.dialog} aria-labelledby="reset-demo-title"
       onCancel={event => { if (pending) event.preventDefault(); }}>
       <h2 id="reset-demo-title">Start a fresh demo?</h2>

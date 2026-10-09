@@ -7,3 +7,11 @@
 .dialog .actions .confirm { background: #6355cc; color: #fff; border-color: #6355cc; }
 
 .control .trigger[type="button"], .dialog .actions button[type="button"] { display: inline-flex; }
+
+.resetIcon { display: none; }
+@media (max-width: 680px) {
+  .control .trigger[type="button"] { width: 36px; height: 36px; min-height: 36px; padding: 0; justify-content: center; }
+  .resetIcon { display: inline; font-size: 23px; line-height: 1; }
+  .resetLabel { display: none; }
+  .dialog .actions { flex-wrap: wrap; }
+}

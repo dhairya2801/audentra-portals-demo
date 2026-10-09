@@ -52,3 +52,18 @@
   .portal-refresh .board-search { min-height: 40px; }
   .portal-refresh .board-search input { font-size: 16px; }
 }
+
+/* Keep board controls readable in narrow embedded workspaces. */
+@media (max-width: 1100px) {
+  .board-heading .heading-row { flex-wrap: wrap; gap: 10px; }
+  .board-heading .heading-row h1 { flex: 1; min-width: 0; font-size: 22px; }
+  .board-heading .heading-row > .project-icon { flex-shrink: 0; }
+  .board-heading .heading-actions { width: 100%; display: flex; gap: 8px; }
+  .board-heading .heading-actions .btn { width: auto; flex: 1 1 auto; min-height: 40px; padding: 9px 12px; font-size: 12px; white-space: nowrap; }
+  .board-heading .heading-actions .btn .icon { display: inline-block; flex-shrink: 0; }
+  .compact-toolbar :is(input, select) { font-size: 16px; }
+  .detail-tabs { overflow-x: auto; flex-shrink: 0; }
+  .detail-tab { white-space: nowrap; min-height: 44px; }
+  .task-dialog { max-height: 100dvh; }
+  .context-fields :is(input, select, textarea), .create-form :is(input, select, textarea) { font-size: 16px; }
+}

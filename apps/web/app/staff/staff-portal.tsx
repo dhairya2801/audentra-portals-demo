@@ -4459,6 +4459,8 @@ function StaffWorkspaceShell({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
+  const mobileNavRef = useRef<HTMLDivElement>(null);
+  const mobileNavTrigger = useRef<HTMLButtonElement>(null);
   const [globalQuery, setGlobalQuery] = useState("");
   const [requestedWorkItemId, setRequestedWorkItemId] = useState<string | null>(null);
   const [taskBoardRequest, setTaskBoardRequest] = useState<{
@@ -4513,6 +4515,37 @@ function StaffWorkspaceShell({
       window.removeEventListener("hashchange", readHash);
     };
   }, [readHash]);
+
+  // Keep the temporary navigation a keyboard-accessible modal on small screens.
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const panel = mobileNavRef.current;
+    const trigger = mobileNavTrigger.current;
+    const focusable = () => Array.from(panel?.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), a[href], summary, [tabindex="0"]',
+    ) ?? []).filter(element => element.getClientRects().length > 0);
+    focusable()[0]?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); setMobileNavOpen(false); }
+      if (event.key !== "Tab") return;
+      const elements = focusable();
+      const first = elements[0], last = elements.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    const desktop = window.matchMedia("(min-width: 1025px)");
+    const onResize = () => { if (desktop.matches) setMobileNavOpen(false); };
+    document.addEventListener("keydown", onKeyDown);
+    desktop.addEventListener("change", onResize);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+      desktop.removeEventListener("change", onResize);
+      if (!desktop.matches) trigger?.focus();
+    };
+  }, [mobileNavOpen]);
 
   // The account menu closes on an outside click or Escape, like any menu.
   useEffect(() => {
@@ -4611,7 +4644,9 @@ function StaffWorkspaceShell({
     <div className={`staff-shell staff-shell--workspace${view !== "edward" ? " portal-refresh" : ""}`}>
       <header className="staff-topbar staff-topbar--workspace">
         <button
+          ref={mobileNavTrigger}
           className="staff-mobile-menu"
+          aria-controls="staff-mobile-navigation"
           type="button"
           aria-label="Toggle navigation"
           aria-expanded={mobileNavOpen}
@@ -4751,7 +4786,9 @@ function StaffWorkspaceShell({
           </div>
         </section>
       ) : null}
-      <div className={mobileNavOpen ? "staff-mobile-nav is-open" : "staff-mobile-nav"}>
+      {mobileNavOpen && <button className="staff-nav-backdrop" type="button" aria-label="Close navigation" tabIndex={-1} onClick={() => setMobileNavOpen(false)} />}
+      <div ref={mobileNavRef} id="staff-mobile-navigation" role={mobileNavOpen ? "dialog" : undefined} aria-modal={mobileNavOpen ? true : undefined} aria-label="Staff navigation" className={mobileNavOpen ? "staff-mobile-nav is-open" : "staff-mobile-nav"}>
+        <div className="staff-mobile-nav__heading"><strong>Your workspace</strong><button type="button" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)}>×</button></div>
         <StaffSidebar view={view} workspace={workspace} navigate={navigate} />
       </div>
       <StaffSidebar view={view} workspace={workspace} navigate={navigate} />

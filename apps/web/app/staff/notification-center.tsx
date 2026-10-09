@@ -1,11 +1,13 @@
 "use client";
 
 import type { StaffNotification, StaffNotificationList } from "@vv/contracts";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getStaffNotifications,
   markStaffNotificationRead,
 } from "../lib/api-client";
+
+import Icon from "../design-system/Icon.jsx";
 
 function dateTime(value: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -25,6 +27,23 @@ export function NotificationCenter({
 }) {
   const [notifications, setNotifications] = useState<StaffNotificationList | null>(null);
   const [open, setOpen] = useState(false);
+  const container = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: PointerEvent) => {
+      if (!container.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setOpen(false); trigger.current?.focus(); }
+    };
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -101,25 +120,28 @@ export function NotificationCenter({
 
   const unread = notifications?.unreadCount ?? 0;
   return (
-    <div className="staff-notification-center">
+    <div ref={container} className="staff-notification-center">
       <button
+        ref={trigger}
+        aria-controls="staff-notifications"
         className="staff-notification-trigger"
         type="button"
         aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`}
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
-        <span aria-hidden="true">N</span>
+        <Icon name="bell" size={18} />
         {unread > 0 ? <i>{unread > 99 ? "99+" : unread}</i> : null}
       </button>
       {open ? (
-        <section className="staff-notification-popover" aria-label="Staff notifications">
+        <section id="staff-notifications" className="staff-notification-popover" aria-label="Staff notifications">
           <header>
             <div>
               <p className="eyebrow">Action Center</p>
               <h2>Notifications</h2>
             </div>
             <button type="button" onClick={() => void refresh()}>Refresh</button>
+            <button type="button" aria-label="Close notifications" onClick={() => { setOpen(false); trigger.current?.focus(); }}>×</button>
           </header>
           {error ? <p className="field-error" role="alert">{error}</p> : null}
           {!notifications ? (

@@ -708,13 +708,10 @@ export function StaffEdwardAssistant({
         aria-controls="staff-edward-panel"
         onClick={() => setOpen((current) => !current)}
       >
-        <span className="edward-avatar" aria-hidden="true">
+        <span className="edward-mark small" aria-hidden="true">
           E
         </span>
-        <span>
-          <strong>Ask Edward</strong>
-          <small>AI staff assistant</small>
-        </span>
+        Ask Edward
       </button>
       {open ? panel : null}
     </>

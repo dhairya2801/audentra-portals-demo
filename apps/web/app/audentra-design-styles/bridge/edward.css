@@ -245,3 +245,13 @@
   font-size: var(--fs-small);
   letter-spacing: var(--ls-caps);
 }
+
+.staff-shell--workspace .edward-launcher { font-family: "Geist Variable", Geist, sans-serif, Arial, sans-serif; }
+
+/* The staff launcher shares the student mark and pill, including on phones. */
+.staff-shell--workspace .edward-launcher > .edward-mark.small {
+  display: grid;
+  align-items: center;
+  color: var(--on-ink);
+  background: linear-gradient(145deg, var(--purple), var(--purple-dark));
+}

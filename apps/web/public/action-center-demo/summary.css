@@ -259,3 +259,16 @@
 #task-summary .sum-reason.blue, #task-summary .sum-focus-row-reason.blue { color: #456d8e; }
 #task-summary .sum-reason.green, #task-summary .sum-focus-row-reason.green { color: #42765f; }
 @media (min-width: 751px) { .sum-footer { padding-right: 150px; } }
+
+/* Keep the personal workspace usable on the smallest phones. */
+@media (max-width: 480px) {
+  .sum-design-switch button { min-width: 0; padding: 10px 6px; gap: 5px; }
+  .sum-portfolio-table { padding-inline: 12px; }
+  .sum-portfolio-table-head, .sum-portfolio-row { grid-template-columns: minmax(0, 1fr) minmax(42px, .65fr) 24px 24px 24px; gap: 6px; }
+  .sum-portfolio-row { min-height: 48px; }
+  .sum-portfolio-row > button:first-child { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+  .sum-portfolio-row > button:last-child { width: 24px; padding: 4px; }
+  .sum-portfolio-side { grid-template-columns: minmax(0, 1fr); }
+  .sum-search input, .sum-filter select { font-size: 16px; }
+  .sum-footer { padding-bottom: 64px; }
+}
