@@ -13,7 +13,9 @@ try{
     if(!await button.isVisible())continue;
     await expect(button).toHaveText('E');expect(await button.getAttribute('aria-label')).toBeTruthy();
     const placement=await button.evaluate(el=>{const card=el.closest('.task-card-body,.org-row,.provenance-card,.outcome-card,.match-card,.register-panel,.help-note,.story,.card');if(!card)return null;const a=el.getBoundingClientRect(),c=card.getBoundingClientRect();return{top:a.top-c.top,right:c.right-a.right};});
-    if(placement){expect(placement.top).toBeLessThan(60);expect(placement.right).toBeLessThan(60);}
+    if(route==='/enrollment' && await button.evaluate(el=>!!el.closest('.enrollment-task'))){
+     const help=button.locator('..');await expect(help).toHaveClass('task-help-actions');await expect(help.getByRole('button',{name:'How this works',exact:true})).toBeVisible();
+    }else if(placement){expect(placement.top).toBeLessThan(60);expect(placement.right).toBeLessThan(60);}
    }
    expect(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
    if(route==='/enrollment'||route==='/financials')await p.screenshot({path:`artifacts/student-meeting-refresh/edward-compact-${route.slice(1)}-${width}.png`,animations:'disabled'});

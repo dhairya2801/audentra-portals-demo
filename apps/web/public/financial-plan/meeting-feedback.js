@@ -12,7 +12,7 @@ window.StudentFinancialPresentation = {
   },
   chargeContext(plan,charge) {
     const rate=this.rateFor(plan,charge),meta=this.metadata(rate);
-    if(/tuition/i.test(charge.label))return {label:'Tuition',sub:`${rate?.name || 'Your tuition rate'} · full-time example, 15 credits`,example:true};
+    if(/tuition/i.test(charge.label)){const load=plan.presentation?.academics?.currentLoads?.find(r=>r.term_id===plan.termId);return {label:'Tuition',sub:`${rate?.name || 'Your tuition rate'} · ${load?`${load.credits} recorded credits`:'credit load awaiting confirmation'}`,example:false};}
     if(/housing|room/i.test(charge.label))return {label:'University housing',sub:rate?.name || 'Assigned campus room'};
     if(/meal/i.test(charge.label))return {label:`Meal plan · ${rate?.name || 'Campus dining'}`,sub:`${meta.swipes || 'Published meal allowance'}${meta.diningDollarsCents?` · $${meta.diningDollarsCents/100} dining dollars`:''}`};
     return {label:charge.label,sub:'Posted university charge'};
@@ -20,7 +20,7 @@ window.StudentFinancialPresentation = {
   scholarshipRules(offer) {
     const rules=offer.renewal_conditions;
     return rules?{sample:false,gpa:rules.minimum_gpa,duration:rules.maximum_semesters,load:rules.enrollment_requirement||'See your offer',review:rules.review_frequency||'Each academic year'}:
-      {sample:true,gpa:3.0,duration:8,load:'Full-time enrollment',review:'At the end of each academic year'};
+      {sample:true,gpa:null,duration:null,load:'Confirm with Financial Aid',review:'Not published'};
   },
   loanTypes: [
     {title:'Direct Subsidized',who:'Eligible undergraduate students',body:'Need-based borrowing with interest support during eligible periods. Your offer sets the amount available.'},

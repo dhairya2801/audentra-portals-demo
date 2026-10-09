@@ -41,7 +41,7 @@ export function AppointmentsTopicRow({
         <div className="task-main">
           <h3>{type.label}</h3>
           <p>{type.blurb}</p>
-          <div className="meeting-owner"><span className="meeting-owner-avatar">{person ? <StaffAvatar person={person}/> : type.team.split(" ").map(word => word[0]).slice(0,2).join("")}</span><span><strong>{person?.name || type.team}</strong><small>{[person?.title, person?.component].filter(Boolean).join(" · ") || "Your student support team"}</small></span></div>
+          <div className="meeting-owner"><span className="meeting-owner-avatar">{person ? <StaffAvatar person={person}/> : type.team.split(" ").map(word => word[0]).slice(0,2).join("")}</span><span><strong>{person?.name || type.team}</strong><small>{person?.title || person?.component || "Your student support team"}</small></span></div>
         </div>
 
         <div className="task-action">

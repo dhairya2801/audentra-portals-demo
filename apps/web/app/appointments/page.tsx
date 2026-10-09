@@ -193,7 +193,7 @@ export default function AppointmentsPage() {
             </CardRows>
           </Card>
 
-          <section className="support-directory"><div className="support-directory-heading"><span className="panel-label">MORE WAYS TO FEEL SUPPORTED</span><h2>The right team for every question.</h2><p>Explore these services and try a booking preview.</p></div><div className="support-service-grid">{supportServices.map(service=><article key={service.id}><span className="support-service-icon"><Icon name={service.icon} size={22}/></span><h3>{service.name}</h3><p>{service.copy}</p><div className="meeting-owner"><span className="meeting-owner-avatar">{service.team.split(' ').slice(0,2).map(s=>s[0]).join('')}</span><span><strong>{service.team}</strong><small>{service.private?"Specialist support":"Student support"}</small></span></div><button type="button" className="secondary-button" onClick={()=>setSupportService(service)}>Explore times →</button></article>)}</div></section>
+          <section className="support-directory"><div className="support-directory-heading"><span className="panel-label">MORE WAYS TO FEEL SUPPORTED</span><h2>The right team for every question.</h2><p>Explore these services and try a booking preview.</p></div><div className="support-service-grid">{supportServices.map(service=><article key={service.id}><span className="support-service-icon"><Icon name={service.icon} size={22}/></span><h3>{service.name}</h3><p>{service.copy}</p><button type="button" className="secondary-button" onClick={()=>setSupportService(service)}>Explore times →</button></article>)}</div></section>
 
         </>
       )}

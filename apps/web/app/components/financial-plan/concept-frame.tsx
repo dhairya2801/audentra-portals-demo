@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { PortalShell, type PortalSection } from "../portal-shell";
 import { openEdward } from "../../design-lib/door.js";
-import { getFinancialPlan, getStudentHousingPlan, getStudentAdvising, saveFinancialPlanInputs, simulateFinancialPlan } from "../../lib/api-client";
+import { getFinancialPlan, getStudentAcademics, getStudentHousingPlan, getStudentAdvising, saveFinancialPlanInputs, simulateFinancialPlan } from "../../lib/api-client";
 import { useTenant } from "../tenant-provider";
 import {
   conceptRoutes,
@@ -61,7 +61,7 @@ export function ConceptFinancialPlan() {
           if (target !== frame.current?.contentWindow) return;
           target.postMessage({type: "financial-plan:response", id, result, error}, window.location.origin);
         }, 0);
-        const operation = event.data.operation === "read" ? Promise.all([getFinancialPlan(),getStudentHousingPlan().catch(()=>null),getStudentAdvising().catch(()=>null)]).then(([result,housing,advising])=>({...result,presentation:{contacts:tenant.contacts,institution:tenant.shortName,housingPreference:housing?.preference,financialAdviser:advising?.advisers.find(entry=>entry.role==="financial_aid_counselor")?.staff}}))
+        const operation = event.data.operation === "read" ? Promise.all([getFinancialPlan(),getStudentHousingPlan().catch(()=>null),getStudentAdvising().catch(()=>null),getStudentAcademics().catch(()=>null)]).then(([result,housing,advising,academics])=>({...result,presentation:{academics,planningCredits:new URLSearchParams(window.location.search).get("planningCredits"),contacts:tenant.contacts,institution:tenant.shortName,housingPreference:housing?.preference,financialAdviser:advising?.advisers.find(entry=>entry.role==="financial_aid_counselor")?.staff}}))
           : event.data.operation === "simulate" ? simulateFinancialPlan(event.data.payload)
           : event.data.operation === "save-inputs" ? saveFinancialPlanInputs(event.data.payload, event.data.idempotencyKey)
           : Promise.reject(new Error("This planning operation is unavailable"));

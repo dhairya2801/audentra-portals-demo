@@ -18,7 +18,7 @@ try{
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.screenshot({path:`artifacts/student-meeting-refresh/contact-enrollment-${width}.png`,fullPage:true,animations:'disabled'});
   await page.locator('.enrollment-adviser').getByRole('link',{name:'Book a Meeting'}).click();await expect(page.getByRole('dialog')).toBeVisible();
-  await page.locator('.booking-with').scrollIntoViewIfNeeded();await expect(page.locator('.booking-with')).toContainText('Bennett Abernathy');await expect(page.locator('.booking-with img')).toBeVisible();await expect.poll(()=>page.locator('.booking-with img').evaluate(el=>el.complete&&el.naturalWidth>0)).toBe(true);
+  await page.locator('.booking-contact').scrollIntoViewIfNeeded();await expect(page.locator('.booking-contact')).toContainText('Bennett Abernathy');await expect(page.locator('.booking-contact img')).toBeVisible();await expect.poll(()=>page.locator('.booking-contact img').evaluate(el=>el.complete&&el.naturalWidth>0)).toBe(true);
   await page.screenshot({path:`artifacts/student-meeting-refresh/contact-booking-${width}.png`,animations:'disabled'});await page.keyboard.press('Escape');
   const portraits=page.locator('.topic-row .staff-portrait');expect(await portraits.count()).toBeGreaterThanOrEqual(3);
   for(const img of await portraits.all()){await img.scrollIntoViewIfNeeded();await expect.poll(()=>img.evaluate(el=>el.complete&&el.naturalWidth>0)).toBe(true);}

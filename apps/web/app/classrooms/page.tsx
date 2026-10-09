@@ -20,6 +20,7 @@ import StateCard from "../design-system/patterns/StateCard.jsx";
 import SummaryFigure from "../design-system/patterns/SummaryFigure.jsx";
 import Card, { CardHead, CardRows } from "../design-system/primitives/Card.jsx";
 import { openEdward } from "../design-lib/door.js";
+import { CourseLoadImpact } from "../components/course-load-impact";
 import { PortalShell } from "../components/portal-shell";
 import { useTenant } from "../components/tenant-provider";
 import { TenantLink as Link } from "../components/tenant-link";
@@ -302,6 +303,7 @@ export default function ClassroomsPage() {
           </StateCard>
         ) : (
           <>
+            <CourseLoadImpact loads={data?.currentLoads ?? []} />
             {groups.map((group, index) => (
               <Card key={group.id}>
                 <CardHead

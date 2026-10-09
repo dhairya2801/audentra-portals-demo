@@ -18,6 +18,7 @@ import {
   ApiClientError,
   createStudentAppointment,
   getAppointmentAvailability,
+  getStudentAdvising,
   rescheduleStudentAppointment,
 } from "../lib/api-client";
 import type { TenantConfig } from "../lib/tenant";
@@ -67,11 +68,14 @@ export function AppointmentsBookingDrawer({
   const personName = useRef(type.team);
   const availability = useApiResource(
     useCallback(
-      (signal: AbortSignal) =>
-        getAppointmentAvailability(
-          { type: type.id, staffMemberId: reschedule?.staff?.id ?? undefined },
-          signal,
-        ),
+      async (signal: AbortSignal) => {
+        const [calendar, advising] = await Promise.all([
+          getAppointmentAvailability({ type: type.id, staffMemberId: reschedule?.staff?.id ?? undefined }, signal),
+          getStudentAdvising(signal).catch(() => null),
+        ]);
+        const role = type.id === "academic_advising" ? "primary_advisor" : type.id === "financial_aid" ? "financial_aid_counselor" : type.id === "enrollment_support" || type.id === "admissions_counseling" ? "admissions_counselor" : "international_adviser";
+        return {...calendar, assignedStaffId: reschedule?.staff?.id ?? advising?.advisers.find(entry => entry.role === role)?.staff.id};
+      },
       [type.id, reschedule?.staff?.id],
     ),
     { refreshOnAmbient: false },
@@ -94,9 +98,11 @@ export function AppointmentsBookingDrawer({
     },
   );
   const people = useMemo(() => availability.data?.staff ?? [], [availability.data]);
+  const [showOthers, setShowOthers] = useState(false);
+  const sortedPeople = [...people].sort((a, b) => (a.nextOpenSlotAt ? Date.parse(a.nextOpenSlotAt) : Infinity) - (b.nextOpenSlotAt ? Date.parse(b.nextOpenSlotAt) : Infinity) || a.name.localeCompare(b.name));
   const [personId, setPersonId] = useState<string | null>(prefill?.staffMemberId ?? null);
   const person: AppointmentAvailabilityStaff | null =
-    people.find((entry) => entry.id === personId) ?? people.find(entry => entry.relationship === (type.id === "academic_advising" ? "primary_advisor" : type.id === "financial_aid" ? "financial_aid_counselor" : type.id === "enrollment_support" || type.id === "admissions_counseling" ? "admissions_counselor" : "international_adviser")) ?? people[0] ?? null;
+    people.find((entry) => entry.id === personId) ?? people.find(entry => entry.id === availability.data?.assignedStaffId) ?? people.find(entry => entry.relationship === (type.id === "academic_advising" ? "primary_advisor" : type.id === "financial_aid" ? "financial_aid_counselor" : type.id === "enrollment_support" || type.id === "admissions_counseling" ? "admissions_counselor" : "international_adviser")) ?? people[0] ?? null;
   useEffect(() => {
     personName.current = person?.name ?? type.team;
   }, [person, type.team]);
@@ -163,7 +169,7 @@ export function AppointmentsBookingDrawer({
       <div className="booking-chosen">
         <span className="panel-label">{reschedule ? "Moving to" : "You are booking"}</span>
         <strong>{chosen ?? (freeTime ? "Choose a date and time above" : "Choose a time above")}</strong>
-        <span className="booking-footer-person">{person && <StaffAvatar person={person} size="xs"/>}{person ? `${person.name}${person.title ? ` · ${person.title}` : ""}` : type.team}</span>
+
       </div>
       <div className="drawer-actions">
         <Button kind="primary" full icon="arrow" disabled={!canBook} pending={action.status === "loading"} onClick={book}>
@@ -276,47 +282,22 @@ export function AppointmentsBookingDrawer({
               </div>
             ) : (
               <>
-                {people.length > 1 ? (
-                  <div className="booking-people" role="radiogroup" aria-label="Who to see">
-                    {people.map((entry) => (
-                      <button
-                        key={entry.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={entry.id === person?.id}
-                        className={`booking-person${entry.id === person?.id ? " is-selected" : ""}`}
-                        onClick={() => {
-                          setPersonId(entry.id);
-                          setSlot(null);
-                        }}
-                      >
-                        <StaffAvatar person={entry} size="sm"/>
-                        <strong>{entry.name}</strong>
-                        <small>
-                          {entry.title ?? entry.component}
-                          {entry.relationship ? ` · your ${entry.relationship.replace(/_/g, " ").replace("advisor", "adviser")}` : ""}
-                          {entry.nextOpenSlotAt ? ` · next ${longDate(entry.nextOpenSlotAt, tenant)}` : entry.reason ? ` · ${entry.reason.replace(/_/g, " ")}` : ""}
-                        </small>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
                 {person ? (
-                  <div className="booking-with booking-with-portrait">
+                  <div className="booking-contact">
                     <StaffAvatar person={person} size="md"/>
-                    <span className="panel-label">
-                      {person.relationship === "primary_advisor"
-                        ? "Your academic adviser"
-                        : person.relationship
-                          ? `Your ${person.relationship.replace(/_/g, " ").replace("advisor", "adviser")}`
-                          : "With"}
-                    </span>
-                    <strong>
-                      {person.name}
-                      {person.title ? <span> · {person.title}</span> : null}
-                    </strong>
+                    <div><span className="panel-label">{person.relationship || person.id === availability.data?.assignedStaffId ? "Your assigned contact" : "Your selected contact"}</span>
+                    <strong>{person.name}</strong><span>{person.title || person.component}</span>
+                    {person.email && <a href={`mailto:${person.email}`}>{person.email}</a>}
+                    <small>{person.nextOpenSlotAt ? `Next available · ${longDate(person.nextOpenSlotAt, tenant)} at ${clockTime(person.nextOpenSlotAt, tenant)}` : "No open times in the next two weeks"}</small></div>
+                    {people.length > 1 && <button type="button" className="text-button" aria-expanded={showOthers} aria-controls={`${ids}-people`} onClick={() => setShowOthers(!showOthers)}>{showOthers ? "Hide alternatives" : "See others"}</button>}
                   </div>
                 ) : null}
+                {showOthers && <div id={`${ids}-people`} className="booking-people" role="radiogroup" aria-label="Who to see, ordered by next availability">
+                  {sortedPeople.map(entry => <button key={entry.id} type="button" role="radio" aria-checked={entry.id === person?.id} className={`booking-person${entry.id === person?.id ? " is-selected" : ""}`} onClick={() => {setPersonId(entry.id);setSlot(null);setShowOthers(false);}}>
+                    <StaffAvatar person={entry} size="sm"/><strong>{entry.name}</strong><small>{entry.title || entry.component}</small>
+                    <small>{entry.nextOpenSlotAt ? `Next · ${longDate(entry.nextOpenSlotAt, tenant)} at ${clockTime(entry.nextOpenSlotAt, tenant)}` : "No open times"}</small>
+                  </button>)}
+                </div>}
                 {refusal ? (
                   <p className="field-error" role="alert">
                     {refusal}

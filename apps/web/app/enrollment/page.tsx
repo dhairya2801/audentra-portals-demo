@@ -266,8 +266,8 @@ export default function EnrollmentPage() {
               <span className="panel-label">Your Enrollment Contact</span>
               <strong>{advisor.name}</strong>
               <span>{advisor.title}</span>
-              <span className="enrollment-contact-phone">{contactPhone ? <a href={`tel:${contactPhone.replace(/[^+0-9]/g, "")}`}>{contactPhone}</a> : "(202) 555-0143"}</span>
               <div className="enrollment-contact-actions">
+                <a href={`tel:${(contactPhone || "(202) 555-0143").replace(/[^+0-9]/g, "")}`} aria-label={`Call ${advisor.name} at ${contactPhone || "(202) 555-0143"}`} title={contactPhone || "(202) 555-0143"}>Call</a>
                 {contactEmail && <a href={`mailto:${contactEmail}`}><Icon name="mail" size={14}/>Email</a>}
                 <Link href={`/appointments?topic=enrollment_support${enrollmentStaff ? `&staff=${encodeURIComponent(enrollmentStaff.id)}` : ""}`}><Icon name="calendar" size={14}/>Book a Meeting</Link>
               </div>

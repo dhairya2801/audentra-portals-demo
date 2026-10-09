@@ -56,7 +56,7 @@ export function EnrollmentTaskCard({
   const gates = item.blocking;
 
   return (
-    <article className={`task-card ${recommended ? "recommended" : ""} ${gates ? "gating" : ""}`}>
+    <article className={`task-card enrollment-task ${recommended ? "recommended" : ""} ${gates ? "gating" : ""}`}>
       {recommended && (
         <ActionBand
           icon="spark"
@@ -114,12 +114,12 @@ export function EnrollmentTaskCard({
               >
                 {actionLabel(item)} <Icon name="arrow" size={16} />
               </button>
-              <button type="button" className="text-button" onClick={() => onOpen(item, "how")}>
+              <div className="task-help-actions"><button type="button" className="text-button" onClick={() => onOpen(item, "how")}>
                 How this works
-              </button>
+              </button><EdwardAsk mark="E" onClick={() => openEdward(edwardAskFor(item, tenant))} /></div>
             </>
           )}
-          <EdwardAsk mark="E" onClick={() => openEdward(edwardAskFor(item, tenant))} />
+          {studentManaged && <EdwardAsk mark="E" onClick={() => openEdward(edwardAskFor(item, tenant))} />}
         </div>
       </div>
     </article>
