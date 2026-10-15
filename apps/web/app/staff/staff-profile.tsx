@@ -270,7 +270,7 @@ function NumbersCard({
         id="staff-profile-numbers"
         icon="chart"
         title="Your numbers"
-        lede="Counted from canonical records at the moment this page loaded. Each work line opens the task board filtered to you."
+        lede="Counted from canonical records at the moment this page loaded. Each work line opens the Action Center filtered to you."
       />
       <div className="staff-profile-meter">
         <div className="staff-profile-meter__figure">

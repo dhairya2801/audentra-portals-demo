@@ -51,3 +51,49 @@ export function reasonFor(task, demoClock, currentTime) {
   if(bucket==='waiting') return stageFor(task)?.name || 'Waiting on a response';
   return task.due ? 'Upcoming deadline' : 'No deadline set';
 }
+
+// Presentation-only projections over the loaded task snapshot. No workflow writes.
+export function responsibleParty(task) {
+ if(task.status==='completed')return 'completed';
+ const owner=stageFor(task)?.owner;
+ if(task.type==='document'&&['processing','resubmitted'].includes(task.status)&&(task.processingMode==='manual'||task.review?.mode==='manual'))return task.owner==='ML'?'me':'team';
+ if(['Student','Payer'].includes(owner))return 'student';
+ if(['EDgent','System'].includes(owner))return 'automation';
+ if(['Leader','Approver'].includes(owner))return 'team';
+ if(['Staff','Advisor','Finance'].includes(owner))return task.owner==='ML'?'me':'team';
+ return 'team';
+}
+export function actionGroup(task) {
+ const party=responsibleParty(task),stage=stageFor(task);
+ let label,minutes;
+ if(party==='completed'){label='Completed '+({document:'document reviews',request:'student requests',outreach:'outreach',payment:'payments'}[task.type]);minutes=0;}
+ else if(party==='student'){label=task.type==='document'?(task.status==='correction'?'Await corrected documents':'Await document uploads'):task.type==='payment'?'Await student payments':'Await student replies';minutes=0;}
+ else if(party==='automation'){label=task.type==='document'?'Process documents':task.type==='payment'?'Await payment processing':'Automated work';minutes=0;}
+ else if(task.type==='document'){label=(['processing','resubmitted'].includes(task.status)?'Process documents':'Review documents');minutes=task.status==='exceptions'?5:3;}
+ else if(task.type==='request'){label=party==='team'?'Await '+(stage?.owner==='Leader'?'escalation review':stage?.owner||'team confirmation'):'Respond to students';minutes=5;}
+ else if(task.type==='payment'){label='Resolve payment exceptions';minutes=6;}
+ else {label=task.status==='approval'?'Approve outreach':task.status==='responded'?'Respond to students':'Prepare outreach';minutes=3;}
+ return {id:[party,label].join(':'),label,minutes,party};
+}
+export function workload(tasks,filters,clock,now=Date.now()) {
+ const snapshot=summarize(tasks,{...filters,bucket:'all'},clock,now);
+ const counts={me:0,student:0,team:0,automation:0,completed:0};
+ for(const task of snapshot.scoped)counts[responsibleParty(task)]++;
+ const queue=snapshot.scoped.filter(t=>filters.party==='all'?t.status!=='completed':responsibleParty(t)===(filters.party||'me'));
+ const deadlineFor=task=>{const hours=dueHours(task,clock,now);return !Number.isFinite(hours)?'none':hours<0?'overdue':hours<8?'risk':'track';};
+ const deadlines={overdue:0,risk:0,track:0,none:0};
+ for(const task of queue)if(task.status!=='completed')deadlines[deadlineFor(task)]++;
+ const selected=queue.filter(t=>filters.party==='completed'||!filters.sla||filters.sla==='all'||deadlineFor(t)===filters.sla);
+ const weights={Urgent:4,High:3,Medium:2,Low:1};
+ const compare=(a,b)=> (filters.sort==='quickest'?actionGroup(a).minutes-actionGroup(b).minutes:filters.sort==='important'?(weights[b.priority]||0)-(weights[a.priority]||0):0)||dueHours(a,clock,now)-dueHours(b,clock,now)||(weights[b.priority]||0)-(weights[a.priority]||0)||a.key.localeCompare(b.key);
+ const groups=new Map();
+ for(const task of selected.sort(compare)){
+  const action=actionGroup(task);
+  if(!groups.has(action.id))groups.set(action.id,{...action,tasks:[],totalMinutes:0,sla:{overdue:0,risk:0,track:0,none:0},targetHours:0});
+  const group=groups.get(action.id);
+  group.tasks.push(task);group.totalMinutes+=action.minutes;group.targetHours+=stageFor(task)?.hours||0;
+  group.sla[deadlineFor(task)]++;
+ }
+ const rows=[...groups.values()].sort((a,b)=> (filters.sort==='quickest'?a.totalMinutes-b.totalMinutes:0)||compare(a.tasks[0],b.tasks[0]));
+ return {...snapshot,counts,queue,deadlines,selected,rows};
+}

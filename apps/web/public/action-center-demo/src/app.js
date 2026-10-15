@@ -142,7 +142,8 @@ document.addEventListener('click',e=>{
  const note=e.target.closest('[data-review-note]');if(note){detail.reviewAction={id:note.dataset.reviewNote,action:'accept'};renderDetail();focusCorrection();return;}
  const undo=e.target.closest('[data-review-undo]');if(undo){const t=currentTask();if(t.actualDocument){void saveFieldDecision(t,undo.dataset.reviewUndo,'undo');return;}delete reviewFor(t).decisions[undo.dataset.reviewUndo];t.resolved=t.resolved.filter(id=>id!==undo.dataset.reviewUndo);tick();event(t,`Field decision reopened: ${undo.dataset.reviewUndo}.`);refresh();return;}
  const edit=e.target.closest('[data-review-edit]');if(edit){detail.reviewEdit=edit.dataset.reviewEdit;renderDetail();document.querySelector(`[data-document-value="${detail.reviewEdit}"]`).focus();return;}
- const requestAction=e.target.closest('[data-request-action]');if(requestAction){try{runRequestAction(currentTask(),requestAction.dataset.requestAction);refresh();toast('Action completed with sample evidence.');}catch(error){toast(error.message);}return;}
+ const requestPane=e.target.closest('[data-request-pane]');if(requestPane){if(detail.tab!=='workspace'){detail.tab='workspace';renderMain();}const pane=document.querySelector('.rq-'+requestPane.dataset.requestPane);pane?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});pane?.querySelector('h2')?.focus({preventScroll:true});return;}
+ const requestAction=e.target.closest('[data-request-action]');if(requestAction){try{runRequestAction(currentTask(),requestAction.dataset.requestAction);refresh();toast('Review updated.');}catch(error){toast(error.message);}return;}
  const simulation=e.target.closest('[data-simulate]');if(simulation){try{simulateResolution(currentTask(),simulation.dataset.simulate);refresh();toast('Resolution trigger simulated; history updated.');}catch(error){toast(error.message);}return;}
  if(e.target.closest('[data-create-status]'))createTask();
 });
@@ -204,7 +205,7 @@ function openDeepLink(){let key;try{key=decodeURIComponent(location.hash.slice(1
 window.addEventListener('hashchange',openDeepLink);
 try{await initializeIdentities();shell();openDeepLink();}
 catch{
- document.querySelector('#app').innerHTML='<main class="main" style="padding:32px"><h1>Task board unavailable</h1><p role="alert">We could not load your students and work items. Your simulated changes are retained.</p><button class="btn primary" id="retry-board">Retry</button></main>';
+ document.querySelector('#app').innerHTML='<main class="main" style="padding:32px"><h1>Action Center unavailable</h1><p role="alert">We could not load your students and work items. Your simulated changes are retained.</p><button class="btn primary" id="retry-board">Retry</button></main>';
  document.querySelector('#retry-board').addEventListener('click',()=>location.reload());
 }
 
@@ -216,7 +217,7 @@ async function refreshLiveBoard(){
     document.activeElement?.matches('input,textarea,select,[contenteditable]'))return;
  refreshing=true;
  try{if(await refreshIdentities())refresh();}
- catch{toast('Task board could not refresh. Retrying shortly.');}
+ catch{toast('Action Center could not refresh. Retrying shortly.');}
  finally{refreshing=false;}
 }
 window.addEventListener('focus',refreshLiveBoard);

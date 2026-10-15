@@ -75,3 +75,77 @@ test('existing board SLA labels distinguish open tasks without deadlines from co
  assert.equal(sla(task({status:'completed',due:new Date(now-3600000).toISOString()})).tone,'green');
  assert.equal(reasonFor(task({due:new Date(now-3600000).toISOString()}),clock,now),'1h past due');
 });
+
+import { workload, responsibleParty } from '../public/action-center-demo/src/summary-model.js';
+
+test('next responsibility is independent of overdue status and assignment scope',()=>{
+ const overdue=task({status:'requested',due:new Date(now-3600000).toISOString()});
+ assert.equal(responsibleParty(overdue),'student');
+ assert.equal(responsibleParty(task({status:'exceptions'})),'me');
+ assert.equal(responsibleParty(task({status:'processing'})),'automation');
+ assert.equal(responsibleParty(task({status:'processing',processingMode:'manual'})),'me');
+ assert.equal(responsibleParty(task({type:'request',status:'escalated'})),'team');
+ assert.equal(responsibleParty(task({type:'request',status:'waiting',requestWork:{sentAt:clock,rule:'api'},resolutionTeam:'Registrar'})),'team');
+ const result=workload([overdue,task({key:'review',status:'clean'})],{owner:'ML',party:'me'},clock,now);
+ assert.equal(result.counts.student,1);assert.equal(result.selected.length,1);assert.equal(result.selected[0].key,'review');
+});
+test('aggregated groups reconcile every scoped task once, including empty deadlines',()=>{
+ const tasks=seedTasks();const before=structuredClone(tasks);
+ for(const party of ['me','student','team','automation','completed','all']){
+  const r=workload(tasks,{owner:'all',party},clock,now);
+  assert.equal(Object.values(r.counts).reduce((a,b)=>a+b,0),tasks.length);
+  assert.equal(r.rows.reduce((n,g)=>n+g.tasks.length,0),r.selected.length);
+  assert.equal(new Set(r.rows.flatMap(g=>g.tasks.map(t=>t.key))).size,r.selected.length);
+  for(const g of r.rows)assert.equal(Object.values(g.sla).reduce((a,b)=>a+b,0),g.tasks.length);
+ }
+ assert.deepEqual(tasks,before);
+ const r=workload([task({status:'clean'})],{party:'me'},clock,now);
+ assert.equal(r.rows[0].sla.none,1);assert.equal(r.rows[0].sla.track,0);
+});
+test('quickest orders group effort while importance and due sort the task queue',()=>{
+ const tasks=[task({key:'T-1',status:'exceptions',category:'Transcript',priority:'Urgent',due:new Date(now+4*3600000).toISOString()}),task({key:'T-2',status:'clean',category:'Transcript',priority:'Low',due:new Date(now+2*3600000).toISOString()}),task({key:'T-3',status:'clean',category:'Identity',priority:'High',due:new Date(now+9*3600000).toISOString()}),task({key:'T-4',type:'outreach',board:'en-outreach',status:'identified',priority:'Low',due:new Date(now+10*3600000).toISOString()})];
+ const due=workload(tasks,{party:'me',sort:'due'},clock,now);
+ assert.equal(due.rows[0].tasks[0].key,'T-2');
+ const important=workload(tasks,{party:'me',sort:'important'},clock,now);
+ assert.equal(important.rows[0].tasks[0].key,'T-1');
+ const quickest=workload(tasks,{party:'me',sort:'quickest'},clock,now);
+ assert.equal(quickest.rows[0].tasks[0].key,'T-4');
+ assert.equal(quickest.rows[1].totalMinutes,11);
+ assert.equal(quickest.rows[1].sla.risk,2);
+});
+
+// A staff action can span document categories and underlying task types.
+test('review and response queues combine related work while preserving each task workspace',()=>{
+ const tasks=[task({key:'document',status:'clean',category:'Transcript'}),task({key:'passport',status:'exceptions',category:'Identity / passport'}),task({key:'request',type:'request',board:'en-requests',status:'reviewing'}),task({key:'reply',type:'outreach',board:'en-outreach',status:'responded'}),task({key:'processing',status:'processing'})];
+ const r=workload(tasks,{party:'me'},clock,now);
+ assert.equal(r.rows.length,2);
+ const documents=r.rows.find(g=>g.label==='Review documents');
+ const responses=r.rows.find(g=>g.label==='Respond to students');
+ assert.deepEqual(new Set(documents.tasks.map(t=>t.key)),new Set(['document','passport']));
+ assert.deepEqual(new Set(responses.tasks.map(t=>t.type)),new Set(['request','outreach']));
+ assert.equal(documents.totalMinutes,8);assert.equal(responses.totalMinutes,8);
+ assert.equal(r.counts.automation,1);assert.equal(r.selected.length,4);
+});
+
+test('deadline chart totals stay stable while filters narrow the queue and preserve responsibility',()=>{
+ const due=hours=>new Date(now+hours*3600000).toISOString();
+ const tasks=[task({key:'late',status:'clean',due:due(-1)}),task({key:'soon',status:'clean',due:due(0)}),task({key:'later',status:'clean',due:due(8)}),task({key:'no-date',status:'clean'}),task({key:'invalid-date',status:'clean',due:'invalid'}),task({key:'waiting',status:'requested',due:due(-2)}),task({key:'done',status:'completed',due:due(-3)})];
+ const expected={overdue:1,risk:1,track:1,none:2};
+ for(const [sla,count] of Object.entries(expected)){
+  const r=workload(tasks,{owner:'ML',party:'me',sla},clock,now);
+  assert.deepEqual(r.deadlines,expected);
+  assert.equal(r.selected.length,count);
+  assert.equal(r.queue.length,5);
+  assert.equal(r.counts.student,1);
+  assert.equal(r.rows.reduce((n,g)=>n+g.tasks.length,0),count);
+  assert.ok(r.selected.every(t=>t.key!=='waiting'&&t.key!=='done'));
+ }
+ const all=workload(tasks,{party:'all',sla:'overdue'},clock,now);
+ assert.deepEqual(new Set(all.selected.map(t=>t.key)),new Set(['late','waiting']));
+ const complete=workload(tasks,{party:'completed',sla:'overdue'},clock,now);
+ assert.deepEqual(complete.deadlines,{overdue:0,risk:0,track:0,none:0});
+ assert.equal(complete.selected[0].key,'done');
+ const empty=workload(tasks,{party:'me',q:'absent',sla:'risk'},clock,now);
+ assert.equal(empty.queue.length,0);assert.equal(empty.selected.length,0);
+ assert.deepEqual(empty.deadlines,{overdue:0,risk:0,track:0,none:0});
+});

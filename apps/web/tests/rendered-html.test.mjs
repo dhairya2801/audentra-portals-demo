@@ -1845,7 +1845,7 @@ test("DSM feedback surfaces remain connected to portal data and safe fallbacks",
   assert.match(edward, /speechSynthesis\.speak/);
   assert.match(edward, /Microphone access was blocked/);
   assert.match(enrollment, /contacts\.admissions/);
-  assert.match(enrollment, /Your next steps/);
+  assert.match(enrollment, /Your enrollment checklist/);
   assert.match(enrollment, /Coming up later/);
   assert.match(enrollment, /Your Enrollment Contact/);
   assert.match(enrollment, /Start here/);

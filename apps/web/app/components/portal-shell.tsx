@@ -1,5 +1,7 @@
 "use client";
 
+import { visibleEnrollmentRequirements } from "./enrollment-presentation";
+
 import type {
   FerpaPortalScope,
   StudentExperienceUpdate,
@@ -494,7 +496,7 @@ export function PortalShell({
   const refreshRequirements = requirements.refresh;
   const openSteps =
     requirements.status === "ready"
-      ? requirements.data.items.filter(
+      ? visibleEnrollmentRequirements(requirements.data.items).filter(
           (item) => !terminalStatuses.has(item.status) && item.status !== "blocked" && item.status !== "submitted" && item.status !== "under_review",
         ).length
       : null;
@@ -848,7 +850,7 @@ export function PortalShell({
   const heroCopy: HeroCopy = destination
     ? {
         ...(destination.id === "my-enrollment"
-          ? { title: `You’re in, ${student.preferredName}. Here’s what’s left.`, kicker: tenant.name }
+          ? { title: `Welcome, ${student.preferredName}. Here’s what’s next.`, lede: "Your next steps are listed in recommended order. Start at the top, or choose a task you’re ready to complete.", kicker: tenant.name }
           : destination.id === "help"
             ? { title: `Get unstuck, ${student.preferredName}.` }
             : {}),

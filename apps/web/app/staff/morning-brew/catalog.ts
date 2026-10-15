@@ -228,7 +228,7 @@ export const BREW_SOURCES: BrewSourceDefinition[] = [
     kicker: "Know what needs attention today",
     description:
       "Your command center for enrollment work—tasks, follow-ups, approvals, alerts, student issues, and workload signals—so you know what needs attention and why.",
-    source: "Open work items, approvals, and alerts on the task board",
+    source: "Open work items, approvals, and alerts on the Action Center",
     icon: "actions",
     accent: "blue",
     recommended: true,

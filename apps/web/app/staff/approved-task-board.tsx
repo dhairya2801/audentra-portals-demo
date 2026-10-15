@@ -29,7 +29,7 @@ export function useApprovedBoardOpenCount() {
   return count;
 }
 
-/** Project navigation lives under Task board in the original staff sidebar. */
+/** Project navigation lives under Action Center in the original staff sidebar. */
 export function ApprovedBoardNavigation({ onSelect }: { onSelect: () => void }) {
   const [navigation, setNavigation] = useState<BoardNavigation | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ fa: true, en: true, cl: false });
@@ -42,7 +42,7 @@ export function ApprovedBoardNavigation({ onSelect }: { onSelect: () => void }) 
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
   }, []);
-  return <div className={styles.tree} aria-label="Task Board projects">
+  return <div className={styles.tree} aria-label="Action Center projects">
     {navigation?.summaryAvailable ? <button type="button"
       className={`${styles.summary} ${navigation.board === "summary" ? styles.selected : ""}`}
       aria-current={navigation.board === "summary" ? "page" : undefined}
@@ -51,7 +51,7 @@ export function ApprovedBoardNavigation({ onSelect }: { onSelect: () => void }) 
         onSelect();
       }}>
       <svg width="15" height="15" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 3h5v5H3zm9 0h5v5h-5zM3 12h5v5H3zm9 0h5v5h-5z" fill="none" stroke="currentColor" strokeWidth="1.3" /></svg>
-      <span>For You</span><small>3 views</small>
+      <span>For You</span>
     </button> : null}
     {navigation?.spaces.map(space => <div key={space.id}>
       <button type="button" className={styles.space} data-board-space={space.id}
@@ -190,7 +190,7 @@ export function ApprovedTaskBoard({ onOpenWorkspace, demo = false, initialTask, 
       <strong>Loading your task workspace</strong>
       <p>Gathering your visible boards and tasks…</p>
     </div> : null}
-    <iframe id="approved-task-board" title="Audentra Task Board" data-summary-active={summaryOpen || undefined}
+    <iframe id="approved-task-board" title="Audentra Action Center" data-summary-active={summaryOpen || undefined}
     src={demo
       ? `/action-center-demo/index.html${initialTask ? `#${encodeURIComponent(initialTask)}` : ""}`
       : `/action-center-approved/index.html?${new URLSearchParams({demo: "0", task: initialTask ?? "", scope: JSON.stringify(initialQuery ?? {})})}`}

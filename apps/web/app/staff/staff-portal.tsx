@@ -235,7 +235,7 @@ const navigation: Array<{
     label: "Workspace",
     items: [
       { id: "morning_brew", label: "Morning Brew", icon: "brew" },
-      { id: "tasks", label: "Task Board", icon: "checklist", badge: "tasks" },
+      { id: "tasks", label: "Action Center", icon: "checklist", badge: "tasks" },
       { id: "students", label: "Student 360", icon: "student" },
     ],
   },
@@ -309,7 +309,7 @@ const viewCopy: Record<
   },
   tasks: {
     eyebrow: "Enrollment task management",
-    title: "Task board",
+    title: "Action Center",
     description:
       "Coordinate student work Jira-style, assign owners, and keep every colleague on the same shared record.",
   },
@@ -529,7 +529,7 @@ function OverviewView({
             type="button"
             onClick={() => navigate("outreach")}
           >
-            Open my Task Board
+            Open my Action Center
           </button>
         }
       />
@@ -568,7 +568,7 @@ function OverviewView({
               <h2>{personal.queue.total > 0 ? `${personal.queue.total.toLocaleString()} open items assigned to you` : "Nothing assigned to you"}</h2>
             </div>
             <button type="button" onClick={() => navigate("outreach")}>
-              Open Task Board
+              Open Action Center
             </button>
           </header>
           <div className="staff-priority-list">
@@ -763,7 +763,7 @@ export function TaskBoardView({
       } catch (error) {
         if (controller.signal.aborted || sequence !== requestSequence.current) return;
         setLoadError(
-          error instanceof Error ? error.message : "The task board could not be loaded.",
+          error instanceof Error ? error.message : "The Action Center could not be loaded.",
         );
         setLoadState("error");
       }
@@ -919,7 +919,7 @@ export function TaskBoardView({
       await updateStaffWorkItem(item.id, {
         expectedVersion: item.version,
         status,
-        note: `Moved to ${status.replaceAll("_", " ")} on the task board.`,
+        note: `Moved to ${status.replaceAll("_", " ")} on the Action Center.`,
       });
       setBoardMessage(
         `${item.key} moved to ${status.replaceAll("_", " ")}.`,
@@ -4169,7 +4169,7 @@ function OutreachView({
           <section className="staff-panel staff-empty-panel">
             <h2>Pick up your team&apos;s work</h2>
             <p>
-              With nothing assigned to you, the Task Board&apos;s <strong>My team</strong> scope shows
+              With nothing assigned to you, the Action Center&apos;s <strong>My team</strong> scope shows
               what {me.component} is carrying; claim an item there and it appears here.
             </p>
           </section>
@@ -4322,7 +4322,7 @@ function EdwardView({ staffName }: { staffName: string }) {
           <ul>
             <li>Student and cohort records</li>
             <li>Enrollment tasks and documents</li>
-            <li>Your Task Board queue</li>
+            <li>Your Action Center queue</li>
             <li>Staff guidance and action rules</li>
             <li>Student inquiries and draft replies</li>
           </ul>
@@ -4589,7 +4589,7 @@ function StaffWorkspaceShell({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  /** Open the task board pre-filtered — the deep link Morning Brew, the profile and the student record use. */
+  /** Open the Action Center pre-filtered — the deep link Morning Brew, the profile and the student record use. */
   const openTaskBoard = (query: StaffActionCenterQuery) => {
     setRequestedWorkItemId(null);
     setTaskBoardRequest((current) => ({ query, key: (current?.key ?? 0) + 1 }));
@@ -4612,7 +4612,7 @@ function StaffWorkspaceShell({
     window.history.replaceState(null, "", url);
   };
 
-  /** Change view; a `boardQuery` opens the task board pre-filtered instead. */
+  /** Change view; a `boardQuery` opens the Action Center pre-filtered instead. */
   const navigate = (next: StaffView, boardQuery?: StaffActionCenterQuery | null) => {
     if (boardQuery) {
       openTaskBoard(boardQuery);

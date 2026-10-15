@@ -12,6 +12,7 @@ import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import "../components/student-meeting-refresh.css";
+import { enrollmentPresentation, visibleEnrollmentRequirements } from "../components/enrollment-presentation";
 import { EnrollmentTour } from "../components/enrollment-tour";
 import { TenantLink as Link } from "../components/tenant-link";
 import { formatTenantDate } from "../lib/tenant";
@@ -174,16 +175,17 @@ export default function EnrollmentPage() {
     setPointsModal(false);
   }, []);
 
-  const items = useMemo(
-    () => (enrollment.status === "ready" ? enrollment.data.requirements.items : []),
+  const allItems = useMemo(
+    () => (enrollment.status === "ready" ? enrollment.data.requirements.items.map(enrollmentPresentation) : []),
     [enrollment],
   );
+  const items = useMemo(() => visibleEnrollmentRequirements(allItems), [allItems]);
   const groups = useMemo(() => {
     const result: Record<RequirementGroup, StudentRequirementDetail[]> = { next: [], reviewing: [], later: [], completed: [] };
     items.forEach((item) => result[groupOf(item)].push(item));
-    result.next = sortTasks(result.next, sort, items);
+    result.next = sortTasks(result.next, sort, allItems);
     return result;
-  }, [items, sort]);
+  }, [items, allItems, sort]);
 
   const shellProps = { active: "enrollment" as const };
   if (enrollment.status === "loading") {
@@ -204,7 +206,7 @@ export default function EnrollmentPage() {
   const data = enrollment.data;
   const rewards = data.bootstrap.rewards ?? sampleRewards;
   const rewardsOn = rewards !== null;
-  const totalSteps = data.requirements.total || items.length;
+  const totalSteps = items.length;
   const completedCount = groups.completed.length;
   const progress = totalSteps > 0 ? Math.round((completedCount / totalSteps) * 100) : 0;
   const earnedPoints = rewards?.lifetimePoints ?? 0;
@@ -336,8 +338,8 @@ export default function EnrollmentPage() {
               kind="status"
               icon="checklist"
               tone="accent"
-              title="Your next steps"
-              note={groups.next.length > 0 ? "Ready when you are." : "Nothing is waiting on you right now."}
+              title="Your enrollment checklist"
+              note={groups.next.length > 0 ? "Start with the tasks required for registration." : "Nothing is waiting on you right now."}
               aside={
                 <div className="sort-group" aria-label="Sort your next steps">
                   <button
@@ -369,7 +371,7 @@ export default function EnrollmentPage() {
                   <EnrollmentTaskCard
                     key={item.id}
                     item={item}
-                    unlocks={unlocksOf(item, items)}
+                    unlocks={unlocksOf(item, allItems)}
                     recommended={index === 0 && sort === "smart"}
                     feedback={documents.data?.items.filter(doc=>doc.requirementId===item.id && ['rejected','needs_resubmission'].includes(doc.status)).sort((a,b)=>Date.parse(b.review?.decidedAt||'')-Date.parse(a.review?.decidedAt||''))[0]?.review?.note || undefined}
                     rewardsOn={rewardsOn}
@@ -448,7 +450,7 @@ export default function EnrollmentPage() {
                       <h3>{item.title}</h3>
                       <p>{item.description}</p>
                       <div className="prerequisite">
-                        <Icon name="arrow" size={14} /> {prerequisiteLine(item, items)}
+                        <Icon name="arrow" size={14} /> {prerequisiteLine(item, allItems)}
                       </div>
                     </div>
                     <span className="locked-due">{dueLabel(item, tenant)}</span>
@@ -526,7 +528,7 @@ export default function EnrollmentPage() {
       {tourOpen && <EnrollmentTour onClose={()=>setTourOpen(false)} />}
       {smartModal && <InfoModal variant="smart" title="The path that moves you forward." icon="flow" kicker="SMART ORDER · EXPLAINED" onClose={closeModals}>
         <p>We follow the prerequisites published by your university, then look at the longest chain of remaining work, its nearest deadline and your estimated effort. Registration requirements come first.</p>
-        <div className="smart-path-list">{groups.next.slice(0,3).map(item=>{const path=criticalPath(item,items);return <div key={item.id}><strong>{item.title}</strong><span>{path.count} dependent steps · about {path.minutes} min across the longest path</span><small>{Number.isFinite(path.deadline)?`Nearest deadline: ${formatTenantDate(new Date(path.deadline).toISOString(),tenant,{month:'short',day:'numeric'})}`:'No deadline published'}</small></div>;})}</div>
+        <div className="smart-path-list">{groups.next.slice(0,3).map(item=>{const path=criticalPath(item,allItems);return <div key={item.id}><strong>{item.title}</strong><span>{path.count} dependent steps · about {path.minutes} min across the longest path</span><small>{Number.isFinite(path.deadline)?`Nearest deadline: ${formatTenantDate(new Date(path.deadline).toISOString(),tenant,{month:'short',day:'numeric'})}`:'No deadline published'}</small></div>;})}</div>
         <p>Effort is an estimate of your time. University review can take longer. Due soon sorts by date alone; Fastest starts with the shortest individual task.</p>
       </InfoModal>}
       {pointsModal && rewards && <PointsInfoModal rewards={rewards} onClose={closeModals} />}

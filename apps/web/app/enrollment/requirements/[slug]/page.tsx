@@ -43,6 +43,7 @@ import StateCard from "../../../design-system/patterns/StateCard.jsx";
 import { openEdward } from "../../../design-lib/door.js";
 import { FerpaAccessCenter } from "../../../components/ferpa-access-center";
 import { PointsInfoModal } from "../../../components/points-popover";
+import { enrollmentPresentation } from "../../../components/enrollment-presentation";
 import { PortalShell } from "../../../components/portal-shell";
 import { RequirementExtractReview } from "../../../components/requirement-extract-review";
 import {
@@ -1901,7 +1902,7 @@ export default function RequirementDetailPage() {
     );
   }
 
-  const item = requirement.data;
+  const item = enrollmentPresentation(requirement.data);
   const office = item.responsibleOffice;
   const due = shortDue(item.dueAt, tenant);
   const pill = helpRequested

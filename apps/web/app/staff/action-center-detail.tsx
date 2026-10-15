@@ -337,7 +337,7 @@ export function ActionCenterDetail({
       <div className="action-detail-state" role="alert">
         <h2>Action unavailable</h2>
         <p>{fatalError ?? "The action record could not be loaded."}</p>
-        <button type="button" onClick={onBack}>Return to task board</button>
+        <button type="button" onClick={onBack}>Return to Action Center</button>
       </div>
     );
   }
@@ -444,7 +444,7 @@ export function ActionCenterDetail({
 
       {presentation === "page" ? (
         <button className="action-back" type="button" onClick={onBack}>
-          Back to task board
+          Back to Action Center
         </button>
       ) : null}
       <header className="action-detail__header">

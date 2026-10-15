@@ -82,8 +82,8 @@ export const DESTINATIONS = [
     hero: {
       flag: 'Offer accepted',
       kicker: 'Class of 2030',
-      title: 'You’re in, Maya. Here’s what’s left.',
-      lede: 'Your next steps are in the order that keeps things moving. Start with the first one, or pick any task you can do now.',
+      title: 'Welcome, Maya. Here’s what’s next.',
+      lede: 'Your next steps are listed in recommended order. Start at the top, or choose a task you’re ready to complete.',
       motif: 'check',
     },
     appears: 'The steps Aster still needs from you appear here.',
