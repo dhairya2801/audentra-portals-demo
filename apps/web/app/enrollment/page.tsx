@@ -217,8 +217,9 @@ export default function EnrollmentPage() {
 
   // ENR-214 semantics on the platform's `blocking` flag: what is yours to act
   // on holds registration; what is with the institution is waiting on them.
-  const gatingMine = [...groups.next, ...groups.later].filter((item) => item.blocking);
-  const gatingWaiting = groups.reviewing.filter((item) => item.blocking);
+  // Checklist consolidation must not hide a canonical registration dependency.
+  const gatingMine = allItems.filter((item) => item.blocking && ["next", "later"].includes(groupOf(item)));
+  const gatingWaiting = allItems.filter((item) => item.blocking && groupOf(item) === "reviewing");
   const gateUrgent = gatingMine.some((item) => {
     const days = daysLeft(item);
     return days != null && days <= 7;
@@ -237,7 +238,7 @@ export default function EnrollmentPage() {
     .find((item): item is StudentRequirementDetail => Boolean(item));
   const onboardingOpen = data.onboarding ? data.onboarding.status !== "completed" : false;
 
-  const active = activeId ? items.find((item) => item.id === activeId) ?? null : null;
+  const active = activeId ? allItems.find((item) => item.id === activeId) ?? null : null;
   const summaryLine =
     groups.next.length > 0 ? "You’re right on track. Your next step is ready when you are." : "Nothing is waiting on you right now.";
 
