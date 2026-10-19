@@ -69,10 +69,6 @@
   :scope .brew-glance > strong { color: #fff; font-size: 34px; }
   :scope .brew-glance__head, :scope .brew-glance > small, :scope .brew-glance__link { color: #e0d9fa; }
   :scope .brew-glance > em { color: #ffe09b; }
-  :scope .brew-insights .brew-insight { overflow: hidden; }
-  :scope .brew-insights .brew-insight__top { margin: -1.05rem -1.05rem 0; padding: 18px 17px; min-height: 74px; background: #ece9f9; align-items: center; }
-  :scope .brew-insights .brew-insight__top h3 { color: #35285e; }
-  :scope .brew-insights .brew-insight__rank { color: white; background: #7546f7; }
   @media (max-width: 1200px) {
     :scope .brew-hero { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
     :scope .brew-hero__greeting { padding-right: 70px; }

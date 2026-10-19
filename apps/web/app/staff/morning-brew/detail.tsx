@@ -6,6 +6,7 @@ import { DayDetail } from "./day-detail";
 import { KpiGoal, TrendChart, TrendKey } from "./pulse";
 import { movementLabel, movementTone } from "./presentation";
 import { useState } from "react";
+import styles from "./intelligence-detail.module.css";
 
 import { topicById } from "./catalog";
 import { formatBrewNumber } from "./data";
@@ -266,29 +267,33 @@ export function MorningBrewDetail({
             : `${topic?.title ?? "Enrollment"} · Institutional Intelligence`
         }
         mark={<Glyph name={topic?.icon ?? "students"} size={20} />}
-        className="brew-detail--intelligence"
+        className={`brew-detail--intelligence ${styles.panel}`}
         onAskEdward={() => onAskEdward({ mode: "cohort", sourceId: insight.id, context: insight.cohort.question })}
-        accent="amber"
+        accent="purple"
         title={insight.title}
         onBack={onBack}
+        headerMeta
         meta={
           <>
             <span>Potential impact · {insight.impactLevel}</span>
+            <span>{insight.confidence}% confidence</span>
             <span>{insight.stats.deep}</span>
           </>
         }
-        actions={openWorkspace(insight.destination)}
+        footer={<footer className={styles.footer}>{openWorkspace(insight.destination)}</footer>}
       >
-        <p className="brew-detail__lede">{insight.summary}</p>
+        <section className={styles.overview} aria-label="Overview">
+          <p className="brew-detail__lede">{insight.summary}</p>
 
-        {insight.detail.narrative.map((paragraph) => (
-          <p className="brew-detail__paragraph" key={paragraph.slice(0, 32)}>
-            {paragraph}
-          </p>
-        ))}
+          {insight.detail.narrative.map((paragraph) => (
+            <p className="brew-detail__paragraph" key={paragraph.slice(0, 32)}>
+              {paragraph}
+            </p>
+          ))}
+        </section>
 
         {insight.detail.drivers.length ? (
-          <section className="brew-detail__section">
+          <section className={`brew-detail__section ${styles.related}`}>
             <h2>Related cohorts</h2>
             <div className="brew-stat-grid">
               {insight.detail.drivers.map((driver) => (
@@ -350,7 +355,7 @@ export function MorningBrewDetail({
         ) : null}
 
         {insight.detail.actions.length ? (
-          <section className="brew-detail__section">
+          <section className={`brew-detail__section ${styles.nextSteps}`}>
             <h2>What to do next</h2>
             <ol className="brew-action-list">
               {insight.detail.actions.map((action) => (

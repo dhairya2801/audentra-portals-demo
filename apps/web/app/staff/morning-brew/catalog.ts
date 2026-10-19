@@ -280,7 +280,7 @@ export const BREW_SOURCES: BrewSourceDefinition[] = [
         title: "With Context",
         kicker: "Why it reads that way",
         description:
-          "Add the paragraph behind the headline: what changed, what it costs, and where the recommendation gets more specific.",
+          "See the current signal beside its forecasted impact, with a specific next move. Hover over or focus Why it matters for the context behind it.",
         tag: "Decision context",
       },
       deep: {

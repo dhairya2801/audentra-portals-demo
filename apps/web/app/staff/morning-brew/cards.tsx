@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
+import styles from "./intelligence.module.css";
 import { topicById } from "./catalog";
 import { Glyph } from "./glyphs";
 import {
   emailPresentation,
   formatEmailTimestamp,
   initialsOf,
-  insightPreviewActions,
 } from "./presentation";
 import type {
   BrewDetailLevelId,
@@ -77,99 +77,114 @@ export function IntelligenceCard({
   onOpen?: () => void;
   onAskEdward?: () => void;
 }) {
+  const [showWhy, setShowWhy] = useState(false);
+  const [showEvidence, setShowEvidence] = useState(false);
+  const whyId = useId();
+  const evidenceId = useId();
+  const topic = topicById(insight.topic);
+  // Reformat the supplied figures only; do not infer new forecasts or exposure.
+  const splitFigure = (label: string) => {
+    const match = label.match(/^([+−≈-]?\$?[\d,.]+(?:[MK%]|pp)?)(?:\s+(.+))?$/);
+    const heading = match?.[2] ?? (label.includes("$") ? "Tuition Impact" : "Projected Impact");
+    return {
+      value: match?.[1] ?? label,
+      label: heading.replace(/\b[a-z]/g, (letter) => letter.toUpperCase()),
+    };
+  };
+  const signal = splitFigure(insight.stats.glance.split(" · ")[0]);
+
   return (
     <article
-      className={`brew-insight brew-insight--${insight.severity}${preview ? " brew-insight--preview" : ""}`}
+      className={`brew-insight ${styles.card}${preview ? ` ${styles.preview}` : ""}`}
+      data-level={level}
     >
-      <div className="brew-insight__top">
-        <span className="brew-insight__rank" aria-hidden="true">
-          <Glyph
-            name={topicById(insight.topic)?.icon ?? "students"}
-            size={15}
-          />
+      <div className={styles.topline}>
+        <span className={styles.category}>
+          <Glyph name={topic?.icon ?? "students"} size={12} />
+          {topic?.title ?? insight.label}
         </span>
-        <h3>
-          <button className="brew-stretch" type="button" onClick={onOpen}>
-            {insight.title}
-          </button>
-        </h3>
-        <EdwardButton
-          label={`Ask Edward about ${insight.title}`}
-          onClick={onAskEdward}
-        />
-      </div>
-
-      <p className="brew-insight__summary">
-        {preview
-          ? insight.stats.glance
-              .split(" · ")
-              .slice(0, 2)
-              .map((stat) => <span key={stat}>{stat}</span>)
-          : insight.summary}
-      </p>
-      {!preview ? (
-        <p className="brew-insight__projection">{insight.projection}</p>
-      ) : null}
-
-      {!preview && level !== "glance" ? (
-        <p className="brew-insight__stats">{insight.stats[level]}</p>
-      ) : null}
-      {!preview && level !== "glance" ? (
-        <p className="brew-insight__reading">
-          {level === "deep" ? insight.deepDive : insight.context}
-        </p>
-      ) : null}
-
-      <div className="brew-insight__impact">
-        <small>Potential impact · {insight.impactLevel}</small>
-        <div>
-          {(preview ? insight.impact.slice(0, 1) : insight.impact).map(
-            (chip) => (
-              <span
-                className={`brew-impact brew-impact--${chip.tone}`}
-                key={chip.label}
-              >
-                {chip.label}
-              </span>
-            ),
-          )}
+        <div className={styles.controls}>
+          <span className={styles.confidence}>{insight.confidence}% confidence</span>
+          <EdwardButton label={`Ask Edward about ${insight.title}`} onClick={onAskEdward} />
         </div>
       </div>
+      <h3 className={styles.title}>
+        <button className="brew-stretch" type="button" onClick={onOpen}>{insight.title}</button>
+      </h3>
+      <p className={styles.summary}>{insight.summary}</p>
 
-      {!preview || level !== "glance" ? (
-        <div className="brew-insight__action">
-          <small>Recommended action</small>
-          <p>
-            {preview
-              ? (insightPreviewActions[insight.id] ??
-                insight.recommendations.glance)
-              : insight.recommendations[level]}
-          </p>
+      <div className={styles.forecast}>
+        <div className={styles.forecastHead}>
+          <span>Forecasted impact</span>
+          {level !== "glance" ? (
+            <div
+              className={styles.whyWrap}
+              onMouseEnter={() => setShowWhy(true)}
+              onMouseLeave={(event) => {
+                if (!event.currentTarget.contains(document.activeElement)) setShowWhy(false);
+              }}
+              onFocus={() => setShowWhy(true)}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) setShowWhy(false);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.stopPropagation();
+                  setShowWhy(false);
+                }
+              }}
+            >
+              <button type="button" className={styles.disclosure} aria-expanded={showWhy}
+                aria-describedby={whyId} onClick={() => setShowWhy(true)}>
+                <span aria-hidden="true">ⓘ</span> Why it matters
+              </button>
+              <div className={styles.whyTooltip} id={whyId} role="tooltip" hidden={!showWhy}>
+                <strong>Why it matters</strong>
+                <p>{insight.projection}</p>
+                <p>{insight.context}</p>
+              </div>
+            </div>
+          ) : <span className={styles.impactLevel}>{insight.impactLevel} impact</span>}
         </div>
-      ) : null}
+        <dl className={styles.figures}>
+          {level !== "glance" ? <div><dt>{signal.label}</dt><dd>{signal.value}</dd></div> : null}
+          {insight.impact.map((chip) => {
+            const figure = splitFigure(chip.label);
+            return <div key={chip.label} data-tone={chip.tone}><dt>{figure.label}</dt><dd>{figure.value}</dd></div>;
+          })}
+        </dl>
+      </div>
 
-      {level === "deep" && insight.detail.students.length > 0 ? (
-        <div className="brew-insight__cohort">
-          <small>In the cohort</small>
-          <ul>
-            {insight.detail.students.slice(0, 2).map((student) => (
-              <li key={student.id}>
-                <Avatar name={student.name} />
-                <span>
-                  <strong>{student.name}</strong>
-                  {!preview ? <small>{student.program}</small> : null}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      <div className={styles.recommendation}>
+        <small>Recommended next move</small>
+        <p>{insight.recommendations[level]}</p>
+      </div>
 
-      <footer className="brew-insight__foot">
+      {level === "deep" ? <div className={styles.deep}>
+        <small>Behind the signal</small>
+        <p>{insight.deepDive}</p>
+        <p className={styles.stats}>{insight.stats.deep}</p>
+        {insight.detail.students.length > 0 ? <ul className={styles.cohort}>
+          {insight.detail.students.slice(0, 2).map((student) => <li key={student.id}>
+            <Avatar name={student.name} /><span><strong>{student.name}</strong><small>{student.program}</small></span>
+          </li>)}
+        </ul> : null}
+      </div> : null}
+
+      <footer className={styles.footer}>
+        <button type="button" className={styles.evidenceToggle} aria-expanded={showEvidence}
+          aria-controls={evidenceId} onClick={() => setShowEvidence(!showEvidence)}>
+          Why am I seeing this? <span aria-hidden="true">{showEvidence ? "⌃" : "⌄"}</span>
+        </button>
         <button className="brew-link" type="button" onClick={onOpen}>
           View details <Glyph name="arrow" size={13} />
         </button>
       </footer>
+      {showEvidence ? <div className={styles.evidence} id={evidenceId}>
+        <strong>Underlying signal · {topic?.title ?? insight.label}</strong>
+        <p>{insight.context}</p>
+        {insight.detail.evidence.length ? <ul>{insight.detail.evidence.map((item) => <li key={item}>{item}</li>)}</ul> : null}
+      </div> : null}
     </article>
   );
 }

@@ -1,0 +1,67 @@
+/* Scoped to the intelligence dialog; day and metric details retain their layouts. */
+.panel.panel {
+  width: min(100%, 1080px);
+  padding: 28px;
+  border: 1px solid #e3e6f0;
+  border-radius: 22px;
+  background: #f8f9fc;
+  color: #4f5f77;
+}
+.panel.panel :global(.brew-detail__head) { gap: 16px; padding: 0 0 24px; align-items: start; }
+.panel.panel :global(.brew-detail__mark) { width: 46px; height: 46px; border-radius: 13px; background: #eee9fb; color: #6949c4; }
+.panel.panel :global(.brew-eyebrow) { margin: 0; color: #6b568f; font-size: 11px; font-weight: 650; letter-spacing: .06em; line-height: 1.5; }
+.panel.panel :global(.brew-detail__head) h1 { margin-top: 7px; font-size: clamp(20px, 2vw, 28px); line-height: 1.25; color: #172b4d; font-weight: 700; letter-spacing: -.03em; }
+.panel.panel :global(.brew-detail__head-actions) { gap: 12px; }
+.panel.panel :global(.brew-detail__meta) { gap: 8px; margin-top: 14px; font-size: 11px; line-height: 1.6; }
+.panel.panel :global(.brew-detail__meta) > span { padding: 4px 9px; border: 1px solid #e2e6ef; border-radius: 6px; background: #fff; color: #53647e; }
+.panel.panel :global(.brew-detail__meta) > span:first-child { color: #72532b; background: #fbf3e7; border-color: #f0e3cb; }
+.panel.panel :global(.brew-detail__meta) > span:last-child { flex-basis: 100%; padding: 3px 0 0; border: 0; background: transparent; }
+.panel.panel :global(.brew-detail__body) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin: 0; padding: 0; border: 0; align-items: start; }
+.overview, .related, .nextSteps { grid-column: 1 / -1; }
+.overview { padding: 22px; border: 1px solid #e5e9f1; border-radius: 14px; background: #fff; }
+.panel.panel .overview :global(.brew-detail__lede) { margin: 0 0 12px; color: #263c5b; font-size: 16px; line-height: 1.65; font-weight: 600; }
+.panel.panel :global(.brew-detail__paragraph) { margin: 10px 0 0; font-size: 13px; line-height: 1.75; color: #5b6a80; }
+.panel.panel :global(.brew-detail__section) { min-width: 0; margin: 0; padding: 20px; border: 1px solid #e5e9f1; border-radius: 14px; background: #fff; }
+.panel.panel :global(.brew-detail__section) h2 { margin: 0 0 16px; font-size: 15px; font-weight: 700; color: #253b5b; letter-spacing: -.01em; }
+.panel.panel :global(.brew-stat-grid) { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.panel.panel :global(.brew-stat) { padding: 16px; border: 1px solid #e9edf5; border-radius: 10px; background: #f7f9fd; }
+.panel.panel :global(.brew-stat) small { display: block; min-height: 2.8em; font-size: 11px; line-height: 1.4; color: #5d6e86; }
+.panel.panel :global(.brew-stat) strong { display: block; margin-top: 8px; color: #273b60; font-size: 24px; font-weight: 700; letter-spacing: -.03em; }
+.panel.panel :global(.brew-stat) p { margin: 8px 0 0; color: #69788d; font-size: 11px; line-height: 1.6; }
+.panel.panel :global(.brew-table) { display: table; width: 100%; table-layout: fixed; font-size: 12px; line-height: 1.5; }
+.panel.panel :global(.brew-table) :is(th, td) { padding: 12px 8px; white-space: normal; overflow-wrap: anywhere; }
+.panel.panel :global(.brew-table) th:first-child { width: 54%; }
+.panel.panel :global(.brew-table) thead th { background: #f7f9fc; font-size: 10px; color: #61718a; }
+.panel.panel :global(.brew-table) :is(th, td):not(:first-child) { text-align: right; }
+.panel.panel :global(.brew-table) tbody th { font-weight: 550; color: #354b69; }
+.panel.panel :global(.brew-detail__note) { margin: 12px 0 0; color: #69788d; font-size: 11px; line-height: 1.6; }
+.panel.panel :global(.brew-student-list) { gap: 0; margin: 0; }
+.panel.panel :global(.brew-student-list) > li { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; padding: 12px 0; border: 0; border-bottom: 1px solid #edf0f6; border-radius: 0; align-items: start; }
+.panel.panel :global(.brew-student-list) > li:first-child { padding-top: 0; }
+.panel.panel :global(.brew-student-list) strong { color: #354b69; font-size: 12px; line-height: 1.5; }
+.panel.panel :global(.brew-student-list) small { display: block; margin-top: 3px; color: #69788d; font-size: 11px; line-height: 1.5; }
+.panel.panel :global(.brew-student-list) > li > span { color: #63728a; font-size: 11px; line-height: 1.6; text-align: left; }
+.panel.panel .nextSteps { background: #faf8ff; border-color: #e6def6; }
+.panel.panel :global(.brew-action-list) { gap: 10px; margin: 0; counter-reset: actions; }
+.panel.panel :global(.brew-action-list) > li { grid-template-columns: 26px minmax(0, 1fr) minmax(130px, 22%); align-items: start; gap: 12px; padding: 14px; border: 1px solid #e9e3f4; border-radius: 10px; background: #fff; }
+.panel.panel :global(.brew-action-list) > li::before { counter-increment: actions; content: counter(actions); display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: #efe9fc; color: #6949c4; font-size: 12px; font-weight: 650; }
+.panel.panel :global(.brew-action-list) strong { font-size: 13px; line-height: 1.5; color: #354b69; }
+.panel.panel :global(.brew-action-list) p { font-size: 12px; line-height: 1.65; color: #63728a; }
+.panel.panel :global(.brew-action-list) > li > span { color: #6b568f; font-size: 11px; line-height: 1.6; text-align: right; }
+.panel.panel :global(.brew-detail__section--evidence) { background: #f1f5fb; }
+.panel.panel :global(.brew-detail__section--evidence) :global(.brew-detail__lede) { margin: 0 0 12px; color: #536780; font-size: 13px; line-height: 1.7; }
+.panel.panel :global(.brew-edward-chip) { margin-top: 18px; max-width: 100%; text-align: left; white-space: normal; line-height: 1.6; }
+.footer { display: flex; justify-content: flex-end; margin-top: 20px; padding: 0; }
+@media (max-width: 760px) {
+  .panel.panel { padding: 18px; border-radius: 16px; max-height: calc(100dvh - 26px); }
+  .panel.panel :global(.brew-detail__head) { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+  .panel.panel :global(.brew-detail__mark) { display: none; }
+  .panel.panel :global(.brew-detail__head-actions) { flex-direction: column-reverse; gap: 12px; }
+  .panel.panel :global(.brew-detail__body), .panel.panel :global(.brew-stat-grid) { grid-template-columns: minmax(0, 1fr); }
+  .panel.panel :global(.brew-detail__section), .overview { padding: 16px; }
+  .panel.panel :global(.brew-stat) small { min-height: 0; }
+  .panel.panel :global(.brew-action-list) > li { grid-template-columns: 26px minmax(0, 1fr); }
+  .panel.panel :global(.brew-action-list) > li > span { grid-column: 2; text-align: left; justify-items: start; }
+  .panel.panel :global(.brew-table) :is(th, td) { padding: 10px 5px; }
+  .footer > button { width: 100%; }
+}

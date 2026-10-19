@@ -40,18 +40,42 @@
   width: 1.65rem;
   height: 1.65rem;
   border: 0;
-  background: #f1edff;
+  background: #6346f5;
   border-radius: 0.45rem;
+  box-shadow: 0 2px 7px rgb(107 69 244 / 15%);
 }
 .brew-kpi__edward > span {
   width: 1.12rem;
   height: 1.12rem;
   font-size: 0.64rem;
   border-radius: 0.3rem;
+  background: transparent;
 }
 .brew-kpi__edward:focus-visible {
   outline: 2px solid var(--audentra-purple);
   outline-offset: 3px;
+}
+.brew-kpi__edward,
+.brew-edward-chip > span {
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+button.brew-kpi__edward:hover,
+button.brew-kpi__edward:focus-visible,
+.brew-edward-chip:is(:hover, :focus-visible) > span {
+  transform: translateY(-1px);
+  background: #4e30dc;
+  box-shadow: 0 2px 7px rgb(107 69 244 / 15%);
+}
+button.brew-kpi__edward:active,
+.brew-edward-chip:active > span {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgb(107 69 244 / 15%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .brew-kpi__edward,
+  .brew-edward-chip > span { transition: none; }
+  button.brew-kpi__edward:is(:hover, :focus-visible),
+  .brew-edward-chip:is(:hover, :focus-visible) > span { transform: none; }
 }
 .brew-kpi__head {
   align-items: flex-start;

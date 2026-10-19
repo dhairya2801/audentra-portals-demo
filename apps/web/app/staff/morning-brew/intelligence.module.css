@@ -1,0 +1,186 @@
+.card.card {
+  min-width: 0;
+  gap: 0;
+  padding: 16px 15px 12px;
+  border: 1px solid #e5e9f3;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgb(37 54 92 / 3%);
+  container-type: inline-size;
+}
+.card.card:hover {
+  transform: none;
+  border-color: #cbd3eb;
+  box-shadow: 0 8px 24px rgb(29 39 70 / 6%);
+}
+.topline, .controls, .forecastHead, .footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.topline { min-height: 28px; flex-wrap: wrap; }
+.category {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid #ececf5;
+  border-radius: 20px;
+  background: #f5f5fb;
+  color: #505575;
+  font-size: 10px;
+  font-weight: 650;
+}
+.category svg { color: var(--audentra-purple); flex: none; }
+.controls { margin-left: auto; }
+.confidence { color: #69788f; font-size: 10px; white-space: nowrap; }
+.card .title {
+  margin: 12px 0 7px;
+  min-height: 2.6em;
+  color: #152345;
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: -.025em;
+  line-height: 1.3;
+}
+.card .summary {
+  margin: 0 0 8px;
+  color: #5e6b82;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.forecast {
+  margin-top: 0;
+  padding: 12px;
+  border: 1px solid #e8edf5;
+  border-radius: 10px;
+  background: #f8faff;
+}
+.forecastHead { flex-wrap: wrap; margin-bottom: 12px; }
+.forecastHead > span:first-child, .recommendation > small, .deep > small {
+  color: #52617b;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.disclosure, .evidenceToggle {
+  position: relative;
+  z-index: 2;
+  border: 0;
+  padding: 3px 0;
+  background: transparent;
+  color: #6949c4;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.disclosure:hover, .evidenceToggle:hover { text-decoration: underline; text-underline-offset: 3px; }
+.whyWrap { position: relative; z-index: 3; }
+.whyTooltip {
+  position: absolute;
+  bottom: calc(100% + 11px);
+  right: -5px;
+  z-index: 15;
+  width: min(280px, 75vw);
+  padding: 12px 13px;
+  border-radius: 10px;
+  background: #1b2446;
+  color: #fff;
+  box-shadow: 0 14px 33px rgb(26 28 67 / 24%);
+  font-size: 11px;
+  font-weight: 450;
+  line-height: 1.5;
+  white-space: normal;
+}
+.whyTooltip::after {
+  content: "";
+  position: absolute;
+  bottom: -6px;
+  right: 18px;
+  width: 12px;
+  height: 12px;
+  background: #1b2446;
+  transform: rotate(45deg);
+}
+/* Bridge the visual gap so moving onto the tooltip doesn't dismiss it. */
+.whyTooltip::before { content: ""; position: absolute; inset: 100% 0 -12px; }
+.whyTooltip strong { display: block; color: #dcd4ff; font-size: 10.5px; }
+.whyTooltip p { margin: 5px 0 0; }
+.card button:focus-visible { outline: 2px solid var(--audentra-purple); outline-offset: 3px; border-radius: 4px; }
+.impactLevel { color: #69788f; font-size: 10px; }
+.figures { display: flex; margin: 0; font-variant-numeric: tabular-nums; }
+.figures > div { flex: 1; min-width: 0; padding: 0 9px; border-left: 1px solid #e1e7f0; }
+.figures > div:first-child { padding-left: 0; border-left: 0; }
+.figures > div:last-child { padding-right: 0; }
+.figures dt { min-height: 2.6em; color: #66768e; font-size: 10px; line-height: 1.3; overflow-wrap: anywhere; }
+.figures dd { margin: 5px 0 0; color: #1b3158; font-size: 20px; font-weight: 750; line-height: 1.2; letter-spacing: -.035em; overflow-wrap: anywhere; }
+.figures [data-tone="negative"] dd { color: #c5334a; }
+.figures [data-tone="positive"] dd { color: #0b7d63; }
+.recommendation { margin-top: 10px; padding: 11px 12px; border-left: 3px solid var(--audentra-purple); border-radius: 0 8px 8px 0; background: #f8f6ff; }
+.recommendation > small { color: #6949c4; font-size: 9px; }
+.recommendation p { margin: 5px 0 0; color: #505d77; font-size: 12px; line-height: 1.6; }
+.deep { padding-top: 16px; }
+.deep p, .evidence { color: #5e6b82; font-size: 12px; line-height: 1.65; }
+.deep p { margin: 6px 0 0; }
+.deep .stats { padding: 10px; border-radius: 7px; background: #f5f7fb; font-size: 11px; }
+.evidence strong { color: #344561; font-weight: 650; }
+.evidence p { margin: 6px 0 0; }
+.cohort { display: grid; gap: 9px; padding: 0; margin: 12px 0 0; list-style: none; }
+.cohort li { display: flex; gap: 8px; align-items: center; }
+.cohort li > span:last-child { min-width: 0; }
+.cohort strong, .cohort small { display: block; font-size: 11px; line-height: 1.5; color: #52617b; }
+.cohort small { font-weight: 400; }
+.footer { flex-direction: row; flex-wrap: wrap; margin-top: 12px; padding: 10px 0 0; border-top: 1px solid #eef0f5; }
+.footer span:last-child { display: inline; }
+.footer .evidenceToggle { color: #5c6a82; }
+.footer :global(.brew-link) { position: relative; z-index: 2; font-size: 11px; margin-left: auto; }
+.evidence { margin-top: 12px; padding: 12px; border-radius: 8px; background: #f5f7fb; }
+.evidence ul { padding-left: 16px; margin-bottom: 0; }
+.card[data-level="glance"] .title { min-height: 0; }
+.card[data-level="glance"] .summary { min-height: 0; }
+/* The setup samples use the actual card, with the same figures and hierarchy. */
+.card.preview { padding: 8px; box-shadow: none; }
+.preview .topline { gap: 5px; }
+.card.card.preview :global(.brew-kpi__edward) { display: grid; }
+.preview .category, .preview .confidence { font-size: 9px; }
+.preview .title { font-size: 11px; line-height: 1.4; margin: 8px 0 6px; }
+.preview .summary, .preview .recommendation p, .preview .deep p { font-size: 9px; line-height: 1.5; }
+.preview .title, .preview .summary, .preview .recommendation p, .preview .deep p {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.preview .summary { -webkit-line-clamp: 2; min-height: 0; margin-bottom: 8px; }
+.preview .forecast { padding: 7px; }
+.preview .forecastHead { margin-bottom: 7px; }
+.preview .forecastHead > span:first-child, .preview .deep > small { font-size: 8px; }
+.preview .disclosure, .preview .impactLevel, .preview .footer, .preview .cohort, .preview .stats { display: none; }
+.preview .recommendation { padding: 7px; }
+.preview .recommendation > small { display: block; font-size: 7px; line-height: 1.5; }
+.preview .deep { padding-top: 10px; }
+.preview .figures > div { padding-inline: 6px; }
+.preview .figures > div:first-child { padding-left: 0; }
+.preview .figures dd { font-size: 12px; white-space: nowrap; }
+.preview .figures dt { font-size: 8px; overflow-wrap: normal; }
+.preview .footer { gap: 5px; }
+.preview .footer button { font-size: 9px; }
+@container (max-width: 240px) {
+  .figures { flex-wrap: wrap; gap: 10px 0; }
+  .figures > div { flex-basis: 50%; }
+  .figures > div:nth-child(3) { padding-left: 0; border-left: 0; }
+  .figures dt { min-height: 0; }
+}
+@container (max-width: 130px) {
+  .preview .category { font-size: 8px; padding: 3px 5px; }
+  .preview .confidence { font-size: 8px; }
+  .preview .figures { flex-direction: column; gap: 8px; }
+  .preview .figures > div { border: 0; padding: 0; }
+  .preview .figures dd { margin-top: 2px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card.card { transition: none; }
+}
