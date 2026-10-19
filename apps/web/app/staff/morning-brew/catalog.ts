@@ -287,7 +287,7 @@ export const BREW_SOURCES: BrewSourceDefinition[] = [
         title: "Deep Dive",
         kicker: "The whole argument",
         description:
-          "Add the full reasoning and people in the cohort to follow up with, alongside a recommendation you can act on this week.",
+          "Add the full reasoning and supporting evidence behind each finding, alongside a recommendation you can act on.",
         tag: "Deeper insight",
       },
     },

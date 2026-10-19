@@ -116,16 +116,6 @@ export function formatEmailTimestamp(
   }).format(date);
 }
 
-/** Short editorial labels for the existing demo findings in setup previews. */
-export const insightPreviewActions: Record<string, string> = {
-  "commuter-deposit-pace": "Reach 312 students awaiting aid.",
-  "verification-backlog": "Add 2 reviewers for priority files.",
-  "transfer-volume": "Add events at key feeder colleges.",
-  "housing-signing-lag": "Clear aid holds, then assign rooms.",
-  "orientation-melt-signal": "Rebalance sessions and follow up.",
-  "discount-rate-creep": "Adjust the top two merit bands.",
-};
-
 /** MB-02: each eligible message belongs to exactly one rule category. */
 export function briefEmailCategory(
   request: BrewRequest,

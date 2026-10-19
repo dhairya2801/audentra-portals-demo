@@ -24,10 +24,9 @@ import type {
  *  - every rate is its own two figures. Deposit rate is deposits ÷ admits;
  *    yield is projected enrolled ÷ admits. Neither is typed in by hand;
  *  - every progress bar is its figure ÷ its target, rounded once;
- *  - a finding's "Potential Impact" chips are the arithmetic of the sentence
- *    directly above them. $19.5K of net tuition per enrolled student is the
- *    single conversion the whole brief uses, so 82 deposits is $1.6M wherever
- *    it appears.
+ *  - finding figures repeat their supplied forecast. The three reference
+ *    scenarios use the illustrative loss and tuition ranges supplied in the
+ *    approved HTML; they are not computed from the Pulse conversion rate.
  *
  * Two conventions worth stating, because a reader will notice both:
  *
@@ -50,7 +49,7 @@ const ADMITS = 6125;
 const DEPOSITS = 2450;
 /** Deposits, less the melt observed at the same point in the Fall 2024 cycle. */
 const PROJECTED_ENROLLED = 1452;
-/** The one conversion the brief uses, in dollars of net tuition per student. */
+/** The Pulse conversion, in dollars of net tuition per student. */
 const NET_TUITION_PER_STUDENT = 19500;
 
 const rate = (numerator: number, denominator: number) =>
@@ -708,384 +707,271 @@ export const DEMO_KPIS: BrewKpi[] = [
  */
 export const DEMO_INSIGHTS: BrewInsight[] = [
   {
-    id: "commuter-deposit-pace",
-    topic: "enrollment",
-    label: "Deposit pace",
-    title: "Commuter student deposit pace is slowing",
+    id: "aid-review-delays",
+    topic: "financial_aid",
+    label: "Financial aid delays",
+    title: "Financial aid delays put 38 deposited students at risk",
     severity: "high",
-    summary: "Deposit rate for accepted commuter students declined 6.4% in the last 7 days.",
-    projection: "If this continues, we project 82 fewer deposits by May 31 (~$1.6M in tuition).",
+    summary: "38 deposited students have waited 7+ days for aid review — 2.4× the typical turnaround.",
+    summaryHighlights: [
+      "38 deposited students",
+      "2.4×"
+    ],
+    projection: "The sample model estimates that 8–11 of these 38 students may fail to enroll if delays remain unresolved. Estimated net tuition at risk is $192K–$264K.",
     stats: {
-      glance: "838 commuter deposits · 6.4% slower over 7 days · 82 deposits at risk by May 31",
-      context:
-        "838 of 1,807 commuter admits have deposited · 46.4% against 52.8% a week ago · 312 of the slipping group have an open aid file",
-      deep: "838 commuter deposits · rate 46.4%, down 6.4% in 7 days · 312 of the 494 undeposited carry an open verification",
+      glance: "38 students exposed · 8–11 estimated loss · $192–264K net tuition at risk",
+      context: "38 students exposed · 8–11 estimated loss · $192–264K net tuition at risk",
+      deep: "38 students exposed · 8–11 estimated loss · $192–264K net tuition at risk"
     },
-    context:
-      "Commuter admits deposit earlier than residential ones in a normal cycle, and this year they have stopped. The slowdown began the day Financial Aid's verification queue crossed 250 files, and 312 of the 494 commuter admits without a deposit are sitting in that queue waiting on a package.",
-    deepDive:
-      "The commuter cohort ran 6 points above residential at this point last cycle and is now 9 points below its own last-year figure. The break is not in interest — visit attendance is flat — it is in the aid package: 312 of the 494 undeposited commuter admits have an open verification file, open 19 days at the median.",
-    impactLabel: "Potential Impact",
+    context: "Financial aid review — not student follow-through — is the main remaining barrier for this cohort. If delays persist, roughly 21–29% of exposed students may not enroll.",
+    deepDive: "38 deposited students are waiting more than seven days for aid review. That is 2.4× the normal turnaround, and 29 have finished at least 80% of their other enrollment steps.",
+    impactLabel: "Forecasted impact",
     impact: [
-      { label: "−$1.6M", tone: "negative" },
-      { label: "−82 Enrolled Students", tone: "negative" },
+      {
+        label: "8–11 Estimated Loss",
+        tone: "negative"
+      },
+      {
+        label: "$192–264K Net Tuition At Risk",
+        tone: "negative"
+      }
+    ],
+    forecast: [
+      {
+        label: "Students Exposed",
+        value: "38",
+        tone: "neutral"
+      },
+      {
+        label: "Estimated Loss",
+        value: "8–11",
+        tone: "negative"
+      },
+      {
+        label: "Net Tuition At Risk",
+        value: "$192–264K",
+        tone: "negative"
+      }
     ],
     recommendations: {
-      glance: "Launch targeted outreach to 312 high-probability students with incomplete financial aid.",
-      context:
-        "Launch targeted outreach to the 312 commuter admits with incomplete financial aid, and clear their verification files first.",
-      deep: "Launch targeted outreach to the 312 commuter admits with incomplete financial aid, put the same 312 at the head of the verification queue, and hold the May 31 deadline.",
-    },
-    owner: "Enrollment Management",
-    impactLevel: "High",
-    confidence: 85,
-    destination: "students",
-    cohort: cohortOf(
-      "commuter_no_deposit",
-      "commuter admits without a deposit",
-      ["decision = admit", "residency = commuter", "deposit state != paid"],
-      "Which commuter admits have not posted an enrollment deposit?",
-    ),
-    detail: {
-      narrative: [
-        "838 of 1,807 commuter admits have deposited, a rate of 46.4%. Seven days ago that rate was 52.8%. Nothing about the cohort changed in the week — the aid packages behind it stopped arriving.",
-        "The shape of the shortfall matters more than its size. Commuter interest is intact: visit attendance is flat and inquiry volume is up. What moved is the gap between an admit letter and a package, which is now 19 days at the median.",
-      ],
-      drivers: [
-        {
-          label: "Commuter admits without a deposit",
-          value: "494 students",
-          note: "Of whom 312 carry an open verification file",
-        },
-        {
-          label: "Median days from admit to package",
-          value: "19 days",
-          note: "11 days at the same point in the Fall 2024 cycle",
-        },
-        {
-          label: "Commuter deposit rate",
-          value: "46.4%",
-          note: "52.8% seven days ago; 55.1% at this point last cycle",
-        },
-      ],
-      breakdown: [
-        {
-          code: "commuter_verification_open",
-          title: "Commuter, verification open",
-          students: 312,
-          requirements: 312,
-          overdue: 197,
-        },
-        {
-          code: "commuter_packaged_no_deposit",
-          title: "Commuter, packaged, no deposit",
-          students: 182,
-          requirements: 182,
-          overdue: 0,
-        },
-        {
-          code: "commuter_deposited",
-          title: "Commuter, deposited",
-          students: 838,
-          requirements: 0,
-          overdue: 0,
-        },
-      ],
-      breakdownNote:
-        "The three rows are exclusive and sum to the 1,807 commuter admits less 475 who declined.",
-      actions: [
-        {
-          title: "Call the 312 commuter admits with an open aid file",
-          detail: "Named list, not a broadcast; the message is the package date",
-          owner: "Enrollment Management",
-          due: "This week",
-        },
-        {
-          title: "Move the same 312 to the head of the verification queue",
-          detail: "The queue is the blocker; outreach without it repeats the wait",
-          owner: "Financial Aid",
-          due: "By May 26",
-        },
-        {
-          title: "Hold the May 31 deposit deadline",
-          detail: "An extension moves the date, not the packages",
-          owner: "Vice President for Enrollment Management",
-          due: "This week",
-        },
-      ],
-      students: [
-        {
-          id: "s-1",
-          name: "Sarah Johnson",
-          program: "Nursing, BSN",
-          note: "Commuter · verification open 19 days · no deposit",
-        },
-        {
-          id: "s-2",
-          name: "Michael Chen",
-          program: "Computer Science, BS",
-          note: "Commuter · awaiting an aid package · no deposit",
-        },
-        {
-          id: "s-3",
-          name: "Priya Raman",
-          program: "Business Administration, BBA",
-          note: "Commuter · correction returned to the family, 15 days",
-        },
-      ],
-      studentsNote: "Three of 312 shown. The full cohort opens in the roster.",
-      evidence: [
-        "838 commuter admits hold a posted deposit; 494 do not.",
-        "312 of those 494 have an open federal verification file.",
-        "$19,500 of net tuition per enrolled student, from the Fall 2025 projection.",
-      ],
-    },
-  },
-  {
-    id: "verification-backlog",
-    topic: "financial_aid",
-    label: "Verification backlog",
-    title: "Financial aid verification backlog increasing",
-    severity: "medium",
-    summary: "Verification cases are up 18% vs last week, driving delays in aid packages.",
-    projection: "312 students are at risk of delaying their deposit.",
-    stats: {
-      glance: "324 open files · up 18% in 7 days · 312 students without a deposit behind it",
-      context:
-        "324 open files · 30 cleared a day against 38 arriving · June 6 packaging date needs 43 a day",
-      deep: "324 open files · 197 awaiting documents, 88 awaiting review, 39 in correction · 30 cleared a day against 38 arriving",
-    },
-    context:
-      "The queue is growing because arrivals outrun clearances, not because output fell — Financial Aid cleared 210 files in the last seven days, its best week of the cycle. At 30 a day against 38 arriving, the queue reaches roughly 372 by month end and the June 6 packaging date slips with it.",
-    deepDive:
-      "324 files are open: 197 waiting on documents from the family, 88 waiting on review here, and 39 in correction. Only the middle 88 are inside this office's control, which is why more staff moves the number and more email does not.",
-    impactLabel: "Potential Impact",
-    impact: [{ label: "−36 Enrolled Students", tone: "negative" }],
-    recommendations: {
-      glance: "Add 2 temporary reviewers and prioritize commuter and transfer cases.",
-      context:
-        "Add 2 temporary reviewers through June 6 and work commuter and transfer files first — both cohorts deposit late and melt early.",
-      deep: "Add 2 temporary reviewers through June 6, work the 312 undeposited files ahead of the rest, and report the queue against arrivals rather than against its own size.",
+      glance: "Prioritize these 38 files within 48 hours; contact only students who still have actions to complete.",
+      context: "Prioritize these 38 files within 48 hours; contact only students who still have actions to complete.",
+      deep: "Prioritize these 38 files within 48 hours; contact only students who still have actions to complete."
     },
     owner: "Financial Aid",
     impactLevel: "High",
-    confidence: 75,
-    destination: "tasks",
-    cohort: cohortOf(
-      "verification_open",
-      "students with an open verification file",
-      ["aid state = verification_selected"],
-      "Which students have an open financial aid verification, and what is each waiting on?",
-    ),
+    confidence: 94,
+    destination: "students",
+    cohort: {
+      key: "aid-review-delays",
+      label: "Financial aid delays put 38 deposited students at risk",
+      filter: {},
+      clauses: [
+        "deposit paid",
+        "aid review pending for 7+ days"
+      ],
+      question: "What evidence would confirm this illustrative finding: Financial aid delays put 38 deposited students at risk?"
+    },
     detail: {
       narrative: [
-        "324 verification files are open, against 275 seven days ago. Output did not fall: 210 files were cleared in the same week, the highest of the cycle. Arrivals rose faster.",
-        "36 fewer enrolled students is the cost of the queue holding through June, using the same melt rate the yield projection uses. It is a smaller number than the deposit finding above because most of these students eventually deposit — they deposit late, and late deposits melt.",
+        "Most of the exposed students have satisfied other enrollment requirements. The remaining friction is an institutional processing delay, so reminders alone are unlikely to resolve it."
       ],
-      drivers: [
-        {
-          label: "Files arriving",
-          value: "38 a day",
-          note: "Up from 26 a day two weeks ago",
-        },
-        {
-          label: "Files cleared",
-          value: "30 a day",
-          note: "The highest sustained rate of the cycle",
-        },
-        {
-          label: "Undeposited students in the queue",
-          value: "312 of 324",
-          note: "The queue is almost entirely students who have not yet committed",
-        },
-      ],
-      breakdown: [
-        {
-          code: "awaiting_family",
-          title: "Awaiting documents from the family",
-          students: 197,
-          requirements: 197,
-          overdue: 118,
-        },
-        {
-          code: "awaiting_review",
-          title: "Awaiting review by Financial Aid",
-          students: 88,
-          requirements: 88,
-          overdue: 41,
-        },
-        {
-          code: "in_correction",
-          title: "Correction returned to the family",
-          students: 39,
-          requirements: 39,
-          overdue: 22,
-        },
-      ],
-      breakdownNote: "Rows are exclusive and sum to the 324 open files.",
+      drivers: [],
+      breakdown: [],
+      breakdownNote: null,
       actions: [
         {
-          title: "Fund two temporary reviewers through June 6",
-          detail: "At the observed 15 files a day each, the standing queue clears June 4",
+          title: "Prioritize these 38 files within 48 hours; contact only students who still have actions to complete.",
+          detail: "Prioritize the 38 cases for review within 48 hours. Flag files that need a staff decision first, and contact students only where a student action is still outstanding.",
           owner: "Financial Aid",
-          due: "This week",
-        },
-        {
-          title: "Work commuter and transfer files first",
-          detail: "Both cohorts deposit late and melt at above-average rates",
-          owner: "Financial Aid",
-          due: "From May 21",
-        },
-        {
-          title: "Report the queue against arrivals",
-          detail: "A record clearing week currently reads as a worsening number",
-          owner: "Enrollment Management",
-          due: "Next Monday",
-        },
+          due: "Within 48 hours"
+        }
       ],
-      students: [
-        {
-          id: "s-4",
-          name: "Devon Alvarez",
-          program: "Health Sciences, BS",
-          note: "Selected 22 days ago · tax transcript outstanding",
-        },
-        {
-          id: "s-5",
-          name: "Amara Okafor",
-          program: "Psychology, BA",
-          note: "Documents complete · awaiting review 9 days",
-        },
-      ],
-      studentsNote: "Two of 324 shown. The full queue opens in the Action Center.",
+      students: [],
+      studentsNote: null,
       evidence: [
-        "324 files open today against 275 on May 13.",
-        "210 files cleared in the last seven days, the highest week of the cycle.",
-        "312 of the 324 students in the queue have not paid a deposit.",
+        "Historically, students with aid reviews taking more than seven days enrolled at 68%, compared with 91% for otherwise-similar students resolved within three days. Of these 38 students, 29 have already completed at least 80% of other onboarding requirements."
       ],
-    },
+      sourceNote: "Illustrative sample data for UI review; not real student or institutional records."
+    }
   },
   {
-    id: "transfer-volume",
-    topic: "admissions",
-    label: "Transfer volume",
-    title: "Transfer application volume trending above target",
-    severity: "positive",
-    summary: "Transfer applications are up 14% vs last year and 9% above target pace.",
-    projection: "Strong interest in Business and Health Sciences programs.",
+    id: "course-capacity",
+    topic: "enrollment",
+    label: "Course capacity",
+    title: "Course capacity blocks 32 enrollment-ready students",
+    severity: "high",
+    summary: "96 incoming students are eligible, but only 64 unreserved seats remain in required sections.",
+    summaryHighlights: [
+      "96 incoming students",
+      "64 unreserved seats"
+    ],
+    projection: "The illustrative risk forecast is 7–10 potential enrollment losses and $168K–$240K in net tuition at risk if no viable course option becomes available.",
     stats: {
-      glance: "2,604 transfer applications · 14% ahead of last year · 9% above target pace",
-      context:
-        "2,604 applications against a 2,400 target · Business 812 and Health Sciences 705 · credit evaluations 9 days behind",
-      deep: "2,604 applications, target met May 14 · Business 812 (+21%) and Health Sciences 705 (+18%) · credit evaluations 9 days behind",
+      glance: "32 students exposed · 7–10 estimated loss · $168–240K net tuition at risk",
+      context: "32 students exposed · 7–10 estimated loss · $168–240K net tuition at risk",
+      deep: "32 students exposed · 7–10 estimated loss · $168–240K net tuition at risk"
     },
-    context:
-      "Transfer is the one part of the funnel running ahead, and it is running ahead in the two programs with room to take students. The constraint has moved from volume to throughput: credit evaluations are nine days behind the application date, and a transfer applicant who waits that long for an evaluation is choosing between offers, not waiting for one.",
-    deepDive:
-      "2,604 transfer applications is 320 more than the same day last cycle and 204 above the 2,400 target, with Business up 21% and Health Sciences 18%. At Aster's 42.6% admit and 33.8% yield those 320 are worth roughly 46 enrolled students — but only if the evaluations keep pace.",
-    impactLabel: "Potential Impact",
+    context: "These students cannot complete registration under the current schedule even if they take every required action on time. Roughly 22–31% may be lost without an available registration path.",
+    deepDive: "There are 96 incoming students prepared to take a required first-year course, but only 64 unreserved seats. That leaves 32 students blocked by capacity rather than unfinished student work.",
+    impactLabel: "Forecasted impact",
     impact: [
-      { label: "+$1.2M", tone: "positive" },
-      { label: "+48 Enrolled Students", tone: "positive" },
+      {
+        label: "7–10 Estimated Loss",
+        tone: "negative"
+      },
+      {
+        label: "$168–240K Net Tuition At Risk",
+        tone: "negative"
+      }
+    ],
+    forecast: [
+      {
+        label: "Students Exposed",
+        value: "32",
+        tone: "neutral"
+      },
+      {
+        label: "Estimated Loss",
+        value: "7–10",
+        tone: "negative"
+      },
+      {
+        label: "Net Tuition At Risk",
+        value: "$168–240K",
+        tone: "negative"
+      }
     ],
     recommendations: {
-      glance: "Increase admitted student events for transfer prospects in top feeder schools.",
-      context:
-        "Increase admitted-student events at the five feeder colleges carrying the growth, and add evaluation capacity so offers land inside a week.",
-      deep: "Run two admitted-student evenings at the five feeder colleges before June 15, and add one evaluator through the same date.",
+      glance: "Open course capacity or approve alternate pathways before the registration deadline.",
+      context: "Open course capacity or approve alternate pathways before the registration deadline.",
+      deep: "Open course capacity or approve alternate pathways before the registration deadline."
     },
-    owner: "Admissions",
-    impactLevel: "Medium",
-    confidence: 80,
-    destination: "students",
-    cohort: cohortOf(
-      "transfer_pending",
-      "transfer applicants awaiting a decision",
-      ["applicant type = transfer", "decision = pending"],
-      "Which transfer applicants are waiting on a credit evaluation?",
-    ),
+    owner: "Academic Scheduling",
+    impactLevel: "High",
+    confidence: 91,
+    destination: "academics",
+    cohort: {
+      key: "course-capacity",
+      label: "Course capacity blocks 32 enrollment-ready students",
+      filter: {},
+      clauses: [
+        "registration eligible",
+        "required course has no available seat"
+      ],
+      question: "What evidence would confirm this illustrative finding: Course capacity blocks 32 enrollment-ready students?"
+    },
     detail: {
       narrative: [
-        "2,604 transfer applications, 14% ahead of the same day last cycle and 204 above the round's target. The growth is concentrated: Business and Health Sciences are 58% of the file between them.",
-        "The risk in a positive finding is that it is read as nothing to do. Here there is something to do — evaluations are nine days behind, and a transfer applicant deciding between institutions rarely waits nine days.",
+        "The bottleneck is a seat shortfall rather than student intent or lack of awareness. A generic registration reminder would not create a valid seat."
       ],
-      drivers: [
-        {
-          label: "Applications above target",
-          value: "+204",
-          note: "Target of 2,400 met on May 14",
-        },
-        {
-          label: "Business and Health Sciences",
-          value: "1,517 applications",
-          note: "Up 21% and 18% respectively; both programs have capacity",
-        },
-        {
-          label: "Credit evaluation lag",
-          value: "9 days",
-          note: "4 days at the same point last cycle",
-        },
-      ],
-      breakdown: [
-        {
-          code: "transfer_business",
-          title: "Business",
-          students: 812,
-          requirements: 812,
-          overdue: 214,
-        },
-        {
-          code: "transfer_health",
-          title: "Health Sciences",
-          students: 705,
-          requirements: 705,
-          overdue: 186,
-        },
-        {
-          code: "transfer_other",
-          title: "All other programs",
-          students: 1087,
-          requirements: 1087,
-          overdue: 173,
-        },
-      ],
-      breakdownNote:
-        "\"Overdue\" here is an evaluation past the five-day service target, not a student obligation.",
+      drivers: [],
+      breakdown: [],
+      breakdownNote: null,
       actions: [
         {
-          title: "Two admitted-student evenings at the five feeder colleges",
-          detail: "61% of the growth comes from five colleges within 40 miles",
-          owner: "Admissions",
-          due: "Before June 15",
-        },
-        {
-          title: "Add one credit evaluator through June 15",
-          detail: "Brings the evaluation lag back inside the five-day service target",
-          owner: "Registrar",
-          due: "This week",
-        },
+          title: "Open course capacity or approve alternate pathways before the registration deadline.",
+          detail: "Coordinate with academic scheduling to add seats or approve equivalent sections and alternate course paths ahead of the registration deadline. Avoid sending more generic reminders.",
+          owner: "Academic Scheduling",
+          due: "Before the registration deadline"
+        }
       ],
-      students: [
-        {
-          id: "s-6",
-          name: "Jordan Reyes",
-          program: "Business Administration, BBA",
-          note: "Transfer · 42 credits submitted · evaluation open 11 days",
-        },
-        {
-          id: "s-7",
-          name: "Nia Thompson",
-          program: "Health Sciences, BS",
-          note: "Transfer · evaluation complete · offer released yesterday",
-        },
-      ],
-      studentsNote: "Two of 573 pending evaluations shown.",
+      students: [],
+      studentsNote: null,
       evidence: [
-        "2,604 transfer applications against 2,284 on the same day last cycle.",
-        "1,108 transfer admits released, the largest transfer round Aster has run.",
-        "42.6% admit rate and 33.8% deposit rate on the transfer file this cycle.",
+        "Audentra matched students’ program requirements, completed prerequisites, registration eligibility and available section capacity. The eligible cohort exceeds remaining unreserved seats by 32."
       ],
+      sourceNote: "Illustrative sample data for UI review; not real student or institutional records."
+    }
+  },
+  {
+    id: "deposited-disengagement",
+    topic: "enrollment",
+    label: "Student disengagement",
+    title: "54 deposited students show signs of disengagement",
+    severity: "medium",
+    summary: "54 deposited students have had no portal, event or two-way activity for 10+ days.",
+    summaryHighlights: [
+      "54 deposited students",
+      "10+ days"
+    ],
+    projection: "The illustrative model estimates 9–13 enrollment losses and $216K–$312K in net tuition at risk if disengagement persists.",
+    stats: {
+      glance: "54 students exposed · 9–13 estimated loss · $216–312K net tuition at risk",
+      context: "54 students exposed · 9–13 estimated loss · $216–312K net tuition at risk",
+      deep: "54 students exposed · 9–13 estimated loss · $216–312K net tuition at risk"
     },
+    context: "Prolonged silence surfaces before a formal enrollment failure appears in headline KPIs. The model attributes incremental loss risk of roughly 17–24% to sustained disengagement.",
+    deepDive: "54 deposited students have had no portal activity, event participation or meaningful two-way reply for at least ten days. That pattern can reveal preventable risk before official enrollment totals change.",
+    impactLabel: "Forecasted impact",
+    impact: [
+      {
+        label: "9–13 Estimated Loss",
+        tone: "negative"
+      },
+      {
+        label: "$216–312K Net Tuition At Risk",
+        tone: "negative"
+      }
+    ],
+    forecast: [
+      {
+        label: "Students Exposed",
+        value: "54",
+        tone: "neutral"
+      },
+      {
+        label: "Estimated Loss",
+        value: "9–13",
+        tone: "negative"
+      },
+      {
+        label: "Net Tuition At Risk",
+        value: "$216–312K",
+        tone: "negative"
+      }
+    ],
+    recommendations: {
+      glance: "Launch counselor-led recovery outreach, prioritizing unresolved checklist items and no recent two-way contact.",
+      context: "Launch counselor-led recovery outreach, prioritizing unresolved checklist items and no recent two-way contact.",
+      deep: "Launch counselor-led recovery outreach, prioritizing unresolved checklist items and no recent two-way contact."
+    },
+    owner: "Enrollment Management",
+    impactLevel: "Medium",
+    confidence: 88,
+    destination: "students",
+    cohort: {
+      key: "deposited-disengagement",
+      label: "54 deposited students show signs of disengagement",
+      filter: {},
+      clauses: [
+        "deposit paid",
+        "no portal, event or two-way activity for 10+ days"
+      ],
+      question: "What evidence would confirm this illustrative finding: 54 deposited students show signs of disengagement?"
+    },
+    detail: {
+      narrative: [
+        "The lack of responses, event attendance and portal activity across multiple signals makes disengagement a more useful intervention trigger than a single missed email."
+      ],
+      drivers: [],
+      breakdown: [],
+      breakdownNote: null,
+      actions: [
+        {
+          title: "Launch counselor-led recovery outreach, prioritizing unresolved checklist items and no recent two-way contact.",
+          detail: "Prioritize a counselor-led contact plan for students with unfinished checklist items and no recent two-way engagement. Tailor outreach to the student’s actual obstacle.",
+          owner: "Enrollment Management",
+          due: ""
+        }
+      ],
+      students: [],
+      studentsNote: null,
+      evidence: [
+        "Among otherwise-similar deposited students at the same stage, students with meaningful activity over the past seven days enrolled at 89%, versus 68% among students inactive for ten or more days."
+      ],
+      sourceNote: "Illustrative sample data for UI review; not real student or institutional records."
+    }
   },
   {
     id: "housing-signing-lag",
@@ -1109,6 +995,23 @@ export const DEMO_INSIGHTS: BrewInsight[] = [
     impact: [
       { label: "≈200 late assignments", tone: "negative" },
       { label: "261 beds held unnecessarily", tone: "neutral" },
+    ],
+    forecast: [
+      {
+        label: "Signed Contracts",
+        value: "1,180",
+        tone: "neutral"
+      },
+      {
+        label: "Late Assignments",
+        value: "≈200",
+        tone: "negative"
+      },
+      {
+        label: "Beds Held Unnecessarily",
+        value: "261",
+        tone: "neutral"
+      }
     ],
     recommendations: {
       glance: "Ask the 261 commuter admits to confirm housing intent before holding beds for them.",
@@ -1225,6 +1128,23 @@ export const DEMO_INSIGHTS: BrewInsight[] = [
       { label: "−54 Enrolled Students", tone: "negative" },
       { label: "44 places to rebalance", tone: "neutral" },
     ],
+    forecast: [
+      {
+        label: "Registered Students",
+        value: "1,504",
+        tone: "neutral"
+      },
+      {
+        label: "Enrolled Students",
+        value: "−54",
+        tone: "negative"
+      },
+      {
+        label: "Places To Rebalance",
+        value: "44",
+        tone: "neutral"
+      }
+    ],
     recommendations: {
       glance: "Rebalance Session 3 into Session 6 and contact the 946 unregistered deposits.",
       context:
@@ -1340,6 +1260,23 @@ export const DEMO_INSIGHTS: BrewInsight[] = [
     impact: [
       { label: "−$2.1M", tone: "negative" },
       { label: "+1.9pp discount rate", tone: "negative" },
+    ],
+    forecast: [
+      {
+        label: "Average Discount",
+        value: "46.4%",
+        tone: "neutral"
+      },
+      {
+        label: "Tuition Impact",
+        value: "−$2.1M",
+        tone: "negative"
+      },
+      {
+        label: "Discount Rate Variance",
+        value: "+1.9pp",
+        tone: "negative"
+      }
     ],
     recommendations: {
       glance: "Adjust the top two merit bands on the 720 packages still to release.",

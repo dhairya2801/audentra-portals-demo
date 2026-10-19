@@ -7,6 +7,7 @@ import { KpiGoal, TrendChart, TrendKey } from "./pulse";
 import { movementLabel, movementTone } from "./presentation";
 import { useState } from "react";
 import styles from "./intelligence-detail.module.css";
+import { ForecastFigures, InsightSummary } from "./cards";
 
 import { topicById } from "./catalog";
 import { formatBrewNumber } from "./data";
@@ -283,14 +284,32 @@ export function MorningBrewDetail({
         footer={<footer className={styles.footer}>{openWorkspace(insight.destination)}</footer>}
       >
         <section className={styles.overview} aria-label="Overview">
-          <p className="brew-detail__lede">{insight.summary}</p>
+          <p className="brew-detail__lede"><InsightSummary insight={insight} /></p>
 
+          {insight.detail.sourceNote ? <h2>What Audentra found</h2> : null}
           {insight.detail.narrative.map((paragraph) => (
             <p className="brew-detail__paragraph" key={paragraph.slice(0, 32)}>
               {paragraph}
             </p>
           ))}
         </section>
+
+        <section className={`brew-detail__section ${styles.related} ${styles.forecast}`}>
+          <h2>Forecasted impact</h2>
+          <ForecastFigures insight={insight} />
+          <p className="brew-detail__paragraph">{insight.projection}</p>
+        </section>
+
+        {insight.detail.sourceNote ? <>
+          <section className="brew-detail__section">
+            <h2>Why it matters</h2>
+            <p className="brew-detail__paragraph">{insight.context}</p>
+          </section>
+          <section className="brew-detail__section">
+            <h2>Evidence behind the signal</h2>
+            {insight.detail.evidence.map((evidence) => <p className="brew-detail__paragraph" key={evidence}>{evidence}</p>)}
+          </section>
+        </> : null}
 
         {insight.detail.drivers.length ? (
           <section className={`brew-detail__section ${styles.related}`}>
@@ -356,7 +375,7 @@ export function MorningBrewDetail({
 
         {insight.detail.actions.length ? (
           <section className={`brew-detail__section ${styles.nextSteps}`}>
-            <h2>What to do next</h2>
+            <h2>Recommended next move</h2>
             <ol className="brew-action-list">
               {insight.detail.actions.map((action) => (
                 <li key={action.title}>
@@ -365,7 +384,7 @@ export function MorningBrewDetail({
                     {action.detail ? <p>{action.detail}</p> : null}
                   </div>
                   <span>
-                    {action.owner} · {action.due}
+                    {action.owner}{action.due ? ` · ${action.due}` : ""}
                   </span>
                 </li>
               ))}
@@ -373,7 +392,9 @@ export function MorningBrewDetail({
           </section>
         ) : null}
 
-        <CohortEvidence cohort={insight.cohort} onAskEdward={onAskEdward} />
+        {insight.detail.sourceNote ? (
+          <p className={`brew-detail__note ${styles.sourceNote}`}>{insight.detail.sourceNote}</p>
+        ) : <CohortEvidence cohort={insight.cohort} onAskEdward={onAskEdward} />}
       </DetailShell>
     );
   }

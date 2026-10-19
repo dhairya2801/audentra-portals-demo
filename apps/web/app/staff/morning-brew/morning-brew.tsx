@@ -381,21 +381,7 @@ export function MorningBrewView({
         canManageTeam={Boolean(team?.canManage)}
         saving={savingTeam}
         teamNotice={
-          <div className="brew-team-notice" role="status">
-            {team ? (
-              <>
-                <strong>Team setting · {team.team}</strong>
-                <span>
-                  {team.canManage
-                    ? "Changing this switch applies to everyone on your team when you save."
-                    : "Your team administrator controls visibility. Your reading depth remains personal."}
-                </span>
-              </>
-            ) : (
-              "Loading your team setting…"
-            )}
-            {teamError ? <p role="alert">{teamError}</p> : null}
-          </div>
+          teamError ? <div className="brew-team-notice" role="alert">{teamError}</div> : null
         }
         onComplete={() => void complete()}
         onCancel={saved ? cancel : undefined}

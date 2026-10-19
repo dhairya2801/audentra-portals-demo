@@ -237,18 +237,31 @@ test("the brief always prints three findings, chosen by what the reader follows"
   }
 });
 
-test("a finding's impact figures are the arithmetic of the sentence above them", async () => {
+test("reference findings preserve supplied forecast ranges and do not reuse unrelated student records", async () => {
   const source = await brew();
-  const finding = source.insights.find((insight) => insight.id === "commuter-deposit-pace");
-  // "82 fewer deposits ... (~$1.6M in tuition)" and the chips under it have to
-  // be the same claim. $19,500 of net tuition per enrolled student is the one
-  // conversion the whole brief uses.
-  assert.match(finding.projection, /82 fewer deposits/);
-  assert.match(finding.projection, /\$1\.6M/);
-  const labels = finding.impact.map((chip) => chip.label);
-  assert.ok(labels.includes("−$1.6M"), `impact chips were ${labels.join(", ")}`);
-  assert.ok(labels.includes("−82 Enrolled Students"));
-  assert.equal(Math.round((82 * 19500) / 100000) / 10, 1.6, "82 students is $1.6M at $19.5K each");
+  const expected = [
+    ["aid-review-delays", "38", "8–11", "$192–264K", 94],
+    ["course-capacity", "32", "7–10", "$168–240K", 91],
+    ["deposited-disengagement", "54", "9–13", "$216–312K", 88],
+  ];
+  for (const [id, exposed, loss, tuition, confidence] of expected) {
+    const finding = source.insights.find((insight) => insight.id === id);
+    assert.deepEqual(finding.forecast.map((figure) => figure.value), [exposed, loss, tuition]);
+    assert.equal(finding.confidence, confidence);
+    assert.match(finding.projection, new RegExp(loss));
+    assert.match(finding.context, /may|risk/);
+    assert.deepEqual(finding.detail.students, [], "reference scenarios must not inherit the old cohort's names");
+    assert.deepEqual(finding.detail.breakdown, [], "reference scenarios must not inherit the old cohort's counts");
+    assert.match(finding.detail.sourceNote, /Illustrative sample data/);
+    assert.equal(finding.recommendations.glance, finding.recommendations.context);
+    assert.equal(finding.recommendations.context, finding.recommendations.deep);
+  }
+  for (const finding of source.insights) {
+    assert.equal(finding.forecast.length, 3, `${finding.id} needs three supplied figures`);
+    assert.equal(finding.forecast.slice(1).length, 2);
+    assert.equal(new Set(finding.forecast.map((figure) => figure.label)).size, 3);
+    for (const figure of finding.forecast) assert.match(figure.value, /\d/);
+  }
 });
 
 test("topics only ever subtract from the countable bands", async () => {

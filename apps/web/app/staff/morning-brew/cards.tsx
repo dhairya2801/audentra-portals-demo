@@ -64,6 +64,33 @@ export function Attendees({ names }: { names: string[] }) {
   );
 }
 
+/** Both card and popup repeat the supplied figures without parsing prose. */
+export function ForecastFigures({ insight, level = "context" }: {
+  insight: BrewInsight;
+  level?: BrewDetailLevelId;
+}) {
+  const figures = level === "glance" ? insight.forecast.slice(1) : insight.forecast;
+  return <dl className={styles.figures}>
+    {figures.map((figure) => <div key={figure.label} data-tone={figure.tone}>
+      <dt>{figure.label}</dt><dd>{figure.value}</dd>
+    </div>)}
+  </dl>;
+}
+
+/** Preserve the reference's emphasis without injecting HTML into the page. */
+export function InsightSummary({ insight }: { insight: BrewInsight }) {
+  let cursor = 0;
+  const parts = [];
+  for (const phrase of insight.summaryHighlights ?? []) {
+    const start = insight.summary.indexOf(phrase, cursor);
+    if (start < 0) continue;
+    const before = insight.summary.slice(cursor, start);
+    cursor = start + phrase.length;
+    parts.push(before, <strong key={start}>{phrase}</strong>);
+  }
+  return <>{parts}{insight.summary.slice(cursor)}</>;
+}
+
 export function IntelligenceCard({
   insight,
   level,
@@ -82,16 +109,6 @@ export function IntelligenceCard({
   const whyId = useId();
   const evidenceId = useId();
   const topic = topicById(insight.topic);
-  // Reformat the supplied figures only; do not infer new forecasts or exposure.
-  const splitFigure = (label: string) => {
-    const match = label.match(/^([+−≈-]?\$?[\d,.]+(?:[MK%]|pp)?)(?:\s+(.+))?$/);
-    const heading = match?.[2] ?? (label.includes("$") ? "Tuition Impact" : "Projected Impact");
-    return {
-      value: match?.[1] ?? label,
-      label: heading.replace(/\b[a-z]/g, (letter) => letter.toUpperCase()),
-    };
-  };
-  const signal = splitFigure(insight.stats.glance.split(" · ")[0]);
 
   return (
     <article
@@ -111,48 +128,39 @@ export function IntelligenceCard({
       <h3 className={styles.title}>
         <button className="brew-stretch" type="button" onClick={onOpen}>{insight.title}</button>
       </h3>
-      <p className={styles.summary}>{insight.summary}</p>
+      <p className={styles.summary}><InsightSummary insight={insight} /></p>
 
       <div className={styles.forecast}>
         <div className={styles.forecastHead}>
           <span>Forecasted impact</span>
-          {level !== "glance" ? (
-            <div
-              className={styles.whyWrap}
-              onMouseEnter={() => setShowWhy(true)}
-              onMouseLeave={(event) => {
-                if (!event.currentTarget.contains(document.activeElement)) setShowWhy(false);
-              }}
-              onFocus={() => setShowWhy(true)}
-              onBlur={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget)) setShowWhy(false);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  event.stopPropagation();
-                  setShowWhy(false);
-                }
-              }}
-            >
-              <button type="button" className={styles.disclosure} aria-expanded={showWhy}
-                aria-describedby={whyId} onClick={() => setShowWhy(true)}>
-                <span aria-hidden="true">ⓘ</span> Why it matters
-              </button>
-              <div className={styles.whyTooltip} id={whyId} role="tooltip" hidden={!showWhy}>
-                <strong>Why it matters</strong>
-                <p>{insight.projection}</p>
-                <p>{insight.context}</p>
-              </div>
+          <div
+            className={styles.whyWrap}
+            onMouseEnter={() => setShowWhy(true)}
+            onMouseLeave={(event) => {
+              if (!event.currentTarget.contains(document.activeElement)) setShowWhy(false);
+            }}
+            onFocus={() => setShowWhy(true)}
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setShowWhy(false);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.stopPropagation();
+                setShowWhy(false);
+              }
+            }}
+          >
+            <button type="button" className={styles.disclosure} aria-expanded={showWhy}
+              aria-describedby={whyId} onClick={() => setShowWhy(true)}>
+              <span aria-hidden="true">ⓘ</span> Why it matters
+            </button>
+            <div className={styles.whyTooltip} id={whyId} role="tooltip" hidden={!showWhy}>
+              <strong>Why it matters</strong>
+              <p>{insight.context}</p>
             </div>
-          ) : <span className={styles.impactLevel}>{insight.impactLevel} impact</span>}
+          </div>
         </div>
-        <dl className={styles.figures}>
-          {level !== "glance" ? <div><dt>{signal.label}</dt><dd>{signal.value}</dd></div> : null}
-          {insight.impact.map((chip) => {
-            const figure = splitFigure(chip.label);
-            return <div key={chip.label} data-tone={chip.tone}><dt>{figure.label}</dt><dd>{figure.value}</dd></div>;
-          })}
-        </dl>
+        <ForecastFigures insight={insight} level={level} />
       </div>
 
       <div className={styles.recommendation}>
@@ -181,9 +189,8 @@ export function IntelligenceCard({
         </button>
       </footer>
       {showEvidence ? <div className={styles.evidence} id={evidenceId}>
-        <strong>Underlying signal · {topic?.title ?? insight.label}</strong>
-        <p>{insight.context}</p>
-        {insight.detail.evidence.length ? <ul>{insight.detail.evidence.map((item) => <li key={item}>{item}</li>)}</ul> : null}
+        <strong>Underlying signal</strong>
+        {insight.detail.evidence.map((item) => <p key={item}>{item}</p>)}
       </div> : null}
     </article>
   );

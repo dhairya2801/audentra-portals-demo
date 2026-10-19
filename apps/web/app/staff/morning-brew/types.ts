@@ -144,6 +144,12 @@ export interface BrewImpactChip {
   tone: "negative" | "positive" | "neutral";
 }
 
+export interface BrewForecastFigure {
+  label: string;
+  value: string;
+  tone: "negative" | "positive" | "neutral";
+}
+
 export interface BrewInsightAction {
   title: string;
   detail: string;
@@ -171,25 +177,28 @@ export interface BrewInsight {
    * should walk away having read the same claim, not two different ones.
    */
   summary: string;
+  /** Exact phrases emphasized in the approved copy, rendered as text, never HTML. */
+  summaryHighlights?: string[];
   /**
-   * The consequence of the finding if nothing changes — the second paragraph
-   * on the card, under the summary.
+   * The supplied forecast explanation, shown alongside the figures in the popup.
    */
   projection: string;
   /** The figures under the headline. Each depth names a different set. */
   stats: Record<BrewDetailLevelId, string>;
-  /** The paragraph that arrives at "With Context". */
+  /** Why the forecast matters, available as a tooltip at every depth. */
   context: string;
   /** The longer reading that replaces it at "Deep Dive". */
   deepDive: string;
   impactLabel: string;
   impact: BrewImpactChip[];
+  /** Current exposure/signal, then two forecast outcomes. Glance shows the outcomes. */
+  forecast: [BrewForecastFigure, BrewForecastFigure, BrewForecastFigure];
   /** What to do about it, stated at the depth the reader asked for. */
   recommendations: Record<BrewDetailLevelId, string>;
   /** The office the recommendation is addressed to. */
   owner: string;
   impactLevel: "High" | "Medium" | "Low";
-  /** How firm the reading is, as a whole percent. Printed in the card's foot. */
+  /** How firm the reading is, as a whole percent. Shown in the card's header. */
   confidence: number;
   destination: MorningBrewDestination;
   cohort: StaffBrewCohortRef;
@@ -208,6 +217,8 @@ export interface BrewInsight {
     students: BrewInsightStudent[];
     studentsNote: string | null;
     evidence: string[];
+    /** Identifies illustrative source material instead of claiming a counted roster. */
+    sourceNote?: string;
   };
 }
 
