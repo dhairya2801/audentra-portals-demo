@@ -48,12 +48,36 @@ const referenceStories = [
     "confidence": 88
   }
 ];
-const sizes = [390, 820, 1440, 2560];
+const sizes = [390, 820, 1024, 1280, 1440, 1920, 2560];
 const levels = ['glance', 'context', 'deep'];
 const cards = () => page.locator('.brew-insights .brew-insight');
 const dialog = () => page.locator('.brew-detail--intelligence');
 const noOverflow = async locator => {
   expect(await locator.evaluateAll(nodes => nodes.filter(node => node.scrollWidth > node.clientWidth + 2).map(node => node.className))).toEqual([]);
+};
+const alignedSections = async locator => {
+  const misaligned = await locator.evaluateAll(nodes => {
+    const rows = new Map();
+    for (const card of nodes) {
+      const top = Math.round(card.getBoundingClientRect().top);
+      const row = rows.get(top) ?? [];
+      row.push(card);
+      rows.set(top, row);
+    }
+    const failures = [];
+    for (const row of rows.values()) {
+      if (row.length < 2) continue;
+      for (const selector of [':scope > h3', ':scope > p', ':scope > div:has(> dl)', ':scope > div:has(> small)', ':scope > div > footer']) {
+        const bounds = row.map(card => card.querySelector(selector)?.getBoundingClientRect()).filter(Boolean);
+        for (const edge of ['top', 'bottom']) {
+          if (Math.max(...bounds.map(rect => rect[edge])) - Math.min(...bounds.map(rect => rect[edge])) > 1)
+            failures.push(`${selector}: ${edge}`);
+        }
+      }
+    }
+    return failures;
+  });
+  expect(misaligned).toEqual([]);
 };
 
 try {
@@ -76,6 +100,7 @@ try {
       await page.setViewportSize({ width, height: 1100 });
       await noOverflow(page.locator('.brew-sample--intelligence .brew-insight'));
       await noOverflow(page.locator('.brew-preview .brew-insight'));
+      await alignedSections(page.locator('.brew-preview .brew-insight'));
     }
     if (level === 'context') {
       await options.screenshot({ path: `${output}/onboarding-options.png` });
@@ -101,6 +126,7 @@ try {
     for (const width of sizes) {
       await page.setViewportSize({ width, height: 1100 });
       await noOverflow(cards());
+      await alignedSections(cards());
       await noOverflow(cards().locator('dd'));
       expect(await cards().locator('dd').evaluateAll(nodes => nodes.every(node =>
         node.getBoundingClientRect().height <= parseFloat(getComputedStyle(node).lineHeight) + 1
@@ -153,7 +179,7 @@ try {
       await page.keyboard.press('Escape');
       await page.setViewportSize({ width: 1440, height: 1100 });
     }
-    console.log(`PASS ${level}: live preview, four viewport sizes, evidence and context disclosures`);
+    console.log(`PASS ${level}: aligned sections, live preview, ${sizes.length} viewport sizes, evidence and context disclosures`);
   }
 
   // E controls have their own hit target; hover and keyboard focus match the reference lift and darker purple.

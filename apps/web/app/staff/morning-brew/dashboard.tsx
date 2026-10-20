@@ -16,6 +16,7 @@ import {
 import { briefEmailCategory, briefEmailCounts } from "./presentation";
 import { LiveNews } from "./live-news";
 import { InstitutionalPulse } from "./pulse";
+import intelligenceStyles from "./intelligence.module.css";
 import type {
   BrewBriefing,
   BrewDetailLevelId,
@@ -569,7 +570,7 @@ export function MorningBrewDashboard({
             </h2>
           </header>
 
-          <div className="brew-insight-grid">
+          <div className={`brew-insight-grid ${intelligenceStyles.grid}`}>
             {briefing.insights.map((insight) => (
               <IntelligenceCard
                 key={insight.id}

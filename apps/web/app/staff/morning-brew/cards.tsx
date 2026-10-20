@@ -179,19 +179,21 @@ export function IntelligenceCard({
         </ul> : null}
       </div> : null}
 
-      <footer className={styles.footer}>
-        <button type="button" className={styles.evidenceToggle} aria-expanded={showEvidence}
-          aria-controls={evidenceId} onClick={() => setShowEvidence(!showEvidence)}>
-          Why am I seeing this? <span aria-hidden="true">{showEvidence ? "⌃" : "⌄"}</span>
-        </button>
-        <button className="brew-link" type="button" onClick={onOpen}>
-          View details <Glyph name="arrow" size={13} />
-        </button>
-      </footer>
-      {showEvidence ? <div className={styles.evidence} id={evidenceId}>
-        <strong>Underlying signal</strong>
-        {insight.detail.evidence.map((item) => <p key={item}>{item}</p>)}
-      </div> : null}
+      <div className={styles.ending}>
+        <footer className={styles.footer}>
+          <button type="button" className={styles.evidenceToggle} aria-expanded={showEvidence}
+            aria-controls={evidenceId} onClick={() => setShowEvidence(!showEvidence)}>
+            Why am I seeing this? <span aria-hidden="true">{showEvidence ? "⌃" : "⌄"}</span>
+          </button>
+          <button className="brew-link" type="button" onClick={onOpen}>
+            View details <Glyph name="arrow" size={13} />
+          </button>
+        </footer>
+        {showEvidence ? <div className={styles.evidence} id={evidenceId}>
+          <strong>Underlying signal</strong>
+          {insight.detail.evidence.map((item) => <p key={item}>{item}</p>)}
+        </div> : null}
+      </div>
     </article>
   );
 }
